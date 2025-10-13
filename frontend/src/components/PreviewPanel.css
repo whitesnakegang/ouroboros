@@ -1,0 +1,42 @@
+.preview-panel-content {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  color: white;
+}
+
+.preview-header {
+  padding: 1rem;
+  border-bottom: 1px solid #37474f;
+}
+
+.preview-header h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.preview-body {
+  flex: 1;
+  overflow: auto;
+  padding: 1rem;
+}
+
+.preview-json {
+  font-family: 'Courier New', monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #a5d6a7;
+  margin: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.preview-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #78909c;
+  font-style: italic;
+}

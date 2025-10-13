@@ -1,0 +1,116 @@
+.endpoint-editor {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.editor-header {
+  padding: 1rem;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #fafafa;
+}
+
+.editor-header h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.editor-content {
+  flex: 1;
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #333;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  border-color: #3498db;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+.responses-section {
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 1rem;
+  background: #f8f9fa;
+}
+
+.status-response-item {
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.status-response-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+  gap: 1rem;
+}
+
+.status-code-selector {
+  flex: 1;
+}
+
+.status-code-selector label {
+  font-size: 0.875rem;
+  margin-bottom: 0.25rem;
+  color: #666;
+}
+
+.status-code-selector select {
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+
+.custom-status-input {
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+.response-type-selector {
+  margin-bottom: 1rem;
+}
+
+.response-type-selector label {
+  font-size: 0.875rem;
+  margin-bottom: 0.25rem;
+  color: #666;
+}
+
+.response-fields {
+  margin-top: 1rem;
+}
+
+.response-fields label {
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+  color: #666;
+}

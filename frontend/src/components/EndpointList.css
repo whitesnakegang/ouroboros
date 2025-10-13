@@ -1,0 +1,91 @@
+.endpoint-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.endpoint-list-empty {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: #999;
+  font-size: 0.9rem;
+}
+
+.endpoint-item {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #e0e0e0;
+  cursor: pointer;
+  transition: background 0.2s;
+  position: relative;
+}
+
+.endpoint-item:hover {
+  background: #f8f9fa;
+}
+
+.endpoint-item.selected {
+  background: #e3f2fd;
+  border-left: 3px solid #2196f3;
+}
+
+.endpoint-item-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.endpoint-method {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 3px;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  min-width: 60px;
+  text-align: center;
+}
+
+.endpoint-path {
+  font-family: 'Courier New', monospace;
+  font-size: 0.875rem;
+  font-weight: 500;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.endpoint-item-description {
+  font-size: 0.8rem;
+  color: #666;
+  margin-left: 68px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.endpoint-delete {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #e74c3c;
+  color: white;
+  font-size: 1.25rem;
+  line-height: 1;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.endpoint-item:hover .endpoint-delete {
+  display: flex;
+}
+
+.endpoint-delete:hover {
+  background: #c0392b;
+  transform: scale(1.1);
+}

@@ -1,0 +1,218 @@
+endpoints:
+- path: "/api/users/{user_id}"
+  method: GET
+  description: 유저정보 가져오기
+  requiresAuth: true
+  authType: bearer
+  authHeader: null
+  request:
+    type: none
+    contentType: json
+    fields: []
+  responses:
+  - statusCode: 200
+    response:
+      type: object
+      fields:
+      - name: name
+        type: faker
+        fakerType: name.fullName
+        required: null
+        defaultValue: null
+        fields: null
+        arrayItemType: null
+      - name: email
+        type: faker
+        fakerType: internet.emailAddress
+        required: null
+        defaultValue: null
+        fields: null
+        arrayItemType: null
+      arrayItemType: null
+  - statusCode: 400
+    response:
+      type: object
+      fields:
+      - name: error
+        type: string
+        fakerType: null
+        required: null
+        defaultValue: Bad Request
+        fields: null
+        arrayItemType: null
+      - name: message
+        type: string
+        fakerType: null
+        required: null
+        defaultValue: Invalid request parameters
+        fields: null
+        arrayItemType: null
+      arrayItemType: null
+  - statusCode: 401
+    response:
+      type: object
+      fields:
+      - name: error
+        type: string
+        fakerType: null
+        required: null
+        defaultValue: Unauthorized
+        fields: null
+        arrayItemType: null
+      - name: message
+        type: string
+        fakerType: null
+        required: null
+        defaultValue: Authentication required
+        fields: null
+        arrayItemType: null
+      arrayItemType: null
+  - statusCode: 403
+    response:
+      type: object
+      fields:
+      - name: error
+        type: string
+        fakerType: null
+        required: null
+        defaultValue: Forbidden
+        fields: null
+        arrayItemType: null
+      - name: message
+        type: string
+        fakerType: null
+        required: null
+        defaultValue: Insufficient permissions
+        fields: null
+        arrayItemType: null
+      arrayItemType: null
+- path: "/api/users/{user_id}"
+  method: PUT
+  description: 유저 정보 수정
+  requiresAuth: true
+  authType: null
+  authHeader: null
+  request:
+    type: body
+    contentType: json
+    fields:
+    - name: name
+      type: faker
+      fakerType: name.fullName
+      required: false
+      defaultValue: null
+      fields: null
+      arrayItemType: null
+    - name: email
+      type: faker
+      fakerType: internet.emailAddress
+      required: true
+      defaultValue: null
+      fields: null
+      arrayItemType: null
+  responses:
+  - statusCode: 200
+    response:
+      type: array
+      fields:
+      - name: name
+        type: string
+        fakerType: null
+        required: null
+        defaultValue: null
+        fields: null
+        arrayItemType: null
+      arrayItemType:
+        name: null
+        type: object
+        fakerType: null
+        required: null
+        defaultValue: null
+        fields:
+        - name: name
+          type: faker
+          fakerType: name.fullName
+          required: null
+          defaultValue: null
+          fields: null
+          arrayItemType: null
+        - name: email
+          type: faker
+          fakerType: internet.emailAddress
+          required: null
+          defaultValue: null
+          fields: null
+          arrayItemType: null
+        arrayItemType: null
+  - statusCode: 400
+    response:
+      type: object
+      fields:
+      - name: error
+        type: string
+        fakerType: null
+        required: null
+        defaultValue: Bad Request
+        fields: null
+        arrayItemType: null
+      - name: message
+        type: string
+        fakerType: null
+        required: null
+        defaultValue: Invalid request parameters
+        fields: null
+        arrayItemType: null
+      arrayItemType: null
+- path: /api/users
+  method: GET
+  description: New endpoint
+  requiresAuth: true
+  authType: null
+  authHeader: null
+  request: null
+  responses:
+  - statusCode: 200
+    response:
+      type: array
+      fields: []
+      arrayItemType:
+        name: null
+        type: object
+        fakerType: null
+        required: null
+        defaultValue: null
+        fields:
+        - name: name
+          type: faker
+          fakerType: name.fullName
+          required: null
+          defaultValue: null
+          fields: null
+          arrayItemType: null
+        - name: email
+          type: faker
+          fakerType: internet.emailAddress
+          required: null
+          defaultValue: null
+          fields: null
+          arrayItemType: null
+        arrayItemType: null
+  - statusCode: 403
+    response:
+      type: object
+      fields:
+      - name: error
+        type: string
+        fakerType: null
+        required: null
+        defaultValue: Forbidden
+        fields: null
+        arrayItemType: null
+      - name: message
+        type: string
+        fakerType: null
+        required: null
+        defaultValue: Insufficient permissions
+        fields: null
+        arrayItemType: null
+      arrayItemType: null
