@@ -1,0 +1,114 @@
+name: Notify Mattermost (PR & Issues with Title + Description)
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+  issues:
+    types: [opened, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure jq exists
+        run: |
+          if ! command -v jq >/dev/null 2>&1; then
+            sudo apt-get update -y && sudo apt-get install -y jq
+          fi
+
+      # ===== PR 알림 =====
+      - name: Build message for PR events
+        if: github.event_name == 'pull_request'
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_USER: ${{ github.event.pull_request.user.login }}
+          ACTION: ${{ github.event.action }}
+          BASE: ${{ github.event.pull_request.base.ref }}
+          HEAD: ${{ github.event.pull_request.head.ref }}
+        run: |
+          DESC="${PR_BODY:-내용 없음}"
+
+          jq -n \
+            --arg username "GitHub Bot" \
+            --arg icon "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" \
+            --arg text "**Pull Request** #${PR_NUMBER}" \
+            --arg title "${PR_TITLE}" \
+            --arg link "${PR_URL}" \
+            --arg desc "${DESC}" \
+            --arg user "${PR_USER}" \
+            --arg action "${ACTION}" \
+            --arg base "${BASE}" \
+            --arg head "${HEAD}" \
+            '{
+              username: $username,
+              icon_url: $icon,
+              text: $text,
+              attachments: [
+                {
+                  title: $title,
+                  title_link: $link,
+                  text: ("**Description**\n"+$desc+"\n\n---\n\n**작성자:** "+$user+"\n**상태:** "+$action+"\n**브랜치:** "+$base+" → "+$head)
+                }
+              ]
+            }' > msg.json
+
+      # ===== 이슈 알림 =====
+      - name: Build message for Issue events
+        if: github.event_name == 'issues'
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_USER: ${{ github.event.issue.user.login }}
+          ACTION: ${{ github.event.action }}
+        run: |
+          DESC="${ISSUE_BODY:-내용 없음}"
+
+          jq -n \
+            --arg username "GitHub Bot" \
+            --arg icon "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" \
+            --arg text "**Issue** #${ISSUE_NUMBER}" \
+            --arg title "${ISSUE_TITLE}" \
+            --arg link "${ISSUE_URL}" \
+            --arg desc "${DESC}" \
+            --arg user "${ISSUE_USER}" \
+            --arg action "${ACTION}" \
+            '{
+              username: $username,
+              icon_url: $icon,
+              text: $text,
+              attachments: [
+                {
+                  title: $title,
+                  title_link: $link,
+                  text: ("**Description**\n"+$desc+"\n\n---\n\n**작성자:** "+$user+"\n**상태:** "+$action)
+                }
+              ]
+            }' > msg.json
+
+      - name: Validate secret availability
+        id: guard
+        run: |
+          if [ -z "${{ secrets.MATTERMOST_WEBHOOK_URL }}" ]; then
+            echo "Missing secret MATTERMOST_WEBHOOK_URL"
+            echo "has_secret=false" >> $GITHUB_OUTPUT
+            exit 0
+          else
+            echo "has_secret=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send to Mattermost
+        if: steps.guard.outputs.has_secret == 'true'
+        run: |
+          curl -sS -X POST -H "Content-Type: application/json" \
+            -d @msg.json "${{ secrets.MATTERMOST_WEBHOOK_URL }}"
