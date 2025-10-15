@@ -18,11 +18,23 @@ public class ApiYamlParser {
     private final ObjectMapper yamlMapper;
     private final PathMatchingResourcePatternResolver resourceResolver;
 
+    /**
+     * Create a parser configured to read API definitions from YAML resources.
+     *
+     * Initializes a YAML-capable Jackson ObjectMapper and a PathMatchingResourcePatternResolver
+     * for locating YAML resources by path patterns.
+     */
     public ApiYamlParser() {
         this.yamlMapper = new ObjectMapper(new YAMLFactory());
         this.resourceResolver = new PathMatchingResourcePatternResolver();
     }
 
+    /**
+     * Loads an API definition from the given YAML resource path and returns its deserialized ApiDefinition.
+     *
+     * @param resourcePath the resource location or pattern to resolve the YAML file
+     * @return the deserialized ApiDefinition, or an empty ApiDefinition whose endpoints list is initialized when the resource is missing or cannot be parsed
+     */
     public ApiDefinition parseApiYaml(String resourcePath) {
         try {
             Resource resource = resourceResolver.getResource(resourcePath);
@@ -42,6 +54,11 @@ public class ApiYamlParser {
         }
     }
 
+    /**
+     * Create an ApiDefinition with its endpoints list initialized.
+     *
+     * @return an ApiDefinition whose endpoints list is initialized to an empty ArrayList
+     */
     private ApiDefinition createEmptyApiDefinition() {
         ApiDefinition definition = new ApiDefinition();
         definition.setEndpoints(new java.util.ArrayList<>());

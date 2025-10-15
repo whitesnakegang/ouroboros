@@ -22,6 +22,12 @@ public class DynamicEndpointRegistrar {
     private final DummyDataGenerator dummyDataGenerator;
     private final DynamicEndpointController dynamicEndpointController;
 
+    /**
+     * Registers dynamic API endpoints defined in classpath:api.yml during application startup.
+     *
+     * <p>Parses the API YAML, registers each discovered endpoint with the application's handler mapping,
+     * and logs the result. If no endpoints are present, logs an informational message and returns.
+     */
     @PostConstruct
     public void registerEndpoints() {
         try {
@@ -42,6 +48,17 @@ public class DynamicEndpointRegistrar {
         }
     }
 
+    /**
+     * Registers a single dynamic HTTP endpoint described by the provided Endpoint object with Spring's
+     * RequestMappingHandlerMapping and stores its metadata in the DynamicEndpointController.
+     *
+     * <p>The mapping is created for the endpoint's path and HTTP method and bound to
+     * DynamicEndpointController.handleRequest(HttpServletRequest). The endpoint metadata is stored
+     * under the key `path:METHOD` (method uppercased). Failures during registration are caught and
+     * logged.
+     *
+     * @param endpoint the endpoint definition containing the path and HTTP method to register
+     */
     private void registerEndpoint(Endpoint endpoint) {
         try {
             RequestMethod requestMethod = RequestMethod.valueOf(endpoint.getMethod().toUpperCase());

@@ -14,6 +14,12 @@ public class DemoApiGenProperties {
 
     private List<DefaultStatusResponse> defaultResponses = createDefaultResponses();
 
+    /**
+     * Create a list of default HTTP status responses.
+     *
+     * @return a list of DefaultStatusResponse containing entries for 200 (Success), 400 (Bad Request),
+     *         401 (Unauthorized), 404 (Not Found), and 500 (Server Error)
+     */
     private static List<DefaultStatusResponse> createDefaultResponses() {
         List<DefaultStatusResponse> responses = new ArrayList<>();
 

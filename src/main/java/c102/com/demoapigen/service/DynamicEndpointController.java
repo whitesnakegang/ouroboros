@@ -26,10 +26,32 @@ public class DynamicEndpointController {
     private final Map<String, Endpoint> endpointRegistry = new ConcurrentHashMap<>();
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
+    /**
+     * Registers an Endpoint in the controller's registry under the given key.
+     *
+     * @param key registry key in the form "path:METHOD" used to look up this endpoint
+     * @param endpoint the Endpoint definition to register
+     */
     public void registerEndpoint(String key, Endpoint endpoint) {
         endpointRegistry.put(key, endpoint);
     }
 
+    /**
+     * Handle an incoming HTTP request against registered dynamic endpoints and produce a mocked HTTP response.
+     *
+     * Processes the request URI and method to find a matching endpoint, honors an optional `X-Mock-Status` header to force a status,
+     * performs authentication when the endpoint requires it, and returns the endpoint's defined success response (the lowest 2xx)
+     * populated with generated dummy data. If the endpoint has no defined responses, returns a 200 OK with a simple success message.
+     *
+     * @param httpRequest the incoming HttpServletRequest; its URI, method, headers (including `X-Mock-Status` and authentication headers),
+     *                    and query parameters are used to resolve the endpoint and determine the response
+     * @return a ResponseEntity containing:
+     *         - a generated response body and the endpoint's status code for a matched success response;
+     *         - a 404 Not Found body when no endpoint matches;
+     *         - a 401 response when authentication is required but fails;
+     *         - a forced status response when `X-Mock-Status` is present and valid;
+     *         - a 500 error body when an internal error occurs
+     */
     public ResponseEntity<?> handleRequest(HttpServletRequest httpRequest) {
         try {
             String path = httpRequest.getRequestURI();
@@ -85,6 +107,13 @@ public class DynamicEndpointController {
         }
     }
 
+    /**
+     * Builds an HTTP response for the given status code using the endpoint's defined responses or a default message.
+     *
+     * @param endpoint   the endpoint whose response definitions should be consulted
+     * @param statusCode the HTTP status code to produce
+     * @return a ResponseEntity with the provided statusCode and a body containing either generated dummy data for a matching response definition or a map with a message indicating the status
+     */
     private ResponseEntity<?> generateResponseForStatus(Endpoint endpoint, int statusCode) {
         if (endpoint.getResponses() == null || endpoint.getResponses().isEmpty()) {
             return ResponseEntity.status(statusCode)
@@ -107,6 +136,12 @@ public class DynamicEndpointController {
                 .body(Map.of("message", "Response for status " + statusCode));
     }
 
+    /**
+     * Selects the success response with the lowest 2xx status code from the given endpoint.
+     *
+     * @param endpoint the endpoint whose responses will be searched
+     * @return the StatusResponse that has the smallest status code in the 200–299 range, or `null` if the endpoint has no responses or none in that range
+     */
     private StatusResponse findSuccessResponse(Endpoint endpoint) {
         if (endpoint.getResponses() == null || endpoint.getResponses().isEmpty()) {
             return null;
@@ -119,6 +154,13 @@ public class DynamicEndpointController {
                 .orElse(null);
     }
 
+    /**
+     * Finds a registered Endpoint whose path pattern and HTTP method match the incoming request.
+     *
+     * @param requestPath the request URI path to match against registered endpoint patterns
+     * @param method the HTTP method of the incoming request (e.g., "GET", "POST")
+     * @return the matching Endpoint if found, or `null` if no registered endpoint matches
+     */
     private Endpoint findMatchingEndpoint(String requestPath, String method) {
         for (Map.Entry<String, Endpoint> entry : endpointRegistry.entrySet()) {
             String key = entry.getKey();
@@ -139,6 +181,17 @@ public class DynamicEndpointController {
         return null;
     }
 
+    /**
+     * Determines whether authentication for the given request and endpoint fails.
+     *
+     * Selects the authentication method from the endpoint's `authType` (defaults to "bearer")
+     * and validates the request using that method. For the "custom" type the endpoint's
+     * `authHeader` value is used as the header name to validate.
+     *
+     * @param request the incoming HTTP request to validate
+     * @param endpoint the endpoint definition containing authentication configuration
+     * @return `true` if authentication failed, `false` otherwise
+     */
     private boolean checkAuthenticationFailed(HttpServletRequest request, Endpoint endpoint) {
         String authType = endpoint.getAuthType();
         if (authType == null || authType.isEmpty()) {
@@ -163,6 +216,12 @@ public class DynamicEndpointController {
         }
     }
 
+    /**
+     * Validates that the HTTP request contains an Authorization header with a Bearer token.
+     *
+     * @param request the incoming HTTP servlet request to inspect
+     * @return `true` if the Authorization header is missing or does not start with `"Bearer "`, `false` otherwise
+     */
     private boolean checkBearerAuthFailed(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -173,6 +232,12 @@ public class DynamicEndpointController {
         return false; // 인증 성공
     }
 
+    /**
+     * Checks whether the HTTP request fails Basic authentication.
+     *
+     * @param request the HTTP servlet request whose `Authorization` header is validated for Basic auth
+     * @return `true` if the `Authorization` header is missing or does not start with `"Basic "`, `false` otherwise
+     */
     private boolean checkBasicAuthFailed(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Basic ")) {
@@ -183,6 +248,14 @@ public class DynamicEndpointController {
         return false; // 인증 성공
     }
 
+    /**
+     * Determines if the request lacks a valid API key.
+     *
+     * Looks for the API key first in the "api_key" query parameter, then in the "X-API-Key" header.
+     *
+     * @param request the incoming HTTP request to inspect for an API key
+     * @return `true` if the API key is missing or empty, `false` otherwise
+     */
     private boolean checkApiKeyAuthFailed(HttpServletRequest request) {
         // Query parameter 또는 Header에서 API Key 확인
         String apiKey = request.getParameter("api_key");
@@ -198,6 +271,14 @@ public class DynamicEndpointController {
         return false; // 인증 성공
     }
 
+    /**
+     * Checks whether custom header-based authentication fails for the given request.
+     *
+     * Uses `headerName` (defaults to "X-Auth-Token" when null or empty) and validates that the header is present and non-empty.
+     *
+     * @param headerName name of the header to validate; if null or empty, "X-Auth-Token" is used
+     * @return `true` if authentication failed (header missing or empty), `false` otherwise
+     */
     private boolean checkCustomAuthFailed(HttpServletRequest request, String headerName) {
         if (headerName == null || headerName.isEmpty()) {
             headerName = "X-Auth-Token"; // 기본값

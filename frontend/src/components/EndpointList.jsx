@@ -1,6 +1,15 @@
 import React from 'react'
 import './EndpointList.css'
 
+/**
+ * Render a list of API endpoints with method badges, paths, descriptions, selection highlighting, and per-item delete controls.
+ *
+ * @param {{method?: string, path: string, description?: string}[]} endpoints - Array of endpoint objects to display; each may include `method`, `path`, and `description`.
+ * @param {{method?: string, path: string, description?: string}|null} selectedEndpoint - The currently selected endpoint object, or null if none.
+ * @param {(endpoint: {method?: string, path: string, description?: string}) => void} onSelectEndpoint - Callback invoked with an endpoint when the user selects (clicks) an item.
+ * @param {(index: number) => void} onDeleteEndpoint - Callback invoked with the index of an endpoint when its delete button is clicked.
+ * @returns {JSX.Element} The React element representing the endpoints list (or an empty-state message when there are no endpoints).
+ */
 function EndpointList({ endpoints, selectedEndpoint, onSelectEndpoint, onDeleteEndpoint }) {
   const getMethodColor = (method) => {
     const colors = {

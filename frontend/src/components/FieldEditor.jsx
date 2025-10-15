@@ -2,6 +2,14 @@ import React, { useState } from 'react'
 import { getDummyTypeOptions, getDummyTypeByKey } from '../utils/dummyTypes'
 import './FieldEditor.css'
 
+/**
+ * Render an editable list of fields with per-field type, dummy data selection, examples, and options.
+ *
+ * @param {Object[]} fields - Array of field definitions; each object may include `name`, `type`, `required`, `defaultValue`, and `fakerType`.
+ * @param {(newFields: Object[]) => void} onChange - Called with the updated fields array when any field is added, updated, or deleted.
+ * @param {boolean} [isRequestField=false] - When true, show "Required" checkbox and a default value input for each field; otherwise show a fixed default input only for string fields.
+ * @returns {JSX.Element} The FieldEditor component UI.
+ */
 function FieldEditor({ fields, onChange, isRequestField = false }) {
   const [selectedDummy, setSelectedDummy] = useState({})
   const dummyOptions = getDummyTypeOptions()
