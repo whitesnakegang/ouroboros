@@ -22,10 +22,25 @@ public class ApiDefinitionService {
     private static final String API_YML_PATH = "classpath:api.yml";
     private static final String API_YML_FILE_PATH = "src/main/resources/api.yml";
 
+    /**
+     * Load the API definition from the configured classpath YAML.
+     *
+     * Parses the YAML at "classpath:api.yml" and returns the resulting ApiDefinition.
+     *
+     * @return the parsed ApiDefinition loaded from the classpath YAML
+     */
     public ApiDefinition loadApiDefinition() {
         return apiYamlParser.parseApiYaml(API_YML_PATH);
     }
 
+    /**
+     * Persists the given API definition to the service's configured API YAML file.
+     *
+     * Writes the provided ApiDefinition as YAML to the file system at the service's configured path.
+     *
+     * @param apiDefinition the API definition to save
+     * @throws IOException if an I/O error occurs while creating directories or writing the file
+     */
     public void saveApiDefinition(ApiDefinition apiDefinition) throws IOException {
         ObjectMapper yamlMapper = new ObjectMapper(
             YAMLFactory.builder()
@@ -45,6 +60,9 @@ public class ApiDefinitionService {
         log.info("API definition saved to: {}", file.getAbsolutePath());
     }
 
+    /**
+     * Reloads dynamic API endpoints so changes to the API definition are applied.
+     */
     public void reloadEndpoints() {
         log.info("Reloading endpoints...");
         dynamicEndpointRegistrar.registerEndpoints();

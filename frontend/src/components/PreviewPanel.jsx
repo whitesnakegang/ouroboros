@@ -1,6 +1,11 @@
 import React from 'react'
 import './PreviewPanel.css'
 
+/**
+ * Render a preview panel that shows pretty-printed JSON for the given data or a placeholder when no data is provided.
+ * @param {Object|Array|any} data - The value to display; when present it is formatted with two-space indentation using `JSON.stringify`.
+ * @returns {JSX.Element} The preview panel React element.
+ */
 function PreviewPanel({ data }) {
   return (
     <div className="preview-panel-content">

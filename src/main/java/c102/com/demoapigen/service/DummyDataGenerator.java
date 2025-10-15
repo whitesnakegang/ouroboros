@@ -15,10 +15,30 @@ public class DummyDataGenerator {
 
     private final Faker faker;
 
+    /**
+     * Creates a new DummyDataGenerator and initializes its Faker instance for generating fake data.
+     */
     public DummyDataGenerator() {
         this.faker = new Faker();
     }
 
+    /**
+     * Generate dummy data that conforms to the provided Response schema.
+     *
+     * If `response` is null an empty map is returned. If `response.getType()` is null it is
+     * treated as `"object"`. Supported types:
+     * - "array": returns a List populated according to the response's array item type
+     * - "object": returns a Map keyed by field names
+     * - "string": returns a generated sentence
+     * - "number": returns a generated numeric value
+     * - "boolean": returns a generated boolean
+     * For any other type the method falls back to object generation using the response's fields.
+     *
+     * @param response the Response schema to generate mock data for; may be null
+     * @return an instance containing mock data matching the schema: a Map for objects,
+     *         a List for arrays, a String for string type, a Number for number type,
+     *         a Boolean for boolean type, or an empty Map if `response` is null
+     */
     public Object generateDummyData(Response response) {
         if (response == null) {
             return Collections.emptyMap();
@@ -45,6 +65,12 @@ public class DummyDataGenerator {
         }
     }
 
+    /**
+     * Generate a list of mock values for an array, using the provided item type to produce each element.
+     *
+     * @param arrayItemType the schema for array items; if `null`, each element is a random lorem word,
+     *                      otherwise each element is produced by `generateFieldValue` for this field
+     * @return a list containing between 3 and 9 generated elements (size chosen randomly between 3 and 10 exclusive of 10)
     private List<Object> generateArray(Field arrayItemType) {
         List<Object> array = new ArrayList<>();
         int arraySize = faker.number().numberBetween(3, 10);
@@ -60,6 +86,14 @@ public class DummyDataGenerator {
         return array;
     }
 
+    /**
+     * Builds an object representation by mapping each field's name to a generated dummy value.
+     *
+     * @param fields field definitions used to generate the object's properties; if null or empty, a single
+     *               entry with key "message" and a random sentence value is returned
+     * @return a LinkedHashMap whose keys are field names and whose values are the generated values for those fields;
+     *         when {@code fields} is null or empty the map contains only a "message" entry
+     */
     private Map<String, Object> generateObject(List<Field> fields) {
         Map<String, Object> result = new LinkedHashMap<>();
 
@@ -75,6 +109,18 @@ public class DummyDataGenerator {
         return result;
     }
 
+    /**
+     * Produce a mock value for the given Field based on its schema, default, and faker settings.
+     *
+     * If the field is null this returns null. If the field supplies a non-empty default value that value is returned.
+     * If the field's type is `"faker"` and a fakerType is provided, a faker-derived value is returned.
+     * Otherwise the returned value matches the field type: a context-aware string, an integer, a double,
+     * a boolean, a list for arrays, or a map for objects. When the type is unknown a context-aware string is returned.
+     *
+     * @param field the Field describing the desired value (may be null; may include defaultValue, type, fakerType,
+     *              arrayItemType, or nested fields)
+     * @return a generated value that conforms to the field's specification, or `null` if `field` is `null`
+     */
     private Object generateFieldValue(Field field) {
         if (field == null) {
             return null;
@@ -117,6 +163,12 @@ public class DummyDataGenerator {
         }
     }
 
+    /**
+     * Generate a context-aware fake string value inferred from the provided field name.
+     *
+     * @param fieldName the field name used to infer the kind of string to generate; may be null
+     * @return a contextually appropriate fake string (for example a name, username, email, phone, address, company, product, URL, UUID, date/time, or a lorem word when no pattern matches or when `fieldName` is null)
+     */
     private Object generateSmartStringValue(String fieldName) {
         if (fieldName == null) {
             return faker.lorem().word();
@@ -190,6 +242,15 @@ public class DummyDataGenerator {
         return faker.lorem().word();
     }
 
+    /**
+     * Generate a value from Faker by invoking a category and method resolved from a dot-separated string.
+     *
+     * <p>Expects `fakerType` in the form "category.method" (for example, "address.city"). If the format is invalid
+     * or invocation fails, a fallback lorem word is returned.</p>
+     *
+     * @param fakerType dot-separated Faker descriptor in the form "category.method"
+     * @return the value produced by the invoked Faker method, or a lorem word if the descriptor is invalid or an error occurs
+     */
     private Object generateFakerValue(String fakerType) {
         try {
             String[] parts = fakerType.split("\\.");

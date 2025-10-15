@@ -3,6 +3,19 @@ import FieldEditor from './FieldEditor'
 import { getAvailableStatusCodes, getStatusTemplate } from '../utils/statusTemplates'
 import './EndpointEditor.css'
 
+/**
+ * Renders a form-based editor for configuring an API endpoint and propagates edits to the parent.
+ *
+ * The component maintains a local editable copy of the provided `endpoint` prop, updates that local
+ * state as the user edits fields, and calls `onUpdate` with the updated endpoint on every change.
+ * It also supports previewing the current local endpoint via `onPreview`.
+ *
+ * @param {Object} props
+ * @param {Object} props.endpoint - Initial endpoint configuration to edit (method, path, description, requiresAuth, authType, authHeader, responses, request, etc.).
+ * @param {(updated: Object) => void} props.onUpdate - Callback invoked whenever the endpoint configuration changes; receives the updated endpoint object.
+ * @param {(snapshot: Object) => void} props.onPreview - Callback invoked when the user requests a preview; receives the current local endpoint snapshot.
+ * @returns {JSX.Element} The EndpointEditor React element.
+ */
 function EndpointEditor({ endpoint, onUpdate, onPreview }) {
   const [localEndpoint, setLocalEndpoint] = useState(endpoint)
 

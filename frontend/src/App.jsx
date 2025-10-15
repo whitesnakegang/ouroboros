@@ -6,6 +6,14 @@ import PreviewPanel from './components/PreviewPanel'
 import { getStatusTemplate } from './utils/statusTemplates'
 import './App.css'
 
+/**
+ * Root editor UI for the Demo API Generator that lets users view, create, edit, preview, and save API endpoints.
+ *
+ * Manages API definition state, selected endpoint, preview data, and loading/saving indicators; triggers network
+ * requests to load and persist the API definition and to generate endpoint previews.
+ *
+ * @returns {JSX.Element} The rendered App component.
+ */
 function App() {
   const [apiDefinition, setApiDefinition] = useState({ endpoints: [] })
   const [selectedEndpoint, setSelectedEndpoint] = useState(null)
