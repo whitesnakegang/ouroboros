@@ -56,7 +56,7 @@ jobs:
                 {
                   title: $title,
                   title_link: $link,
-                  text: ("**Description**\n"+$desc+"\n\n---\n\n**작성자:** "+$user+"\n**상태:** "+$action+"\n**브랜치:** "+$base+" → "+$head)
+                  text: ("**Description**\n"+$desc+"\n\n---\n\n**작성자:** "+$user+"\n**상태:** "+$action+"\n**브랜치:** "+$base+" ← "+$head)
                 }
               ]
             }' > msg.json
