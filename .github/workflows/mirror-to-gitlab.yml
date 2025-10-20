@@ -44,66 +44,76 @@ jobs:
         working-directory: super
         run: |
           set -euo pipefail
-
+      
           purge_submodule_sections () {
             local path="$1"
-            # .gitmodules 내의 submodule.*.path 전체 훑어서 path 또는 path.backup.* 를 가리키면 제거
+      
+            # 1) .gitmodules에서 submodule.*.path 키만 추출해 값 비교 후 섹션 제거
             if [ -f .gitmodules ]; then
-              while IFS=' ' read -r key _; do
-                sec="${key%.*}" # submodule.SEC.path -> submodule.SEC
-                val="$(git config -f .gitmodules "$key" || true)"
+              while IFS= read -r key; do
+                val="$(git config -f .gitmodules --get "$key" || true)"   # 값만
+                sec="${key%.*}"                                           # submodule.SEC.path -> submodule.SEC
                 if [[ "$val" == "$path" || "$val" == "$path.backup."* ]]; then
                   echo "==> Removing section [$sec] (path=$val)"
+                  # 인덱스에 gitlink 있으면 지움
+                  git rm -f --cached "$path" 2>/dev/null || true
                   git submodule deinit -f -- "$path" 2>/dev/null || true
                   git config -f .gitmodules --remove-section "$sec" || true
                 fi
-              done < <(git config -f .gitmodules -l | grep '^submodule\..*\.path=' || true)
+              done < <(git config -f .gitmodules --name-only --get-regexp '^submodule\..*\.path$' || true)
+      
               git add .gitmodules || true
               git commit -m "chore: purge stale submodule sections for $path" || true
             fi
-            # .git/modules/* 찌꺼기 제거
+      
+            # 2) .git/modules 찌꺼기 제거
             rm -rf ".git/modules/$path" ".git/modules/$path.backup."* 2>/dev/null || true
-            # 인덱스에 남은 gitlink/경로 제거
-            git rm -f --cached "$path" 2>/dev/null || true
-            git rm -f --cached "$path.backup."* 2>/dev/null || true
           }
-
+      
           add_or_convert () {
             local name=$1 url=$2 path=$3 branch=$4
-
-            # 선제 정리
+      
             purge_submodule_sections "$path"
-
+      
             if [ -f "$path/.git" ]; then
               echo "==> $path already a submodule"
             else
               if [ -d "$path" ]; then
-                echo "==> $path exists as a normal folder. Converting to submodule..."
-                tmp="${path}.backup.$(date +%s)"
-                git mv "$path" "$tmp"
-                git commit -m "chore: temp move $path to $tmp for submodule conversion"
-
-                # mv 이후 혹시 생긴 꼬임 재정리
-                purge_submodule_sections "$path"
-
-                git submodule add -b "$branch" "$url" "$path"
-                git rm -r "$tmp"
-                git commit -m "refactor: replace $path folder with git submodule"
+                # 해당 경로에 '트래킹된 파일'이 있는지 확인 (빈 폴더/미트래킹이면 이동 불가)
+                if git ls-files -- "$path" | grep -q .; then
+                  echo "==> $path has tracked files. Converting to submodule with backup..."
+                  tmp="${path}.backup.$(date +%s)"
+                  git mv "$path" "$tmp"
+                  git commit -m "chore: temp move $path to $tmp for submodule conversion"
+      
+                  purge_submodule_sections "$path"   # mv 후 혹시 꼬임 재정리
+                  git submodule add -b "$branch" "$url" "$path"
+      
+                  git rm -r "$tmp"
+                  git commit -m "refactor: replace $path folder with git submodule"
+                else
+                  echo "==> $path is empty or untracked. Removing and adding as submodule..."
+                  rm -rf "$path"
+                  git submodule add -b "$branch" "$url" "$path"
+                  git commit -m "chore: add $path as submodule (clean path)"
+                fi
               else
                 echo "==> Adding submodule $name at $path (branch=$branch)"
                 git submodule add -b "$branch" "$url" "$path"
+                git commit -m "chore: add $path as submodule"
               fi
             fi
-
+      
             # .gitmodules 고정값
             git config -f .gitmodules "submodule.$path.url" "$url"
             git config -f .gitmodules "submodule.$path.branch" "$branch"
             git submodule sync --recursive
           }
-
+      
           add_or_convert "$MOD1_NAME" "$MOD1_URL" "$MOD1_PATH" "$MOD1_BRANCH"
           add_or_convert "$MOD2_NAME" "$MOD2_URL" "$MOD2_PATH" "$MOD2_BRANCH"
           add_or_convert "$MOD3_NAME" "$MOD3_URL" "$MOD3_PATH" "$MOD3_BRANCH"
+      
 
       - name: Update all submodules to latest branch tips
         working-directory: super
