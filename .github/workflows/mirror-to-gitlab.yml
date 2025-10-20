@@ -113,18 +113,29 @@ jobs:
           echo "== Last commit (superproject) =="
           git log -1 --oneline || true
 
-      - name: Commit & push if changed
+      - name: Commit & push (always push if ahead)
         working-directory: super
         run: |
           set -euo pipefail
-          git add .gitmodules "$MOD1_PATH" "$MOD2_PATH" "$MOD3_PATH"
-
-          if [ -n "$(git status --porcelain)" ]; then
+          # 1) 변경이 스테이징에 있으면 커밋
+          git add .gitmodules "$MOD1_PATH" "$MOD2_PATH" "$MOD3_PATH" || true
+          if ! git diff --cached --quiet; then
             git commit -m "chore: sync submodules to latest main"
+          else
+            echo "No new working tree changes to commit."
+          fi
+
+          # 2) 원격 상태 갱신 후, 로컬이 앞서 있으면 항상 푸시
+          git fetch origin "$TARGET_BRANCH" --quiet || true
+          AHEAD_BEHIND=$(git rev-list --left-right --count HEAD...origin/$TARGET_BRANCH || echo "0	0")
+          AHEAD=$(echo "$AHEAD_BEHIND" | awk '{print $1}')
+          echo "Ahead by $AHEAD commits."
+          if [ "$AHEAD" -gt 0 ]; then
+            echo "Pushing to origin/$TARGET_BRANCH ..."
             git push origin "$TARGET_BRANCH"
             echo "Push OK."
           else
-            echo "No changes to push."
+            echo "Already up to date. Nothing to push."
           fi
 
       - name: Verify remote HEAD changed (debug)
