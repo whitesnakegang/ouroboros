@@ -1,19 +1,36 @@
-name: Mirror to GitLab
+name: Sync GitHub submodules into GitLab superproject
 
 on:
-  push:
-    branches: ["**"]
-    tags: ["**"]
+  workflow_dispatch: {}          # 수동 실행 가능
+  schedule:
+    - cron: "0 */6 * * *"        # 6시간마다 자동 실행 (UTC 기준)
 
 jobs:
-  mirror:
+  sync:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+    env:
+      TARGET_REPO: https://oauth2:${{ secrets.GITLAB_PAT }}@lab.ssafy.com/s13-final/S13P31C102.git
+      TARGET_BRANCH: main
+      GIT_USER_NAME:  ${{ secrets.GIT_USER_NAME }}
+      GIT_USER_EMAIL: ${{ secrets.GIT_USER_EMAIL }}
 
-      - name: Mirror to GitLab (HTTPS + PAT)
-        uses: pixta-dev/repository-mirroring-action@v1
-        with:
-          target_repo_url: ${{ secrets.GITLAB_MIRROR_URL }}
+      # 서브모듈 정의
+      MOD1_NAME: OuroHead
+      MOD1_URL:  https://github.com/whitesnakegang/OuroHead.git
+      MOD1_PATH: OuroHead
+      MOD1_BRANCH: main
+
+      MOD2_NAME: OuroTail
+      MOD2_URL:  https://github.com/whitesnakegang/OuroTail.git
+      MOD2_PATH: OuroTail
+      MOD2_BRANCH: main
+
+      MOD3_NAME: ouroboros
+      MOD3_URL:  https://github.com/whitesnakegang/ouroboros.git
+      MOD3_PATH: ouroboros
+      MOD3_BRANCH: main
+
+    steps:
+      - name: Clone GitLab superproject
+        run: |
+          set
