@@ -1,19 +1,186 @@
-name: Mirror to GitLab
+name: Sync GitHub submodules into GitLab superproject
 
 on:
-  push:
-    branches: ["**"]
-    tags: ["**"]
+  workflow_dispatch: {}          # 수동 실행 가능
+  schedule:
+    - cron: "0 */6 * * *"        # 6시간마다 자동 실행 (UTC 기준)
 
 jobs:
-  mirror:
+  sync:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+    env:
+      TARGET_REPO: https://oauth2:${{ secrets.GITLAB_PAT }}@lab.ssafy.com/s13-final/S13P31C102.git
+      TARGET_BRANCH: main
+      GIT_USER_NAME:  ${{ secrets.GIT_USER_NAME }}
+      GIT_USER_EMAIL: ${{ secrets.GIT_USER_EMAIL }}
 
-      - name: Mirror to GitLab (HTTPS + PAT)
-        uses: pixta-dev/repository-mirroring-action@v1
-        with:
-          target_repo_url: ${{ secrets.GITLAB_MIRROR_URL }}
+      # 서브모듈 정의 (원본 브랜치: develop)
+      MOD1_NAME: OuroHead
+      MOD1_URL:  https://github.com/whitesnakegang/OuroHead.git
+      MOD1_PATH: OuroHead
+      MOD1_BRANCH: develop
+
+      MOD2_NAME: OuroTail
+      MOD2_URL:  https://github.com/whitesnakegang/OuroTail.git
+      MOD2_PATH: OuroTail
+      MOD2_BRANCH: develop
+
+      MOD3_NAME: ouroboros
+      MOD3_URL:  https://github.com/whitesnakegang/ouroboros.git
+      MOD3_PATH: ouroboros
+      MOD3_BRANCH: develop
+
+    steps:
+      - name: Clone GitLab superproject
+        run: |
+          set -euo pipefail
+          git clone "$TARGET_REPO" super
+          cd super
+          git checkout -B "$TARGET_BRANCH" || git checkout "$TARGET_BRANCH"
+          git config user.name  "$GIT_USER_NAME"
+          git config user.email "$GIT_USER_EMAIL"
+
+      - name: Ensure submodules exist (robust cleanup & convert)
+        working-directory: super
+        run: |
+          set -euo pipefail
+      
+          purge_submodule_sections () {
+            local path="$1"
+      
+            # 1) .gitmodules에서 submodule.*.path 키만 추출해 값 비교 후 섹션 제거
+            if [ -f .gitmodules ]; then
+              while IFS= read -r key; do
+                val="$(git config -f .gitmodules --get "$key" || true)"   # 값만
+                sec="${key%.*}"                                           # submodule.SEC.path -> submodule.SEC
+                if [[ "$val" == "$path" || "$val" == "$path.backup."* ]]; then
+                  echo "==> Removing section [$sec] (path=$val)"
+                  # 인덱스에 gitlink 있으면 지움
+                  git rm -f --cached "$path" 2>/dev/null || true
+                  git submodule deinit -f -- "$path" 2>/dev/null || true
+                  git config -f .gitmodules --remove-section "$sec" || true
+                fi
+              done < <(git config -f .gitmodules --name-only --get-regexp '^submodule\..*\.path$' || true)
+      
+              git add .gitmodules || true
+              git commit -m "chore: purge stale submodule sections for $path" || true
+            fi
+      
+            # 2) .git/modules 찌꺼기 제거
+            rm -rf ".git/modules/$path" ".git/modules/$path.backup."* 2>/dev/null || true
+          }
+      
+          add_or_convert () {
+            local name=$1 url=$2 path=$3 branch=$4
+      
+            purge_submodule_sections "$path"
+      
+            if [ -f "$path/.git" ]; then
+              echo "==> $path already a submodule"
+            else
+              if [ -d "$path" ]; then
+                # 해당 경로에 '트래킹된 파일'이 있는지 확인 (빈 폴더/미트래킹이면 이동 불가)
+                if git ls-files -- "$path" | grep -q .; then
+                  echo "==> $path has tracked files. Converting to submodule with backup..."
+                  tmp="${path}.backup.$(date +%s)"
+                  git mv "$path" "$tmp"
+                  git commit -m "chore: temp move $path to $tmp for submodule conversion"
+      
+                  purge_submodule_sections "$path"   # mv 후 혹시 꼬임 재정리
+                  git submodule add -b "$branch" "$url" "$path"
+      
+                  git rm -r "$tmp"
+                  git commit -m "refactor: replace $path folder with git submodule"
+                else
+                  echo "==> $path is empty or untracked. Removing and adding as submodule..."
+                  rm -rf "$path"
+                  git submodule add -b "$branch" "$url" "$path"
+                  git commit -m "chore: add $path as submodule (clean path)"
+                fi
+              else
+                echo "==> Adding submodule $name at $path (branch=$branch)"
+                git submodule add -b "$branch" "$url" "$path"
+                git commit -m "chore: add $path as submodule"
+              fi
+            fi
+      
+            # .gitmodules 고정값
+            git config -f .gitmodules "submodule.$path.url" "$url"
+            git config -f .gitmodules "submodule.$path.branch" "$branch"
+            git submodule sync --recursive
+          }
+      
+          add_or_convert "$MOD1_NAME" "$MOD1_URL" "$MOD1_PATH" "$MOD1_BRANCH"
+          add_or_convert "$MOD2_NAME" "$MOD2_URL" "$MOD2_PATH" "$MOD2_BRANCH"
+          add_or_convert "$MOD3_NAME" "$MOD3_URL" "$MOD3_PATH" "$MOD3_BRANCH"
+      
+
+      - name: Update all submodules to latest branch tips
+        working-directory: super
+        run: |
+          set -euo pipefail
+          git submodule update --init --recursive
+
+          update_to_branch () {
+            local path=$1 branch=$2
+            echo "==> Updating $path to $branch"
+            cd "$path"
+            git fetch origin "$branch" --tags --prune
+            git checkout "$branch" || git checkout -B "$branch" "origin/$branch"
+            git pull --ff-only origin "$branch" || true
+            cd - >/dev/null
+          }
+
+          update_to_branch "$MOD1_PATH" "$MOD1_BRANCH"
+          update_to_branch "$MOD2_PATH" "$MOD2_BRANCH"
+          update_to_branch "$MOD3_PATH" "$MOD3_BRANCH"
+
+      - name: Show .gitmodules (debug)
+        working-directory: super
+        run: |
+          set -euo pipefail
+          test -f .gitmodules && cat .gitmodules || echo ".gitmodules not found"
+          git config -f .gitmodules -l || true
+
+      - name: Debug before commit
+        working-directory: super
+        run: |
+          set -euo pipefail
+          echo "== Git status ==" && git status
+          echo "== Diff stat =="  && (git diff --stat || true)
+          echo "== Submodule status ==" && (git submodule status || true)
+          echo "== Last commit (superproject) ==" && (git log -1 --oneline || true)
+
+      - name: Commit & push (always push if ahead)
+        working-directory: super
+        run: |
+          set -euo pipefail
+          # 1) 변경이 스테이징에 있으면 커밋
+          git add .gitmodules "$MOD1_PATH" "$MOD2_PATH" "$MOD3_PATH" || true
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: sync submodules to latest develop"
+          else
+            echo "No new working tree changes to commit."
+          fi
+
+          # 2) 원격 상태 갱신 후, 로컬이 앞서 있으면 항상 푸시
+          git fetch origin "$TARGET_BRANCH" --quiet || true
+          AHEAD_BEHIND=$(git rev-list --left-right --count HEAD...origin/$TARGET_BRANCH || echo "0	0")
+          AHEAD=$(echo "$AHEAD_BEHIND" | awk '{print $1}')
+          echo "Ahead by $AHEAD commits."
+          if [ "$AHEAD" -gt 0 ]; then
+            echo "Pushing to origin/$TARGET_BRANCH ..."
+            git push origin "$TARGET_BRANCH"
+            echo "Push OK."
+          else
+            echo "Already up to date. Nothing to push."
+          fi
+
+      - name: Verify remote HEAD changed (debug)
+        working-directory: super
+        env:
+          BRANCH: ${{ env.TARGET_BRANCH }}
+        run: |
+          set -euo pipefail
+          echo "== Remote $BRANCH HEAD =="
+          git ls-remote origin "refs/heads/$BRANCH" || true
