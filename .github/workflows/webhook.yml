@@ -44,31 +44,30 @@ jobs:
           set -euo pipefail
           DESC="${PR_BODY:-내용 없음}"
 
+          # 실제 개행을 포함한 텍스트 생성 (printf)
+          TEXT=$(printf "**Repo:** [%s](%s)\n**Pull Request** #%s" "${REPO}" "${REPO_URL}" "${PR_NUMBER}")
+          BODY=$(printf "**Description**\n%s\n\n---\n\n**작성자:** %s\n**상태:** %s\n**브랜치:** %s ← %s" \
+                       "${DESC}" "${PR_USER}" "${ACTION}" "${BASE}" "${HEAD}")
+
           jq -n \
             --arg username "GitHub Bot" \
-            --arg icon "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" \
-            --arg repo "$REPO" \
-            --arg repo_url "$REPO_URL" \
-            --arg prnum "$PR_NUMBER" \
-            --arg title "$PR_TITLE" \
-            --arg link "$PR_URL" \
-            --arg desc "$DESC" \
-            --arg user "$PR_USER" \
-            --arg action "$ACTION" \
-            --arg base "$BASE" \
-            --arg head "$HEAD" \
+            --arg icon      "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" \
+            --arg text      "$TEXT" \
+            --arg title     "$PR_TITLE" \
+            --arg link      "$PR_URL" \
+            --arg body      "$BODY" \
             '{
               username: $username,
               icon_url: $icon,
-              text: ("**Repo:** ["+$repo+"]("+$repo_url+")\n**Pull Request** #"+$prnum),
+              text: $text,
               attachments: [
                 {
                   title: $title,
                   title_link: $link,
-                  text: ("**Description**\n"+$desc+"\n\n---\n\n**작성자:** "+$user+"\n**상태:** "+$action+"\n**브랜치:** "+$base+" ← "+$head)
+                  text: $body
                 }
               ]
-            }' | sed 's/\\n/\n/g' > msg.json
+            }' > msg.json
 
       # ===== 이슈 알림 =====
       - name: Build message for Issue events
@@ -86,29 +85,30 @@ jobs:
           set -euo pipefail
           DESC="${ISSUE_BODY:-내용 없음}"
 
+          # 실제 개행 포함
+          TEXT=$(printf "**Repo:** [%s](%s)\n**Issue** #%s" "${REPO}" "${REPO_URL}" "${ISSUE_NUMBER}")
+          BODY=$(printf "**Description**\n%s\n\n---\n\n**작성자:** %s\n**상태:** %s" \
+                       "${DESC}" "${ISSUE_USER}" "${ACTION}")
+
           jq -n \
             --arg username "GitHub Bot" \
-            --arg icon "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" \
-            --arg repo "$REPO" \
-            --arg repo_url "$REPO_URL" \
-            --arg issnum "$ISSUE_NUMBER" \
-            --arg title "$ISSUE_TITLE" \
-            --arg link "$ISSUE_URL" \
-            --arg desc "$DESC" \
-            --arg user "$ISSUE_USER" \
-            --arg action "$ACTION" \
+            --arg icon      "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" \
+            --arg text      "$TEXT" \
+            --arg title     "$ISSUE_TITLE" \
+            --arg link      "$ISSUE_URL" \
+            --arg body      "$BODY" \
             '{
               username: $username,
               icon_url: $icon,
-              text: ("**Repo:** ["+$repo+"]("+$repo_url+")\n**Issue** #"+$issnum),
+              text: $text,
               attachments: [
                 {
                   title: $title,
                   title_link: $link,
-                  text: ("**Description**\n"+$desc+"\n\n---\n\n**작성자:** "+$user+"\n**상태:** "+$action)
+                  text: $body
                 }
               ]
-            }' | sed 's/\\n/\n/g' > msg.json
+            }' > msg.json
 
       # ===== 시크릿 확인 =====
       - name: Validate secret availability
