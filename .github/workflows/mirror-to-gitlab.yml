@@ -18,17 +18,17 @@ jobs:
       MOD1_NAME: OuroHead
       MOD1_URL:  https://github.com/whitesnakegang/OuroHead.git
       MOD1_PATH: OuroHead
-      MOD1_BRANCH: main
+      MOD1_BRANCH: develop
 
       MOD2_NAME: OuroTail
       MOD2_URL:  https://github.com/whitesnakegang/OuroTail.git
       MOD2_PATH: OuroTail
-      MOD2_BRANCH: main
+      MOD2_BRANCH: develop
 
       MOD3_NAME: ouroboros
       MOD3_URL:  https://github.com/whitesnakegang/ouroboros.git
       MOD3_PATH: ouroboros
-      MOD3_BRANCH: main
+      MOD3_BRANCH: develop
 
     steps:
       - name: Clone GitLab superproject
