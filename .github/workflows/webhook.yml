@@ -43,23 +43,24 @@ jobs:
         run: |
           set -euo pipefail
           DESC="${PR_BODY:-내용 없음}"
-          TEXT="**Repo:** [${REPO}](${REPO_URL})\n**Pull Request** #${PR_NUMBER}"
 
           jq -n \
             --arg username "GitHub Bot" \
-            --arg icon      "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" \
-            --arg text      "$TEXT" \
-            --arg title     "$PR_TITLE" \
-            --arg link      "$PR_URL" \
-            --arg desc      "$DESC" \
-            --arg user      "$PR_USER" \
-            --arg action    "$ACTION" \
-            --arg base      "$BASE" \
-            --arg head      "$HEAD" \
+            --arg icon "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" \
+            --arg repo "$REPO" \
+            --arg repo_url "$REPO_URL" \
+            --arg prnum "$PR_NUMBER" \
+            --arg title "$PR_TITLE" \
+            --arg link "$PR_URL" \
+            --arg desc "$DESC" \
+            --arg user "$PR_USER" \
+            --arg action "$ACTION" \
+            --arg base "$BASE" \
+            --arg head "$HEAD" \
             '{
               username: $username,
               icon_url: $icon,
-              text: $text,
+              text: ("**Repo:** ["+$repo+"]("+$repo_url+")\n**Pull Request** #"+$prnum),
               attachments: [
                 {
                   title: $title,
@@ -67,7 +68,7 @@ jobs:
                   text: ("**Description**\n"+$desc+"\n\n---\n\n**작성자:** "+$user+"\n**상태:** "+$action+"\n**브랜치:** "+$base+" ← "+$head)
                 }
               ]
-            }' > msg.json
+            }' | sed 's/\\n/\n/g' > msg.json
 
       # ===== 이슈 알림 =====
       - name: Build message for Issue events
@@ -84,21 +85,22 @@ jobs:
         run: |
           set -euo pipefail
           DESC="${ISSUE_BODY:-내용 없음}"
-          TEXT="**Repo:** [${REPO}](${REPO_URL})\n**Issue** #${ISSUE_NUMBER}"
 
           jq -n \
             --arg username "GitHub Bot" \
-            --arg icon      "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" \
-            --arg text      "$TEXT" \
-            --arg title     "$ISSUE_TITLE" \
-            --arg link      "$ISSUE_URL" \
-            --arg desc      "$DESC" \
-            --arg user      "$ISSUE_USER" \
-            --arg action    "$ACTION" \
+            --arg icon "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" \
+            --arg repo "$REPO" \
+            --arg repo_url "$REPO_URL" \
+            --arg issnum "$ISSUE_NUMBER" \
+            --arg title "$ISSUE_TITLE" \
+            --arg link "$ISSUE_URL" \
+            --arg desc "$DESC" \
+            --arg user "$ISSUE_USER" \
+            --arg action "$ACTION" \
             '{
               username: $username,
               icon_url: $icon,
-              text: $text,
+              text: ("**Repo:** ["+$repo+"]("+$repo_url+")\n**Issue** #"+$issnum),
               attachments: [
                 {
                   title: $title,
@@ -106,7 +108,7 @@ jobs:
                   text: ("**Description**\n"+$desc+"\n\n---\n\n**작성자:** "+$user+"\n**상태:** "+$action)
                 }
               ]
-            }' > msg.json
+            }' | sed 's/\\n/\n/g' > msg.json
 
       # ===== 시크릿 확인 =====
       - name: Validate secret availability
