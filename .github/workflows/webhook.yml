@@ -15,6 +15,10 @@ permissions:
 jobs:
   notify:
     runs-on: ubuntu-latest
+    env:
+      REPO: ${{ github.repository }}                              # ex) whitesnakegang/OuroHead
+      REPO_URL: ${{ github.server_url }}/${{ github.repository }} # ex) https://github.com/whitesnakegang/OuroHead
+
     steps:
       - name: Ensure jq exists
         run: |
@@ -34,13 +38,17 @@ jobs:
           ACTION: ${{ github.event.action }}
           BASE: ${{ github.event.pull_request.base.ref }}
           HEAD: ${{ github.event.pull_request.head.ref }}
+          REPO: ${{ env.REPO }}
+          REPO_URL: ${{ env.REPO_URL }}
         run: |
           DESC="${PR_BODY:-내용 없음}"
 
           jq -n \
             --arg username "GitHub Bot" \
             --arg icon "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" \
-            --arg text "**Pull Request** #${PR_NUMBER}" \
+            --arg repo "$REPO" \
+            --arg repo_url "$REPO_URL" \
+            --arg text ("**Repo:** ["+$REPO+"]("+$REPO_URL+")\n**Pull Request** #${PR_NUMBER}") \
             --arg title "${PR_TITLE}" \
             --arg link "${PR_URL}" \
             --arg desc "${DESC}" \
@@ -71,13 +79,17 @@ jobs:
           ISSUE_BODY: ${{ github.event.issue.body }}
           ISSUE_USER: ${{ github.event.issue.user.login }}
           ACTION: ${{ github.event.action }}
+          REPO: ${{ env.REPO }}
+          REPO_URL: ${{ env.REPO_URL }}
         run: |
           DESC="${ISSUE_BODY:-내용 없음}"
 
           jq -n \
             --arg username "GitHub Bot" \
             --arg icon "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" \
-            --arg text "**Issue** #${ISSUE_NUMBER}" \
+            --arg repo "$REPO" \
+            --arg repo_url "$REPO_URL" \
+            --arg text ("**Repo:** ["+$REPO+"]("+$REPO_URL+")\n**Issue** #${ISSUE_NUMBER}") \
             --arg title "${ISSUE_TITLE}" \
             --arg link "${ISSUE_URL}" \
             --arg desc "${DESC}" \
