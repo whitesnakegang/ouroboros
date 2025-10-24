@@ -1,0 +1,56 @@
+name: Mirror to GitLab (lab.ssafy.com)
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["*"]
+  delete:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Git setup
+        run: |
+          git config --global gc.auto 0
+          git config --global http.version HTTP/1.1
+          git config --global advice.detachedHead false
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Add GitLab remote (no creds in URL)
+        run: |
+          git remote remove gitlab 2>/dev/null || true
+          git remote add gitlab https://lab.ssafy.com/s13-final/S13P31C102.git
+          git remote -v
+
+      - name: Build Authorization header (Basic oauth2:<PAT>)
+        env:
+          GITLAB_PAT: ${{ secrets.GITLAB_PAT }}
+        run: |
+          if [ -z "$GITLAB_PAT" ]; then
+            echo "::error::Missing secret GITLAB_PAT"
+            exit 1
+          fi
+          B64=$(printf "oauth2:%s" "$GITLAB_PAT" | base64 | tr -d '\n')
+          echo "AUTH=Authorization: Basic $B64" >> $GITHUB_ENV
+
+      # --- 강제 동기화: heads/tags만, 숨은 refs 제외 ---
+      - name: Force-push all branches (like mirror, no hidden refs)
+        run: |
+          # + (leading plus) = force update
+          # --prune = 원격에만 존재하는 브랜치 삭제
+          git -c http.extraheader="$AUTH" push gitlab +refs/heads/*:refs/heads/* --prune
+
+      - name: Force-push all tags (and prune)
+        run: |
+          git -c http.extraheader="$AUTH" push gitlab +refs/tags/*:refs/tags/* --prune
