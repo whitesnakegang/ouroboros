@@ -1,0 +1,21 @@
+package kr.co.ouroboros.core.global.annotation;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+@Target({ElementType.METHOD})
+@Retention(RetentionPolicy.RUNTIME)
+public @interface ApiState {
+
+    State state();
+    String owner() default "";
+    String description() default "";
+
+    enum State {
+        IMPLEMENTING,
+        BUGFIX,
+        COMPLETED,
+    }
+}
