@@ -1,0 +1,97 @@
+{
+  "path": "/api/products/{productId}/reviews/{reviewId}",
+  "method": "GET",
+  "summary": "특정 상품의 특정 리뷰 조회",
+  "description": "상품 ID와 리뷰 ID로 리뷰를 조회합니다",
+  "deprecated": false,
+  "tags": ["Product", "Review"],
+  "parameters": [
+    {
+      "name": "productId",
+      "in": "path",
+      "description": "상품 ID",
+      "required": true,
+      "schema": {
+        "type": "integer"
+      }
+    },
+    {
+      "name": "reviewId",
+      "in": "path",
+      "description": "리뷰 ID",
+      "required": true,
+      "schema": {
+        "type": "integer"
+      }
+    }
+  ],
+  "responses": {
+    "200": {
+      "name": "OK",
+      "description": "성공",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "reviewId": {
+                "type": "integer",
+                "mockExpression": "{{$number.int(min=1, max=10000)}}",
+                "description": "리뷰 ID"
+              },
+              "productId": {
+                "type": "integer",
+                "mockExpression": "{{$number.int(min=1, max=1000)}}",
+                "description": "상품 ID"
+              },
+              "rating": {
+                "type": "integer",
+                "mockExpression": "{{$number.int(min=1, max=5)}}",
+                "description": "평점"
+              },
+              "comment": {
+                "type": "string",
+                "mockExpression": "{{$lorem.paragraph}}",
+                "description": "리뷰 내용"
+              },
+              "author": {
+                "type": "string",
+                "mockExpression": "{{$person.fullName}}",
+                "description": "작성자"
+              }
+            },
+            "required": ["reviewId", "productId", "rating", "comment", "author"],
+            "orders": ["reviewId", "productId", "rating", "comment", "author"]
+          }
+        }
+      },
+      "headers": {}
+    },
+    "404": {
+      "name": "Not Found",
+      "description": "리뷰를 찾을 수 없음",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "error": {
+                "type": "string",
+                "mockExpression": "Not Found",
+                "description": "오류 코드"
+              },
+              "message": {
+                "type": "string",
+                "mockExpression": "Review not found",
+                "description": "오류 메시지"
+              }
+            },
+            "required": ["error", "message"],
+            "orders": ["error", "message"]
+          }
+        }
+      },
+      "headers": {}
+    }
+  }
+}

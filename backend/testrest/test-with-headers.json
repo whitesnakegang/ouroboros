@@ -1,0 +1,104 @@
+{
+  "path": "/api/users/profile",
+  "method": "GET",
+  "summary": "사용자 프로필 조회 (헤더 필요)",
+  "description": "인증된 사용자의 프로필을 조회합니다",
+  "deprecated": false,
+  "tags": ["User"],
+  "parameters": [
+    {
+      "name": "Authorization",
+      "in": "header",
+      "description": "Bearer 토큰",
+      "required": true,
+      "schema": {
+        "type": "string"
+      }
+    },
+    {
+      "name": "X-Request-ID",
+      "in": "header",
+      "description": "요청 추적 ID",
+      "required": false,
+      "schema": {
+        "type": "string"
+      }
+    }
+  ],
+  "responses": {
+    "200": {
+      "name": "OK",
+      "description": "성공",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "userId": {
+                "type": "integer",
+                "mockExpression": "{{$number.int(min=1, max=1000)}}",
+                "description": "사용자 ID"
+              },
+              "email": {
+                "type": "string",
+                "mockExpression": "{{$internet.email}}",
+                "description": "이메일"
+              },
+              "profile": {
+                "type": "object",
+                "properties": {
+                  "nickname": {
+                    "type": "string",
+                    "mockExpression": "{{$internet.username}}",
+                    "description": "닉네임"
+                  },
+                  "bio": {
+                    "type": "string",
+                    "mockExpression": "{{$lorem.sentence}}",
+                    "description": "자기소개"
+                  }
+                }
+              }
+            },
+            "required": ["userId", "email"],
+            "orders": ["userId", "email", "profile"]
+          }
+        }
+      },
+      "headers": {}
+    },
+    "401": {
+      "name": "Unauthorized",
+      "description": "인증 실패",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "error": {
+                "type": "string",
+                "mockExpression": "Unauthorized",
+                "description": "오류 코드"
+              },
+              "message": {
+                "type": "string",
+                "mockExpression": "{{$lorem.sentence}}",
+                "description": "오류 메시지"
+              }
+            },
+            "required": ["error", "message"],
+            "orders": ["error", "message"]
+          }
+        }
+      },
+      "headers": {}
+    }
+  },
+  "security": [
+    {
+      "schemes": {
+        "bearer": []
+      }
+    }
+  ]
+}

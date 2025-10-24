@@ -1,0 +1,139 @@
+{
+  "path": "/api/products/search",
+  "method": "POST",
+  "summary": "상품 검색 (필터링)",
+  "description": "다양한 조건으로 상품을 검색합니다",
+  "deprecated": false,
+  "tags": ["Product"],
+  "parameters": [
+    {
+      "name": "page",
+      "in": "query",
+      "description": "페이지 번호",
+      "required": false,
+      "schema": {
+        "type": "integer"
+      }
+    },
+    {
+      "name": "size",
+      "in": "query",
+      "description": "페이지 크기",
+      "required": false,
+      "schema": {
+        "type": "integer"
+      }
+    },
+    {
+      "name": "sort",
+      "in": "query",
+      "description": "정렬 기준",
+      "required": false,
+      "schema": {
+        "type": "string"
+      }
+    }
+  ],
+  "requestBody": {
+    "description": "검색 조건",
+    "required": true,
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "properties": {
+            "keyword": {
+              "type": "string",
+              "description": "검색 키워드"
+            },
+            "category": {
+              "type": "string",
+              "description": "카테고리"
+            },
+            "minPrice": {
+              "type": "number",
+              "description": "최소 가격"
+            },
+            "maxPrice": {
+              "type": "number",
+              "description": "최대 가격"
+            },
+            "inStock": {
+              "type": "boolean",
+              "description": "재고 있는 상품만"
+            }
+          },
+          "required": ["keyword"],
+          "orders": ["keyword", "category", "minPrice", "maxPrice", "inStock"]
+        }
+      }
+    }
+  },
+  "responses": {
+    "200": {
+      "name": "OK",
+      "description": "검색 성공",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "totalCount": {
+                "type": "integer",
+                "mockExpression": "{{$number.int(min=0, max=1000)}}",
+                "description": "전체 개수"
+              },
+              "items": {
+                "type": "array",
+                "description": "상품 목록"
+              },
+              "page": {
+                "type": "integer",
+                "mockExpression": "{{$number.int(min=1, max=10)}}",
+                "description": "현재 페이지"
+              },
+              "hasMore": {
+                "type": "boolean",
+                "mockExpression": "{{$bool.bool}}",
+                "description": "다음 페이지 존재 여부"
+              }
+            },
+            "required": ["totalCount", "items", "page", "hasMore"],
+            "orders": ["totalCount", "items", "page", "hasMore"]
+          }
+        }
+      },
+      "headers": {}
+    },
+    "400": {
+      "name": "Bad Request",
+      "description": "잘못된 요청",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "error": {
+                "type": "string",
+                "mockExpression": "Bad Request",
+                "description": "오류 코드"
+              },
+              "message": {
+                "type": "string",
+                "mockExpression": "{{$lorem.sentence}}",
+                "description": "오류 메시지"
+              },
+              "validationErrors": {
+                "type": "array",
+                "description": "유효성 검사 오류 목록"
+              }
+            },
+            "required": ["error", "message"],
+            "orders": ["error", "message", "validationErrors"]
+          }
+        }
+      },
+      "headers": {}
+    }
+  }
+}
