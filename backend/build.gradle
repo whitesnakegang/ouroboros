@@ -34,6 +34,7 @@ dependencyManagement {
 }
 
 dependencies {
+	implementation("org.springdoc:springdoc-openapi-starter-webmvc-api:2.8.13")
 	// Spring Boot (사용자 프로젝트의 버전에 기생)
 	compileOnly 'org.springframework.boot:spring-boot-starter-web'
 
