@@ -5,11 +5,14 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
- * Try 세션 관리를 위한 Spring 설정.
- * TrySessionProperties 활성화 및 스케줄링 활성화.
+ * Try session management configuration.
+ * Enables TrySessionProperties and TempoProperties, along with scheduling.
  */
 @Configuration
-@EnableConfigurationProperties(kr.co.ouroboros.core.rest.tryit.config.TrySessionProperties.class)
+@EnableConfigurationProperties({
+        TrySessionProperties.class,
+        TempoProperties.class
+})
 @EnableScheduling
 public class TrySessionConfig {
 }

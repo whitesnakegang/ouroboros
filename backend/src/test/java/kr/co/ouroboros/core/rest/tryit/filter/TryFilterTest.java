@@ -5,94 +5,186 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import kr.co.ouroboros.core.rest.tryit.config.TrySessionProperties;
 import kr.co.ouroboros.core.rest.tryit.session.TrySessionRegistry;
+import kr.co.ouroboros.core.rest.tryit.util.TryContext;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.UUID;
 
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-/**
- * Unit tests for TryFilter.
- */
 @ExtendWith(MockitoExtension.class)
 class TryFilterTest {
 
     @Mock
-    private TrySessionRegistry registry;
+    TrySessionRegistry registry;
 
     @Mock
-    private TrySessionProperties properties;
+    TrySessionProperties properties;
 
     @Mock
-    private HttpServletRequest request;
+    HttpServletRequest request;
 
     @Mock
-    private HttpServletResponse response;
+    HttpServletResponse response;
 
     @Mock
-    private FilterChain filterChain;
+    FilterChain filterChain;
 
     @InjectMocks
-    private TryFilter tryFilter;
+    TryFilter filter;
 
-    @Test
-    void testFilterWithoutTryHeader() throws Exception {
-        // No header
-        when(request.getHeader("X-Ouroboros-Try")).thenReturn(null);
+    @Nested
+    class HeaderAbsentOrEmpty {
 
-        tryFilter.doFilterInternal(request, response, filterChain);
+        @Test
+        void noHeader_null() throws Exception {
+            when(request.getHeader("X-Ouroboros-Try")).thenReturn(null);
 
-        verify(filterChain).doFilter(request, response);
-        verify(registry, never()).isValid(any(UUID.class), anyString(), anyBoolean());
+            try (MockedStatic<TryContext> ctx = mockStatic(TryContext.class)) {
+                filter.doFilterInternal(request, response, filterChain);
+
+                verify(filterChain).doFilter(request, response);
+                verifyNoInteractions(registry, properties);
+                // finally 블록 검증
+                ctx.verify(TryContext::clear, times(1));
+                ctx.verifyNoMoreInteractions();
+            }
+        }
+
+        @Test
+        void noHeader_emptyString() throws Exception {
+            when(request.getHeader("X-Ouroboros-Try")).thenReturn("");
+
+            try (MockedStatic<TryContext> ctx = mockStatic(TryContext.class)) {
+                filter.doFilterInternal(request, response, filterChain);
+
+                verify(filterChain).doFilter(request, response);
+                verifyNoInteractions(registry, properties);
+                ctx.verify(TryContext::clear, times(1));
+                ctx.verifyNoMoreInteractions();
+            }
+        }
     }
 
     @Test
-    void testFilterWithValidTryHeader() throws Exception {
+    void invalidUuidHeader_gracefullyContinues() throws Exception {
+        when(request.getHeader("X-Ouroboros-Try")).thenReturn("not-a-uuid");
+
+        try (MockedStatic<TryContext> ctx = mockStatic(TryContext.class)) {
+            filter.doFilterInternal(request, response, filterChain);
+
+            verify(filterChain).doFilter(request, response);
+            verify(registry, never()).isValid(any(), anyString(), anyBoolean());
+            verify(registry, never()).markUsed(any());
+            verifyNoInteractions(properties);
+            // setTryId는 호출되지 않아야 함
+            ctx.verify(() -> TryContext.setTryId(any()), never());
+            ctx.verify(TryContext::clear, times(1));
+        }
+    }
+
+    @Test
+    void validHeader_withRemoteAddr_bindClientIp_true_oneShot_false() throws Exception {
         UUID tryId = UUID.randomUUID();
+        when(request.getHeader("X-Ouroboros-Try")).thenReturn(tryId.toString());
+        when(request.getHeader("X-Forwarded-For")).thenReturn(null);
+        when(request.getRemoteAddr()).thenReturn("127.0.0.1");
         when(properties.isBindClientIp()).thenReturn(true);
         when(properties.isOneShot()).thenReturn(false);
-        when(request.getHeader("X-Ouroboros-Try")).thenReturn(tryId.toString());
-        when(request.getHeader("X-Forwarded-For")).thenReturn(null);
-        when(request.getRemoteAddr()).thenReturn("127.0.0.1");
-        when(registry.isValid(any(UUID.class), anyString(), anyBoolean())).thenReturn(true);
+        when(registry.isValid(tryEq(tryId), eq("127.0.0.1"), eq(true))).thenReturn(true);
 
-        tryFilter.doFilterInternal(request, response, filterChain);
+        try (MockedStatic<TryContext> ctx = mockStatic(TryContext.class)) {
+            filter.doFilterInternal(request, response, filterChain);
 
-        verify(registry).isValid(eq(tryId), eq("127.0.0.1"), eq(true));
-        verify(filterChain).doFilter(request, response);
+            verify(registry).isValid(tryEq(tryId), eq("127.0.0.1"), eq(true));
+            verify(properties).isBindClientIp();
+            verify(properties).isOneShot();
+            // oneShot=false -> markUsed 호출 안됨
+            verify(registry, never()).markUsed(any());
+
+            ctx.verify(() -> TryContext.setTryId(tryId), times(1));
+            verify(filterChain).doFilter(request, response);
+            ctx.verify(TryContext::clear, times(1));
+        }
     }
 
     @Test
-    void testFilterWithInvalidTryHeader() throws Exception {
-        String invalidHeader = "not-a-uuid";
-        when(request.getHeader("X-Ouroboros-Try")).thenReturn(invalidHeader);
-
-        tryFilter.doFilterInternal(request, response, filterChain);
-
-        verify(registry, never()).isValid(any(UUID.class), anyString(), anyBoolean());
-        verify(filterChain).doFilter(request, response);
-    }
-
-    @Test
-    void testFilterWithExpiredSession() throws Exception {
+    void validHeader_withXForwardedFor_bindClientIp_false() throws Exception {
         UUID tryId = UUID.randomUUID();
-        when(properties.isBindClientIp()).thenReturn(true);
+        String forwarded = "203.0.113.10, 70.1.2.3"; // 코드가 첫번째만 추출하지 않고 전체 문자열을 사용함
+        when(request.getHeader("X-Ouroboros-Try")).thenReturn(tryId.toString());
+        when(request.getHeader("X-Forwarded-For")).thenReturn(forwarded);
+        when(properties.isBindClientIp()).thenReturn(false);
+        when(properties.isOneShot()).thenReturn(false);
+        when(registry.isValid(tryEq(tryId), eq(forwarded), eq(false))).thenReturn(true);
+
+        try (MockedStatic<TryContext> ctx = mockStatic(TryContext.class)) {
+            filter.doFilterInternal(request, response, filterChain);
+
+            verify(registry).isValid(tryEq(tryId), eq(forwarded), eq(false));
+            verify(registry, never()).markUsed(any());
+            ctx.verify(() -> TryContext.setTryId(tryId), times(1));
+            verify(filterChain).doFilter(request, response);
+            ctx.verify(TryContext::clear, times(1));
+        }
+    }
+
+    @Test
+    void validHeader_sessionInvalid_doesNotSetContextOrMarkUsed() throws Exception {
+        UUID tryId = UUID.randomUUID();
         when(request.getHeader("X-Ouroboros-Try")).thenReturn(tryId.toString());
         when(request.getHeader("X-Forwarded-For")).thenReturn(null);
-        when(request.getRemoteAddr()).thenReturn("127.0.0.1");
-        when(registry.isValid(any(UUID.class), anyString(), anyBoolean())).thenReturn(false);
-        // isOneShot() is not called when isValid returns false, so don't mock it
+        when(request.getRemoteAddr()).thenReturn("10.0.0.5");
+        when(properties.isBindClientIp()).thenReturn(true);
+        when(registry.isValid(tryEq(tryId), eq("10.0.0.5"), eq(true))).thenReturn(false);
 
-        tryFilter.doFilterInternal(request, response, filterChain);
+        try (MockedStatic<TryContext> ctx = mockStatic(TryContext.class)) {
+            filter.doFilterInternal(request, response, filterChain);
 
-        verify(registry).isValid(eq(tryId), eq("127.0.0.1"), eq(true));
-        verify(filterChain).doFilter(request, response);
-        // TryContext.clear() is called in finally block but we can't verify static calls
+            verify(registry).isValid(tryEq(tryId), eq("10.0.0.5"), eq(true));
+            // isOneShot()은 호출되지 않아야 함 (유효하지 않으므로)
+            verify(properties, never()).isOneShot();
+            verify(registry, never()).markUsed(any());
+            // TryContext.setTryId 호출되지 않음
+            ctx.verify(() -> TryContext.setTryId(any()), never());
+
+            verify(filterChain).doFilter(request, response);
+            ctx.verify(TryContext::clear, times(1));
+        }
+    }
+
+    @Test
+    void validHeader_oneShot_true_marksUsedOnce() throws Exception {
+        UUID tryId = UUID.randomUUID();
+        when(request.getHeader("X-Ouroboros-Try")).thenReturn(tryId.toString());
+        when(request.getHeader("X-Forwarded-For")).thenReturn(null);
+        when(request.getRemoteAddr()).thenReturn("192.168.0.7");
+        when(properties.isBindClientIp()).thenReturn(true);
+        when(registry.isValid(tryEq(tryId), eq("192.168.0.7"), eq(true))).thenReturn(true);
+        when(properties.isOneShot()).thenReturn(true);
+
+        try (MockedStatic<TryContext> ctx = mockStatic(TryContext.class)) {
+            filter.doFilterInternal(request, response, filterChain);
+
+            verify(registry).isValid(tryEq(tryId), eq("192.168.0.7"), eq(true));
+            verify(properties).isOneShot();
+            verify(registry).markUsed(tryEq(tryId));
+
+            ctx.verify(() -> TryContext.setTryId(tryId), times(1));
+            verify(filterChain).doFilter(request, response);
+            ctx.verify(TryContext::clear, times(1));
+        }
+    }
+
+    // 편의: UUID eq helper (Mockito가 toString 비교를 타는 경우를 줄이기 위해)
+    private static UUID tryEq(UUID expected) {
+        return argThat(actual -> actual != null && actual.equals(expected));
     }
 }
