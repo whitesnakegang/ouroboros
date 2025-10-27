@@ -6,12 +6,16 @@ package kr.co.ouroboros.core.global.spec;
  */
 public interface OuroApiSpec {
     /**
-     * 이 스펙이 어떤 프로토콜인지 반환 (예: "rest", "grpc")
-     */
+ * Gets the protocol identifier for this API specification.
+ *
+ * @return the protocol name (for example, "rest" or "grpc")
+ */
     String getProtocol();
 
     /**
-     * 스펙의 버전을 반환
-     */
+ * Gets the API spec version.
+ *
+ * @return the version string of the spec (for example, "v1" or "1.0")
+ */
     String getVersion();
 }

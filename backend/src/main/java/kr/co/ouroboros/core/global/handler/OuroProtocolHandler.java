@@ -4,32 +4,41 @@ import kr.co.ouroboros.core.global.spec.OuroApiSpec;
 
 public interface OuroProtocolHandler {
     /**
-     * 핸들러가 처리할 프로토콜의 고유 이름(Key)
-     * (예: "rest", "grpc")
-     */
+ * Protocol key that this handler processes (for example "rest" or "grpc").
+ *
+ * @return the unique protocol name handled by this handler
+ */
     String getProtocol();
 
     /**
-     * 코드(@Annotation)를 스캔하여
-     * 현재 상태의 스펙 객체(OuroApiSpec)를 생성
-     */
+ * Produce the current API specification by scanning code annotations.
+ *
+ * @return the {@code OuroApiSpec} representing the API specification discovered in the codebase via annotations
+ */
     OuroApiSpec scanCurrentState();
 
     /**
-     * YAML 파일을 파싱하여
-     * 저장된(Desired) 스펙 객체(OuroApiSpec)를 생성
-     * @param yamlContent .yml 파일의 내용
-     */
+ * Parse YAML content into the saved (desired) API specification.
+ *
+ * @param yamlContent the full contents of a YAML (.yml) file representing an Ouro API specification
+ * @return the parsed saved (desired) API specification as an {@code OuroApiSpec}
+ */
     OuroApiSpec loadFromFile(String yamlContent);
 
     /**
-     * 두 스펙 객체를 비교하여 불일치 결과 반환
-     */
+ * Compare a persisted API spec with the scanned current API spec and produce a validation spec that describes their discrepancies.
+ *
+ * @param fileSpec    the API specification loaded from the persisted file (desired state)
+ * @param scannedSpec the API specification produced by scanning the current codebase (actual state)
+ * @return            an OuroApiSpec representing validation results—detailing differences between the provided fileSpec and scannedSpec
+ */
     OuroApiSpec validate(OuroApiSpec fileSpec, OuroApiSpec scannedSpec);
 
     /**
-     * 스펙 객체(주로 scannedSpec)를
-     * .yml 파일 포맷(String)으로 변환 (저장용)
-     */
+ * Serialize the given OuroApiSpec into a YAML-formatted string for persistence.
+ *
+ * @param specToSave the API specification to serialize (typically a scanned or merged spec)
+ * @return the YAML representation of the provided specification
+ */
     String saveToString(OuroApiSpec specToSave);
 }
