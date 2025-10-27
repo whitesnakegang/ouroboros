@@ -24,8 +24,9 @@ public class OuroApiSpecManager {
     private final Map<String, OuroProtocolHandler> handlers;
 
     /**
-     * Spring이 @Component로 등록된 모든 OuroProtocolHandler 구현체를
-     * List로 주입받아, Map으로 변환하여 저장
+     * Construct an OuroApiSpecManager by indexing provided protocol handlers into a map.
+     *
+     * @param handlerList a list of all Spring-registered {@code OuroProtocolHandler} implementations; each handler is stored in the manager's internal map keyed by the handler's {@code getProtocol()} value
      */
     @Autowired
     public OuroApiSpecManager(List<OuroProtocolHandler> handlerList) {
@@ -34,7 +35,10 @@ public class OuroApiSpecManager {
     }
 
     /**
-     * 컨트롤러가 호출할 메서드 (캐시된 스펙 제공)
+     * Provide the cached final API specification for the given protocol.
+     *
+     * @param protocol the protocol identifier (case-insensitive) whose API spec is requested
+     * @return the cached {@link OuroApiSpec} for the protocol; if none is cached, scans the current state via the protocol handler, caches the resulting spec, and returns it
      */
     public OuroApiSpec getApiSpec(String protocol) {
         // 캐시에서 가져오고, 없으면 스캔해서 캐시/반환
@@ -42,7 +46,14 @@ public class OuroApiSpecManager {
     }
 
     /**
-     *  스캔후 검증
+     * Validate a submitted API YAML against the current scanned API state for the given protocol and update the in-memory spec.
+     *
+     * <p>Loads the provided YAML, reconciles it with the protocol's current scanned state, converts the validated spec back
+     * to YAML for persistence, and refreshes the internal cache for the protocol.</p>
+     *
+     * @param protocol          protocol identifier (case-insensitive) used to select the appropriate handler
+     * @param yamlFromFrontend  YAML content submitted from the frontend representing the API spec to validate
+     * @throws IllegalArgumentException if the specified protocol is not supported
      */
     public void validateAndSave(String protocol, String yamlFromFrontend) {
         // 1. 프로토콜에 맞는 핸들러(전략) 선택
@@ -66,6 +77,13 @@ public class OuroApiSpecManager {
         apiCache.put(protocol, validatedSpec);
     }
 
+    /**
+     * Retrieves the registered protocol handler for the given protocol name.
+     *
+     * @param protocol the protocol name (case-insensitive)
+     * @return the {@code OuroProtocolHandler} registered for the protocol
+     * @throws IllegalArgumentException if no handler is registered for the protocol
+     */
     private OuroProtocolHandler getHandler(String protocol) {
         OuroProtocolHandler handler = handlers.get(protocol.toLowerCase());
         if (handler == null) {
@@ -75,7 +93,11 @@ public class OuroApiSpecManager {
     }
 
     /**
-     * 캐시가 없을 때 (Cache Miss) 실행되는 함수
+     * Obtain the latest API specification for the given protocol when a cache miss occurs.
+     *
+     * @param protocol the protocol name (case-insensitive)
+     * @return the latest {@code OuroApiSpec} scanned for the specified protocol
+     * @throws IllegalArgumentException if no handler is registered for the protocol
      */
     private OuroApiSpec findAndCacheSpec(String protocol) {
         // 캐시가 없을 땐 코드를 스캔한 최신본을 캐시
