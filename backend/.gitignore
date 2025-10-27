@@ -35,3 +35,6 @@ out/
 
 ### VS Code ###
 .vscode/
+CLAUDE.md
+.claude
+PROJECT_DOCUMENTATION.md

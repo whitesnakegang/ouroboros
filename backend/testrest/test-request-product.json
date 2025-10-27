@@ -1,0 +1,42 @@
+{
+  "path": "/api/products",
+  "method": "GET",
+  "summary": "상품 목록 조회",
+  "description": "모든 상품 목록을 조회합니다",
+  "deprecated": false,
+  "tags": ["Product"],
+  "parameters": [],
+  "responses": {
+    "200": {
+      "name": "OK",
+      "description": "성공",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "mockExpression": "{{$number.int(min=1, max=1000)}}",
+                "description": "상품 ID"
+              },
+              "name": {
+                "type": "string",
+                "mockExpression": "{{$commerce.productName}}",
+                "description": "상품명"
+              },
+              "price": {
+                "type": "number",
+                "mockExpression": "{{$number.decimal(min=1000, max=100000)}}",
+                "description": "가격"
+              }
+            },
+            "required": ["id", "name", "price"],
+            "orders": ["id", "name", "price"]
+          }
+        }
+      },
+      "headers": {}
+    }
+  }
+}

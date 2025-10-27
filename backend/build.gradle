@@ -38,6 +38,12 @@ dependencies {
 	// Spring Boot (사용자 프로젝트의 버전에 기생)
 	compileOnly 'org.springframework.boot:spring-boot-starter-web'
 
+	// YAML processing
+	implementation 'org.yaml:snakeyaml:2.2'
+
+	// DataFaker for mock data generation
+	implementation 'net.datafaker:datafaker:2.1.0'
+
 	// Lombok
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'
@@ -49,6 +55,16 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+}
+
+tasks.withType(JavaCompile) {
+	options.encoding = 'UTF-8'
+}
+
+tasks.withType(Javadoc) {
+	options.encoding = 'UTF-8'
+	options.charSet = 'UTF-8'
+	options.docEncoding = 'UTF-8'
 }
 
 publishing {
