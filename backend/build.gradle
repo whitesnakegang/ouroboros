@@ -41,11 +41,15 @@ dependencies {
 	// Lombok
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'
-
+	
+	// OpenTelemetry API for Baggage
+	compileOnly 'io.opentelemetry:opentelemetry-api:1.45.0'
+	
 	// Testing
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testImplementation 'org.springframework.boot:spring-boot-starter-web'
+	testImplementation 'io.opentelemetry:opentelemetry-api:1.45.0'
 }
 
 tasks.named('test') {
