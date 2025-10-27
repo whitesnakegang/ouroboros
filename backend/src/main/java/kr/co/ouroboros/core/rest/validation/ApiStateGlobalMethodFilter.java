@@ -1,6 +1,7 @@
-package kr.co.ouroboros.core.global.annotation;
+package kr.co.ouroboros.core.rest.validation;
 
 import java.lang.reflect.Method;
+import kr.co.ouroboros.core.global.annotation.ApiState;
 import org.springdoc.core.filters.GlobalOpenApiMethodFilter;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.stereotype.Component;

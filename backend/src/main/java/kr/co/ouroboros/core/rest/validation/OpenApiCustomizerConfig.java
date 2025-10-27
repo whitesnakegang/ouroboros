@@ -1,7 +1,8 @@
-package kr.co.ouroboros.core.global.annotation;
+package kr.co.ouroboros.core.rest.validation;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import kr.co.ouroboros.core.global.annotation.ApiState;
 import org.springdoc.core.customizers.OperationCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
