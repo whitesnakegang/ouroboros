@@ -5,6 +5,14 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * Represents a property within a schema.
+ * <p>
+ * Defines individual fields in a data object including type, description,
+ * and optional mock data generation expressions.
+ *
+ * @since 0.0.1
+ */
 @Data
 @Builder
 @NoArgsConstructor

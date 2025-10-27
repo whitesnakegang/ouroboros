@@ -7,6 +7,14 @@ import lombok.NoArgsConstructor;
 
 import java.util.Map;
 
+/**
+ * Represents a request body specification.
+ * <p>
+ * Defines the structure and content types of an HTTP request body.
+ * Conforms to OpenAPI 3.1.0 Request Body Object.
+ *
+ * @since 0.0.1
+ */
 @Data
 @Builder
 @NoArgsConstructor

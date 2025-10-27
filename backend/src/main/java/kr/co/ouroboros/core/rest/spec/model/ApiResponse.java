@@ -7,6 +7,14 @@ import lombok.NoArgsConstructor;
 
 import java.util.Map;
 
+/**
+ * Represents an API response specification.
+ * <p>
+ * Defines the structure of an HTTP response including content types, headers,
+ * and response body schema. Conforms to OpenAPI 3.1.0 Response Object.
+ *
+ * @since 0.0.1
+ */
 @Data
 @Builder
 @NoArgsConstructor

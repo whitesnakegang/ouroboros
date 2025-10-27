@@ -4,18 +4,29 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springdoc.core.customizers.OperationCustomizer;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 
-@Configuration
+/**
+ * Configuration for OpenAPI operation customizers.
+ * <p>
+ * Provides beans that customize OpenAPI operations by reading {@link ApiState} annotations
+ * and adding metadata to the generated OpenAPI specification.
+ * This class is no longer a {@code @Configuration} and its beans are registered
+ * in {@link kr.co.ouroboros.core.global.config.OuroborosAutoConfiguration}.
+ *
+ * @since 0.0.1
+ */
 public class OpenApiCustomizerConfig {
 
     /**
-     * 핸들러 메서드에서 {@code ApiState} 애노테이션을 읽어 OpenAPI Operation에 상태 메타정보를 확장으로 주입하는 {@code OperationCustomizer} 빈을 생성한다.
+     * Creates an {@code OperationCustomizer} that reads {@code @ApiState} annotations
+     * and injects state metadata into OpenAPI operations.
+     * <p>
+     * The generated extension includes {@code state} (enum name), {@code owner},
+     * and {@code description} fields. If the annotation is not present, the operation
+     * is not modified.
      *
-     * 생성되는 확장에는 {@code state} (열거형 이름), {@code owner}, {@code description} 필드를 가진 맵이 포함되며,
-     * 해당 애노테이션이 없으면 Operation을 변경하지 않는다.
-     *
-     * @return 핸들러 메서드의 {@code ApiState}를 기반으로 Operation의 extensions에 {@code "ouro-api-state"} 메타맵을 추가하는 {@code OperationCustomizer}
+     * @return an {@code OperationCustomizer} that adds {@code "ouro-api-state"} metadata
+     *         to operations based on {@code @ApiState} annotations
      */
     @Bean
     public OperationCustomizer apiOperationCustomizer() {

@@ -3,16 +3,25 @@ package kr.co.ouroboros.core.global.annotation;
 import java.lang.reflect.Method;
 import org.springdoc.core.filters.GlobalOpenApiMethodFilter;
 import org.springframework.core.annotation.AnnotatedElementUtils;
-import org.springframework.stereotype.Component;
 
-@Component
+/**
+ * Global OpenAPI method filter that includes only methods annotated with {@link ApiState}.
+ * <p>
+ * This filter is used by SpringDoc to determine which API endpoints should be included
+ * in the generated OpenAPI documentation based on the presence of the {@code @ApiState} annotation.
+ * Registered as a bean in {@link kr.co.ouroboros.core.global.config.OuroborosAutoConfiguration}.
+ *
+ * @since 0.0.1
+ */
 public class ApiStateGlobalMethodFilter implements GlobalOpenApiMethodFilter {
 
     /**
-     * 주어진 메서드에 `@ApiState` 애노테이션이 존재하는지 판별한다.
+     * Determines whether the given method should be included in OpenAPI documentation.
+     * <p>
+     * A method is included if it has the {@code @ApiState} annotation.
      *
-     * @param method 검사할 리플렉션 `Method` 객체
-     * @return {@code true}이면 메서드에 `@ApiState` 애노테이션이 존재하고, {@code false}이면 존재하지 않습니다.
+     * @param method the reflection {@code Method} object to check
+     * @return {@code true} if the method has {@code @ApiState} annotation, {@code false} otherwise
      */
     @Override
     public boolean isMethodToInclude(Method method) {

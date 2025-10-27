@@ -1,5 +1,6 @@
 package kr.co.ouroboros.core.rest.spec.writer;
 
+import kr.co.ouroboros.core.global.exception.DuplicateApiSpecException;
 import kr.co.ouroboros.core.rest.spec.model.*;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
@@ -12,14 +13,31 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 
+/**
+ * Writes REST API specifications to OpenAPI 3.1.0 YAML format.
+ * <p>
+ * Handles generation and merging of OpenAPI specification files. When a file exists,
+ * it merges new API specifications while checking for duplicate path+method combinations.
+ * Generates files at {@code resources/ouroboros/rest/ourorest.yml}.
+ *
+ * @since 0.0.1
+ */
 public class OpenApiYamlWriter {
 
-    private static final String OPENAPI_VERSION = "3.0.1";
+    private static final String OPENAPI_VERSION = "3.1.0";
     private final Yaml yaml;
     private final String serverUrl;
+    private final String serverDescription;
 
-    public OpenApiYamlWriter(String serverUrl) {
+    /**
+     * Constructs a new OpenApiYamlWriter with the specified server URL and description.
+     *
+     * @param serverUrl the base server URL to include in the OpenAPI document
+     * @param serverDescription the description of the server
+     */
+    public OpenApiYamlWriter(String serverUrl, String serverDescription) {
         this.serverUrl = serverUrl;
+        this.serverDescription = serverDescription;
         DumperOptions options = new DumperOptions();
         options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
         options.setPrettyFlow(true);
@@ -27,13 +45,25 @@ public class OpenApiYamlWriter {
         this.yaml = new Yaml(options);
     }
 
+    /**
+     * Writes a REST API specification to OpenAPI YAML file.
+     * <p>
+     * If the file already exists, merges the new specification into the existing document.
+     * Throws {@link kr.co.ouroboros.core.global.exception.DuplicateApiSpecException}
+     * if a specification with the same path and method already exists.
+     *
+     * @param spec the REST API specification to write
+     * @param baseResourcePath the base resources directory path
+     * @throws IOException if file I/O operation fails
+     * @throws kr.co.ouroboros.core.global.exception.DuplicateApiSpecException if duplicate path+method found
+     */
     public void writeToFile(RestApiSpec spec, String baseResourcePath) throws IOException {
         // Create directory: resources/ouroboros/rest/
         Path dirPath = Paths.get(baseResourcePath, "ouroboros", "rest");
         Files.createDirectories(dirPath);
 
-        // Single file: rest.yml
-        String fileName = "rest.yml";
+        // Single file: ourorest.yml
+        String fileName = "ourorest.yml";
         Path filePath = dirPath.resolve(fileName);
 
         Map<String, Object> openApiDoc;
@@ -45,6 +75,9 @@ public class OpenApiYamlWriter {
         } else {
             openApiDoc = generateOpenApiDocument(spec);
         }
+
+        // Always update servers section with latest configuration
+        updateServersSection(openApiDoc);
 
         try (FileWriter writer = new FileWriter(filePath.toFile())) {
             yaml.dump(openApiDoc, writer);
@@ -78,9 +111,15 @@ public class OpenApiYamlWriter {
             paths.put(spec.getPath(), pathItem);
         }
 
-        // Add or update operation (method)
+        // Check for duplicate path+method combination
+        String methodLower = spec.getMethod().toLowerCase();
+        if (pathItem.containsKey(methodLower)) {
+            throw new DuplicateApiSpecException(spec.getPath(), spec.getMethod());
+        }
+
+        // Add operation (method)
         Map<String, Object> operation = buildOperation(spec);
-        pathItem.put(spec.getMethod().toLowerCase(), operation);
+        pathItem.put(methodLower, operation);
 
         // Merge security schemes if needed
         if (spec.getSecurity() != null && !spec.getSecurity().isEmpty()) {
@@ -148,18 +187,30 @@ public class OpenApiYamlWriter {
         }
         doc.put("components", components);
 
-        // servers
-        List<Map<String, String>> servers = new ArrayList<>();
-        Map<String, String> server = new LinkedHashMap<>();
-        server.put("url", serverUrl);
-        server.put("description", "Local Mock");
-        servers.add(server);
-        doc.put("servers", servers);
+        // servers - will be updated by updateServersSection()
+        doc.put("servers", new ArrayList<>());
 
         // security (global)
         doc.put("security", new ArrayList<>());
 
         return doc;
+    }
+
+    /**
+     * Updates the servers section in the OpenAPI document with the latest configuration.
+     * <p>
+     * This method is called every time the YAML file is written to ensure the server URL
+     * and description are always up-to-date with the current configuration.
+     *
+     * @param doc the OpenAPI document to update
+     */
+    private void updateServersSection(Map<String, Object> doc) {
+        List<Map<String, String>> servers = new ArrayList<>();
+        Map<String, String> server = new LinkedHashMap<>();
+        server.put("url", serverUrl);
+        server.put("description", serverDescription);
+        servers.add(server);
+        doc.put("servers", servers);
     }
 
     private Map<String, Object> buildOperation(RestApiSpec spec) {
@@ -190,7 +241,10 @@ public class OpenApiYamlWriter {
             operation.put("security", securityList);
         }
 
-        // custom fields - always set status to "mock" and conflict to "none"
+        // custom fields
+        if (spec.getId() != null) {
+            operation.put("x-ouroboros-id", spec.getId());
+        }
         operation.put("x-ouroboros-status", "mock");
         operation.put("x-ouroboros-conflict", "none");
 

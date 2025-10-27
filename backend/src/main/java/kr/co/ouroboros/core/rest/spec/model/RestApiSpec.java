@@ -8,11 +8,23 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Represents a complete REST API specification.
+ * <p>
+ * This is the core domain model that encapsulates all aspects of a REST API endpoint
+ * including path, method, parameters, request/response structures, and security requirements.
+ * Based on OpenAPI 3.1.0 specification.
+ * <p>
+ * Each specification is assigned a unique ID (UUID) for identification in update/delete operations.
+ *
+ * @since 0.0.1
+ */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class RestApiSpec {
+    private String id;
     private String path;
     private String method;
     private String summary;
