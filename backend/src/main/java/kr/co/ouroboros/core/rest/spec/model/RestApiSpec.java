@@ -35,4 +35,9 @@ public class RestApiSpec {
     private RequestBody requestBody;
     private Map<String, ApiResponse> responses;
     private List<SecurityRequirement> security;
+
+    // Ouroboros custom fields
+    private String progress = "mock";  // mock or completed
+    private String tag = "none";       // bugfix, implementing, or none
+    private boolean isValid = true;
 }

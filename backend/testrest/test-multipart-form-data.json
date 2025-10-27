@@ -1,0 +1,74 @@
+{
+  "path": "/api/upload",
+  "method": "POST",
+  "summary": "파일 업로드",
+  "description": "파일과 메타데이터를 업로드합니다",
+  "tags": ["Upload"],
+  "requestBody": {
+    "description": "업로드할 파일과 메타데이터",
+    "required": true,
+    "content": {
+      "multipart/form-data": {
+        "schema": {
+          "type": "object",
+          "properties": {
+            "file": {
+              "type": "string",
+              "description": "업로드할 파일 (binary)",
+              "mockExpression": "binary"
+            },
+            "title": {
+              "type": "string",
+              "description": "파일 제목",
+              "mockExpression": "{{$lorem.word}}"
+            },
+            "description": {
+              "type": "string",
+              "description": "파일 설명",
+              "mockExpression": "{{$lorem.sentence}}"
+            },
+            "tags": {
+              "type": "array",
+              "description": "태그 목록",
+              "minItems": 1,
+              "maxItems": 5,
+              "items": {
+                "type": "string",
+                "mockExpression": "{{$lorem.word}}"
+              }
+            }
+          },
+          "required": ["file", "title"],
+          "orders": ["file", "title", "description", "tags"]
+        }
+      }
+    }
+  },
+  "responses": {
+    "200": {
+      "description": "업로드 성공",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "fileId": {
+                "type": "string",
+                "description": "파일 ID",
+                "mockExpression": "{{$random.uuid}}"
+              },
+              "url": {
+                "type": "string",
+                "description": "파일 URL",
+                "mockExpression": "{{$internet.url}}"
+              }
+            },
+            "required": ["fileId", "url"],
+            "orders": ["fileId", "url"]
+          }
+        }
+      },
+      "headers": {}
+    }
+  }
+}

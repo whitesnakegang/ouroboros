@@ -1,0 +1,98 @@
+{
+  "path": "/api/books",
+  "method": "POST",
+  "summary": "Create a book record",
+  "description": "Create a new book record using XML format",
+  "tags": ["Books"],
+  "requestBody": {
+    "required": true,
+    "content": {
+      "application/xml": {
+        "schema": {
+          "type": "object",
+          "xmlName": "Book",
+          "properties": {
+            "title": {
+              "type": "string",
+              "mockExpression": "The Great Gatsby"
+            },
+            "author": {
+              "type": "string",
+              "mockExpression": "F. Scott Fitzgerald"
+            },
+            "isbn": {
+              "type": "string",
+              "mockExpression": "978-0-7432-7356-5"
+            },
+            "publishedYear": {
+              "type": "integer",
+              "mockExpression": "1925"
+            },
+            "price": {
+              "type": "number",
+              "mockExpression": "15.99"
+            }
+          }
+        }
+      }
+    }
+  },
+  "responses": {
+    "201": {
+      "description": "Book created successfully",
+      "content": {
+        "application/xml": {
+          "schema": {
+            "type": "object",
+            "xmlName": "BookResponse",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Book ID",
+                "mockExpression": "book-789"
+              },
+              "title": {
+                "type": "string",
+                "description": "Book title",
+                "mockExpression": "The Great Gatsby"
+              },
+              "author": {
+                "type": "string",
+                "description": "Book author",
+                "mockExpression": "F. Scott Fitzgerald"
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Created timestamp",
+                "mockExpression": "2025-10-27T10:30:00Z"
+              }
+            },
+            "required": ["id", "title", "author", "createdAt"],
+            "orders": ["id", "title", "author", "createdAt"]
+          }
+        }
+      },
+      "headers": {}
+    },
+    "400": {
+      "description": "Invalid XML format",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "error": {
+                "type": "string",
+                "description": "Error message",
+                "mockExpression": "Invalid XML structure"
+              }
+            },
+            "required": ["error"],
+            "orders": ["error"]
+          }
+        }
+      },
+      "headers": {}
+    }
+  }
+}

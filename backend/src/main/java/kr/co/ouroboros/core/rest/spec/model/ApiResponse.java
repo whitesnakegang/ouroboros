@@ -20,7 +20,6 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ApiResponse {
-    private String name;
     private String description;
     private Map<String, MediaType> content;
     private Map<String, Header> headers;

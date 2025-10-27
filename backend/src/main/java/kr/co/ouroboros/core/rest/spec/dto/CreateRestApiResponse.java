@@ -1,15 +1,16 @@
 package kr.co.ouroboros.core.rest.spec.dto;
 
+import kr.co.ouroboros.core.global.response.GlobalApiResponse;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * Response DTO for REST API specification creation.
+ * Data object for REST API specification creation response.
  * <p>
- * Returns the result of the API specification creation operation including
- * success status, message, the generated ID, and the path to the generated YAML file.
+ * Contains the generated ID and file path of the created API specification.
+ * Used as the data field in the standard {@link GlobalApiResponse}.
  *
  * @since 0.0.1
  */
@@ -18,8 +19,13 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CreateRestApiResponse {
-    private boolean success;
-    private String message;
+    /**
+     * Generated unique ID (UUID) for the API specification
+     */
     private String id;
+
+    /**
+     * File path where the OpenAPI YAML was saved
+     */
     private String filePath;
 }

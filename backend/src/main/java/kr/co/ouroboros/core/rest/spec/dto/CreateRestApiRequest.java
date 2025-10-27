@@ -35,4 +35,9 @@ public class CreateRestApiRequest {
     private RequestBody requestBody;
     private Map<String, ApiResponse> responses;
     private List<SecurityRequirement> security;
+
+    // Ouroboros custom fields
+    private String progress;  // mock or completed (default: mock)
+    private String tag;       // bugfix, implementing, or none (default: none)
+    private Boolean isValid;  // default: true
 }

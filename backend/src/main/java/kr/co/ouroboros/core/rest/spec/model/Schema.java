@@ -13,6 +13,7 @@ import java.util.Map;
  * <p>
  * Defines the structure and validation rules for data objects in request/response bodies.
  * Includes type information, property definitions, and field ordering.
+ * For XML content types, the xmlName field specifies the root element name.
  * Conforms to OpenAPI 3.1.0 Schema Object (JSON Schema compatible).
  *
  * @since 0.0.1
@@ -28,4 +29,5 @@ public class Schema {
     private Map<String, Property> properties;
     private List<String> required;
     private List<String> orders;
+    private String xmlName;  // XML root element name
 }

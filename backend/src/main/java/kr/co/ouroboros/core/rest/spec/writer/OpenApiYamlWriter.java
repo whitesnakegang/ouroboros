@@ -223,6 +223,11 @@ public class OpenApiYamlWriter {
         operation.put("parameters", spec.getParameters() != null ?
             buildParameters(spec.getParameters()) : new ArrayList<>());
 
+        // requestBody
+        if (spec.getRequestBody() != null) {
+            operation.put("requestBody", buildRequestBody(spec.getRequestBody()));
+        }
+
         // responses
         if (spec.getResponses() != null) {
             Map<String, Object> responses = new LinkedHashMap<>();
@@ -245,8 +250,9 @@ public class OpenApiYamlWriter {
         if (spec.getId() != null) {
             operation.put("x-ouroboros-id", spec.getId());
         }
-        operation.put("x-ouroboros-status", "mock");
-        operation.put("x-ouroboros-conflict", "none");
+        operation.put("x-ouroboros-progress", spec.getProgress() != null ? spec.getProgress() : "mock");
+        operation.put("x-ouroboros-tag", spec.getTag() != null ? spec.getTag() : "none");
+        operation.put("x-ouroboros-isvalid", spec.isValid());
 
         return operation;
     }
@@ -267,6 +273,29 @@ public class OpenApiYamlWriter {
         return result;
     }
 
+    private Map<String, Object> buildRequestBody(RequestBody requestBody) {
+        Map<String, Object> requestBodyMap = new LinkedHashMap<>();
+
+        if (requestBody.getDescription() != null) {
+            requestBodyMap.put("description", requestBody.getDescription());
+        }
+        requestBodyMap.put("required", requestBody.isRequired());
+
+        if (requestBody.getContent() != null) {
+            Map<String, Object> content = new LinkedHashMap<>();
+            for (Map.Entry<String, MediaType> entry : requestBody.getContent().entrySet()) {
+                Map<String, Object> mediaTypeMap = new LinkedHashMap<>();
+                if (entry.getValue().getSchema() != null) {
+                    mediaTypeMap.put("schema", buildSchema(entry.getValue().getSchema()));
+                }
+                content.put(entry.getKey(), mediaTypeMap);
+            }
+            requestBodyMap.put("content", content);
+        }
+
+        return requestBodyMap;
+    }
+
     private Map<String, Object> buildResponse(ApiResponse response) {
         Map<String, Object> responseMap = new LinkedHashMap<>();
         responseMap.put("description", response.getDescription() != null ? response.getDescription() : "");
@@ -285,10 +314,6 @@ public class OpenApiYamlWriter {
 
         responseMap.put("headers", response.getHeaders() != null ? response.getHeaders() : new LinkedHashMap<>());
 
-        if (response.getName() != null) {
-            responseMap.put("x-ouroboros-name", response.getName());
-        }
-
         return responseMap;
     }
 
@@ -299,6 +324,13 @@ public class OpenApiYamlWriter {
             schemaMap.put("title", schema.getTitle());
         }
         schemaMap.put("type", schema.getType() != null ? schema.getType() : "object");
+
+        // XML support - add xml.name for root element
+        if (schema.getXmlName() != null) {
+            Map<String, Object> xml = new LinkedHashMap<>();
+            xml.put("name", schema.getXmlName());
+            schemaMap.put("xml", xml);
+        }
 
         if (schema.getProperties() != null) {
             Map<String, Object> properties = new LinkedHashMap<>();
@@ -322,6 +354,19 @@ public class OpenApiYamlWriter {
     private Map<String, Object> buildProperty(Property property) {
         Map<String, Object> propertyMap = new LinkedHashMap<>();
         propertyMap.put("type", property.getType() != null ? property.getType() : "string");
+
+        // For array types, recursively build items
+        if (property.getItems() != null) {
+            propertyMap.put("items", buildProperty(property.getItems()));
+        }
+
+        // Array constraints
+        if (property.getMinItems() != null) {
+            propertyMap.put("minItems", property.getMinItems());
+        }
+        if (property.getMaxItems() != null) {
+            propertyMap.put("maxItems", property.getMaxItems());
+        }
 
         if (property.getMockExpression() != null) {
             propertyMap.put("x-ouroboros-mock", property.getMockExpression());

@@ -58,8 +58,6 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         writer.writeToFile(spec, resourcePath);
 
         return CreateRestApiResponse.builder()
-                .success(true)
-                .message("REST API specification created successfully")
                 .id(id)
                 .filePath(resourcePath + "/ouroboros/rest/ourorest.yml")
                 .build();
@@ -78,6 +76,10 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
                 .requestBody(request.getRequestBody())
                 .responses(request.getResponses())
                 .security(request.getSecurity())
+                // Ouroboros custom fields with defaults
+                .progress(request.getProgress() != null ? request.getProgress() : "mock")
+                .tag(request.getTag() != null ? request.getTag() : "none")
+                .isValid(request.getIsValid() != null ? request.getIsValid() : true)
                 .build();
     }
 }
