@@ -10,8 +10,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Try 세션을 인메모리에 저장하고 관리하는 레지스트리.
- * ConcurrentHashMap을 사용하여 스레드 안전성을 보장한다.
+ * Registry for storing and managing Try sessions in memory.
+ * Uses ConcurrentHashMap for thread safety.
  */
 @Slf4j
 @Component
@@ -41,6 +41,22 @@ public class TrySessionRegistry {
         return session;
     }
 
+    /**
+     * 세션을 조회한다.
+     *
+     * @param tryId 세션 식별자
+     * @return TrySession 객체, 없으면 null
+     */
+    public TrySession getSession(UUID tryId) {
+        TrySession session = sessions.get(tryId);
+        if (session != null && session.isExpired()) {
+            sessions.remove(tryId);
+            activeSessionCount = sessions.size();
+            return null;
+        }
+        return session;
+    }
+    
     /**
      * 세션이 유효한지 검증한다.
      * 만료되지 않았고, 사용되지 않았으며, IP가 일치하는지 확인한다.

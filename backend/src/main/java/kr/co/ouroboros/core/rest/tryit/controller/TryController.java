@@ -3,21 +3,26 @@ package kr.co.ouroboros.core.rest.tryit.controller;
 import jakarta.servlet.http.HttpServletRequest;
 import kr.co.ouroboros.core.rest.tryit.config.TrySessionProperties;
 import kr.co.ouroboros.core.rest.tryit.dto.CreateSessionResponse;
+import kr.co.ouroboros.core.rest.tryit.dto.TryResultResponse;
 import kr.co.ouroboros.core.rest.tryit.session.TrySession;
 import kr.co.ouroboros.core.rest.tryit.session.TrySessionRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.UUID;
 
 /**
- * Try 세션 발급을 위한 REST API 컨트롤러.
- * UI가 세션을 요청하면 UUID를 생성하여 반환한다.
+ * REST API controller for Try session management.
+ * Creates and retrieves Try sessions for QA analysis.
  */
 @Slf4j
 @RestController
@@ -28,30 +33,30 @@ public class TryController {
     private final TrySessionRegistry registry;
     private final TrySessionProperties properties;
     
-    /** HTTP 헤더 이름: X-Ouroboros-Try */
+    /** HTTP header name: X-Ouroboros-Try */
     private static final String HEADER_NAME = "X-Ouroboros-Try";
     
-    /** OpenTelemetry Baggage 키: ouro.try_id */
+    /** OpenTelemetry Baggage key: ouro.try_id */
     private static final String BAGGAGE_KEY = "ouro.try_id";
 
     /**
-     * 새로운 Try 세션을 발급한다.
+     * Creates a new Try session.
      * 
      * POST /ouroboros/tries
      * 
-     * 응답:
-     * - tryId: 세션 식별자
-     * - headerName: HTTP 헤더 이름
-     * - baggageKey: Baggage 키
-     * - expiresAt: 만료 시각
+     * Response:
+     * - tryId: session identifier
+     * - headerName: HTTP header name
+     * - baggageKey: Baggage key
+     * - expiresAt: expiration time
      * 
-     * @param request HTTP 요청 객체 (IP 추출용)
-     * @return 생성된 세션 정보
-     * @throws ResponseStatusException 활성 세션 수가 maxActive를 초과할 경우 429
+     * @param request HTTP request (for IP extraction)
+     * @return created session information
+     * @throws ResponseStatusException 429 if active sessions exceed maxActive
      */
     @PostMapping
     public CreateSessionResponse createSession(HttpServletRequest request) {
-        // 활성 세션 수 체크
+        // Check active session count
         if (registry.getActiveSessionCount() >= properties.getMaxActive()) {
             log.warn("Max active sessions exceeded: current={}, max={}", 
                     registry.getActiveSessionCount(), properties.getMaxActive());
@@ -81,11 +86,52 @@ public class TryController {
     }
     
     /**
-     * HTTP 요청에서 클라이언트 IP 주소를 추출한다.
-     * X-Forwarded-For 헤더를 우선 확인하고, 없으면 RemoteAddr를 사용한다.
+     * Retrieves Try result.
      * 
-     * @param request HTTP 요청
-     * @return 클라이언트 IP 주소
+     * GET /ouroboros/tries/{tryId}
+     * 
+     * @param tryIdStr Try session ID
+     * @return analysis result
+     */
+    @GetMapping("/{tryId}")
+    public TryResultResponse getResult(@PathVariable String tryIdStr) {
+        UUID tryId;
+        try {
+            tryId = UUID.fromString(tryIdStr);
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid tryId format: {}", tryIdStr);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid tryId format");
+        }
+        
+        TrySession session = registry.getSession(tryId);
+        if (session == null) {
+            log.debug("Try session not found: tryId={}", tryId);
+            return TryResultResponse.builder()
+                    .tryId(tryIdStr)
+                    .status(TryResultResponse.Status.NOT_FOUND)
+                    .error("Try session not found or expired")
+                    .build();
+        }
+        
+        // TODO: Integrate with Tempo and perform analysis
+        // For now, return a placeholder response
+        log.info("Retrieving result for tryId: {}", tryId);
+        return TryResultResponse.builder()
+                .tryId(tryIdStr)
+                .status(TryResultResponse.Status.PENDING)
+                .createdAt(session.getExpiresAt().atZone(java.time.ZoneId.systemDefault()).toInstant())
+                .analyzedAt(Instant.now())
+                .issues(new ArrayList<>())
+                .spanCount(0)
+                .build();
+    }
+    
+    /**
+     * Extracts client IP address from HTTP request.
+     * Checks X-Forwarded-For header first, then uses RemoteAddr.
+     * 
+     * @param request HTTP request
+     * @return client IP address
      */
     private String getClientIp(HttpServletRequest request) {
         String ip = request.getHeader("X-Forwarded-For");
