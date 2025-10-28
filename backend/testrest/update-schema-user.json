@@ -1,0 +1,38 @@
+{
+  "type": "object",
+  "title": "Updated User Schema",
+  "description": "An updated user entity with additional fields",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "User ID",
+      "mockExpression": "{{$random.uuid}}"
+    },
+    "name": {
+      "type": "string",
+      "description": "User name",
+      "mockExpression": "{{$name.fullName}}"
+    },
+    "email": {
+      "type": "string",
+      "description": "User email",
+      "mockExpression": "{{$internet.email}}"
+    },
+    "age": {
+      "type": "integer",
+      "description": "User age",
+      "mockExpression": "{{$number.numberBetween(18,80)}}"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "email"
+  ],
+  "orders": [
+    "id",
+    "name",
+    "email",
+    "age"
+  ]
+}
