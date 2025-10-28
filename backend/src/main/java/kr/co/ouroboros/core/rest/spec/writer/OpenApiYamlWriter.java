@@ -136,7 +136,7 @@ public class OpenApiYamlWriter {
             }
 
             for (SecurityRequirement req : spec.getSecurity()) {
-                for (String schemeName : req.getSchemes().keySet()) {
+                for (String schemeName : req.getRequirements().keySet()) {
                     if (!securitySchemes.containsKey(schemeName)) {
                         Map<String, Object> scheme = new LinkedHashMap<>();
                         scheme.put("type", "http");
@@ -176,7 +176,7 @@ public class OpenApiYamlWriter {
         if (spec.getSecurity() != null && !spec.getSecurity().isEmpty()) {
             Map<String, Object> securitySchemes = new LinkedHashMap<>();
             for (SecurityRequirement req : spec.getSecurity()) {
-                for (String schemeName : req.getSchemes().keySet()) {
+                for (String schemeName : req.getRequirements().keySet()) {
                     Map<String, Object> scheme = new LinkedHashMap<>();
                     scheme.put("type", "http");
                     scheme.put("scheme", schemeName);
@@ -241,7 +241,7 @@ public class OpenApiYamlWriter {
         if (spec.getSecurity() != null && !spec.getSecurity().isEmpty()) {
             List<Map<String, List<String>>> securityList = new ArrayList<>();
             for (SecurityRequirement req : spec.getSecurity()) {
-                securityList.add(req.getSchemes());
+                securityList.add(req.getRequirements());
             }
             operation.put("security", securityList);
         }
