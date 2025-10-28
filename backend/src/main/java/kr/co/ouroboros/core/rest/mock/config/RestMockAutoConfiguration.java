@@ -46,7 +46,7 @@ public class RestMockAutoConfiguration {
             XmlMapper xmlMapper
     ) {
         FilterRegistrationBean<MockResponseFilter> reg = new FilterRegistrationBean<>();
-        reg.setFilter(new MockResponseFilter(generator, schemaMockBuilder, objectMapper, xmlMapper));
+        reg.setFilter(new MockResponseFilter(schemaMockBuilder, objectMapper, xmlMapper));
         reg.setOrder(3);
         return reg;
     }
