@@ -11,7 +11,6 @@ import kr.co.ouroboros.core.rest.mock.model.EndpointMeta;
 import lombok.RequiredArgsConstructor;
 
 import java.io.IOException;
-import java.util.Map;
 
 @RequiredArgsConstructor
 public class MockResponseFilter implements Filter{

@@ -14,5 +14,5 @@ public class ResponseMeta {
     private int statusCode;
     private Map<String, Object> headers;
     private Map<String, Object> body;
-    private String contentType;                   // JSON/xml
+    private String contentType;                   // JSON of XML
 }
