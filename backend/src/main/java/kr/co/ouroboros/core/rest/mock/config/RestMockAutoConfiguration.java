@@ -2,20 +2,15 @@ package kr.co.ouroboros.core.rest.mock.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
-import kr.co.ouroboros.core.global.mock.service.DummyDataGenerator;
 import kr.co.ouroboros.core.global.mock.service.SchemaMockBuilder;
 import kr.co.ouroboros.core.rest.mock.filter.*;
-import kr.co.ouroboros.core.rest.mock.model.EndpointMeta;
 import kr.co.ouroboros.core.rest.mock.registry.RestMockRegistry;
-import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-
-import java.util.Map;
 
 @Configuration
 @ConditionalOnClass(name = "jakarta.servlet.Filter")
@@ -40,7 +35,6 @@ public class RestMockAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean(MockResponseFilter.class)
     public FilterRegistrationBean<MockResponseFilter> response(
-            DummyDataGenerator generator,
             SchemaMockBuilder schemaMockBuilder,
             ObjectMapper objectMapper,
             XmlMapper xmlMapper
