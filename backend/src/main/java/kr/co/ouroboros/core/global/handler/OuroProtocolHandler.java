@@ -47,5 +47,5 @@ String getSpecFilePath();
  * @param specToSave the API specification to serialize (typically a scanned or merged spec)
  * @return the YAML representation of the provided specification
  */
-    String saveToString(OuroApiSpec specToSave);
+    String serializeToYaml(OuroApiSpec specToSave);
 }

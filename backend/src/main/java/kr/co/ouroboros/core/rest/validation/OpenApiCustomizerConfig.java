@@ -3,32 +3,38 @@ package kr.co.ouroboros.core.rest.validation;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import kr.co.ouroboros.core.global.annotation.ApiState;
+import lombok.extern.slf4j.Slf4j;
+import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springdoc.core.customizers.OperationCustomizer;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
-/**
- * Configuration for OpenAPI operation customizers.
- * <p>
- * Provides beans that customize OpenAPI operations by reading {@link ApiState} annotations
- * and adding metadata to the generated OpenAPI specification.
- * This class is no longer a {@code @Configuration} and its beans are registered
- * in {@link kr.co.ouroboros.core.global.config.OuroborosAutoConfiguration}.
- *
- * @since 0.0.1
- */
+@Configuration
+@Slf4j
 public class OpenApiCustomizerConfig {
 
+    @Bean
+    public OpenApiCustomizer openApiCustomizer() {
+        return openApi -> {
+            log.info("OpenApiCustomizer found");
+            openApi.getPaths().forEach((path, pathItem) -> {
+
+            });
+        };
+    }
+
     /**
-     * Creates an {@code OperationCustomizer} that reads {@code @ApiState} annotations
-     * and injects state metadata into OpenAPI operations.
-     * <p>
-     * The generated extension includes {@code state} (enum name), {@code owner},
-     * and {@code description} fields. If the annotation is not present, the operation
-     * is not modified.
+     * Creates an {@code OperationCustomizer} bean that reads the {@code ApiState} annotation
+     * from handler methods and injects state metadata into the OpenAPI {@code Operation} as an extension.
      *
-     * @return an {@code OperationCustomizer} that adds {@code "ouro-api-state"} metadata
-     *         to operations based on {@code @ApiState} annotations
+     * The generated extension contains a map with the fields {@code state} (enum name),
+     * {@code owner}, and {@code description}.
+     * If the annotation is not present, the {@code Operation} remains unchanged.
+     *
+     * @return an {@code OperationCustomizer} that adds an {@code "ouro-api-state"} metadata map
+     *         to the {@code Operation}'s extensions based on the method's {@code ApiState}
      */
+
     @Bean
     public OperationCustomizer apiOperationCustomizer() {
         return (operation, handlerMethod) -> {
@@ -40,9 +46,17 @@ public class OpenApiCustomizerConfig {
             }
 
             Map<String, Object> meta = new LinkedHashMap<>();
+
+
+            if (apiState.state() == ApiState.State.COMPLETED) {
+                meta.put("state", apiState.state().name());
+                meta.put("tag", "");
+            } else {
+                meta.put("state", "Mock");
+                meta.put("tag", apiState.state().name());
+            }
+
             meta.put("state", apiState.state().name());
-            meta.put("owner", apiState.owner());
-            meta.put("description", apiState.description());
 
             if (operation.getExtensions() == null) {
                 operation.setExtensions(new LinkedHashMap<>());
