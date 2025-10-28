@@ -6,6 +6,7 @@ import { ProtocolTabs } from "./ProtocolTabs";
 import { CodeSnippetPanel } from "./CodeSnippetPanel";
 import { useSpecStore } from "../store/spec.store";
 import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
+import { exportToMarkdown, downloadMarkdown } from "../utils/markdownExporter";
 
 interface KeyValuePair {
   key: string;
@@ -173,6 +174,31 @@ export function ApiEditorLayout() {
     setStatusCodes([]);
   };
 
+  const handleExportMarkdown = () => {
+    const markdownContent = exportToMarkdown({
+      method,
+      url,
+      description,
+      tags,
+      owner,
+      headers: requestHeaders,
+      requestBody,
+      statusCodes,
+    });
+
+    const filename = `${method.toUpperCase()}_${url.replace(/\//g, "_")}.md`;
+    downloadMarkdown(markdownContent, filename);
+    alert("Markdown 파일이 다운로드되었습니다.");
+  };
+
+  const handleImportYAML = () => {
+    alert("Import YAML 기능은 구현 중입니다.");
+  };
+
+  const handleGenerateApiYaml = () => {
+    alert("Generate api.yaml 기능은 구현 중입니다.");
+  };
+
   return (
     <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900">
       {/* Header Tabs */}
@@ -257,13 +283,22 @@ export function ApiEditorLayout() {
                   </button>
                 </>
               )}
-              <button className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium">
+              <button
+                onClick={handleImportYAML}
+                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium"
+              >
                 Import YAML
               </button>
-              <button className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium">
+              <button
+                onClick={handleExportMarkdown}
+                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium"
+              >
                 Export Markdown
               </button>
-              <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white rounded-lg transition-colors font-medium">
+              <button
+                onClick={handleGenerateApiYaml}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white rounded-lg transition-colors font-medium"
+              >
                 Generate api.yaml
               </button>
             </div>
