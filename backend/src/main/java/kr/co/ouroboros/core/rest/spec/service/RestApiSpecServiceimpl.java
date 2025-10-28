@@ -1,189 +1,662 @@
 package kr.co.ouroboros.core.rest.spec.service;
 
-import kr.co.ouroboros.core.global.properties.OuroborosProperties;
+import kr.co.ouroboros.core.rest.common.yaml.RestApiYamlParser;
 import kr.co.ouroboros.core.rest.spec.dto.CreateRestApiRequest;
-import kr.co.ouroboros.core.rest.spec.dto.CreateRestApiResponse;
-import kr.co.ouroboros.core.rest.spec.dto.GetRestApiSpecsResponse;
-import kr.co.ouroboros.core.rest.spec.model.RestApiSpec;
-import kr.co.ouroboros.core.rest.spec.writer.OpenApiYamlWriter;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
+import kr.co.ouroboros.core.rest.spec.dto.RestApiSpecResponse;
+import kr.co.ouroboros.core.rest.spec.dto.UpdateRestApiRequest;
+import kr.co.ouroboros.core.rest.spec.model.*;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.yaml.snakeyaml.Yaml;
 
-import java.io.FileInputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
- * Default implementation of {@link RestApiSpecService}.
+ * Implementation of {@link RestApiSpecService}.
  * <p>
- * Handles the creation of REST API specifications by converting DTOs to domain models
- * and delegating YAML file generation to {@link OpenApiYamlWriter}.
+ * Manages REST API specifications in the OpenAPI paths section of ourorest.yml.
+ * Uses {@link RestApiYamlParser} for all YAML file operations.
+ * Each specification is identified by a UUID stored in the x-ouroboros-id extension.
  *
  * @since 0.0.1
  */
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class RestApiSpecServiceimpl implements RestApiSpecService {
 
-    @Value("${server.port:8080}")
-    private String serverPort;
-
-    private final OuroborosProperties properties;
-
-    @Autowired
-    public RestApiSpecServiceimpl(OuroborosProperties properties) {
-        this.properties = properties;
-    }
+    private final RestApiYamlParser yamlParser;
 
     @Override
-    public CreateRestApiResponse createRestApiSpec(CreateRestApiRequest request) throws Exception {
+    public RestApiSpecResponse createRestApiSpec(CreateRestApiRequest request) throws Exception {
         // Generate UUID if not provided
-        String id = request.getId();
-        if (id == null || id.trim().isEmpty()) {
-            id = java.util.UUID.randomUUID().toString();
+        String id = request.getId() != null ? request.getId() : UUID.randomUUID().toString();
+
+        // Read existing document or create new one
+        Map<String, Object> openApiDoc = yamlParser.readOrCreateDocument();
+
+        // Check for duplicate path+method
+        if (yamlParser.operationExists(openApiDoc, request.getPath(), request.getMethod())) {
+            throw new IllegalArgumentException(
+                    "API specification already exists for " + request.getMethod().toUpperCase() + " " + request.getPath()
+            );
         }
 
-        // Convert DTO to domain model
-        RestApiSpec spec = convertToSpec(request, id);
+        // Build operation definition
+        Map<String, Object> operation = buildOperation(id, request);
 
-        // Get base resource path from classpath
-        String resourcePath = System.getProperty("user.dir") + "/src/main/resources";
+        // Add operation to document
+        yamlParser.putOperation(openApiDoc, request.getPath(), request.getMethod(), operation);
 
-        // Determine server URL
-        String serverUrl = properties.getServer().getUrl();
-        if (serverUrl == null || serverUrl.trim().isEmpty()) {
-            serverUrl = "http://127.0.0.1:" + serverPort;
-        }
+        // Write back to file
+        yamlParser.writeDocument(openApiDoc);
 
-        // Determine server description
-        String serverDescription = properties.getServer().getDescription();
+        log.info("Created REST API spec: {} {} (ID: {})", request.getMethod().toUpperCase(), request.getPath(), id);
 
-        // Write YAML file
-        OpenApiYamlWriter writer = new OpenApiYamlWriter(serverUrl, serverDescription);
-        writer.writeToFile(spec, resourcePath);
-
-        return CreateRestApiResponse.builder()
-                .id(id)
-                .filePath(resourcePath + "/ouroboros/rest/ourorest.yml")
-                .build();
+        return convertToResponse(id, request.getPath(), request.getMethod(), operation);
     }
 
     @Override
-    @SuppressWarnings("unchecked")
-    public GetRestApiSpecsResponse getAllRestApiSpecs() throws Exception {
-        // Set resource path
-        String resourcePath = System.getProperty("user.dir") + "/src/main/resources";
-        Path filePath = Paths.get(resourcePath, "ouroboros", "rest", "ourorest.yml");
-
-        // Return empty response if file does not exist
-        if (!Files.exists(filePath)) {
-            return GetRestApiSpecsResponse.builder()
-                    .baseUrl("")
-                    .version("")
-                    .specs(new ArrayList<>())
-                    .build();
+    public List<RestApiSpecResponse> getAllRestApiSpecs() throws Exception {
+        if (!yamlParser.fileExists()) {
+            return new ArrayList<>();
         }
 
-        // Read YAML file
-        Yaml yaml = new Yaml();
-        Map<String, Object> openApiDoc;
-        try (FileInputStream fis = new FileInputStream(filePath.toFile())) {
-            Object loaded = yaml.load(fis);
-            if (!(loaded instanceof Map)) {
-                return GetRestApiSpecsResponse.builder()
-                        .baseUrl("")
-                        .version("")
-                        .specs(new ArrayList<>())
-                        .build();
-            }
-            openApiDoc = (Map<String, Object>) loaded;
-        }
+        Map<String, Object> openApiDoc = yamlParser.readDocument();
+        Map<String, Object> paths = yamlParser.getOrCreatePaths(openApiDoc);
 
-        // Extract baseUrl from servers section
-        String baseUrl = "";
-        List<Map<String, String>> servers = (List<Map<String, String>>) openApiDoc.get("servers");
-        if (servers != null && !servers.isEmpty()) {
-            baseUrl = servers.get(0).getOrDefault("url", "");
-        }
+        List<RestApiSpecResponse> responses = new ArrayList<>();
 
-        // Extract version from info section
-        String version = "";
-        Map<String, Object> info = (Map<String, Object>) openApiDoc.get("info");
-        if (info != null) {
-            version = (String) info.getOrDefault("version", "");
-        }
+        for (Map.Entry<String, Object> pathEntry : paths.entrySet()) {
+            String path = pathEntry.getKey();
+            @SuppressWarnings("unchecked")
+            Map<String, Object> methods = (Map<String, Object>) pathEntry.getValue();
 
-        // Iterate through paths section to generate API specification summary list
-        List<GetRestApiSpecsResponse.RestApiSpecSummary> specs = new ArrayList<>();
-        Map<String, Object> paths = (Map<String, Object>) openApiDoc.get("paths");
-        if (paths != null) {
-            for (Map.Entry<String, Object> pathEntry : paths.entrySet()) {
-                String path = pathEntry.getKey();
-                Map<String, Object> pathItem = (Map<String, Object>) pathEntry.getValue();
+            for (Map.Entry<String, Object> methodEntry : methods.entrySet()) {
+                String method = methodEntry.getKey();
+                @SuppressWarnings("unchecked")
+                Map<String, Object> operation = (Map<String, Object>) methodEntry.getValue();
 
-                // Process each HTTP method
-                for (Map.Entry<String, Object> methodEntry : pathItem.entrySet()) {
-                    String method = methodEntry.getKey().toUpperCase();
-                    Map<String, Object> operation = (Map<String, Object>) methodEntry.getValue();
-
-                    // Extract domain from tags field
-                    List<String> domain = (List<String>) operation.get("tags");
-                    if (domain == null) {
-                        domain = new ArrayList<>();
-                    }
-
-                    // Extract Ouroboros custom fields
-                    String id = (String) operation.get("x-ouroboros-id");
-                    String progress = (String) operation.getOrDefault("x-ouroboros-progress", "mock");
-                    String tag = (String) operation.getOrDefault("x-ouroboros-tag", "none");
-                    Boolean isValid = (Boolean) operation.getOrDefault("x-ouroboros-isvalid", true);
-
-                    // Build RestApiSpecSummary
-                    GetRestApiSpecsResponse.RestApiSpecSummary summary = GetRestApiSpecsResponse.RestApiSpecSummary.builder()
-                            .domain(domain)
-                            .method(method)
-                            .path(path)
-                            .protocol("rest")
-                            .id(id)
-                            .progress(progress)
-                            .tag(tag)
-                            .isValid(isValid)
-                            .build();
-
-                    specs.add(summary);
+                String id = (String) operation.get("x-ouroboros-id");
+                if (id != null) {
+                    responses.add(convertToResponse(id, path, method, operation));
                 }
             }
         }
 
-        return GetRestApiSpecsResponse.builder()
-                .baseUrl(baseUrl)
-                .version(version)
-                .specs(specs)
+        return responses;
+    }
+
+    @Override
+    public RestApiSpecResponse getRestApiSpec(String id) throws Exception {
+        if (!yamlParser.fileExists()) {
+            throw new IllegalArgumentException("No API specifications found. The specification file does not exist.");
+        }
+
+        Map<String, Object> openApiDoc = yamlParser.readDocument();
+        Map<String, Object> paths = yamlParser.getOrCreatePaths(openApiDoc);
+
+        // Search for operation with matching ID
+        for (Map.Entry<String, Object> pathEntry : paths.entrySet()) {
+            String path = pathEntry.getKey();
+            @SuppressWarnings("unchecked")
+            Map<String, Object> methods = (Map<String, Object>) pathEntry.getValue();
+
+            for (Map.Entry<String, Object> methodEntry : methods.entrySet()) {
+                String method = methodEntry.getKey();
+                @SuppressWarnings("unchecked")
+                Map<String, Object> operation = (Map<String, Object>) methodEntry.getValue();
+
+                String operationId = (String) operation.get("x-ouroboros-id");
+                if (id.equals(operationId)) {
+                    return convertToResponse(id, path, method, operation);
+                }
+            }
+        }
+
+        throw new IllegalArgumentException("REST API specification with ID '" + id + "' not found");
+    }
+
+    @Override
+    public RestApiSpecResponse updateRestApiSpec(String id, UpdateRestApiRequest request) throws Exception {
+        if (!yamlParser.fileExists()) {
+            throw new IllegalArgumentException("No API specifications found. The specification file does not exist.");
+        }
+
+        Map<String, Object> openApiDoc = yamlParser.readDocument();
+        Map<String, Object> paths = yamlParser.getOrCreatePaths(openApiDoc);
+
+        // Find operation with matching ID
+        String foundPath = null;
+        String foundMethod = null;
+        Map<String, Object> operation = null;
+
+        for (Map.Entry<String, Object> pathEntry : paths.entrySet()) {
+            String path = pathEntry.getKey();
+            @SuppressWarnings("unchecked")
+            Map<String, Object> methods = (Map<String, Object>) pathEntry.getValue();
+
+            for (Map.Entry<String, Object> methodEntry : methods.entrySet()) {
+                String method = methodEntry.getKey();
+                @SuppressWarnings("unchecked")
+                Map<String, Object> op = (Map<String, Object>) methodEntry.getValue();
+
+                String operationId = (String) op.get("x-ouroboros-id");
+                if (id.equals(operationId)) {
+                    foundPath = path;
+                    foundMethod = method;
+                    operation = op;
+                    break;
+                }
+            }
+            if (operation != null) break;
+        }
+
+        if (operation == null) {
+            throw new IllegalArgumentException("REST API specification with ID '" + id + "' not found");
+        }
+
+        // Update only provided fields
+        updateOperationFields(operation, request);
+
+        // Write back to file
+        yamlParser.writeDocument(openApiDoc);
+
+        log.info("Updated REST API spec: {} {} (ID: {})", foundMethod.toUpperCase(), foundPath, id);
+
+        return convertToResponse(id, foundPath, foundMethod, operation);
+    }
+
+    @Override
+    public void deleteRestApiSpec(String id) throws Exception {
+        if (!yamlParser.fileExists()) {
+            throw new IllegalArgumentException("No API specifications found. The specification file does not exist.");
+        }
+
+        Map<String, Object> openApiDoc = yamlParser.readDocument();
+        Map<String, Object> paths = yamlParser.getOrCreatePaths(openApiDoc);
+
+        // Find and remove operation with matching ID
+        boolean found = false;
+        for (Map.Entry<String, Object> pathEntry : paths.entrySet()) {
+            String path = pathEntry.getKey();
+            @SuppressWarnings("unchecked")
+            Map<String, Object> methods = (Map<String, Object>) pathEntry.getValue();
+
+            for (Map.Entry<String, Object> methodEntry : methods.entrySet()) {
+                String method = methodEntry.getKey();
+                @SuppressWarnings("unchecked")
+                Map<String, Object> operation = (Map<String, Object>) methodEntry.getValue();
+
+                String operationId = (String) operation.get("x-ouroboros-id");
+                if (id.equals(operationId)) {
+                    yamlParser.removeOperation(openApiDoc, path, method);
+                    found = true;
+                    log.info("Deleted REST API spec: {} {} (ID: {})", method.toUpperCase(), path, id);
+                    break;
+                }
+            }
+            if (found) break;
+        }
+
+        if (!found) {
+            throw new IllegalArgumentException("REST API specification with ID '" + id + "' not found");
+        }
+
+        // Write back to file
+        yamlParser.writeDocument(openApiDoc);
+    }
+
+    // Helper methods
+
+    private Map<String, Object> buildOperation(String id, CreateRestApiRequest request) {
+        Map<String, Object> operation = new LinkedHashMap<>();
+
+        // Add standard OpenAPI fields
+        if (request.getSummary() != null) {
+            operation.put("summary", request.getSummary());
+        }
+        if (request.getDescription() != null) {
+            operation.put("description", request.getDescription());
+        }
+        operation.put("deprecated", request.isDeprecated());
+
+        if (request.getTags() != null && !request.getTags().isEmpty()) {
+            operation.put("tags", request.getTags());
+        }
+
+        if (request.getParameters() != null && !request.getParameters().isEmpty()) {
+            operation.put("parameters", convertParameters(request.getParameters()));
+        }
+
+        if (request.getRequestBody() != null) {
+            operation.put("requestBody", convertRequestBody(request.getRequestBody()));
+        }
+
+        if (request.getResponses() != null && !request.getResponses().isEmpty()) {
+            operation.put("responses", convertResponses(request.getResponses()));
+        } else {
+            operation.put("responses", new LinkedHashMap<>());
+        }
+
+        if (request.getSecurity() != null && !request.getSecurity().isEmpty()) {
+            operation.put("security", convertSecurity(request.getSecurity()));
+        }
+
+        // Add Ouroboros custom fields
+        operation.put("x-ouroboros-id", id);
+        operation.put("x-ouroboros-progress", request.getProgress() != null ? request.getProgress() : "mock");
+        operation.put("x-ouroboros-tag", request.getTag() != null ? request.getTag() : "none");
+        operation.put("x-ouroboros-isvalid", request.getIsValid() != null ? request.getIsValid() : true);
+
+        return operation;
+    }
+
+    private void updateOperationFields(Map<String, Object> operation, UpdateRestApiRequest request) {
+        if (request.getSummary() != null) {
+            operation.put("summary", request.getSummary());
+        }
+        if (request.getDescription() != null) {
+            operation.put("description", request.getDescription());
+        }
+        if (request.getDeprecated() != null) {
+            operation.put("deprecated", request.getDeprecated());
+        }
+        if (request.getTags() != null) {
+            operation.put("tags", request.getTags());
+        }
+        if (request.getParameters() != null) {
+            operation.put("parameters", convertParameters(request.getParameters()));
+        }
+        if (request.getRequestBody() != null) {
+            operation.put("requestBody", convertRequestBody(request.getRequestBody()));
+        }
+        if (request.getResponses() != null) {
+            operation.put("responses", convertResponses(request.getResponses()));
+        }
+        if (request.getSecurity() != null) {
+            operation.put("security", convertSecurity(request.getSecurity()));
+        }
+        if (request.getProgress() != null) {
+            operation.put("x-ouroboros-progress", request.getProgress());
+        }
+        if (request.getTag() != null) {
+            operation.put("x-ouroboros-tag", request.getTag());
+        }
+        if (request.getIsValid() != null) {
+            operation.put("x-ouroboros-isvalid", request.getIsValid());
+        }
+    }
+
+    private List<Map<String, Object>> convertParameters(List<Parameter> parameters) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Parameter param : parameters) {
+            Map<String, Object> paramMap = new LinkedHashMap<>();
+            paramMap.put("name", param.getName());
+            paramMap.put("in", param.getIn());
+            if (param.getDescription() != null) {
+                paramMap.put("description", param.getDescription());
+            }
+            paramMap.put("required", param.isRequired());
+            if (param.getSchema() != null) {
+                paramMap.put("schema", convertSchema(param.getSchema()));
+            }
+            result.add(paramMap);
+        }
+        return result;
+    }
+
+    private Map<String, Object> convertRequestBody(RequestBody requestBody) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        if (requestBody.getDescription() != null) {
+            result.put("description", requestBody.getDescription());
+        }
+        result.put("required", requestBody.isRequired());
+        if (requestBody.getContent() != null) {
+            result.put("content", convertContent(requestBody.getContent()));
+        }
+        return result;
+    }
+
+    private Map<String, Object> convertResponses(Map<String, ApiResponse> responses) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        for (Map.Entry<String, ApiResponse> entry : responses.entrySet()) {
+            Map<String, Object> responseMap = new LinkedHashMap<>();
+            ApiResponse response = entry.getValue();
+
+            if (response.getDescription() != null) {
+                responseMap.put("description", response.getDescription());
+            }
+            if (response.getContent() != null) {
+                responseMap.put("content", convertContent(response.getContent()));
+            }
+            if (response.getHeaders() != null) {
+                responseMap.put("headers", convertHeaders(response.getHeaders()));
+            }
+            result.put(entry.getKey(), responseMap);
+        }
+        return result;
+    }
+
+    private Map<String, Object> convertContent(Map<String, MediaType> content) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        for (Map.Entry<String, MediaType> entry : content.entrySet()) {
+            Map<String, Object> mediaTypeMap = new LinkedHashMap<>();
+            if (entry.getValue().getSchema() != null) {
+                mediaTypeMap.put("schema", convertSchema(entry.getValue().getSchema()));
+            }
+            result.put(entry.getKey(), mediaTypeMap);
+        }
+        return result;
+    }
+
+    private Map<String, Object> convertSchema(Schema schema) {
+        Map<String, Object> result = new LinkedHashMap<>();
+
+        // Handle schema reference
+        if (schema.getRef() != null && !schema.getRef().isBlank()) {
+            // Convert to full $ref format for YAML
+            String fullRef = schema.getRef().startsWith("#/components/schemas/")
+                    ? schema.getRef()
+                    : "#/components/schemas/" + schema.getRef();
+            result.put("$ref", fullRef);
+            return result; // Reference mode: ignore other fields
+        }
+
+        // Inline mode
+        if (schema.getType() != null) {
+            result.put("type", schema.getType());
+        }
+        if (schema.getTitle() != null) {
+            result.put("title", schema.getTitle());
+        }
+        if (schema.getDescription() != null) {
+            result.put("description", schema.getDescription());
+        }
+        if (schema.getProperties() != null) {
+            result.put("properties", convertProperties(schema.getProperties()));
+        }
+        if (schema.getRequired() != null) {
+            result.put("required", schema.getRequired());
+        }
+        if (schema.getOrders() != null) {
+            result.put("x-ouroboros-orders", schema.getOrders());
+        }
+        if (schema.getXmlName() != null) {
+            Map<String, Object> xml = new LinkedHashMap<>();
+            xml.put("name", schema.getXmlName());
+            result.put("xml", xml);
+        }
+
+        return result;
+    }
+
+    private Map<String, Object> convertProperties(Map<String, Property> properties) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        for (Map.Entry<String, Property> entry : properties.entrySet()) {
+            result.put(entry.getKey(), convertProperty(entry.getValue()));
+        }
+        return result;
+    }
+
+    private Map<String, Object> convertProperty(Property property) {
+        Map<String, Object> result = new LinkedHashMap<>();
+
+        // Handle schema reference
+        if (property.getRef() != null && !property.getRef().isBlank()) {
+            // Convert to full $ref format for YAML
+            String fullRef = property.getRef().startsWith("#/components/schemas/")
+                    ? property.getRef()
+                    : "#/components/schemas/" + property.getRef();
+            result.put("$ref", fullRef);
+            return result; // Reference mode: ignore other fields
+        }
+
+        // Inline mode
+        if (property.getType() != null) {
+            result.put("type", property.getType());
+        }
+        if (property.getDescription() != null) {
+            result.put("description", property.getDescription());
+        }
+        if (property.getMockExpression() != null) {
+            result.put("x-ouroboros-mock", property.getMockExpression());
+        }
+        if (property.getItems() != null) {
+            result.put("items", convertProperty(property.getItems()));
+        }
+        if (property.getMinItems() != null) {
+            result.put("minItems", property.getMinItems());
+        }
+        if (property.getMaxItems() != null) {
+            result.put("maxItems", property.getMaxItems());
+        }
+        return result;
+    }
+
+    private Map<String, Object> convertHeaders(Map<String, Header> headers) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        for (Map.Entry<String, Header> entry : headers.entrySet()) {
+            Map<String, Object> headerMap = new LinkedHashMap<>();
+            Header header = entry.getValue();
+            if (header.getDescription() != null) {
+                headerMap.put("description", header.getDescription());
+            }
+            headerMap.put("required", header.isRequired());
+            if (header.getSchema() != null) {
+                headerMap.put("schema", convertSchema(header.getSchema()));
+            }
+            result.put(entry.getKey(), headerMap);
+        }
+        return result;
+    }
+
+    private List<Map<String, List<String>>> convertSecurity(List<SecurityRequirement> security) {
+        List<Map<String, List<String>>> result = new ArrayList<>();
+        for (SecurityRequirement req : security) {
+            result.add(req.getRequirements());
+        }
+        return result;
+    }
+
+    @SuppressWarnings("unchecked")
+    private RestApiSpecResponse convertToResponse(String id, String path, String method, Map<String, Object> operation) {
+        RestApiSpecResponse.RestApiSpecResponseBuilder builder = RestApiSpecResponse.builder()
+                .id(id)
+                .path(path)
+                .method(method.toUpperCase())
+                .summary((String) operation.get("summary"))
+                .description((String) operation.get("description"))
+                .deprecated((Boolean) operation.get("deprecated"))
+                .tags((List<String>) operation.get("tags"))
+                .progress((String) operation.get("x-ouroboros-progress"))
+                .tag((String) operation.get("x-ouroboros-tag"))
+                .isValid((Boolean) operation.get("x-ouroboros-isvalid"));
+
+        // Convert parameters
+        List<Object> params = (List<Object>) operation.get("parameters");
+        if (params != null) {
+            List<Parameter> parameters = new ArrayList<>();
+            for (Object p : params) {
+                Map<String, Object> paramMap = (Map<String, Object>) p;
+                Parameter param = Parameter.builder()
+                        .name((String) paramMap.get("name"))
+                        .in((String) paramMap.get("in"))
+                        .description((String) paramMap.get("description"))
+                        .required((Boolean) paramMap.getOrDefault("required", false))
+                        .schema(parseSchema((Map<String, Object>) paramMap.get("schema")))
+                        .build();
+                parameters.add(param);
+            }
+            builder.parameters(parameters);
+        }
+
+        // Convert request body
+        Map<String, Object> reqBody = (Map<String, Object>) operation.get("requestBody");
+        if (reqBody != null) {
+            builder.requestBody(parseRequestBody(reqBody));
+        }
+
+        // Convert responses
+        Map<String, Object> responses = (Map<String, Object>) operation.get("responses");
+        if (responses != null) {
+            builder.responses(parseResponses(responses));
+        }
+
+        // Convert security
+        List<Object> sec = (List<Object>) operation.get("security");
+        if (sec != null) {
+            List<SecurityRequirement> security = new ArrayList<>();
+            for (Object s : sec) {
+                SecurityRequirement req = SecurityRequirement.builder()
+                        .requirements((Map<String, List<String>>) s)
+                        .build();
+                security.add(req);
+            }
+            builder.security(security);
+        }
+
+        return builder.build();
+    }
+
+    @SuppressWarnings("unchecked")
+    private RequestBody parseRequestBody(Map<String, Object> reqBody) {
+        return RequestBody.builder()
+                .description((String) reqBody.get("description"))
+                .required((Boolean) reqBody.getOrDefault("required", false))
+                .content(parseContent((Map<String, Object>) reqBody.get("content")))
                 .build();
     }
 
-    private RestApiSpec convertToSpec(CreateRestApiRequest request, String id) {
-        return RestApiSpec.builder()
-                .id(id)
-                .path(request.getPath())
-                .method(request.getMethod())
-                .summary(request.getSummary())
-                .description(request.getDescription())
-                .deprecated(request.isDeprecated())
-                .tags(request.getTags())
-                .parameters(request.getParameters())
-                .requestBody(request.getRequestBody())
-                .responses(request.getResponses())
-                .security(request.getSecurity())
-                // Ouroboros custom fields with defaults
-                .progress(request.getProgress() != null ? request.getProgress() : "mock")
-                .tag(request.getTag() != null ? request.getTag() : "none")
-                .isValid(request.getIsValid() != null ? request.getIsValid() : true)
-                .build();
+    @SuppressWarnings("unchecked")
+    private Map<String, MediaType> parseContent(Map<String, Object> content) {
+        if (content == null) return null;
+
+        Map<String, MediaType> result = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry : content.entrySet()) {
+            Map<String, Object> mediaTypeMap = (Map<String, Object>) entry.getValue();
+            MediaType mediaType = MediaType.builder()
+                    .schema(parseSchema((Map<String, Object>) mediaTypeMap.get("schema")))
+                    .build();
+            result.put(entry.getKey(), mediaType);
+        }
+        return result;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Schema parseSchema(Map<String, Object> schemaMap) {
+        if (schemaMap == null) return null;
+
+        Schema.SchemaBuilder builder = Schema.builder();
+
+        // Check for $ref (reference mode) in YAML
+        if (schemaMap.containsKey("$ref")) {
+            String dollarRef = (String) schemaMap.get("$ref");
+            
+            // Convert $ref to simplified ref for client
+            if (dollarRef != null && dollarRef.startsWith("#/components/schemas/")) {
+                String simplifiedRef = dollarRef.substring("#/components/schemas/".length());
+                builder.ref(simplifiedRef);
+            } else if (dollarRef != null) {
+                builder.ref(dollarRef);
+            }
+            
+            return builder.build();
+        }
+
+        // Inline mode
+        builder.type((String) schemaMap.get("type"))
+                .title((String) schemaMap.get("title"))
+                .description((String) schemaMap.get("description"))
+                .required((List<String>) schemaMap.get("required"))
+                .orders((List<String>) schemaMap.get("x-ouroboros-orders"));
+
+        // Parse properties
+        Map<String, Object> props = (Map<String, Object>) schemaMap.get("properties");
+        if (props != null) {
+            Map<String, Property> properties = new LinkedHashMap<>();
+            for (Map.Entry<String, Object> entry : props.entrySet()) {
+                properties.put(entry.getKey(), parseProperty((Map<String, Object>) entry.getValue()));
+            }
+            builder.properties(properties);
+        }
+
+        // Parse XML
+        Map<String, Object> xml = (Map<String, Object>) schemaMap.get("xml");
+        if (xml != null) {
+            builder.xmlName((String) xml.get("name"));
+        }
+
+        return builder.build();
+    }
+
+    @SuppressWarnings("unchecked")
+    private Property parseProperty(Map<String, Object> propMap) {
+        if (propMap == null) return null;
+
+        Property.PropertyBuilder builder = Property.builder();
+
+        // Check for $ref (reference mode) in YAML
+        if (propMap.containsKey("$ref")) {
+            String dollarRef = (String) propMap.get("$ref");
+            
+            // Convert $ref to simplified ref for client
+            if (dollarRef != null && dollarRef.startsWith("#/components/schemas/")) {
+                String simplifiedRef = dollarRef.substring("#/components/schemas/".length());
+                builder.ref(simplifiedRef);
+            } else if (dollarRef != null) {
+                builder.ref(dollarRef);
+            }
+            
+            return builder.build();
+        }
+
+        // Inline mode
+        builder.type((String) propMap.get("type"))
+                .description((String) propMap.get("description"))
+                .mockExpression((String) propMap.get("x-ouroboros-mock"))
+                .minItems((Integer) propMap.get("minItems"))
+                .maxItems((Integer) propMap.get("maxItems"));
+
+        Map<String, Object> items = (Map<String, Object>) propMap.get("items");
+        if (items != null) {
+            builder.items(parseProperty(items));
+        }
+
+        return builder.build();
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, ApiResponse> parseResponses(Map<String, Object> responses) {
+        if (responses == null) return null;
+
+        Map<String, ApiResponse> result = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry : responses.entrySet()) {
+            Map<String, Object> responseMap = (Map<String, Object>) entry.getValue();
+            ApiResponse response = ApiResponse.builder()
+                    .description((String) responseMap.get("description"))
+                    .content(parseContent((Map<String, Object>) responseMap.get("content")))
+                    .headers(parseHeaders((Map<String, Object>) responseMap.get("headers")))
+                    .build();
+            result.put(entry.getKey(), response);
+        }
+        return result;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Header> parseHeaders(Map<String, Object> headers) {
+        if (headers == null) return null;
+
+        Map<String, Header> result = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry : headers.entrySet()) {
+            Map<String, Object> headerMap = (Map<String, Object>) entry.getValue();
+            Header header = Header.builder()
+                    .description((String) headerMap.get("description"))
+                    .required((Boolean) headerMap.getOrDefault("required", false))
+                    .schema(parseSchema((Map<String, Object>) headerMap.get("schema")))
+                    .build();
+            result.put(entry.getKey(), header);
+        }
+        return result;
     }
 }
