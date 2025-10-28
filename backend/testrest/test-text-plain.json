@@ -1,0 +1,70 @@
+{
+  "path": "/api/notes",
+  "method": "POST",
+  "summary": "Create a plain text note",
+  "description": "Create a note with plain text content",
+  "tags": ["Notes"],
+  "requestBody": {
+    "required": true,
+    "content": {
+      "text/plain": {
+        "schema": {
+          "type": "string",
+          "mockExpression": "This is a plain text note content.\nIt can contain multiple lines.\nUseful for simple text storage."
+        }
+      }
+    }
+  },
+  "responses": {
+    "201": {
+      "description": "Note created successfully",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Note ID",
+                "mockExpression": "note-12345"
+              },
+              "content": {
+                "type": "string",
+                "description": "Note content",
+                "mockExpression": "This is a plain text note content."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Created timestamp",
+                "mockExpression": "2025-10-27T10:30:00Z"
+              }
+            },
+            "required": ["id", "content", "createdAt"],
+            "orders": ["id", "content", "createdAt"]
+          }
+        }
+      },
+      "headers": {}
+    },
+    "400": {
+      "description": "Invalid content",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "error": {
+                "type": "string",
+                "description": "Error message",
+                "mockExpression": "Content cannot be empty"
+              }
+            },
+            "required": ["error"],
+            "orders": ["error"]
+          }
+        }
+      },
+      "headers": {}
+    }
+  }
+}
