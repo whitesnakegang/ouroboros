@@ -18,6 +18,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Default implementation of {@link RestApiSpecService}.
@@ -29,6 +30,10 @@ import java.util.Map;
  */
 @Service
 public class RestApiSpecServiceimpl implements RestApiSpecService {
+
+    private static final Set<String> HTTP_METHODS = Set.of(
+            "get", "post", "put", "delete", "patch", "options", "head", "trace"
+    );
 
     @Value("${server.port:8080}")
     private String serverPort;
@@ -128,8 +133,21 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
 
                 // Process each HTTP method
                 for (Map.Entry<String, Object> methodEntry : pathItem.entrySet()) {
-                    String method = methodEntry.getKey().toUpperCase();
-                    Map<String, Object> operation = (Map<String, Object>) methodEntry.getValue();
+                    String key = methodEntry.getKey().toLowerCase();
+                    Object value = methodEntry.getValue();
+
+                    // Filter: only process valid HTTP methods
+                    if (!HTTP_METHODS.contains(key)) {
+                        continue; // Skip non-HTTP keys (summary, description, servers, parameters)
+                    }
+
+                    // Type check: ensure value is a Map (operation object)
+                    if (!(value instanceof Map)) {
+                        continue; // Skip unexpected types
+                    }
+
+                    String method = key.toUpperCase();
+                    Map<String, Object> operation = (Map<String, Object>) value;
 
                     // Extract domain from tags field
                     List<String> domain = (List<String>) operation.get("tags");

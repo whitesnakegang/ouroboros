@@ -7,6 +7,7 @@ import kr.co.ouroboros.core.rest.spec.dto.CreateRestApiResponse;
 import kr.co.ouroboros.core.rest.spec.dto.GetRestApiSpecsResponse;
 import kr.co.ouroboros.core.rest.spec.service.RestApiSpecService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
  *
  * @since 0.0.1
  */
+@Slf4j
 @RestController
 @RequestMapping("/ouro/rest-specs")
 @RequiredArgsConstructor
@@ -47,19 +49,21 @@ public class RestApiSpecController {
             );
             return ResponseEntity.ok(response);
         } catch (DuplicateApiSpecException e) {
+            log.warn("Duplicate API specification: {} {}", e.getMethod(), e.getPath(), e);
             GlobalApiResponse<CreateRestApiResponse> response = GlobalApiResponse.error(
                     HttpStatus.CONFLICT.value(),
                     "Failed to create REST API specification",
                     "DUPLICATE_API",
-                    e.getMessage()
+                    "The API specification for this path and method already exists"
             );
             return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
         } catch (Exception e) {
+            log.error("Failed to create REST API specification", e);
             GlobalApiResponse<CreateRestApiResponse> response = GlobalApiResponse.error(
                     HttpStatus.INTERNAL_SERVER_ERROR.value(),
                     "Failed to create REST API specification",
                     "INTERNAL_ERROR",
-                    e.getMessage()
+                    "An internal error occurred while creating the API specification"
             );
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
@@ -69,7 +73,7 @@ public class RestApiSpecController {
      * Retrieves all REST API specifications.
      * <p>
      * Reads the ourorest.yml file and returns server information and summary data
-     * for all API specifications. Returns an empty list if the file does not exist.
+     * for all API specifications. Returns 404 if the file does not exist.
      *
      * @return server information and all API specification summaries
      */
@@ -77,17 +81,31 @@ public class RestApiSpecController {
     public ResponseEntity<GlobalApiResponse<GetRestApiSpecsResponse>> getAllRestApiSpecs() {
         try {
             GetRestApiSpecsResponse data = restApiSpecService.getAllRestApiSpecs();
+
+            // Return 404 if no specifications exist (file not found or empty)
+            if (data.getSpecs() == null || data.getSpecs().isEmpty()) {
+                log.info("No API specifications found");
+                GlobalApiResponse<GetRestApiSpecsResponse> response = GlobalApiResponse.error(
+                        HttpStatus.NOT_FOUND.value(),
+                        "No API specifications found",
+                        "SPEC_NOT_FOUND",
+                        "No API specification file exists yet. Create your first API specification to get started."
+                );
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            }
+
             GlobalApiResponse<GetRestApiSpecsResponse> response = GlobalApiResponse.success(
                     data,
                     "REST API specifications retrieved successfully"
             );
             return ResponseEntity.ok(response);
         } catch (Exception e) {
+            log.error("Failed to retrieve REST API specifications", e);
             GlobalApiResponse<GetRestApiSpecsResponse> response = GlobalApiResponse.error(
                     HttpStatus.INTERNAL_SERVER_ERROR.value(),
                     "Failed to retrieve REST API specifications",
                     "INTERNAL_ERROR",
-                    e.getMessage()
+                    "An internal error occurred while retrieving API specifications"
             );
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
