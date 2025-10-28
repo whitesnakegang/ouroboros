@@ -37,7 +37,10 @@ public class RestApiSpec {
     private List<SecurityRequirement> security;
 
     // Ouroboros custom fields
+    @Builder.Default
     private String progress = "mock";  // mock or completed
+    @Builder.Default
     private String tag = "none";       // bugfix, implementing, or none
+    @Builder.Default
     private boolean isValid = true;
 }

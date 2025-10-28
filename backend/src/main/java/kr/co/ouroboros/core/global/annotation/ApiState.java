@@ -10,7 +10,7 @@ import java.lang.annotation.Target;
  * <p>
  * Use this annotation on controller methods to indicate the current implementation status.
  * This metadata is included in the generated OpenAPI documentation via
- * {@link OpenApiCustomizerConfig#apiOperationCustomizer()}.
+ * {@link kr.co.ouroboros.core.rest.validation.OpenApiCustomizerConfig#apiOperationCustomizer()}.
  *
  * @since 0.0.1
  */
