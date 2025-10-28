@@ -13,6 +13,11 @@ public class OuroRestHandler implements OuroProtocolHandler {
 
     private final OpenAPI springDocOpenApi;
 
+    /**
+     * Identifies this handler's protocol as REST.
+     *
+     * @return the {@link Protocol#REST} enum value
+     */
     @Override
     public Protocol getProtocol() {
         return Protocol.REST;
