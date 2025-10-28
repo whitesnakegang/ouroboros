@@ -3,6 +3,7 @@ import { ApiRequestCard } from "./ApiRequestCard";
 import { ApiResponseCard } from "./ApiResponseCard";
 import { ApiPreviewCard } from "./ApiPreviewCard";
 import { ProtocolTabs } from "./ProtocolTabs";
+import { CodeSnippetPanel } from "./CodeSnippetPanel";
 import { useSpecStore } from "../store/spec.store";
 import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
 
@@ -42,6 +43,7 @@ export function ApiEditorLayout() {
     setTriggerNewForm,
   } = useSidebarStore();
   const [activeTab, setActiveTab] = useState<"form" | "test">("form");
+  const [isCodeSnippetOpen, setIsCodeSnippetOpen] = useState(false);
 
   // 사이드바 Add 버튼 클릭 시 새 폼 초기화
   useEffect(() => {
@@ -402,17 +404,41 @@ export function ApiEditorLayout() {
             {/* Preview Card */}
             {protocol === "REST" && (
               <div className="mt-6">
-                <ApiPreviewCard
-                  method={method}
-                  url={url}
-                  tags={tags}
-                  description={description}
-                />
+                <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                      <span>📄</span> Preview
+                    </h3>
+                    <button
+                      onClick={() => setIsCodeSnippetOpen(true)}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white rounded-lg transition-colors font-medium flex items-center gap-2"
+                    >
+                      <span>&lt;/&gt;</span>
+                      Code Snippet
+                    </button>
+                  </div>
+                  <ApiPreviewCard
+                    method={method}
+                    url={url}
+                    tags={tags}
+                    description={description}
+                  />
+                </div>
               </div>
             )}
           </div>
         )}
       </div>
+
+      {/* Code Snippet Panel */}
+      <CodeSnippetPanel
+        isOpen={isCodeSnippetOpen}
+        onClose={() => setIsCodeSnippetOpen(false)}
+        method={method}
+        url={url}
+        headers={requestHeaders}
+        requestBody={requestBody}
+      />
     </div>
   );
 }
