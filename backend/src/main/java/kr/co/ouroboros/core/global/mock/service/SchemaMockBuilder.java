@@ -7,6 +7,7 @@ import java.util.*;
 @RequiredArgsConstructor
 public class SchemaMockBuilder {
     private final DummyDataGenerator generator;
+    private final Random random = new Random();
 
     public Object build(Map<String, Object> schema) {
         if (schema == null) return Collections.emptyMap();
@@ -26,8 +27,13 @@ public class SchemaMockBuilder {
             }
             case "array" -> {
                 Map<String, Object> items = (Map<String, Object>) schema.get("items");
-                List<Object> arr = new ArrayList<>();
-                for (int i = 0; i < 3; i++) {
+                int minItems = ((Number) schema.getOrDefault("minItems", 1)).intValue();
+                int maxItems = ((Number) schema.getOrDefault("maxItems", 3)).intValue();
+
+                int size = random.nextInt(maxItems - minItems + 1) + minItems;
+                List<Object> arr = new ArrayList<>(size);
+
+                for (int i = 0; i < size; i++) {
                     arr.add(build(items));
                 }
                 return arr;
