@@ -12,6 +12,11 @@ public class OuroRestHandler implements OuroProtocolHandler {
     }
 
     @Override
+    public String getSpecFilePath() {
+        return "";
+    }
+
+    @Override
     public OuroApiSpec scanCurrentState() {
         return null;
     }

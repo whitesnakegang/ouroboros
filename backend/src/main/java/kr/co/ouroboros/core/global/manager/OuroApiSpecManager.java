@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import kr.co.ouroboros.core.global.Protocol;
 import kr.co.ouroboros.core.global.handler.OuroProtocolHandler;
 import kr.co.ouroboros.core.global.spec.OuroApiSpec;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,8 +19,8 @@ import org.springframework.util.FileCopyUtils;
 @Component
 public class OuroApiSpecManager {
 
-    private final Map<String, OuroApiSpec> apiCache = new ConcurrentHashMap<>();
-    private final Map<String, OuroProtocolHandler> handlers;
+    private final Map<Protocol, OuroApiSpec> apiCache = new ConcurrentHashMap<>();
+    private final Map<Protocol, OuroProtocolHandler> handlers;
 
     // 'classpath:' 경로에서 리소스를 읽기 위해 주입
     private final ResourceLoader resourceLoader;
@@ -49,7 +50,7 @@ public class OuroApiSpecManager {
      * @param yamlFileContent the YAML content of the spec file to be validated and reconciled with
      *                        the current state
      */
-    public void processAndCacheSpec(String protocol, String yamlFileContent) {
+    public void processAndCacheSpec(Protocol protocol, String yamlFileContent) {
         OuroProtocolHandler handler = getHandler(protocol);
 
         // 1. 파일(YAML) 스펙 파싱
@@ -82,7 +83,7 @@ public class OuroApiSpecManager {
      * state is scanned, cached, and returned
      * @throws IllegalArgumentException if the protocol is not supported
      */
-    public OuroApiSpec getApiSpec(String protocol) {
+    public OuroApiSpec getApiSpec(Protocol protocol) {
         // 캐시가 없으면(초기화 실패 시) 스캔/생성 시도
         // (Runner가 먼저 실행되므로 대부분 캐시에서 바로 반환됨)
         return apiCache.computeIfAbsent(protocol, this::findAndCacheSpecOnDemand);
@@ -95,7 +96,7 @@ public class OuroApiSpecManager {
      * @param protocol the protocol identifier whose specification should be initialized
      * @throws IllegalArgumentException if the protocol is not supported
      */
-    public void initializeProtocolOnStartup(String protocol) {
+    public void initializeProtocolOnStartup(Protocol protocol) {
 
         OuroProtocolHandler handler = getHandler(protocol);
         String filePath = handler.getSpecFilePath();
@@ -115,8 +116,8 @@ public class OuroApiSpecManager {
      * @throws IllegalArgumentException if no handler is registered for the protocol
      */
 
-    private OuroProtocolHandler getHandler(String protocol) {
-        OuroProtocolHandler handler = handlers.get(protocol.toLowerCase());
+    private OuroProtocolHandler getHandler(Protocol protocol) {
+        OuroProtocolHandler handler = handlers.get(protocol);
         if (handler == null) {
             throw new IllegalArgumentException("Unsupported protocol: " + protocol);
         }
@@ -129,7 +130,7 @@ public class OuroApiSpecManager {
      * @param protocol the protocol identifier used to select the protocol handler
      * @return the scanned OuroApiSpec that was stored in the cache
      */
-    private OuroApiSpec findAndCacheSpecOnDemand(String protocol) {
+    private OuroApiSpec findAndCacheSpecOnDemand(Protocol protocol) {
         OuroApiSpec scannedSpec = getHandler(protocol).scanCurrentState();
         apiCache.put(protocol, scannedSpec);
         return scannedSpec;
