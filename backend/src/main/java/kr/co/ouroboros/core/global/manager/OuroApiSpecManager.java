@@ -24,6 +24,12 @@ public class OuroApiSpecManager {
     // 'classpath:' 경로에서 리소스를 읽기 위해 주입
     private final ResourceLoader resourceLoader;
 
+    /**
+     * Constructs an OuroApiSpecManager, registering protocol handlers and storing the ResourceLoader.
+     *
+     * @param handlerList a list of OuroProtocolHandler instances to be indexed by each handler's protocol string
+     * @param resourceLoader the ResourceLoader used to read YAML resources from the classpath
+     */
     @Autowired
     public OuroApiSpecManager(List<OuroProtocolHandler> handlerList, ResourceLoader resourceLoader) {
         this.handlers = handlerList.stream()
@@ -32,8 +38,11 @@ public class OuroApiSpecManager {
     }
 
     /**
-     * Startup Runner 또는 Controller가 호출할 공통 로직
-     * (스캔 -> 검증 -> 파일 갱신 -> 캐싱)
+     * Processes an API spec for the given protocol by reconciling the provided YAML with the current runtime state,
+     * persisting any validated updates back to the protocol's spec resource, and updating the in-memory cache.
+     *
+     * @param protocol        the protocol identifier whose spec is being processed
+     * @param yamlFileContent the YAML content of the spec file to be validated and reconciled with the current state
      */
     public void processAndCacheSpec(String protocol, String yamlFileContent) {
         OuroProtocolHandler handler = getHandler(protocol);
@@ -59,7 +68,11 @@ public class OuroApiSpecManager {
     }
 
     /**
-     * 컨트롤러가 호출할 메서드 (캐시된 스펙 제공)
+     * Provide the cached API specification for the given protocol, scanning and caching it on demand if not already cached.
+     *
+     * @param protocol the protocol identifier corresponding to a registered OuroProtocolHandler (case-insensitive)
+     * @return the OuroApiSpec for the specified protocol; if not present in the cache, the current state is scanned, cached, and returned
+     * @throws IllegalArgumentException if the protocol is not supported
      */
     public OuroApiSpec getApiSpec(String protocol) {
         // 캐시가 없으면(초기화 실패 시) 스캔/생성 시도
@@ -68,7 +81,10 @@ public class OuroApiSpecManager {
     }
 
     /**
-     * Startup Runner가 호출할 초기화 메서드
+     * Initialize and load the API specification for the given protocol from classpath resources and process it into the in-memory cache.
+     *
+     * @param protocol the protocol identifier whose specification should be initialized
+     * @throws IllegalArgumentException if the protocol is not supported
      */
     public void initializeProtocolOnStartup(String protocol) {
 
@@ -82,7 +98,13 @@ public class OuroApiSpecManager {
         processAndCacheSpec(protocol, yamlFromFile);
     }
 
-    // --- Helper Methods ---
+    /**
+     * Retrieve the protocol handler for the given protocol.
+     *
+     * @param protocol the protocol name (case-insensitive)
+     * @return the {@code OuroProtocolHandler} associated with the protocol
+     * @throws IllegalArgumentException if no handler is registered for the protocol
+     */
 
     private OuroProtocolHandler getHandler(String protocol) {
         OuroProtocolHandler handler = handlers.get(protocol.toLowerCase());
@@ -93,7 +115,10 @@ public class OuroApiSpecManager {
     }
 
     /**
-     * 캐시가 없을 때만 스캔
+     * Scan the current state for the given protocol and cache the resulting API spec.
+     *
+     * @param protocol the protocol identifier used to select the protocol handler
+     * @return the scanned OuroApiSpec that was stored in the cache
      */
     private OuroApiSpec findAndCacheSpecOnDemand(String protocol) {
         OuroApiSpec scannedSpec = getHandler(protocol).scanCurrentState();
@@ -102,7 +127,10 @@ public class OuroApiSpecManager {
     }
 
     /**
-     * 리소스 경로에서 .yml 파일 읽기
+     * Load a YAML file from classpath resources and return its contents decoded as UTF-8.
+     *
+     * @param filePath the classpath-relative path to the YAML file (for example, "specs/foo.yml")
+     * @return the file contents as a UTF-8 string, or an empty string if the resource does not exist or cannot be read
      */
     private String loadYamlFromResources(String filePath) {
         try {
@@ -120,7 +148,13 @@ public class OuroApiSpecManager {
     }
 
     /**
-     * 스캔한 내용을 .yml 파일에 다시 저장
+     * Persist the given YAML content to the specified classpath resource path.
+     *
+     * Writes the provided YAML string to the resource location identified by filePath (classpath-relative),
+     * creating parent directories if necessary and overwriting any existing file using UTF-8 encoding.
+     *
+     * @param filePath the classpath-relative path to the YAML resource to write (e.g., "specs/protocol.yml")
+     * @param content  the YAML content to be written to the resource
      */
     private void saveYamlToResources(String filePath, String content) {
         // (TODO) 파일 저장 로직 구현

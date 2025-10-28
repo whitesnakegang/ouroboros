@@ -10,7 +10,12 @@ public interface OuroProtocolHandler {
  */
     String getProtocol();
 
-    String getSpecFilePath();
+    /**
+ * Get the file path to the API specification used by this protocol handler.
+ *
+ * @return the file system path or classpath location of the Ouro API specification YAML for this protocol
+ */
+String getSpecFilePath();
 
     /**
  * Produce the current API specification by scanning code annotations.

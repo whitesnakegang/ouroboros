@@ -16,6 +16,12 @@ public class OuroApiSpecStartUpRunner implements ApplicationRunner {
     private final OuroApiSpecManager specManager;
     private final List<OuroProtocolHandler> handlers;
 
+    /**
+     * Runs protocol initialization for all registered protocol handlers on application startup.
+     *
+     * Delegates initialization of each handler's protocol to the spec manager; if initialization for a protocol fails,
+     * the exception is caught and logged and processing continues for remaining handlers.
+     */
     @Override
     public void run(ApplicationArguments args) throws Exception {
         // (Job 3-11)
