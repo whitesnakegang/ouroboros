@@ -1,3 +1,5 @@
+import { useSidebarStore } from "../store/sidebar.store";
+
 interface Endpoint {
   id: number;
   method: string;
@@ -29,12 +31,21 @@ const mockStatusColors = {
 };
 
 export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
+  const { setSelectedEndpoint } = useSidebarStore();
+
+  const handleClick = () => {
+    setSelectedEndpoint(endpoint);
+  };
+
   const methodColor =
     methodBadgeColors[endpoint.method as keyof typeof methodBadgeColors] ||
     "bg-gray-100 text-gray-700 border-gray-200";
 
   return (
-    <div className="p-3 mx-2 my-2 rounded-lg bg-white dark:bg-gray-700 cursor-pointer hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600">
+    <div
+      onClick={handleClick}
+      className="p-3 mx-2 my-2 rounded-lg bg-white dark:bg-gray-700 cursor-pointer hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600"
+    >
       <div className="flex items-start gap-2">
         {/* Mock 탭: 구현 상태 표시 점 (왼쪽) */}
         {filterType === "mock" && endpoint.implementationStatus && (
