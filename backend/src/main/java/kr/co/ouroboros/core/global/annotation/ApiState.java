@@ -10,7 +10,7 @@ import java.lang.annotation.Target;
  * <p>
  * Use this annotation on controller methods to indicate the current implementation status.
  * This metadata is included in the generated OpenAPI documentation via
- * {@link kr.co.ouroboros.core.rest.validation.OpenApiCustomizerConfig#apiOperationCustomizer()}.
+ * {@link kr.co.ouroboros.core.rest.config.OpenApiCustomizerConfig#apiOperationCustomizer()}.
  *
  * @since 0.0.1
  */
@@ -24,20 +24,6 @@ public @interface ApiState {
      * @return the state enum value
      */
     State state();
-
-    /**
-     * The owner or developer responsible for this API endpoint.
-     *
-     * @return the owner name, empty string by default
-     */
-    String owner() default "";
-
-    /**
-     * Additional description or notes about the API state.
-     *
-     * @return the description, empty string by default
-     */
-    String description() default "";
 
     /**
      * Enumeration of possible API development states.
