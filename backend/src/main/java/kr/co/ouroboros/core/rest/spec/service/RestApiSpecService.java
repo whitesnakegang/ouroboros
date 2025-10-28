@@ -2,6 +2,7 @@ package kr.co.ouroboros.core.rest.spec.service;
 
 import kr.co.ouroboros.core.rest.spec.dto.CreateRestApiRequest;
 import kr.co.ouroboros.core.rest.spec.dto.CreateRestApiResponse;
+import kr.co.ouroboros.core.rest.spec.dto.GetRestApiSpecsResponse;
 
 /**
  * Service interface for REST API specification management.
@@ -24,4 +25,15 @@ public interface RestApiSpecService {
      * @throws Exception if specification creation fails or duplicate path+method exists
      */
     CreateRestApiResponse createRestApiSpec(CreateRestApiRequest request) throws Exception;
+
+    /**
+     * Retrieves all REST API specifications.
+     * <p>
+     * Reads the ourorest.yml file and returns summary information for all API specifications.
+     * Returns an empty list if the file does not exist.
+     *
+     * @return server information and all API specification summaries
+     * @throws Exception if file reading fails
+     */
+    GetRestApiSpecsResponse getAllRestApiSpecs() throws Exception;
 }
