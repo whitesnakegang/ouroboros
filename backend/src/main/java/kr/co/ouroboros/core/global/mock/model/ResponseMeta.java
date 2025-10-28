@@ -12,7 +12,7 @@ import java.util.Map;
 @Builder
 public class ResponseMeta {
     private int statusCode;
-    private Map<String, String> properties;
-    private Map<String, Object> schema;
-    private String contentType;
+    private Map<String, Object> headers;
+    private Map<String, Object> body;
+    private String contentType;                   // JSON/xml
 }
