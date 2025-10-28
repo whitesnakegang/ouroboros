@@ -10,6 +10,9 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
+import org.springframework.web.util.UriUtils;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -45,7 +48,9 @@ public class RestTemplateTempoClient implements TempoClient {
         }
         
         try {
-            String url = properties.getBaseUrl() + "/api/search?q=" + query;
+            // Manually encode query parameter to avoid URI template variable expansion
+            String encodedQuery = UriUtils.encode(query, StandardCharsets.UTF_8);
+            String url = properties.getBaseUrl() + "/api/search?q=" + encodedQuery;
             log.debug("Searching Tempo: {}", url);
             
             HttpHeaders headers = new HttpHeaders();
@@ -53,7 +58,7 @@ public class RestTemplateTempoClient implements TempoClient {
             HttpEntity<?> entity = new HttpEntity<>(headers);
             
             ResponseEntity<String> response = restTemplate.exchange(
-                    url, 
+                    URI.create(url),
                     HttpMethod.GET, 
                     entity, 
                     String.class

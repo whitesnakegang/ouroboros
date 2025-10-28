@@ -1,7 +1,11 @@
 package kr.co.ouroboros.core.rest.tryit.config;
 
+import io.opentelemetry.sdk.trace.samplers.Sampler;
+import kr.co.ouroboros.core.rest.tryit.sampling.TrySampler;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
@@ -14,10 +18,21 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  */
 @AutoConfiguration
 @EnableConfigurationProperties({
-        TrySessionProperties.class,
         TempoProperties.class
 })
 @ComponentScan(basePackages = "kr.co.ouroboros")
 @EnableScheduling
 public class TryConfig {
+    
+    /**
+     * Registers the custom Try sampler.
+     * This sampler ensures that traces are only created for requests with X-Ouroboros-Try header.
+     * 
+     * @return TrySampler instance
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public Sampler trySampler() {
+        return new TrySampler();
+    }
 }

@@ -4,10 +4,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import kr.co.ouroboros.core.rest.tryit.config.TrySessionProperties;
-import kr.co.ouroboros.core.rest.tryit.session.TrySessionRegistry;
 import kr.co.ouroboros.core.rest.tryit.util.TryContext;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -17,54 +14,41 @@ import java.util.UUID;
 
 /**
  * Filter that identifies Try requests.
- * Checks X-Ouroboros-Try header and validates against TrySessionRegistry.
+ * Checks X-Ouroboros-Try header for "on" value and generates tryId automatically.
  * 
  * Behavior:
- * 1. If X-Ouroboros-Try header exists, treat as tryId
- * 2. Validate with TrySessionRegistry
- * 3. If valid, set tryId in Baggage (for OpenTelemetry integration)
- * 4. If invalid or missing, process as normal request
+ * 1. If X-Ouroboros-Try header equals "on", generate tryId
+ * 2. Set tryId in Baggage (for OpenTelemetry integration)
+ * 3. Return tryId in response header X-Ouroboros-Try-Id
+ * 4. If missing or not "on", process as normal request
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class TryFilter extends OncePerRequestFilter {
 
     private static final String HEADER_NAME = "X-Ouroboros-Try";
-    private static final String BAGGAGE_KEY = "ouro.try_id";
-    
-    private final TrySessionRegistry registry;
-    private final TrySessionProperties properties;
+    private static final String RESPONSE_HEADER_NAME = "X-Ouroboros-Try-Id";
+    private static final String TRY_VALUE = "on";
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, 
                                    FilterChain filterChain) throws ServletException, IOException {
         
-        String tryIdHeader = request.getHeader(HEADER_NAME);
+        String tryHeader = request.getHeader(HEADER_NAME);
+        UUID tryId = null;
         
-        if (tryIdHeader != null && !tryIdHeader.isEmpty()) {
-            // Try request identified
-            try {
-                UUID tryId = UUID.fromString(tryIdHeader);
-                String clientIp = getClientIp(request);
-                
-                // Validate session
-                if (registry.isValid(tryId, clientIp, properties.isBindClientIp())) {
-                    log.debug("Valid Try request detected: tryId={}, clientIp={}", tryId, clientIp);
-                    
-                    // Set tryId in ThreadLocal context for OpenTelemetry integration
-                    TryContext.setTryId(tryId);
-                    
-                    // Mark as used if oneShot mode
-                    if (properties.isOneShot()) {
-                        registry.markUsed(tryId);
-                    }
-                } else {
-                    log.debug("Invalid Try request: tryId={}, clientIp={}", tryId, clientIp);
-                }
-            } catch (IllegalArgumentException e) {
-                log.warn("Invalid UUID in X-Ouroboros-Try header: {}", tryIdHeader);
-            }
+        // Check if this is a Try request
+        if (TRY_VALUE.equalsIgnoreCase(tryHeader)) {
+            tryId = UUID.randomUUID();
+            log.debug("Try request detected, generating tryId: {}", tryId);
+            
+            // Set tryId in ThreadLocal context for OpenTelemetry integration
+            TryContext.setTryId(tryId);
+            
+            // Set response header BEFORE processing request
+            // This ensures the header is added before response is committed
+            response.setHeader(RESPONSE_HEADER_NAME, tryId.toString());
+            log.debug("Added tryId to response header: {}", tryId);
         }
         
         try {
@@ -75,20 +59,4 @@ public class TryFilter extends OncePerRequestFilter {
             TryContext.clear();
         }
     }
-    
-    /**
-     * Extracts client IP address from HTTP request.
-     * 
-     * @param request HTTP request
-     * @return client IP address
-     */
-    private String getClientIp(HttpServletRequest request) {
-        String ip = request.getHeader("X-Forwarded-For");
-        if (ip == null || ip.isEmpty()) {
-            ip = request.getRemoteAddr();
-        }
-        return ip;
-    }
-    
-
 }

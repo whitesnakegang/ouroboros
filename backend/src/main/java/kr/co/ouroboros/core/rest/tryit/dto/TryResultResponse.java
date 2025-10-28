@@ -40,9 +40,19 @@ public class TryResultResponse {
     private Instant analyzedAt;
     
     /**
-     * Duration of the request in milliseconds.
+     * Total duration of the request in milliseconds.
      */
-    private Long durationMs;
+    private Long totalDurationMs;
+    
+    /**
+     * HTTP status code of the response.
+     */
+    private Integer statusCode;
+    
+    /**
+     * Hierarchical span tree showing all method calls.
+     */
+    private List<SpanNode> spans;
     
     /**
      * Detected issues (bottlenecks).
@@ -70,6 +80,86 @@ public class TryResultResponse {
     }
     
     /**
+     * Span node in the hierarchical tree.
+     */
+    @Data
+    @Builder
+    public static class SpanNode {
+        
+        /**
+         * Span name (e.g., "OrderController.getOrder").
+         */
+        private String name;
+        
+        /**
+         * Class name where this span/method is located.
+         */
+        private String className;
+        
+        /**
+         * Method name.
+         */
+        private String methodName;
+        
+        /**
+         * Method parameters (if available).
+         */
+        private List<Parameter> parameters;
+        
+        /**
+         * Parameter information.
+         */
+        @Data
+        @Builder
+        public static class Parameter {
+            /**
+             * Parameter type.
+             */
+            private String type;
+            
+            /**
+             * Parameter name.
+             */
+            private String name;
+        }
+        
+        /**
+         * Total duration in milliseconds (including children).
+         */
+        private Long durationMs;
+        
+        /**
+         * Self duration in milliseconds (excluding children execution time).
+         */
+        private Long selfDurationMs;
+        
+        /**
+         * Percentage of total trace duration (including children).
+         */
+        private Double percentage;
+        
+        /**
+         * Self percentage of total trace duration (excluding children).
+         */
+        private Double selfPercentage;
+        
+        /**
+         * Child spans (nested method calls).
+         */
+        private List<SpanNode> children;
+        
+        /**
+         * Span kind (e.g., SERVER, CLIENT, INTERNAL).
+         */
+        private String kind;
+        
+        /**
+         * Additional attributes (e.g., HTTP method, status code, DB query).
+         */
+        private List<String> attributes;
+    }
+    
+    /**
      * Detected issue (bottleneck).
      */
     @Data
@@ -87,9 +177,9 @@ public class TryResultResponse {
         private Severity severity;
         
         /**
-         * Issue description.
+         * Issue summary description.
          */
-        private String description;
+        private String summary;
         
         /**
          * Affected span name.
@@ -102,13 +192,25 @@ public class TryResultResponse {
         private Long durationMs;
         
         /**
+         * Evidence supporting the issue detection.
+         */
+        private List<String> evidence;
+        
+        /**
+         * Recommendation for fixing the issue.
+         */
+        private String recommendation;
+        
+        /**
          * Issue type.
          */
         public enum Type {
             SLOW_HTTP,
             SLOW_DATABASE,
             N_PLUS_ONE,
-            SLOW_SPAN
+            SLOW_SPAN,
+            DB_QUERY_SLOW,
+            HIGH_LATENCY
         }
         
         /**

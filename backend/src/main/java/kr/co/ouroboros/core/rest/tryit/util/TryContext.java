@@ -24,6 +24,7 @@ public class TryContext {
     
     /**
      * Sets the current tryId for this thread and propagates it via OpenTelemetry Baggage.
+     * If null is provided, clears the current tryId.
      * 
      * @param tryId the try session ID
      */
@@ -43,6 +44,25 @@ public class TryContext {
                 // OpenTelemetry not available, just log
                 log.trace("OpenTelemetry Baggage not available: {}", e.getMessage());
                 log.debug("Set tryId in context: {}", tryId);
+            }
+        } else {
+            // Clear the tryId if null is provided
+            UUID removed = CURRENT_TRY_ID.get();
+            CURRENT_TRY_ID.remove();
+            
+            if (removed != null) {
+                // Clear from Baggage
+                try {
+                    Baggage currentBaggage = Baggage.current();
+                    BaggageBuilder builder = currentBaggage.toBuilder();
+                    builder.remove(BAGGAGE_KEY);
+                    Baggage updatedBaggage = builder.build();
+                    updatedBaggage.makeCurrent();
+                    log.debug("Cleared tryId from context and baggage: {}", removed);
+                } catch (Exception e) {
+                    log.trace("OpenTelemetry Baggage not available: {}", e.getMessage());
+                    log.debug("Cleared tryId from context: {}", removed);
+                }
             }
         }
     }

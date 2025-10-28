@@ -1,17 +1,15 @@
 package kr.co.ouroboros.core.rest.tryit.controller;
 
-import jakarta.servlet.http.HttpServletRequest;
-import kr.co.ouroboros.core.rest.tryit.config.TrySessionProperties;
-import kr.co.ouroboros.core.rest.tryit.dto.CreateSessionResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import kr.co.ouroboros.core.rest.tryit.analysis.TraceAnalyzer;
 import kr.co.ouroboros.core.rest.tryit.dto.TryResultResponse;
-import kr.co.ouroboros.core.rest.tryit.session.TrySession;
-import kr.co.ouroboros.core.rest.tryit.session.TrySessionRegistry;
+import kr.co.ouroboros.core.rest.tryit.tempo.TempoClient;
+import kr.co.ouroboros.core.rest.tryit.tempo.TraceDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
@@ -21,8 +19,11 @@ import java.util.ArrayList;
 import java.util.UUID;
 
 /**
- * REST API controller for Try session management.
- * Creates and retrieves Try sessions for QA analysis.
+ * REST API controller for Try result retrieval.
+ * Retrieves Try analysis results for QA analysis.
+ * 
+ * Note: Session creation is no longer needed. Try requests are identified
+ * by X-Ouroboros-Try: on header and tryId is returned in response header.
  */
 @Slf4j
 @RestController
@@ -30,61 +31,10 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class TryController {
     
-    private final TrySessionRegistry registry;
-    private final TrySessionProperties properties;
-    
-    /** HTTP header name: X-Ouroboros-Try */
-    private static final String HEADER_NAME = "X-Ouroboros-Try";
-    
-    /** OpenTelemetry Baggage key: ouro.try_id */
-    private static final String BAGGAGE_KEY = "ouro.try_id";
+    private final TempoClient tempoClient;
+    private final TraceAnalyzer traceAnalyzer;
+    private final ObjectMapper objectMapper;
 
-    /**
-     * Creates a new Try session.
-     * 
-     * POST /ouroboros/tries
-     * 
-     * Response:
-     * - tryId: session identifier
-     * - headerName: HTTP header name
-     * - baggageKey: Baggage key
-     * - expiresAt: expiration time
-     * 
-     * @param request HTTP request (for IP extraction)
-     * @return created session information
-     * @throws ResponseStatusException 429 if active sessions exceed maxActive
-     */
-    @PostMapping
-    public CreateSessionResponse createSession(HttpServletRequest request) {
-        // Check active session count
-        if (registry.getActiveSessionCount() >= properties.getMaxActive()) {
-            log.warn("Max active sessions exceeded: current={}, max={}", 
-                    registry.getActiveSessionCount(), properties.getMaxActive());
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, 
-                    "Maximum active sessions exceeded");
-        }
-        
-        UUID tryId = UUID.randomUUID();
-        String clientIp = getClientIp(request);
-        
-        TrySession session = registry.register(
-                tryId, 
-                clientIp, 
-                properties.getTtlSeconds(), 
-                properties.isOneShot()
-        );
-        
-        log.info("Created try session: tryId={}, clientIp={}, expiresAt={}", 
-                tryId, clientIp, session.getExpiresAt());
-        
-        return new CreateSessionResponse(
-                tryId.toString(),
-                HEADER_NAME,
-                BAGGAGE_KEY,
-                session.getExpiresAt()
-        );
-    }
-    
     /**
      * Retrieves Try result.
      * 
@@ -103,41 +53,116 @@ public class TryController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid tryId format");
         }
         
-        TrySession session = registry.getSession(tryId);
-        if (session == null) {
-            log.debug("Try session not found: tryId={}", tryId);
+        log.info("Retrieving result for tryId: {}", tryId);
+        
+        // Check if Tempo is enabled
+        if (!tempoClient.isEnabled()) {
+            log.debug("Tempo is not enabled, returning pending status");
             return TryResultResponse.builder()
                     .tryId(tryIdStr)
-                    .status(TryResultResponse.Status.NOT_FOUND)
-                    .error("Try session not found or expired")
+                    .status(TryResultResponse.Status.PENDING)
+                    .createdAt(Instant.now())
+                    .analyzedAt(Instant.now())
+                    .totalDurationMs(0L)
+                    .spans(new ArrayList<>())
+                    .issues(new ArrayList<>())
+                    .spanCount(0)
                     .build();
         }
         
-        // TODO: Integrate with Tempo and perform analysis
-        // For now, return a placeholder response
-        log.info("Retrieving result for tryId: {}", tryId);
-        return TryResultResponse.builder()
-                .tryId(tryIdStr)
-                .status(TryResultResponse.Status.PENDING)
-                .createdAt(session.getExpiresAt().atZone(java.time.ZoneId.systemDefault()).toInstant())
-                .analyzedAt(Instant.now())
-                .issues(new ArrayList<>())
-                .spanCount(0)
-                .build();
+        try {
+            // Query Tempo for traces with this tryId in baggage
+            // OpenTelemetry Baggage is automatically added as span attributes
+            String query = String.format("{ span.ouro.try_id = \"%s\" }", tryId);
+            String traceId = tempoClient.pollForTrace(query);
+            
+            if (traceId == null) {
+                log.debug("Trace not found in Tempo for tryId: {}", tryId);
+                return TryResultResponse.builder()
+                        .tryId(tryIdStr)
+                        .status(TryResultResponse.Status.PENDING)
+                        .createdAt(Instant.now())
+                        .analyzedAt(Instant.now())
+                        .totalDurationMs(0L)
+                        .spans(new ArrayList<>())
+                        .issues(new ArrayList<>())
+                        .spanCount(0)
+                        .build();
+            }
+            
+            // Fetch trace data
+            String traceDataJson = tempoClient.getTrace(traceId);
+            
+            // Parse trace data
+            TraceDTO traceData = objectMapper.readValue(traceDataJson, TraceDTO.class);
+            
+            // Calculate total duration
+            long totalDurationMs = calculateTotalDuration(traceData);
+            
+            // Analyze trace and build response
+            TryResultResponse response = traceAnalyzer.analyze(traceData, totalDurationMs);
+            
+            // Set tryId and traceId
+            response.setTryId(tryIdStr);
+            response.setTraceId(traceId);
+            response.setCreatedAt(Instant.now());
+            response.setAnalyzedAt(Instant.now());
+            response.setStatusCode(200); // TODO: Extract from trace
+            
+            return response;
+            
+        } catch (Exception e) {
+            log.error("Error retrieving trace for tryId: {}", tryId, e);
+            return TryResultResponse.builder()
+                    .tryId(tryIdStr)
+                    .status(TryResultResponse.Status.FAILED)
+                    .createdAt(Instant.now())
+                    .analyzedAt(Instant.now())
+                    .error("Failed to retrieve trace: " + e.getMessage())
+                    .spans(new ArrayList<>())
+                    .issues(new ArrayList<>())
+                    .spanCount(0)
+                    .build();
+        }
     }
     
     /**
-     * Extracts client IP address from HTTP request.
-     * Checks X-Forwarded-For header first, then uses RemoteAddr.
+     * Calculates total duration of the trace.
      * 
-     * @param request HTTP request
-     * @return client IP address
+     * @param traceData Trace data
+     * @return Total duration in milliseconds
      */
-    private String getClientIp(HttpServletRequest request) {
-        String ip = request.getHeader("X-Forwarded-For");
-        if (ip == null || ip.isEmpty()) {
-            ip = request.getRemoteAddr();
+    private long calculateTotalDuration(TraceDTO traceData) {
+        if (traceData == null || traceData.getBatches() == null) {
+            return 0;
         }
-        return ip;
+        
+        long minStart = Long.MAX_VALUE;
+        long maxEnd = Long.MIN_VALUE;
+        
+        for (TraceDTO.BatchDTO batch : traceData.getBatches()) {
+            if (batch.getScopeSpans() == null) {
+                continue;
+            }
+            
+            for (TraceDTO.ScopeSpanDTO scopeSpan : batch.getScopeSpans()) {
+                if (scopeSpan.getSpans() == null) {
+                    continue;
+                }
+                
+                for (TraceDTO.SpanDTO span : scopeSpan.getSpans()) {
+                    if (span.getStartTimeUnixNano() != null && span.getEndTimeUnixNano() != null) {
+                        minStart = Math.min(minStart, span.getStartTimeUnixNano());
+                        maxEnd = Math.max(maxEnd, span.getEndTimeUnixNano());
+                    }
+                }
+            }
+        }
+        
+        if (minStart == Long.MAX_VALUE || maxEnd == Long.MIN_VALUE) {
+            return 0;
+        }
+        
+        return (maxEnd - minStart) / 1_000_000; // Convert nanoseconds to milliseconds
     }
 }

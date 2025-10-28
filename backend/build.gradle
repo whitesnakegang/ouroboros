@@ -35,15 +35,25 @@ dependencyManagement {
 
 dependencies {
 	implementation("org.springdoc:springdoc-openapi-starter-webmvc-api:2.8.13")
+	
 	// Spring Boot (사용자 프로젝트의 버전에 기생)
 	compileOnly 'org.springframework.boot:spring-boot-starter-web'
-
+	compileOnly 'org.springframework.boot:spring-boot-autoconfigure'
+	
 	// Lombok
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'
 	
-	// OpenTelemetry API for Baggage
+	// OpenTelemetry - API and SDK
 	implementation 'io.opentelemetry:opentelemetry-api:1.45.0'
+	implementation 'io.opentelemetry:opentelemetry-sdk:1.45.0'
+	implementation 'io.opentelemetry:opentelemetry-sdk-trace:1.45.0'
+	implementation 'io.opentelemetry:opentelemetry-exporter-otlp:1.45.0'
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+	// Micrometer - Tracing Bridge
+	implementation 'io.micrometer:micrometer-tracing-bridge-otel'
+	implementation 'io.micrometer:micrometer-registry-otlp'
 	
 	// Testing
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
