@@ -54,6 +54,8 @@ dependencies {
 
 	// Data Generator
 	implementation 'net.datafaker:datafaker:2.5.2'
+	// xml formatting
+	implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-xml'
 }
 
 tasks.named('test') {
