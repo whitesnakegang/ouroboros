@@ -1,10 +1,17 @@
 package kr.co.ouroboros.core.rest.handler;
 
+import io.swagger.v3.oas.models.OpenAPI;
 import kr.co.ouroboros.core.global.Protocol;
 import kr.co.ouroboros.core.global.handler.OuroProtocolHandler;
 import kr.co.ouroboros.core.global.spec.OuroApiSpec;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
 
+@RequiredArgsConstructor
+@Component
 public class OuroRestHandler implements OuroProtocolHandler {
+
+    private final OpenAPI springDocOpenApi;
 
     @Override
     public Protocol getProtocol() {
