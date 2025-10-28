@@ -35,8 +35,16 @@ public class MockResponseFilter implements Filter{
         // 요청자가 특정 상태 코드를 지정한 경우 우선 적용
         String forcedError = http.getHeader("X-Ouroboros-Error");
         int statusCode = 200;
-        if (forcedError != null && meta.getResponses().containsKey(Integer.parseInt(forcedError))) {
-            statusCode = Integer.parseInt(forcedError);
+        if (forcedError != null) {
+            try {
+                int forcedCode = Integer.parseInt(forcedError);
+                if (meta.getResponses().containsKey(forcedCode)) {
+                    statusCode = forcedCode;
+                }
+            } catch (NumberFormatException e) {
+                // 잘못된 헤더 값이면 무시하고 기본 200 유지
+                System.err.println("Invalid X-Ouroboros-Error value: " + forcedError);
+            }
         }
 
         // 해당 코드의 ResponseMeta 가져오기
@@ -55,11 +63,9 @@ public class MockResponseFilter implements Filter{
         }
 
         // Body 생성
-        Object body;
+        Object body=null;
         if (responseMeta.getBody() != null && !responseMeta.getBody().isEmpty()) {
             body = schemaMockBuilder.build(responseMeta.getBody());
-        } else {
-            body = Map.of("message", "No body schema defined");
         }
 
         // Content-Type 결정
@@ -76,11 +82,13 @@ public class MockResponseFilter implements Filter{
         httpRes.setStatus(responseMeta.getStatusCode() > 0 ? responseMeta.getStatusCode() : statusCode);
 
         // 직렬화 및 응답 전송
-        String bodyText;
-        if (contentType.contains("xml")) {
-            bodyText = xmlMapper.writeValueAsString(body);
-        } else {
-            bodyText = objectMapper.writeValueAsString(body);
+        String bodyText = "";
+        if (body != null) {
+            if (contentType.contains("xml")) {
+                bodyText = xmlMapper.writeValueAsString(body);
+            } else {
+                bodyText = objectMapper.writeValueAsString(body);
+            }
         }
 
         httpRes.getWriter().write(bodyText);
