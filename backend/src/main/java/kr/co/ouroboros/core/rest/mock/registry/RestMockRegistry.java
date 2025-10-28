@@ -19,7 +19,7 @@ public class RestMockRegistry implements MockRegistryBase<EndpointMeta> {
 
     @Override
     public void register(EndpointMeta meta) {
-        registry.put(key(meta.getPath(), meta.getMethod()), meta);
+        registry.put(meta.getId(), meta);
     }
 
     @Override
