@@ -6,7 +6,6 @@ import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import kr.co.ouroboros.core.global.mock.model.ResponseMeta;
-import kr.co.ouroboros.core.global.mock.service.DummyDataGenerator;
 import kr.co.ouroboros.core.global.mock.service.SchemaMockBuilder;
 import kr.co.ouroboros.core.rest.mock.model.EndpointMeta;
 import lombok.RequiredArgsConstructor;
@@ -16,7 +15,6 @@ import java.util.Map;
 
 @RequiredArgsConstructor
 public class MockResponseFilter implements Filter{
-    private final DummyDataGenerator generator;
     private final SchemaMockBuilder schemaMockBuilder;
     private final ObjectMapper objectMapper;
     private final XmlMapper xmlMapper;
@@ -34,43 +32,57 @@ public class MockResponseFilter implements Filter{
             return;
         }
 
-        // 요청자가 특정 상태 코드를 강제로 요청할 수도 있음
+        // 요청자가 특정 상태 코드를 지정한 경우 우선 적용
         String forcedError = http.getHeader("X-Ouroboros-Error");
         int statusCode = 200;
         if (forcedError != null && meta.getResponses().containsKey(Integer.parseInt(forcedError))) {
             statusCode = Integer.parseInt(forcedError);
         }
 
-        // 응답 스키마 선택
+        // 해당 코드의 ResponseMeta 가져오기
         ResponseMeta responseMeta = meta.getResponses().get(statusCode);
-        Object body;
-        if (responseMeta.getSchema() != null) {
-            body = schemaMockBuilder.build(responseMeta.getSchema());
-        } else if (responseMeta.getProperties() != null) {
-            body = responseMeta.getProperties();
-        } else {
-            body = Map.of("message", "No schema or properties found");
+        if (responseMeta == null) {
+            httpRes.setStatus(500);
+            httpRes.getWriter().write("{\"error\": \"No response definition found for code " + statusCode + "\"}");
+            return;
         }
 
-        // Accept 헤더 및 content-type 결정
+        // 헤더 설정
+        if (responseMeta.getHeaders() != null) {
+            for (var entry : responseMeta.getHeaders().entrySet()) {
+                httpRes.setHeader(entry.getKey(), String.valueOf(entry.getValue()));
+            }
+        }
+
+        // Body 생성
+        Object body;
+        if (responseMeta.getBody() != null && !responseMeta.getBody().isEmpty()) {
+            body = schemaMockBuilder.build(responseMeta.getBody());
+        } else {
+            body = Map.of("message", "No body schema defined");
+        }
+
+        // Content-Type 결정
+        String contentType = responseMeta.getContentType();
         String accept = http.getHeader("Accept");
-        String contentType = responseMeta.getContentType(); // YAML의 contentType 반영
+
         if (contentType == null) {
             contentType = (accept != null && accept.toLowerCase().contains("xml"))
                     ? "application/xml"
                     : "application/json";
         }
 
+        httpRes.setContentType(contentType + ";charset=UTF-8");
+        httpRes.setStatus(responseMeta.getStatusCode() > 0 ? responseMeta.getStatusCode() : statusCode);
+
+        // 직렬화 및 응답 전송
         String bodyText;
         if (contentType.contains("xml")) {
             bodyText = xmlMapper.writeValueAsString(body);
-            httpRes.setContentType("application/xml;charset=UTF-8");
         } else {
             bodyText = objectMapper.writeValueAsString(body);
-            httpRes.setContentType("application/json;charset=UTF-8");
         }
 
-        httpRes.setStatus(statusCode);
         httpRes.getWriter().write(bodyText);
     }
 }
