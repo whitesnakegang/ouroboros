@@ -31,26 +31,26 @@ public class MockResponseFilter implements Filter{
             return;
         }
 
-        // 요청자가 특정 상태 코드를 지정한 경우 우선 적용
-        String forcedError = http.getHeader("X-Ouroboros-Error");
+        // 검증 에러가 있는지 확인
+        Integer validationError = (Integer) http.getAttribute("validationError");
         int statusCode = 200;
-        if (forcedError != null) {
-            try {
-                int forcedCode = Integer.parseInt(forcedError);
-                if (meta.getResponses().containsKey(forcedCode)) {
-                    statusCode = forcedCode;
-                }
-            } catch (NumberFormatException e) {
-                // 잘못된 헤더 값이면 무시하고 기본 200 유지
-                System.err.println("Invalid X-Ouroboros-Error value: " + forcedError);
-            }
+
+        if (validationError != null) {
+            // 검증 실패 → 에러 응답 생성
+            statusCode = validationError;
         }
 
         // 해당 코드의 ResponseMeta 가져오기
         ResponseMeta responseMeta = meta.getResponses().get(statusCode);
         if (responseMeta == null) {
-            httpRes.setStatus(500);
-            httpRes.getWriter().write("{\"error\": \"No response definition found for code " + statusCode + "\"}");
+            // 커스텀 응답이 없으면 기본 에러 메시지
+            String validationMessage = (String) http.getAttribute("validationMessage");
+            if (validationMessage != null) {
+                sendError(httpRes, statusCode, validationMessage);
+            } else {
+                httpRes.setStatus(500);
+                httpRes.getWriter().write("{\"error\": \"No response definition found for code " + statusCode + "\"}");
+            }
             return;
         }
 
@@ -91,5 +91,11 @@ public class MockResponseFilter implements Filter{
         }
 
         httpRes.getWriter().write(bodyText);
+    }
+
+    private void sendError(HttpServletResponse res, int code, String msg) throws IOException {
+        res.setStatus(code);
+        res.setContentType("application/json;charset=UTF-8");
+        res.getWriter().write("{\"error\": \"" + msg + "\"}");
     }
 }

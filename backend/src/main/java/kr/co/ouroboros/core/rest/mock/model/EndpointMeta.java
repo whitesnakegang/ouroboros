@@ -16,7 +16,8 @@ public class EndpointMeta {
     private String path;
     private String method;
     private String status;
-    private List<String> requiredHeaders;
+    private List<String> requiredHeaders;      // 일반 필수 헤더 (400 반환)
+    private List<String> authHeaders;          // 인증 필수 헤더 (401 반환)
     private List<String> requiredParams;
     private Map<Integer, ResponseMeta> responses;
 }
