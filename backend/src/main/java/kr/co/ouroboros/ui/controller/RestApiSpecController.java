@@ -4,6 +4,7 @@ import kr.co.ouroboros.core.global.exception.DuplicateApiSpecException;
 import kr.co.ouroboros.core.global.response.GlobalApiResponse;
 import kr.co.ouroboros.core.rest.spec.dto.CreateRestApiRequest;
 import kr.co.ouroboros.core.rest.spec.dto.CreateRestApiResponse;
+import kr.co.ouroboros.core.rest.spec.dto.GetRestApiSpecsResponse;
 import kr.co.ouroboros.core.rest.spec.service.RestApiSpecService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -57,6 +58,34 @@ public class RestApiSpecController {
             GlobalApiResponse<CreateRestApiResponse> response = GlobalApiResponse.error(
                     HttpStatus.INTERNAL_SERVER_ERROR.value(),
                     "Failed to create REST API specification",
+                    "INTERNAL_ERROR",
+                    e.getMessage()
+            );
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    /**
+     * Retrieves all REST API specifications.
+     * <p>
+     * Reads the ourorest.yml file and returns server information and summary data
+     * for all API specifications. Returns an empty list if the file does not exist.
+     *
+     * @return server information and all API specification summaries
+     */
+    @GetMapping
+    public ResponseEntity<GlobalApiResponse<GetRestApiSpecsResponse>> getAllRestApiSpecs() {
+        try {
+            GetRestApiSpecsResponse data = restApiSpecService.getAllRestApiSpecs();
+            GlobalApiResponse<GetRestApiSpecsResponse> response = GlobalApiResponse.success(
+                    data,
+                    "REST API specifications retrieved successfully"
+            );
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            GlobalApiResponse<GetRestApiSpecsResponse> response = GlobalApiResponse.error(
+                    HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                    "Failed to retrieve REST API specifications",
                     "INTERNAL_ERROR",
                     e.getMessage()
             );

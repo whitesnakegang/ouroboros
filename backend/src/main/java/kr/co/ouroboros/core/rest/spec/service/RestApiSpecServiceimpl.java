@@ -3,11 +3,21 @@ package kr.co.ouroboros.core.rest.spec.service;
 import kr.co.ouroboros.core.global.properties.OuroborosProperties;
 import kr.co.ouroboros.core.rest.spec.dto.CreateRestApiRequest;
 import kr.co.ouroboros.core.rest.spec.dto.CreateRestApiResponse;
+import kr.co.ouroboros.core.rest.spec.dto.GetRestApiSpecsResponse;
 import kr.co.ouroboros.core.rest.spec.model.RestApiSpec;
 import kr.co.ouroboros.core.rest.spec.writer.OpenApiYamlWriter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.yaml.snakeyaml.Yaml;
+
+import java.io.FileInputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Default implementation of {@link RestApiSpecService}.
@@ -60,6 +70,100 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         return CreateRestApiResponse.builder()
                 .id(id)
                 .filePath(resourcePath + "/ouroboros/rest/ourorest.yml")
+                .build();
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public GetRestApiSpecsResponse getAllRestApiSpecs() throws Exception {
+        // Set resource path
+        String resourcePath = System.getProperty("user.dir") + "/src/main/resources";
+        Path filePath = Paths.get(resourcePath, "ouroboros", "rest", "ourorest.yml");
+
+        // Return empty response if file does not exist
+        if (!Files.exists(filePath)) {
+            return GetRestApiSpecsResponse.builder()
+                    .baseUrl("")
+                    .version("")
+                    .specs(new ArrayList<>())
+                    .build();
+        }
+
+        // Read YAML file
+        Yaml yaml = new Yaml();
+        Map<String, Object> openApiDoc;
+        try (FileInputStream fis = new FileInputStream(filePath.toFile())) {
+            Object loaded = yaml.load(fis);
+            if (!(loaded instanceof Map)) {
+                return GetRestApiSpecsResponse.builder()
+                        .baseUrl("")
+                        .version("")
+                        .specs(new ArrayList<>())
+                        .build();
+            }
+            openApiDoc = (Map<String, Object>) loaded;
+        }
+
+        // Extract baseUrl from servers section
+        String baseUrl = "";
+        List<Map<String, String>> servers = (List<Map<String, String>>) openApiDoc.get("servers");
+        if (servers != null && !servers.isEmpty()) {
+            baseUrl = servers.get(0).getOrDefault("url", "");
+        }
+
+        // Extract version from info section
+        String version = "";
+        Map<String, Object> info = (Map<String, Object>) openApiDoc.get("info");
+        if (info != null) {
+            version = (String) info.getOrDefault("version", "");
+        }
+
+        // Iterate through paths section to generate API specification summary list
+        List<GetRestApiSpecsResponse.RestApiSpecSummary> specs = new ArrayList<>();
+        Map<String, Object> paths = (Map<String, Object>) openApiDoc.get("paths");
+        if (paths != null) {
+            for (Map.Entry<String, Object> pathEntry : paths.entrySet()) {
+                String path = pathEntry.getKey();
+                Map<String, Object> pathItem = (Map<String, Object>) pathEntry.getValue();
+
+                // Process each HTTP method
+                for (Map.Entry<String, Object> methodEntry : pathItem.entrySet()) {
+                    String method = methodEntry.getKey().toUpperCase();
+                    Map<String, Object> operation = (Map<String, Object>) methodEntry.getValue();
+
+                    // Extract domain from tags field
+                    List<String> domain = (List<String>) operation.get("tags");
+                    if (domain == null) {
+                        domain = new ArrayList<>();
+                    }
+
+                    // Extract Ouroboros custom fields
+                    String id = (String) operation.get("x-ouroboros-id");
+                    String progress = (String) operation.getOrDefault("x-ouroboros-progress", "mock");
+                    String tag = (String) operation.getOrDefault("x-ouroboros-tag", "none");
+                    Boolean isValid = (Boolean) operation.getOrDefault("x-ouroboros-isvalid", true);
+
+                    // Build RestApiSpecSummary
+                    GetRestApiSpecsResponse.RestApiSpecSummary summary = GetRestApiSpecsResponse.RestApiSpecSummary.builder()
+                            .domain(domain)
+                            .method(method)
+                            .path(path)
+                            .protocol("rest")
+                            .id(id)
+                            .progress(progress)
+                            .tag(tag)
+                            .isValid(isValid)
+                            .build();
+
+                    specs.add(summary);
+                }
+            }
+        }
+
+        return GetRestApiSpecsResponse.builder()
+                .baseUrl(baseUrl)
+                .version(version)
+                .specs(specs)
                 .build();
     }
 
