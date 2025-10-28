@@ -94,7 +94,7 @@ public class TryController {
      * @return analysis result
      */
     @GetMapping("/{tryId}")
-    public TryResultResponse getResult(@PathVariable String tryIdStr) {
+    public TryResultResponse getResult(@PathVariable("tryId") String tryIdStr) {
         UUID tryId;
         try {
             tryId = UUID.fromString(tryIdStr);

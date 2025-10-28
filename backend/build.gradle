@@ -43,17 +43,25 @@ dependencies {
 	annotationProcessor 'org.projectlombok:lombok'
 	
 	// OpenTelemetry API for Baggage
-	compileOnly 'io.opentelemetry:opentelemetry-api:1.45.0'
+	implementation 'io.opentelemetry:opentelemetry-api:1.45.0'
 	
 	// Testing
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testImplementation 'org.springframework.boot:spring-boot-starter-web'
-	testImplementation 'io.opentelemetry:opentelemetry-api:1.45.0'
 }
 
 tasks.named('test') {
 	useJUnitPlatform()
+}
+
+tasks.withType(JavaCompile).configureEach {
+	options.encoding = 'UTF-8'
+}
+tasks.withType(Javadoc).configureEach {
+	options.encoding = 'UTF-8'
+	options.charSet = 'UTF-8'
+	options.docEncoding = 'UTF-8'
 }
 
 publishing {
