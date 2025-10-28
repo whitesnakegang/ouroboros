@@ -13,7 +13,6 @@ public class MockValidationFilter implements Filter {
     @Override
     public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain) throws IOException, ServletException {
         HttpServletRequest http = (HttpServletRequest) req;
-        HttpServletResponse httpRes = (HttpServletResponse) res;
         EndpointMeta meta = (EndpointMeta) http.getAttribute("mockMeta");
 
         if (meta == null) {
