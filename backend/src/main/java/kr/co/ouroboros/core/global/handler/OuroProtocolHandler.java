@@ -10,6 +10,8 @@ public interface OuroProtocolHandler {
  */
     String getProtocol();
 
+    String getSpecFilePath();
+
     /**
  * Produce the current API specification by scanning code annotations.
  *
