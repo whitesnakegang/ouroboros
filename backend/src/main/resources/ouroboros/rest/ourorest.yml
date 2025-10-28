@@ -1,0 +1,382 @@
+openapi: 3.1.0
+info:
+  title: API Documentation
+  version: 1.0.0
+paths:
+  /api/books:
+    post:
+      summary: Create a book record
+      deprecated: false
+      description: Create a new book record using XML format
+      tags:
+      - Books
+      parameters: [
+        ]
+      requestBody:
+        required: true
+        content:
+          application/xml:
+            schema:
+              type: object
+              xml:
+                name: Book
+              properties:
+                title:
+                  type: string
+                  x-ouroboros-mock: The Great Gatsby
+                author:
+                  type: string
+                  x-ouroboros-mock: F. Scott Fitzgerald
+                isbn:
+                  type: string
+                  x-ouroboros-mock: 978-0-7432-7356-5
+                publishedYear:
+                  type: integer
+                  x-ouroboros-mock: '1925'
+                price:
+                  type: number
+                  x-ouroboros-mock: '15.99'
+      responses:
+        '201':
+          description: Book created successfully
+          content:
+            application/xml:
+              schema:
+                type: object
+                xml:
+                  name: BookResponse
+                properties:
+                  id:
+                    type: string
+                    x-ouroboros-mock: book-789
+                    description: Book ID
+                  title:
+                    type: string
+                    x-ouroboros-mock: The Great Gatsby
+                    description: Book title
+                  author:
+                    type: string
+                    x-ouroboros-mock: F. Scott Fitzgerald
+                    description: Book author
+                  createdAt:
+                    type: string
+                    x-ouroboros-mock: '2025-10-27T10:30:00Z'
+                    description: Created timestamp
+                x-ouroboros-orders:
+                - id
+                - title
+                - author
+                - createdAt
+                required:
+                - id
+                - title
+                - author
+                - createdAt
+          headers: {
+            }
+        '400':
+          description: Invalid XML format
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    x-ouroboros-mock: Invalid XML structure
+                    description: Error message
+                x-ouroboros-orders:
+                - error
+                required:
+                - error
+          headers: {
+            }
+      x-ouroboros-id: d697d38b-42d5-4954-9e2f-03f44836e0f9
+      x-ouroboros-progress: mock
+      x-ouroboros-tag: none
+      x-ouroboros-isvalid: true
+  /api/upload:
+    post:
+      summary: 파일 업로드
+      deprecated: false
+      description: 파일과 메타데이터를 업로드합니다
+      tags:
+      - Upload
+      parameters: [
+        ]
+      requestBody:
+        description: 업로드할 파일과 메타데이터
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  x-ouroboros-mock: binary
+                  description: 업로드할 파일 (binary)
+                title:
+                  type: string
+                  x-ouroboros-mock: '{{$lorem.word}}'
+                  description: 파일 제목
+                description:
+                  type: string
+                  x-ouroboros-mock: '{{$lorem.sentence}}'
+                  description: 파일 설명
+                tags:
+                  type: array
+                  items:
+                    type: string
+                    x-ouroboros-mock: '{{$lorem.word}}'
+                  minItems: 1
+                  maxItems: 5
+                  description: 태그 목록
+              x-ouroboros-orders:
+              - file
+              - title
+              - description
+              - tags
+              required:
+              - file
+              - title
+      responses:
+        '200':
+          description: 업로드 성공
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  fileId:
+                    type: string
+                    x-ouroboros-mock: '{{$random.uuid}}'
+                    description: 파일 ID
+                  url:
+                    type: string
+                    x-ouroboros-mock: '{{$internet.url}}'
+                    description: 파일 URL
+                x-ouroboros-orders:
+                - fileId
+                - url
+                required:
+                - fileId
+                - url
+          headers: {
+            }
+      x-ouroboros-id: e1293cfa-65a2-4dbd-858e-0abf17a6e70c
+      x-ouroboros-progress: mock
+      x-ouroboros-tag: none
+      x-ouroboros-isvalid: true
+  /api/login:
+    post:
+      summary: User login
+      deprecated: false
+      description: Login with username and password using form-urlencoded
+      tags:
+      - Authentication
+      parameters: [
+        ]
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  x-ouroboros-mock: testuser
+                password:
+                  type: string
+                  x-ouroboros-mock: password123
+                rememberMe:
+                  type: boolean
+                  x-ouroboros-mock: 'false'
+              required:
+              - username
+              - password
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    x-ouroboros-mock: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                    description: JWT token
+                  userId:
+                    type: string
+                    x-ouroboros-mock: user123
+                    description: User ID
+                x-ouroboros-orders:
+                - token
+                - userId
+                required:
+                - token
+                - userId
+          headers: {
+            }
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    x-ouroboros-mock: Invalid username or password
+                    description: Error message
+                x-ouroboros-orders:
+                - error
+                required:
+                - error
+          headers: {
+            }
+      x-ouroboros-id: cd4366f7-1762-4671-885b-f957218ffdfd
+      x-ouroboros-progress: mock
+      x-ouroboros-tag: none
+      x-ouroboros-isvalid: true
+  /api/notes:
+    post:
+      summary: Create a plain text note
+      deprecated: false
+      description: Create a note with plain text content
+      tags:
+      - Notes
+      parameters: [
+        ]
+      requestBody:
+        required: true
+        content:
+          text/plain:
+            schema:
+              type: string
+      responses:
+        '201':
+          description: Note created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    x-ouroboros-mock: note-12345
+                    description: Note ID
+                  content:
+                    type: string
+                    x-ouroboros-mock: This is a plain text note content.
+                    description: Note content
+                  createdAt:
+                    type: string
+                    x-ouroboros-mock: '2025-10-27T10:30:00Z'
+                    description: Created timestamp
+                x-ouroboros-orders:
+                - id
+                - content
+                - createdAt
+                required:
+                - id
+                - content
+                - createdAt
+          headers: {
+            }
+        '400':
+          description: Invalid content
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    x-ouroboros-mock: Content cannot be empty
+                    description: Error message
+                x-ouroboros-orders:
+                - error
+                required:
+                - error
+          headers: {
+            }
+      x-ouroboros-id: 6111d662-d987-4dc4-af0d-98a43bc742e1
+      x-ouroboros-progress: mock
+      x-ouroboros-tag: none
+      x-ouroboros-isvalid: true
+  /api/users/{id}:
+    get:
+      summary: Get user by ID
+      deprecated: false
+      description: Retrieve a single user by their ID
+      tags:
+      - Users
+      parameters:
+      - name: id
+        in: path
+        description: User ID
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: User found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    x-ouroboros-mock: '{{$random.uuid}}'
+                    description: User ID
+                  name:
+                    type: string
+                    x-ouroboros-mock: '{{$name.fullName}}'
+                    description: User name
+                  email:
+                    type: string
+                    x-ouroboros-mock: '{{$internet.email}}'
+                    description: User email
+                x-ouroboros-orders:
+                - id
+                - name
+                - email
+                required:
+                - id
+                - name
+                - email
+          headers: {
+            }
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    x-ouroboros-mock: User not found
+                    description: Error message
+                x-ouroboros-orders:
+                - error
+                required:
+                - error
+          headers: {
+            }
+      x-ouroboros-id: 64e9b87f-6ae6-438d-a558-bb6fab8548f0
+      x-ouroboros-progress: mock
+      x-ouroboros-tag: none
+      x-ouroboros-isvalid: true
+components:
+  schemas: {
+    }
+servers:
+- url: https://api.example.com
+  description: Production API Server
+security: [
+  ]
