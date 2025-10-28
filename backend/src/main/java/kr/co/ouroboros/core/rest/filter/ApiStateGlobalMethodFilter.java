@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.validation;
+package kr.co.ouroboros.core.rest.filter;
 
 import java.lang.reflect.Method;
 import kr.co.ouroboros.core.global.annotation.ApiState;

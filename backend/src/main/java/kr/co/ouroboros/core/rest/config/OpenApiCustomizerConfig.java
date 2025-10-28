@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.validation;
+package kr.co.ouroboros.core.rest.config;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
