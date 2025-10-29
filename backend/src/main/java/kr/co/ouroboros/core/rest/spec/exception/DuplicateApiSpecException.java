@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.global.exception;
+package kr.co.ouroboros.core.rest.spec.exception;
 
 /**
  * Exception thrown when attempting to create a REST API specification
