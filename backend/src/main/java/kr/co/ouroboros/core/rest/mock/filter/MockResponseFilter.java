@@ -31,26 +31,12 @@ public class MockResponseFilter implements Filter{
             return;
         }
 
-        // 검증 에러가 있는지 확인
-        Integer validationError = (Integer) http.getAttribute("validationError");
         int statusCode = 200;
-
-        if (validationError != null) {
-            // 검증 실패 → 에러 응답 생성
-            statusCode = validationError;
-        }
-
         // 해당 코드의 ResponseMeta 가져오기
         ResponseMeta responseMeta = meta.getResponses().get(statusCode);
         if (responseMeta == null) {
-            // 커스텀 응답이 없으면 기본 에러 메시지
-            String validationMessage = (String) http.getAttribute("validationMessage");
-            if (validationMessage != null) {
-                sendError(httpRes, statusCode, validationMessage);
-            } else {
-                httpRes.setStatus(500);
-                httpRes.getWriter().write("{\"error\": \"No response definition found for code " + statusCode + "\"}");
-            }
+            httpRes.setStatus(500);
+            httpRes.getWriter().write("{\"error\": \"No response definition found\"}");
             return;
         }
 
@@ -93,9 +79,4 @@ public class MockResponseFilter implements Filter{
         httpRes.getWriter().write(bodyText);
     }
 
-    private void sendError(HttpServletResponse res, int code, String msg) throws IOException {
-        res.setStatus(code);
-        res.setContentType("application/json;charset=UTF-8");
-        res.getWriter().write("{\"error\": \"" + msg + "\"}");
-    }
 }
