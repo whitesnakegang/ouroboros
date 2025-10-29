@@ -240,42 +240,50 @@ public class SchemaServiceImpl implements SchemaService {
         return propertyMap;
     }
 
-    @SuppressWarnings("unchecked")
     private SchemaResponse convertToResponse(String schemaName, Map<String, Object> schemaDefinition) {
         SchemaResponse.SchemaResponseBuilder builder = SchemaResponse.builder()
                 .schemaName(schemaName)
-                .type((String) schemaDefinition.get("type"))
-                .title((String) schemaDefinition.get("title"))
-                .description((String) schemaDefinition.get("description"))
-                .required((List<String>) schemaDefinition.get("required"))
-                .orders((List<String>) schemaDefinition.get("x-ouroboros-orders"));
+                .type(safeGetString(schemaDefinition, "type"))
+                .title(safeGetString(schemaDefinition, "title"))
+                .description(safeGetString(schemaDefinition, "description"))
+                .required(safeGetStringList(schemaDefinition, "required"))
+                .orders(safeGetStringList(schemaDefinition, "x-ouroboros-orders"));
 
         // Extract properties
-        Map<String, Object> propertiesMap = (Map<String, Object>) schemaDefinition.get("properties");
-        if (propertiesMap != null) {
+        Object propertiesObj = schemaDefinition.get("properties");
+        if (propertiesObj instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> propertiesMap = (Map<String, Object>) propertiesObj;
             Map<String, Property> properties = new LinkedHashMap<>();
             for (Map.Entry<String, Object> entry : propertiesMap.entrySet()) {
-                Map<String, Object> propDef = (Map<String, Object>) entry.getValue();
-                properties.put(entry.getKey(), convertToProperty(propDef));
+                if (entry.getValue() instanceof Map) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> propDef = (Map<String, Object>) entry.getValue();
+                    properties.put(entry.getKey(), convertToProperty(propDef));
+                } else {
+                    log.warn("Invalid property definition for '{}': expected Map but got {}", 
+                            entry.getKey(), entry.getValue() != null ? entry.getValue().getClass().getSimpleName() : "null");
+                }
             }
             builder.properties(properties);
         }
 
         // Extract XML name
-        Map<String, Object> xml = (Map<String, Object>) schemaDefinition.get("xml");
-        if (xml != null) {
-            builder.xmlName((String) xml.get("name"));
+        Object xmlObj = schemaDefinition.get("xml");
+        if (xmlObj instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> xml = (Map<String, Object>) xmlObj;
+            builder.xmlName(safeGetString(xml, "name"));
         }
 
         return builder.build();
     }
 
-    @SuppressWarnings("unchecked")
     private Property convertToProperty(Map<String, Object> propertyDefinition) {
         Property.PropertyBuilder builder = Property.builder();
 
         // Check for schema reference in YAML ($ref)
-        String dollarRef = (String) propertyDefinition.get("$ref");
+        String dollarRef = safeGetString(propertyDefinition, "$ref");
         if (dollarRef != null) {
             // Convert $ref to simplified ref for client
             if (dollarRef.startsWith("#/components/schemas/")) {
@@ -288,18 +296,92 @@ public class SchemaServiceImpl implements SchemaService {
         }
 
         // Inline mode: extract all property fields
-        builder.type((String) propertyDefinition.get("type"))
-                .description((String) propertyDefinition.get("description"))
-                .mockExpression((String) propertyDefinition.get("x-ouroboros-mock"))
-                .minItems((Integer) propertyDefinition.get("minItems"))
-                .maxItems((Integer) propertyDefinition.get("maxItems"));
+        builder.type(safeGetString(propertyDefinition, "type"))
+                .description(safeGetString(propertyDefinition, "description"))
+                .mockExpression(safeGetString(propertyDefinition, "x-ouroboros-mock"))
+                .minItems(safeGetInteger(propertyDefinition, "minItems"))
+                .maxItems(safeGetInteger(propertyDefinition, "maxItems"));
 
         // Handle nested items for array type
-        Map<String, Object> items = (Map<String, Object>) propertyDefinition.get("items");
-        if (items != null) {
+        Object itemsObj = propertyDefinition.get("items");
+        if (itemsObj instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> items = (Map<String, Object>) itemsObj;
             builder.items(convertToProperty(items));
         }
 
         return builder.build();
+    }
+
+    /**
+     * Safely extracts a String value from a Map.
+     * 
+     * @param map the source map
+     * @param key the key to look up
+     * @return the String value, or null if not found or not a String
+     */
+    private String safeGetString(Map<String, Object> map, String key) {
+        Object value = map.get(key);
+        if (value instanceof String) {
+            return (String) value;
+        }
+        if (value != null) {
+            log.warn("Expected String for key '{}' but got {}", key, value.getClass().getSimpleName());
+        }
+        return null;
+    }
+
+    /**
+     * Safely extracts an Integer value from a Map.
+     * 
+     * @param map the source map
+     * @param key the key to look up
+     * @return the Integer value, or null if not found or not an Integer
+     */
+    private Integer safeGetInteger(Map<String, Object> map, String key) {
+        Object value = map.get(key);
+        if (value instanceof Integer) {
+            return (Integer) value;
+        }
+        if (value instanceof Number) {
+            return ((Number) value).intValue();
+        }
+        if (value != null) {
+            log.warn("Expected Integer for key '{}' but got {}", key, value.getClass().getSimpleName());
+        }
+        return null;
+    }
+
+    /**
+     * Safely extracts a List of Strings from a Map.
+     * 
+     * @param map the source map
+     * @param key the key to look up
+     * @return the List of Strings, or null if not found or not a valid list
+     */
+    @SuppressWarnings("unchecked")
+    private List<String> safeGetStringList(Map<String, Object> map, String key) {
+        Object value = map.get(key);
+        if (value instanceof List) {
+            try {
+                List<?> list = (List<?>) value;
+                // Validate all elements are Strings
+                for (Object item : list) {
+                    if (!(item instanceof String)) {
+                        log.warn("List for key '{}' contains non-String element: {}", 
+                                key, item != null ? item.getClass().getSimpleName() : "null");
+                        return null;
+                    }
+                }
+                return (List<String>) value;
+            } catch (ClassCastException e) {
+                log.warn("Failed to cast list for key '{}': {}", key, e.getMessage());
+                return null;
+            }
+        }
+        if (value != null) {
+            log.warn("Expected List for key '{}' but got {}", key, value.getClass().getSimpleName());
+        }
+        return null;
     }
 }

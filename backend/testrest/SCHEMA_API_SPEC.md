@@ -46,6 +46,7 @@ Creates a new reusable schema definition.
 ```
 
 #### Request Fields
+
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | schemaName | string | Yes | Schema identifier (used for $ref references) |
@@ -58,6 +59,7 @@ Creates a new reusable schema definition.
 | xmlName | string | No | XML root element name |
 
 #### Property Object Structure
+
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | ref | string | No | **Schema reference** (e.g., "Address") - simply provide the schema name |
@@ -171,6 +173,7 @@ Retrieves all schema definitions.
 Retrieves a specific schema definition by name.
 
 #### Path Parameters
+
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | schemaName | string | Schema identifier |
@@ -218,6 +221,7 @@ Retrieves a specific schema definition by name.
 Updates an existing schema definition. Only provided fields will be updated.
 
 #### Path Parameters
+
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | schemaName | string | Schema identifier |
@@ -256,6 +260,7 @@ Updates an existing schema definition. Only provided fields will be updated.
 ```
 
 #### Request Fields (All Optional)
+
 | Field | Type | Description |
 |-------|------|-------------|
 | type | string | Schema type |
@@ -304,6 +309,7 @@ Updates an existing schema definition. Only provided fields will be updated.
 Deletes a schema definition.
 
 #### Path Parameters
+
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | schemaName | string | Schema identifier |
