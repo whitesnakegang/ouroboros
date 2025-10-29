@@ -90,7 +90,10 @@ public class RestMockLoaderService {
     private EndpointMeta parseOperation(String path, String method, Map<String, Object> operation, Map<String, Object> schemas) {
         // Extract Ouroboros custom fields
         String id = (String) operation.get("x-ouroboros-id");
-        String progress = (String) operation.getOrDefault("x-ouroboros-progress", "mock");
+        String progress = (String) operation.get("x-ouroboros-progress");
+        if (!"mock".equalsIgnoreCase(progress)) {
+            return null;  // mock이 아닌 endpoint는 registry에 등록하지 않음
+        }
 
         // Extract required parameters
         List<String> requiredHeaders = new ArrayList<>();

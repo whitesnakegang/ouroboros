@@ -18,10 +18,13 @@ public class MockRoutingFilter implements Filter{
             throws IOException, ServletException {
         HttpServletRequest http = (HttpServletRequest) req;
         Optional<EndpointMeta> metaOpt = registry.find(http.getRequestURI(), http.getMethod());
-        if (metaOpt.isEmpty() || !"mock".equalsIgnoreCase(metaOpt.get().getStatus())) {
+        // Registry에 없으면 실제 구현으로 pass
+        if (metaOpt.isEmpty()) {
             chain.doFilter(req, res);
             return;
         }
+
+        // Registry에 있으면 mock 대상
         req.setAttribute("mockMeta", metaOpt.get());
         chain.doFilter(req, res);
     }
