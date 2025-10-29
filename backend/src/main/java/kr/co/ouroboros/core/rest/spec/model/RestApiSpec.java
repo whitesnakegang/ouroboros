@@ -42,5 +42,5 @@ public class RestApiSpec {
     @Builder.Default
     private String tag = "none";       // bugfix, implementing, or none
     @Builder.Default
-    private boolean isValid = true;
+    private String diff = "none";      // none, request, response, endpoint, or both
 }

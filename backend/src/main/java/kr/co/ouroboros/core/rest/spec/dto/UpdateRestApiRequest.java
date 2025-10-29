@@ -13,7 +13,7 @@ import java.util.Map;
  * Request DTO for updating an existing REST API specification.
  * <p>
  * All fields are optional - only provided fields will be updated.
- * The path and method cannot be changed (use delete + create instead).
+ * If path or method is changed, the operation will be moved to the new location.
  *
  * @since 0.0.1
  */
@@ -22,6 +22,20 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 public class UpdateRestApiRequest {
+
+    /**
+     * API endpoint path (e.g., "/api/users/{id}")
+     * <p>
+     * If changed, the operation will be moved from the old path to the new path
+     */
+    private String path;
+
+    /**
+     * HTTP method (GET, POST, PUT, DELETE, PATCH)
+     * <p>
+     * If changed, the operation will be moved from the old method to the new method
+     */
+    private String method;
 
     /**
      * Brief endpoint description
@@ -74,7 +88,7 @@ public class UpdateRestApiRequest {
     private String tag;
 
     /**
-     * Validation flag
+     * Diff status (none, request, response, endpoint, both)
      */
-    private Boolean isValid;
+    private String diff;
 }
