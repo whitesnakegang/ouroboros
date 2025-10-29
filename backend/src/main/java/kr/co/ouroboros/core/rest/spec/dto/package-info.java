@@ -7,6 +7,9 @@
  *   <li>{@link kr.co.ouroboros.core.rest.spec.dto.CreateRestApiRequest} - Request DTO for creating API specs</li>
  *   <li>{@link kr.co.ouroboros.core.rest.spec.dto.CreateRestApiResponse} - Response DTO for API spec creation</li>
  *   <li>{@link kr.co.ouroboros.core.rest.spec.dto.GetRestApiSpecsResponse} - Response DTO for retrieving all API specs</li>
+ *   <li>{@link kr.co.ouroboros.core.rest.spec.dto.CreateSchemaRequest} - Request DTO for creating schemas</li>
+ *   <li>{@link kr.co.ouroboros.core.rest.spec.dto.UpdateSchemaRequest} - Request DTO for updating schemas</li>
+ *   <li>{@link kr.co.ouroboros.core.rest.spec.dto.SchemaResponse} - Response DTO for schema operations</li>
  * </ul>
  *
  * @since 0.0.1

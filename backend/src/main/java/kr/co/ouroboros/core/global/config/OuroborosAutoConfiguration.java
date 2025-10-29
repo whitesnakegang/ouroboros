@@ -1,8 +1,9 @@
 package kr.co.ouroboros.core.global.config;
 
-import kr.co.ouroboros.core.global.annotation.ApiStateGlobalMethodFilter;
-import kr.co.ouroboros.core.global.annotation.OpenApiCustomizerConfig;
+
 import kr.co.ouroboros.core.global.properties.OuroborosProperties;
+import kr.co.ouroboros.core.rest.filter.ApiStateGlobalMethodFilter;
+import kr.co.ouroboros.core.rest.config.OpenApiCustomizerConfig;
 import org.springdoc.core.customizers.OperationCustomizer;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;

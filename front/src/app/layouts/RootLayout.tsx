@@ -4,7 +4,14 @@ import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
 import { useEffect } from "react";
 
 export function RootLayout() {
-  const { isDarkMode, isOpen, toggle } = useSidebarStore();
+  const { isDarkMode, isOpen, toggle, setTriggerNewForm } = useSidebarStore();
+
+  const handleNewApiForm = () => {
+    // 새 API 폼 트리거
+    if (setTriggerNewForm) {
+      setTriggerNewForm(true);
+    }
+  };
 
   useEffect(() => {
     if (isDarkMode) {
@@ -58,7 +65,7 @@ export function RootLayout() {
             isOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
-          <Sidebar />
+          <Sidebar onAddNew={handleNewApiForm} />
         </aside>
 
         {/* 메인 콘텐츠 */}
