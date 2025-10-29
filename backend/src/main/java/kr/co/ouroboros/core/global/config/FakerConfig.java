@@ -8,7 +8,7 @@ import java.util.Locale;
 @Configuration
 public class FakerConfig {
     private static final ThreadLocal<Faker> threadLocalFaker =
-            ThreadLocal.withInitial(() -> new Faker(Locale.KOREA));
+            ThreadLocal.withInitial(() -> new Faker(Locale.US));
 
     @Bean
     public Faker faker() {
