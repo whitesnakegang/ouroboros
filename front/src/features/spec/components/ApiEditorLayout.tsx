@@ -82,10 +82,10 @@ export function ApiEditorLayout() {
 
   // Form state
   const [method, setMethod] = useState("POST");
-  const [url, setUrl] = useState("/api/auth/login");
-  const [tags, setTags] = useState("AUTH");
-  const [description, setDescription] = useState("사용자 로그인");
-  const [owner, setOwner] = useState("SMART-TEAM");
+  const [url, setUrl] = useState("");
+  const [tags, setTags] = useState("");
+  const [description, setDescription] = useState("");
+  const [owner, setOwner] = useState("");
 
   // Request state
   const [requestHeaders, setRequestHeaders] = useState<KeyValuePair[]>([
@@ -140,10 +140,7 @@ export function ApiEditorLayout() {
           security: [],
         };
 
-        const response = await updateRestApiSpec(
-          selectedEndpoint.id,
-          updateRequest
-        );
+        await updateRestApiSpec(selectedEndpoint.id, updateRequest);
 
         alert("API 스펙이 수정되었습니다.");
         setIsEditMode(false);

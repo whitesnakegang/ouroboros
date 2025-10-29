@@ -36,55 +36,6 @@ interface SidebarState {
   isLoading: boolean;
 }
 
-const mockInitialEndpoints: EndpointData = {
-  AUTH: [
-    {
-      id: "1",
-      method: "POST",
-      path: "/api/auth/login",
-      description: "사용자 로그인",
-      implementationStatus: "not-implemented" as const,
-    },
-    {
-      id: "2",
-      method: "POST",
-      path: "/api/auth/register",
-      description: "신규 사용자 등록",
-      implementationStatus: "in-progress" as const,
-    },
-    {
-      id: "3",
-      method: "POST",
-      path: "/api/auth/logout",
-      description: "사용자 로그아웃",
-      implementationStatus: "modifying" as const,
-    },
-  ],
-  USERS: [
-    {
-      id: "4",
-      method: "GET",
-      path: "/api/users/:id",
-      description: "ID로 사용자 조회",
-      hasSpecError: false,
-    },
-    {
-      id: "5",
-      method: "GET",
-      path: "/api/users",
-      description: "전체 사용자 목록",
-      hasSpecError: true,
-    },
-    {
-      id: "6",
-      method: "PUT",
-      path: "/api/users/:id",
-      description: "사용자 정보 수정",
-      hasSpecError: false,
-    },
-  ],
-};
-
 // 백엔드 스펙을 프론트엔드 엔드포인트 형태로 변환
 function convertSpecToEndpoint(spec: RestApiSpecResponse): Endpoint {
   return {
@@ -109,7 +60,7 @@ export const useSidebarStore = create<SidebarState>()(
       toggleDarkMode: () => set((state) => ({ isDarkMode: !state.isDarkMode })),
       selectedEndpoint: null,
       setSelectedEndpoint: (endpoint) => set({ selectedEndpoint: endpoint }),
-      endpoints: mockInitialEndpoints,
+      endpoints: {},
       setEndpoints: (endpoints) => set({ endpoints }),
       updateEndpoint: (updatedEndpoint) => {
         const { endpoints } = get();
@@ -174,8 +125,8 @@ export const useSidebarStore = create<SidebarState>()(
         } catch (error) {
           console.error("API 목록 로드 실패:", error);
           set({ isLoading: false });
-          // 에러 발생 시 mock 데이터 사용
-          set({ endpoints: mockInitialEndpoints });
+          // 에러 발생 시 빈 객체로 설정
+          set({ endpoints: {} });
         }
       },
     }),

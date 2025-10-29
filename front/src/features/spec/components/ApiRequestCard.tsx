@@ -377,25 +377,7 @@ export function ApiRequestCard({
         )}
       </div>
 
-      {/* Send Button */}
-      <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
-        <button className="w-full bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2">
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M14 5l7 7m0 0l-7 7m7-7H3"
-            />
-          </svg>
-          Send Request
-        </button>
-      </div>
+      {/* Send Button removed: Spec 작성 화면에서는 실제 전송 기능을 제공하지 않음 */}
     </div>
   );
 }

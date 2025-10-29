@@ -1,5 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { SchemaModal } from "./SchemaModal";
+import { getAllSchemas, createSchema, updateSchema } from "../services/api";
+import type {
+  SchemaResponse,
+  CreateSchemaRequest,
+  UpdateSchemaRequest,
+} from "../services/api";
 
 interface StatusCode {
   code: string;
@@ -10,8 +16,9 @@ interface StatusCode {
 interface SchemaField {
   name: string;
   type: string;
-  mock: string;
-  description: string;
+  description?: string;
+  mockExpression?: string;
+  ref?: string;
 }
 
 interface ApiResponseCardProps {
@@ -69,12 +76,117 @@ export function ApiResponseCard({
   };
 
   const [activeTab, setActiveTab] = useState("status");
-  const [schemas, setSchemas] = useState<
-    Array<{ id: string; name: string; fields: SchemaField[] }>
-  >([]);
+  const [schemas, setSchemas] = useState<SchemaResponse[]>([]);
   const [isSchemaModalOpen, setIsSchemaModalOpen] = useState(false);
   const [schemaFields, setSchemaFields] = useState<SchemaField[]>([]);
   const [currentSchemaName, setCurrentSchemaName] = useState("");
+  const [currentSchemaDescription, setCurrentSchemaDescription] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // 컴포넌트 마운트 시 스키마 목록 로드
+  useEffect(() => {
+    loadSchemas();
+  }, []);
+
+  // 스키마 목록 로드
+  const loadSchemas = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await getAllSchemas();
+      setSchemas(response.data);
+    } catch (err) {
+      console.error("스키마 로드 실패:", err);
+      setError(
+        err instanceof Error ? err.message : "스키마를 불러오는데 실패했습니다."
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 스키마 저장 (생성 또는 수정)
+  const saveSchema = async () => {
+    if (!currentSchemaName.trim()) {
+      alert("스키마 이름을 입력해주세요.");
+      return;
+    }
+
+    if (schemaFields.length === 0) {
+      alert("최소 하나의 필드를 추가해주세요.");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // 필드들을 백엔드 형식으로 변환
+      const properties: Record<string, any> = {};
+      const required: string[] = [];
+
+      schemaFields.forEach((field) => {
+        if (field.name.trim()) {
+          properties[field.name] = {
+            type: field.type,
+            description: field.description,
+            mockExpression: field.mockExpression,
+            ref: field.ref,
+          };
+          // 필수 필드는 현재 모든 필드로 설정 (실제로는 UI에서 선택할 수 있도록 개선 가능)
+          required.push(field.name);
+        }
+      });
+
+      const schemaRequest: CreateSchemaRequest = {
+        schemaName: currentSchemaName.trim(),
+        type: "object",
+        title: `${currentSchemaName} Schema`,
+        description:
+          currentSchemaDescription.trim() || `${currentSchemaName} 스키마 정의`,
+        properties,
+        required,
+        orders: schemaFields.map((f) => f.name),
+      };
+
+      // 기존 스키마가 있는지 확인
+      const existingSchema = schemas.find(
+        (s) => s.schemaName === currentSchemaName
+      );
+
+      if (existingSchema) {
+        // 수정
+        const updateRequest: UpdateSchemaRequest = {
+          type: schemaRequest.type,
+          title: schemaRequest.title,
+          description: schemaRequest.description,
+          properties: schemaRequest.properties,
+          required: schemaRequest.required,
+          orders: schemaRequest.orders,
+        };
+        await updateSchema(currentSchemaName, updateRequest);
+        alert(`"${currentSchemaName}" 스키마가 수정되었습니다.`);
+      } else {
+        // 생성
+        await createSchema(schemaRequest);
+        alert(`"${currentSchemaName}" 스키마가 생성되었습니다.`);
+      }
+
+      // 스키마 목록 다시 로드
+      await loadSchemas();
+
+      // 폼 초기화
+      setSchemaFields([]);
+      setCurrentSchemaName("");
+      setCurrentSchemaDescription("");
+    } catch (err) {
+      console.error("스키마 저장 실패:", err);
+      alert(err instanceof Error ? err.message : "스키마 저장에 실패했습니다.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6 shadow-sm">
@@ -263,15 +375,27 @@ export function ApiResponseCard({
         {activeTab === "schema" && (
           <div>
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Schema 편집 및 관리
-              </p>
-              <button
-                onClick={() => setIsSchemaModalOpen(true)}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 dark:bg-purple-700 dark:hover:bg-purple-600 text-white rounded-lg text-sm font-medium transition-colors"
-              >
-                📦 Schema 관리
-              </button>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Schema 편집 및 관리
+                </p>
+                {error && <p className="text-sm text-red-500 mt-1">{error}</p>}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={loadSchemas}
+                  disabled={isLoading}
+                  className="px-3 py-1 text-sm text-gray-600 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 font-medium border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+                >
+                  {isLoading ? "로딩..." : "새로고침"}
+                </button>
+                <button
+                  onClick={() => setIsSchemaModalOpen(true)}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 dark:bg-purple-700 dark:hover:bg-purple-600 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  📦 Schema 관리
+                </button>
+              </div>
             </div>
 
             {/* Schema Fields Table */}
@@ -289,12 +413,30 @@ export function ApiResponseCard({
                 />
               </div>
 
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Schema 설명
+                </label>
+                <textarea
+                  value={currentSchemaDescription}
+                  onChange={(e) => setCurrentSchemaDescription(e.target.value)}
+                  placeholder="Schema에 대한 설명을 입력하세요 (선택사항)"
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                />
+              </div>
+
               <div className="mb-3 flex items-center justify-between">
                 <button
                   onClick={() => {
                     setSchemaFields([
                       ...schemaFields,
-                      { name: "", type: "string", mock: "", description: "" },
+                      {
+                        name: "",
+                        type: "string",
+                        description: "",
+                        mockExpression: "",
+                      },
                     ]);
                   }}
                   className="px-3 py-1 text-sm text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 font-medium"
@@ -303,18 +445,11 @@ export function ApiResponseCard({
                 </button>
                 {currentSchemaName && schemaFields.length > 0 && (
                   <button
-                    onClick={() => {
-                      const newSchema = {
-                        id: Date.now().toString(),
-                        name: currentSchemaName,
-                        fields: schemaFields,
-                      };
-                      setSchemas([...schemas, newSchema]);
-                      alert(`"${currentSchemaName}" Schema가 저장되었습니다.`);
-                    }}
-                    className="px-4 py-2 bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white rounded-lg text-sm font-medium transition-colors"
+                    onClick={saveSchema}
+                    disabled={isLoading}
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                   >
-                    💾 Save Schema
+                    {isLoading ? "저장 중..." : "💾 Save Schema"}
                   </button>
                 )}
               </div>
@@ -339,7 +474,7 @@ export function ApiResponseCard({
                         Type <span className="text-red-500">*</span>
                       </th>
                       <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 w-1/4">
-                        Mock Value
+                        Mock Expression
                       </th>
                       <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 w-1/3">
                         Description
@@ -393,16 +528,16 @@ export function ApiResponseCard({
                         <td className="px-4 py-3">
                           <input
                             type="text"
-                            value={field.mock}
+                            value={field.mockExpression || ""}
                             onChange={(e) => {
                               const updated = [...schemaFields];
                               updated[index] = {
                                 ...updated[index],
-                                mock: e.target.value,
+                                mockExpression: e.target.value,
                               };
                               setSchemaFields(updated);
                             }}
-                            placeholder="예: user123, John Doe"
+                            placeholder="예: {{$random.uuid}}, {{$name.fullName}}"
                             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
                           />
                         </td>
@@ -463,6 +598,7 @@ export function ApiResponseCard({
         onClose={() => setIsSchemaModalOpen(false)}
         onSelect={(schema) => {
           setCurrentSchemaName(schema.name);
+          setCurrentSchemaDescription(schema.description || "");
           setSchemaFields(schema.fields);
         }}
         schemas={schemas}
