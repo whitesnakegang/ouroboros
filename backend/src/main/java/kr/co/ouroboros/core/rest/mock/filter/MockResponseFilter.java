@@ -9,9 +9,11 @@ import kr.co.ouroboros.core.global.mock.model.ResponseMeta;
 import kr.co.ouroboros.core.global.mock.service.SchemaMockBuilder;
 import kr.co.ouroboros.core.rest.mock.model.EndpointMeta;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 
+@Slf4j
 @RequiredArgsConstructor
 public class MockResponseFilter implements Filter{
     private final SchemaMockBuilder schemaMockBuilder;
@@ -35,8 +37,11 @@ public class MockResponseFilter implements Filter{
         // 해당 코드의 ResponseMeta 가져오기
         ResponseMeta responseMeta = meta.getResponses().get(statusCode);
         if (responseMeta == null) {
+            log.error("No 200 response defined for endpoint: {} {}",
+                    meta.getMethod(), meta.getPath());
             httpRes.setStatus(500);
-            httpRes.getWriter().write("{\"error\": \"No response definition found\"}");
+            httpRes.getWriter().write("{\"error\": \"No response definition found for "
+                    + meta.getPath() + "\"}");
             return;
         }
 
