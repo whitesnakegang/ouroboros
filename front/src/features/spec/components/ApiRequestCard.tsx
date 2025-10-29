@@ -24,6 +24,7 @@ interface ApiRequestCardProps {
   setRequestHeaders: (headers: KeyValuePair[]) => void;
   requestBody: RequestBody;
   setRequestBody: (body: RequestBody) => void;
+  isReadOnly?: boolean;
 }
 
 export function ApiRequestCard({
@@ -31,6 +32,7 @@ export function ApiRequestCard({
   setRequestHeaders,
   requestBody,
   setRequestBody,
+  isReadOnly = false,
 }: ApiRequestCardProps) {
   const bodyTypes: RequestBody["type"][] = [
     "none",
@@ -50,10 +52,12 @@ export function ApiRequestCard({
   ];
 
   const addHeader = () => {
+    if (isReadOnly) return;
     setRequestHeaders([...requestHeaders, { key: "", value: "" }]);
   };
 
   const removeHeader = (index: number) => {
+    if (isReadOnly) return;
     setRequestHeaders(requestHeaders.filter((_, i) => i !== index));
   };
 
@@ -62,6 +66,7 @@ export function ApiRequestCard({
     field: "key" | "value",
     value: string
   ) => {
+    if (isReadOnly) return;
     const updated = [...requestHeaders];
     updated[index] = { ...updated[index], [field]: value };
     setRequestHeaders(updated);
@@ -128,7 +133,12 @@ export function ApiRequestCard({
               </p>
               <button
                 onClick={addHeader}
-                className="px-3 py-1 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+                disabled={isReadOnly}
+                className={`px-3 py-1 text-sm font-medium ${
+                  isReadOnly
+                    ? "text-gray-400 cursor-not-allowed"
+                    : "text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                }`}
               >
                 + Add
               </button>

@@ -17,11 +17,13 @@ interface SchemaField {
 interface ApiResponseCardProps {
   statusCodes: StatusCode[];
   setStatusCodes: (codes: StatusCode[]) => void;
+  isReadOnly?: boolean;
 }
 
 export function ApiResponseCard({
   statusCodes,
   setStatusCodes,
+  isReadOnly = false,
 }: ApiResponseCardProps) {
   const statusCodeTemplates: StatusCode[] = [
     { code: "200", type: "Success", message: "요청이 성공적으로 처리됨" },
@@ -39,6 +41,7 @@ export function ApiResponseCard({
   ];
 
   const addStatusCode = (template?: StatusCode) => {
+    if (isReadOnly) return;
     if (template) {
       setStatusCodes([...statusCodes, { ...template }]);
     } else {
@@ -50,6 +53,7 @@ export function ApiResponseCard({
   };
 
   const removeStatusCode = (index: number) => {
+    if (isReadOnly) return;
     setStatusCodes(statusCodes.filter((_, i) => i !== index));
   };
 
@@ -58,6 +62,7 @@ export function ApiResponseCard({
     field: "code" | "type" | "message",
     value: string
   ) => {
+    if (isReadOnly) return;
     const updated = [...statusCodes];
     updated[index] = { ...updated[index], [field]: value };
     setStatusCodes(updated);

@@ -1,13 +1,17 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { getAllRestApiSpecs } from "@/features/spec/services/api";
+import type { RestApiSpecResponse } from "@/features/spec/services/api";
 
 interface Endpoint {
-  id: number;
+  id: string;
   method: string;
   path: string;
   description: string;
   implementationStatus?: "not-implemented" | "in-progress" | "modifying";
   hasSpecError?: boolean;
+  tags?: string[];
+  progress?: string;
 }
 
 export interface EndpointData {
@@ -24,30 +28,32 @@ interface SidebarState {
   endpoints: EndpointData;
   setEndpoints: (endpoints: EndpointData) => void;
   updateEndpoint: (updatedEndpoint: Endpoint) => void;
-  deleteEndpoint: (endpointId: number) => void;
+  deleteEndpoint: (endpointId: string) => void;
   addEndpoint: (endpoint: Endpoint, group: string) => void;
   triggerNewForm: boolean;
   setTriggerNewForm: (trigger: boolean) => void;
+  loadEndpoints: () => Promise<void>;
+  isLoading: boolean;
 }
 
-const mockInitialEndpoints = {
+const mockInitialEndpoints: EndpointData = {
   AUTH: [
     {
-      id: 1,
+      id: "1",
       method: "POST",
       path: "/api/auth/login",
       description: "사용자 로그인",
       implementationStatus: "not-implemented" as const,
     },
     {
-      id: 2,
+      id: "2",
       method: "POST",
       path: "/api/auth/register",
       description: "신규 사용자 등록",
       implementationStatus: "in-progress" as const,
     },
     {
-      id: 3,
+      id: "3",
       method: "POST",
       path: "/api/auth/logout",
       description: "사용자 로그아웃",
@@ -56,21 +62,21 @@ const mockInitialEndpoints = {
   ],
   USERS: [
     {
-      id: 4,
+      id: "4",
       method: "GET",
       path: "/api/users/:id",
       description: "ID로 사용자 조회",
       hasSpecError: false,
     },
     {
-      id: 5,
+      id: "5",
       method: "GET",
       path: "/api/users",
       description: "전체 사용자 목록",
       hasSpecError: true,
     },
     {
-      id: 6,
+      id: "6",
       method: "PUT",
       path: "/api/users/:id",
       description: "사용자 정보 수정",
@@ -78,6 +84,21 @@ const mockInitialEndpoints = {
     },
   ],
 };
+
+// 백엔드 스펙을 프론트엔드 엔드포인트 형태로 변환
+function convertSpecToEndpoint(spec: RestApiSpecResponse): Endpoint {
+  return {
+    id: spec.id,
+    method: spec.method,
+    path: spec.path,
+    description: spec.description || spec.summary || "",
+    implementationStatus:
+      spec.progress === "mock" ? "not-implemented" : undefined,
+    hasSpecError: spec.isValid === false ? true : undefined,
+    tags: spec.tags,
+    progress: spec.progress,
+  };
+}
 
 export const useSidebarStore = create<SidebarState>()(
   persist(
@@ -127,6 +148,36 @@ export const useSidebarStore = create<SidebarState>()(
       },
       triggerNewForm: false,
       setTriggerNewForm: (trigger) => set({ triggerNewForm: trigger }),
+      isLoading: false,
+      loadEndpoints: async () => {
+        set({ isLoading: true });
+        try {
+          const response = await getAllRestApiSpecs();
+          const specs = response.data;
+
+          // 스펙을 그룹별로 분류
+          const grouped: EndpointData = {};
+
+          specs.forEach((spec) => {
+            // tags를 그룹 키로 사용 (첫 번째 태그 또는 기본값)
+            const group =
+              spec.tags && spec.tags.length > 0 ? spec.tags[0] : "OTHERS";
+
+            if (!grouped[group]) {
+              grouped[group] = [];
+            }
+
+            grouped[group].push(convertSpecToEndpoint(spec));
+          });
+
+          set({ endpoints: grouped, isLoading: false });
+        } catch (error) {
+          console.error("API 목록 로드 실패:", error);
+          set({ isLoading: false });
+          // 에러 발생 시 mock 데이터 사용
+          set({ endpoints: mockInitialEndpoints });
+        }
+      },
     }),
     {
       name: "sidebar-storage",

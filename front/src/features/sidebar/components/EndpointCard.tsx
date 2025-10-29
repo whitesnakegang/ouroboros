@@ -1,7 +1,7 @@
 import { useSidebarStore } from "../store/sidebar.store";
 
 interface Endpoint {
-  id: number;
+  id: string;
   method: string;
   path: string;
   description: string;

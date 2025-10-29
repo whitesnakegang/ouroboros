@@ -7,6 +7,12 @@ import { CodeSnippetPanel } from "./CodeSnippetPanel";
 import { useSpecStore } from "../store/spec.store";
 import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
 import { exportToMarkdown, downloadMarkdown } from "../utils/markdownExporter";
+import {
+  createRestApiSpec,
+  updateRestApiSpec,
+  deleteRestApiSpec,
+  getRestApiSpec,
+} from "../services/api";
 
 interface KeyValuePair {
   key: string;
@@ -36,24 +42,43 @@ export function ApiEditorLayout() {
   const { protocol, setProtocol } = useSpecStore();
   const {
     selectedEndpoint,
-    updateEndpoint,
     deleteEndpoint,
     addEndpoint,
     setSelectedEndpoint,
     triggerNewForm,
     setTriggerNewForm,
+    loadEndpoints,
+    updateEndpoint,
   } = useSidebarStore();
   const [activeTab, setActiveTab] = useState<"form" | "test">("form");
   const [isCodeSnippetOpen, setIsCodeSnippetOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   // Load selected endpoint data when endpoint is clicked
   useEffect(() => {
     if (selectedEndpoint) {
-      setMethod(selectedEndpoint.method);
-      setUrl(selectedEndpoint.path);
-      setDescription(selectedEndpoint.description);
+      setIsEditMode(false); // 항목 선택 시 읽기 전용 모드로 시작
+      loadEndpointData(selectedEndpoint.id);
+    } else {
+      setIsEditMode(false);
     }
   }, [selectedEndpoint]);
+
+  // Load endpoint data from backend
+  const loadEndpointData = async (id: string) => {
+    try {
+      const response = await getRestApiSpec(id);
+      const spec = response.data;
+      setMethod(spec.method);
+      setUrl(spec.path);
+      setDescription(spec.description || spec.summary || "");
+      setTags(spec.tags ? spec.tags.join(", ") : "");
+      // 추가 데이터 로드 필요시 여기에 구현
+    } catch (error) {
+      console.error("API 스펙 로드 실패:", error);
+      alert("API 스펙을 불러오는데 실패했습니다.");
+    }
+  };
 
   // Form state
   const [method, setMethod] = useState("POST");
@@ -84,54 +109,143 @@ export function ApiEditorLayout() {
     (completedEndpoints / totalEndpoints) * 100
   );
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!method || !url) {
       alert("Method와 URL을 입력해주세요.");
       return;
     }
-    if (selectedEndpoint) {
-      // 기존 엔드포인트 수정
-      const updatedEndpoint = {
-        ...selectedEndpoint,
-        method,
-        path: url,
-        description,
-      };
-      updateEndpoint(updatedEndpoint);
-      alert(`${method} ${url} API가 수정되었습니다.`);
-      setSelectedEndpoint(updatedEndpoint);
-    } else {
-      // 새 엔드포인트 생성
-      const newEndpoint = {
-        id: Date.now(),
-        method,
-        path: url,
-        description,
-        implementationStatus: "not-implemented" as const,
-      };
 
-      addEndpoint(newEndpoint, tags);
-      alert(`${method} ${url} API가 생성되었습니다.`);
+    try {
+      if (selectedEndpoint && isEditMode) {
+        // 수정 로직 - path와 method는 변경 불가 (백엔드 제약)
+        const updateRequest = {
+          summary: description,
+          description,
+          tags: tags ? tags.split(",").map((tag) => tag.trim()) : [],
+          progress: "mock",
+          tag: "none",
+          isValid: true,
+          // 추가 필드들도 포함
+          parameters: [], // 실제 데이터로 교체 필요
+          requestBody: requestBody, // 실제 requestBody 데이터
+          responses: statusCodes.reduce((acc, code) => {
+            acc[code.code] = {
+              description: code.message,
+              type: code.type.toLowerCase(),
+            };
+            return acc;
+          }, {} as Record<string, unknown>),
+          security: [],
+        };
 
-      // 선택 상태로 만들기
-      setSelectedEndpoint(newEndpoint);
+        await updateRestApiSpec(selectedEndpoint.id, updateRequest);
+        alert("API 스펙이 수정되었습니다.");
+        setIsEditMode(false);
+
+        // 수정된 엔드포인트를 로컬 상태에 반영
+        const updatedEndpoint = {
+          id: selectedEndpoint.id,
+          method: selectedEndpoint.method, // path/method는 변경 불가
+          path: selectedEndpoint.path,
+          description,
+          implementationStatus: selectedEndpoint.implementationStatus,
+          hasSpecError: selectedEndpoint.hasSpecError,
+          tags: tags ? tags.split(",").map((tag) => tag.trim()) : [],
+          progress: "mock",
+        };
+        updateEndpoint(updatedEndpoint);
+        setSelectedEndpoint(updatedEndpoint);
+
+        // 사이드바 목록 다시 로드 (백그라운드에서)
+        loadEndpoints();
+      } else {
+        // 새 엔드포인트 생성
+        const apiRequest = {
+          path: url,
+          method,
+          summary: description,
+          description,
+          tags: tags ? tags.split(",").map((tag) => tag.trim()) : [],
+          progress: "mock",
+          tag: "none",
+          isValid: true,
+        };
+
+        const response = await createRestApiSpec(apiRequest);
+
+        const newEndpoint = {
+          id: response.data.id,
+          method,
+          path: url,
+          description,
+          implementationStatus: "not-implemented" as const,
+          tags: tags ? tags.split(",").map((tag) => tag.trim()) : [],
+          progress: "mock",
+        };
+
+        const group = tags ? tags.split(",")[0].trim() : "OTHERS";
+        addEndpoint(newEndpoint, group);
+        alert(`${method} ${url} API가 생성되었습니다.`);
+
+        // 사이드바 목록 다시 로드
+        await loadEndpoints();
+
+        // 수정된 엔드포인트를 다시 선택
+        const updatedEndpoint = {
+          id: response.data.id,
+          method,
+          path: url,
+          description,
+          implementationStatus: "not-implemented" as const,
+          tags: tags ? tags.split(",").map((tag) => tag.trim()) : [],
+          progress: "mock",
+        };
+        setSelectedEndpoint(updatedEndpoint);
+      }
+    } catch (error: unknown) {
+      console.error("API 저장 실패:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "알 수 없는 오류";
+      alert(`API 저장에 실패했습니다: ${errorMessage}`);
     }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!selectedEndpoint) return;
 
     if (confirm("이 엔드포인트를 삭제하시겠습니까?")) {
-      deleteEndpoint(selectedEndpoint.id);
-      alert("엔드포인트가 삭제되었습니다.");
+      try {
+        await deleteRestApiSpec(selectedEndpoint.id);
+        deleteEndpoint(selectedEndpoint.id);
+        alert("엔드포인트가 삭제되었습니다.");
 
-      // 폼 초기화
-      setMethod("POST");
-      setUrl("/api/auth/login");
-      setTags("AUTH");
-      setDescription("사용자 로그인");
-      setOwner("SMART-TEAM");
+        // 폼 초기화
+        setSelectedEndpoint(null);
+        setMethod("POST");
+        setUrl("/api/auth/login");
+        setTags("AUTH");
+        setDescription("사용자 로그인");
+        setOwner("SMART-TEAM");
+        setIsEditMode(false);
+        loadEndpoints();
+      } catch (error: unknown) {
+        console.error("API 삭제 실패:", error);
+        const errorMessage =
+          error instanceof Error ? error.message : "알 수 없는 오류";
+        alert(`API 삭제에 실패했습니다: ${errorMessage}`);
+      }
     }
+  };
+
+  const handleEdit = () => {
+    setIsEditMode(true);
+  };
+
+  const handleCancelEdit = () => {
+    if (selectedEndpoint) {
+      loadEndpointData(selectedEndpoint.id);
+    }
+    setIsEditMode(false);
   };
 
   const handleReset = () => {
@@ -215,8 +329,8 @@ export function ApiEditorLayout() {
               }`}
             >
               <div className="flex items-center gap-2">
-                <span className="text-lg">📝</span>
-              API 생성 폼
+                <span className="text-lg"></span>
+                API 생성 폼
               </div>
             </button>
             <button
@@ -228,8 +342,8 @@ export function ApiEditorLayout() {
               }`}
             >
               <div className="flex items-center gap-2">
-                <span className="text-lg">🧪</span>
-              테스트 폼
+                <span className="text-lg"></span>
+                테스트 폼
               </div>
             </button>
           </div>
@@ -256,51 +370,28 @@ export function ApiEditorLayout() {
                 {progressPercentage}%
               </span>
             </div>
-            
-            {/* Action Buttons */}
+
+            {/* Action Buttons - Utility만 유지 */}
             <div className="flex flex-wrap items-center gap-2">
-              {/* 선택된 엔드포인트가 있을 때: 수정/삭제 버튼 */}
-              {selectedEndpoint && (
-                <>
-                  <button
-                    onClick={handleSave}
-                    className="px-3 sm:px-4 py-2 bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white rounded-xl transition-all duration-200 font-semibold shadow-sm hover:shadow-md flex items-center gap-2 text-sm sm:text-base"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3-3m0 0l-3 3m3-3v12" />
-                    </svg>
-                    <span className="hidden sm:inline">수정 저장</span>
-                    <span className="sm:hidden">저장</span>
-                  </button>
-                  <button
-                    onClick={handleDelete}
-                    className="px-3 sm:px-4 py-2 bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 text-white rounded-xl transition-all duration-200 font-semibold shadow-sm hover:shadow-md flex items-center gap-2 text-sm sm:text-base"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                    <span className="hidden sm:inline">삭제</span>
-                  </button>
-                  <button
-                    onClick={handleReset}
-                    className="px-3 sm:px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 font-semibold shadow-sm hover:shadow-md flex items-center gap-2 text-sm sm:text-base"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    <span className="hidden sm:inline">초기화</span>
-                  </button>
-                </>
-              )}
-              {/* 새 엔드포인트 작성 모드: 생성 버튼 */}
+              {/* 새 엔드포인트 작성 모드: 생성 버튼만 상단에 유지 */}
               {!selectedEndpoint && (
                 <>
                   <button
                     onClick={handleSave}
                     className="px-3 sm:px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white rounded-xl transition-all duration-200 font-semibold shadow-sm hover:shadow-md flex items-center gap-2 text-sm sm:text-base"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                      />
                     </svg>
                     <span className="hidden sm:inline">생성</span>
                   </button>
@@ -308,25 +399,45 @@ export function ApiEditorLayout() {
                     onClick={handleReset}
                     className="px-3 sm:px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 font-semibold shadow-sm hover:shadow-md flex items-center gap-2 text-sm sm:text-base"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                      />
                     </svg>
                     <span className="hidden sm:inline">초기화</span>
                   </button>
                 </>
               )}
-              
+
               {/* Divider */}
               <div className="w-px h-8 bg-gray-300 dark:bg-gray-600 hidden sm:block"></div>
-              
+
               {/* Utility Buttons */}
               <button
                 onClick={handleImportYAML}
                 className="px-2 sm:px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 font-medium shadow-sm hover:shadow-md flex items-center gap-2 text-sm sm:text-base"
                 title="YAML 파일 가져오기"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
+                  />
                 </svg>
                 <span className="hidden sm:inline">Import</span>
               </button>
@@ -335,8 +446,18 @@ export function ApiEditorLayout() {
                 className="px-2 sm:px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 font-medium shadow-sm hover:shadow-md flex items-center gap-2 text-sm sm:text-base"
                 title="Markdown 파일 내보내기"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
                 </svg>
                 <span className="hidden sm:inline">Export</span>
               </button>
@@ -345,9 +466,24 @@ export function ApiEditorLayout() {
                 className="px-2 sm:px-3 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-xl transition-all duration-200 font-semibold shadow-sm hover:shadow-md flex items-center gap-2 text-sm sm:text-base"
                 title="API YAML 파일 생성"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                  />
                 </svg>
                 <span className="hidden sm:inline">Generate</span>
               </button>
@@ -410,7 +546,7 @@ export function ApiEditorLayout() {
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                      Step 1: Method & URL
+                      Method & URL
                     </h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
                       HTTP 메서드와 엔드포인트 URL을 입력하세요
@@ -421,20 +557,35 @@ export function ApiEditorLayout() {
                 <div className="space-y-6">
                   <div className="flex flex-col sm:flex-row gap-4">
                     <div className="relative sm:w-auto w-full">
-                    <select
-                      value={method}
-                      onChange={(e) => setMethod(e.target.value)}
-                        className="appearance-none w-full sm:w-auto px-4 py-3 pr-10 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 font-semibold min-w-[120px]"
-                    >
-                      {methods.map((m) => (
-                        <option key={m} value={m}>
-                          {m}
-                        </option>
-                      ))}
-                    </select>
+                      <select
+                        value={method}
+                        onChange={(e) => setMethod(e.target.value)}
+                        disabled={!!(selectedEndpoint && !isEditMode)}
+                        className={`appearance-none w-full sm:w-auto px-4 py-3 pr-10 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 font-semibold min-w-[120px] ${
+                          selectedEndpoint && !isEditMode
+                            ? "bg-gray-100 dark:bg-gray-800 cursor-not-allowed opacity-60"
+                            : ""
+                        }`}
+                      >
+                        {methods.map((m) => (
+                          <option key={m} value={m}>
+                            {m}
+                          </option>
+                        ))}
+                      </select>
                       <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        <svg
+                          className="w-5 h-5 text-gray-400"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 9l-7 7-7-7"
+                          />
                         </svg>
                       </div>
                     </div>
@@ -443,20 +594,33 @@ export function ApiEditorLayout() {
                       value={url}
                       onChange={(e) => setUrl(e.target.value)}
                       placeholder="/api/endpoint"
-                      className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 font-mono"
+                      disabled={!!(selectedEndpoint && !isEditMode)}
+                      className={`flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 font-mono ${
+                        selectedEndpoint && !isEditMode
+                          ? "bg-gray-100 dark:bg-gray-800 cursor-not-allowed opacity-60"
+                          : ""
+                      }`}
                     />
                   </div>
 
                   {/* Method Badge */}
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Method:</span>
-                    <span className={`px-3 py-1 rounded-lg text-sm font-semibold ${
-                      method === 'GET' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                      method === 'POST' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                      method === 'PUT' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                      method === 'PATCH' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' :
-                      'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                    }`}>
+                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                      Method:
+                    </span>
+                    <span
+                      className={`px-3 py-1 rounded-lg text-sm font-semibold ${
+                        method === "GET"
+                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                          : method === "POST"
+                          ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                          : method === "PUT"
+                          ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                          : method === "PATCH"
+                          ? "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
+                          : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                      }`}
+                    >
                       {method}
                     </span>
                   </div>
@@ -471,7 +635,12 @@ export function ApiEditorLayout() {
                         value={tags}
                         onChange={(e) => setTags(e.target.value)}
                         placeholder="AUTH, USER, PRODUCT, etc."
-                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                        disabled={!!(selectedEndpoint && !isEditMode)}
+                        className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
+                          selectedEndpoint && !isEditMode
+                            ? "bg-gray-100 dark:bg-gray-800 cursor-not-allowed opacity-60"
+                            : ""
+                        }`}
                       />
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         쉼표로 구분하여 여러 태그를 입력할 수 있습니다
@@ -486,7 +655,12 @@ export function ApiEditorLayout() {
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
                         placeholder="API의 목적과 기능을 설명하세요"
-                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                        disabled={!!(selectedEndpoint && !isEditMode)}
+                        className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
+                          selectedEndpoint && !isEditMode
+                            ? "bg-gray-100 dark:bg-gray-800 cursor-not-allowed opacity-60"
+                            : ""
+                        }`}
                       />
                     </div>
                     <div>
@@ -498,7 +672,12 @@ export function ApiEditorLayout() {
                         value={owner}
                         onChange={(e) => setOwner(e.target.value)}
                         placeholder="팀명 또는 담당자"
-                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                        disabled={!!(selectedEndpoint && !isEditMode)}
+                        className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
+                          selectedEndpoint && !isEditMode
+                            ? "bg-gray-100 dark:bg-gray-800 cursor-not-allowed opacity-60"
+                            : ""
+                        }`}
                       />
                     </div>
                   </div>
@@ -513,6 +692,7 @@ export function ApiEditorLayout() {
                 setRequestHeaders={setRequestHeaders}
                 requestBody={requestBody}
                 setRequestBody={setRequestBody}
+                isReadOnly={!!(selectedEndpoint && !isEditMode)}
               />
             )}
 
@@ -522,6 +702,7 @@ export function ApiEditorLayout() {
                 <ApiResponseCard
                   statusCodes={statusCodes}
                   setStatusCodes={setStatusCodes}
+                  isReadOnly={!!(selectedEndpoint && !isEditMode)}
                 />
               </div>
             )}
@@ -538,7 +719,7 @@ export function ApiEditorLayout() {
                       <div>
                         <h3 className="text-xl font-bold text-gray-900 dark:text-white">
                           API Preview
-                    </h3>
+                        </h3>
                         <p className="text-sm text-gray-500 dark:text-gray-400">
                           작성한 API 명세서의 미리보기입니다
                         </p>
@@ -548,19 +729,29 @@ export function ApiEditorLayout() {
                       onClick={() => setIsCodeSnippetOpen(true)}
                       className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-xl transition-all duration-200 font-semibold shadow-sm hover:shadow-md flex items-center gap-2"
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
+                        />
                       </svg>
                       Code Snippet
                     </button>
                   </div>
                   <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-6">
-                  <ApiPreviewCard
-                    method={method}
-                    url={url}
-                    tags={tags}
-                    description={description}
-                  />
+                    <ApiPreviewCard
+                      method={method}
+                      url={url}
+                      tags={tags}
+                      description={description}
+                    />
                   </div>
                 </div>
               </div>
@@ -568,6 +759,97 @@ export function ApiEditorLayout() {
           </div>
         )}
       </div>
+
+      {/* 하단 수정/삭제 버튼 - 선택된 엔드포인트가 있을 때만 표시 */}
+      {selectedEndpoint && (
+        <div className="border-t border-gray-200 dark:border-gray-700 px-6 py-4 bg-white dark:bg-gray-800 shadow-lg">
+          <div className="flex items-center justify-end gap-3">
+            {isEditMode ? (
+              <>
+                <button
+                  onClick={handleCancelEdit}
+                  className="px-6 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 font-semibold shadow-sm hover:shadow-md flex items-center gap-2"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                  취소
+                </button>
+                <button
+                  onClick={handleSave}
+                  className="px-6 py-3 bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white rounded-xl transition-all duration-200 font-semibold shadow-sm hover:shadow-md flex items-center gap-2"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                  저장
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={handleEdit}
+                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white rounded-xl transition-all duration-200 font-semibold shadow-sm hover:shadow-md flex items-center gap-2"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                    />
+                  </svg>
+                  수정
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="px-6 py-3 bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 text-white rounded-xl transition-all duration-200 font-semibold shadow-sm hover:shadow-md flex items-center gap-2"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                    />
+                  </svg>
+                  삭제
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Code Snippet Panel */}
       <CodeSnippetPanel
