@@ -8,16 +8,23 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import java.util.Map;
 import kr.co.ouroboros.core.global.annotation.ApiState;
 import kr.co.ouroboros.core.global.annotation.ApiState.State;
-import kr.co.ouroboros.core.global.spec.OuroApiSpec;
 import kr.co.ouroboros.core.rest.handler.OuroRestHandler;
 import lombok.AllArgsConstructor;
+import lombok.Data;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
  * 테스트용 REST API 컨트롤러 예시.
@@ -37,6 +44,18 @@ public class TestController {
     @Setter
     static class User {
         private String name;
+        private Integer age;
+        private Double height;
+        private Address address;
+    }
+
+    @AllArgsConstructor
+    @NoArgsConstructor
+    @Data
+    static class Address {
+        String roadname;
+        String dong;
+        String gu;
     }
 
     /**
@@ -64,7 +83,7 @@ public class TestController {
     @PostMapping("/users")
     @ApiState(state = State.COMPLETED)
     public ResponseEntity<User> createUser(@RequestBody User user) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(new User("heello"));
+        return ResponseEntity.status(HttpStatus.CREATED).body(new User("name", 13, 180.2, new Address("road", "Adong", "Bgu")));
     }
 
     /**
@@ -125,5 +144,14 @@ public class TestController {
                 "filter", Map.of("name", name, "age", age),
                 "data", new String[]{"방준엽", "홍길동"} // 예시 데이터
         ));
+    }
+
+    @GetMapping("/response")
+    @ApiState(state = State.COMPLETED)
+    public ResponseEntity<String> response(
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) Integer age
+    ) {
+        return ResponseEntity.ok("성공");
     }
 }
