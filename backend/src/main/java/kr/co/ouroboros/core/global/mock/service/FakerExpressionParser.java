@@ -47,9 +47,9 @@ public class FakerExpressionParser {
             }
 
             if (method.equals("randomDouble")) {
-                double min = Double.parseDouble(params.getOrDefault("min", "1000").toString());
-                double max = Double.parseDouble(params.getOrDefault("max", "100000").toString());
-                return catObj.getClass().getMethod(method, int.class, double.class, double.class)
+                long min = Long.parseLong(params.getOrDefault("min", "1000").toString());
+                long max = Long.parseLong(params.getOrDefault("max", "100000").toString());
+                return catObj.getClass().getMethod(method, int.class, long.class, long.class)
                         .invoke(catObj, 2, min, max);
             }
 
