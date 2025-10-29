@@ -176,15 +176,45 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
                 throw new IllegalArgumentException("REST API specification with ID '" + id + "' not found");
             }
 
-            // Update only provided fields
-            updateOperationFields(operation, request);
+            // Determine final path and method
+            String finalPath = request.getPath() != null ? request.getPath() : foundPath;
+            String finalMethod = request.getMethod() != null ? request.getMethod() : foundMethod;
+
+            // Check if path or method is changing
+            boolean isLocationChanging = !foundPath.equals(finalPath) || !foundMethod.equalsIgnoreCase(finalMethod);
+
+            if (isLocationChanging) {
+                // Check for duplicate at new location
+                if (yamlParser.operationExists(openApiDoc, finalPath, finalMethod)) {
+                    throw new IllegalArgumentException(
+                            "Cannot move operation: API specification already exists for " +
+                            finalMethod.toUpperCase() + " " + finalPath
+                    );
+                }
+
+                // Remove from old location
+                yamlParser.removeOperation(openApiDoc, foundPath, foundMethod);
+
+                // Update operation fields before moving
+                updateOperationFields(operation, request);
+
+                // Add to new location
+                yamlParser.putOperation(openApiDoc, finalPath, finalMethod, operation);
+
+                log.info("Moved REST API spec from {} {} to {} {} (ID: {})",
+                        foundMethod.toUpperCase(), foundPath,
+                        finalMethod.toUpperCase(), finalPath, id);
+            } else {
+                // Update only provided fields (no location change)
+                updateOperationFields(operation, request);
+
+                log.info("Updated REST API spec: {} {} (ID: {})", foundMethod.toUpperCase(), foundPath, id);
+            }
 
             // Write back to file
             yamlParser.writeDocument(openApiDoc);
 
-            log.info("Updated REST API spec: {} {} (ID: {})", foundMethod.toUpperCase(), foundPath, id);
-
-            return convertToResponse(id, foundPath, foundMethod, operation);
+            return convertToResponse(id, finalPath, finalMethod, operation);
         } finally {
             lock.writeLock().unlock();
         }
@@ -275,7 +305,7 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         operation.put("x-ouroboros-id", id);
         operation.put("x-ouroboros-progress", request.getProgress() != null ? request.getProgress() : "mock");
         operation.put("x-ouroboros-tag", request.getTag() != null ? request.getTag() : "none");
-        operation.put("x-ouroboros-isvalid", request.getIsValid() != null ? request.getIsValid() : true);
+        operation.put("x-ouroboros-diff", request.getDiff() != null ? request.getDiff() : "none");
 
         return operation;
     }
@@ -311,8 +341,8 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         if (request.getTag() != null) {
             operation.put("x-ouroboros-tag", request.getTag());
         }
-        if (request.getIsValid() != null) {
-            operation.put("x-ouroboros-isvalid", request.getIsValid());
+        if (request.getDiff() != null) {
+            operation.put("x-ouroboros-diff", request.getDiff());
         }
     }
 
@@ -499,7 +529,7 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
                 .tags((List<String>) operation.get("tags"))
                 .progress((String) operation.get("x-ouroboros-progress"))
                 .tag((String) operation.get("x-ouroboros-tag"))
-                .isValid((Boolean) operation.get("x-ouroboros-isvalid"));
+                .diff((String) operation.get("x-ouroboros-diff"));
 
         // Convert parameters
         List<Object> params = (List<Object>) operation.get("parameters");
