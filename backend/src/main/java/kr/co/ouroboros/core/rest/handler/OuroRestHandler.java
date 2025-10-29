@@ -2,7 +2,7 @@ package kr.co.ouroboros.core.rest.handler;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.swagger.v3.core.util.Json;
+import io.swagger.v3.core.util.Json31;
 import io.swagger.v3.oas.models.OpenAPI;
 import java.util.Locale;
 import java.util.Map;
@@ -63,7 +63,7 @@ public class OuroRestHandler implements OuroProtocolHandler {
 
             log.info("OpenAPI model : {}", model);
 
-            String json = Json.mapper().writeValueAsString(model);
+            String json = Json31.mapper().writeValueAsString(model);
             OuroRestApiSpec spec = mapper.readValue(json, OuroRestApiSpec.class);
 
             if (spec.getInfo() != null && spec.getInfo().getVersion() == null) {
