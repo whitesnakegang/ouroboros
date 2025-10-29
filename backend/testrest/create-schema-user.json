@@ -1,0 +1,32 @@
+{
+  "schemaName": "User",
+  "type": "object",
+  "title": "User Schema",
+  "description": "A user entity",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "User ID",
+      "mockExpression": "{{$random.uuid}}"
+    },
+    "name": {
+      "type": "string",
+      "description": "User name",
+      "mockExpression": "{{$name.fullName}}"
+    },
+    "email": {
+      "type": "string",
+      "description": "User email",
+      "mockExpression": "{{$internet.email}}"
+    }
+  },
+  "required": [
+    "id",
+    "name"
+  ],
+  "orders": [
+    "id",
+    "name",
+    "email"
+  ]
+}

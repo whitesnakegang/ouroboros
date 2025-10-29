@@ -1,0 +1,39 @@
+{
+  "schemaName": "UserWithAddress",
+  "type": "object",
+  "title": "User with Address Schema",
+  "description": "A user entity with nested address reference - demonstrates nested schema support",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "User ID",
+      "mockExpression": "{{$random.uuid}}"
+    },
+    "name": {
+      "type": "string",
+      "description": "User name",
+      "mockExpression": "{{$name.fullName}}"
+    },
+    "email": {
+      "type": "string",
+      "description": "User email",
+      "mockExpression": "{{$internet.email}}"
+    },
+    "address": {
+      "ref": "Address",
+      "description": "User's address (references Address schema)"
+    },
+    "addresses": {
+      "type": "array",
+      "description": "Multiple addresses",
+      "items": {
+        "ref": "Address"
+      },
+      "minItems": 0,
+      "maxItems": 5
+    }
+  },
+  "required": ["id", "name", "email"],
+  "orders": ["id", "name", "email", "address", "addresses"]
+}
+
