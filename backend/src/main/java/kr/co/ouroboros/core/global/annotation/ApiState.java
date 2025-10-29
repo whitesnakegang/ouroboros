@@ -32,7 +32,7 @@ public @interface ApiState {
         /** API is currently being implemented */
         IMPLEMENTING,
         /** API is under bug fixing */
-        BUGFIX,
+        BUG_FIXING,
         /** API implementation is completed */
         COMPLETED
     }
