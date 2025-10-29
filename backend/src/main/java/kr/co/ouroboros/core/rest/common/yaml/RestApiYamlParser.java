@@ -1,5 +1,6 @@
 package kr.co.ouroboros.core.rest.common.yaml;
 
+import kr.co.ouroboros.core.global.properties.OuroborosProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.yaml.snakeyaml.DumperOptions;
@@ -32,13 +33,15 @@ public class RestApiYamlParser {
     private static final String YAML_FILE_PATH = "ouroboros/rest/ourorest.yml";
 
     private final Yaml yaml;
+    private final OuroborosProperties properties;
 
-    public RestApiYamlParser() {
+    public RestApiYamlParser(OuroborosProperties properties) {
         DumperOptions options = new DumperOptions();
         options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
         options.setPrettyFlow(true);
         options.setIndent(2);
         this.yaml = new Yaml(options);
+        this.properties = properties;
     }
 
     /**
@@ -103,7 +106,22 @@ public class RestApiYamlParser {
         doc.put("info", info);
 
         doc.put("paths", new LinkedHashMap<>());
-        doc.put("components", new LinkedHashMap<>());
+
+        // Initialize components with schemas section
+        Map<String, Object> components = new LinkedHashMap<>();
+        components.put("schemas", new LinkedHashMap<>());
+        doc.put("components", components);
+
+        // Add servers section from properties
+        java.util.List<Map<String, Object>> servers = new java.util.ArrayList<>();
+        Map<String, Object> server = new LinkedHashMap<>();
+        server.put("url", properties.getServer().getUrl());
+        server.put("description", properties.getServer().getDescription());
+        servers.add(server);
+        doc.put("servers", servers);
+
+        // Add security section (empty array)
+        doc.put("security", new java.util.ArrayList<>());
 
         return doc;
     }
