@@ -18,6 +18,7 @@ export interface RestApiSpecResponse {
   progress: string;
   tag: string;
   isValid?: boolean;
+  diff?: string;
 }
 
 export interface GetAllSpecsResponse {
@@ -40,6 +41,7 @@ export interface CreateApiRequest {
   progress?: string;
   tag?: string;
   isValid?: boolean;
+  diff?: string;
 }
 
 export interface CreateApiResponse {
@@ -49,6 +51,8 @@ export interface CreateApiResponse {
 }
 
 export interface UpdateApiRequest {
+  path?: string;
+  method?: string;
   summary?: string;
   description?: string;
   deprecated?: boolean;
@@ -60,6 +64,7 @@ export interface UpdateApiRequest {
   progress?: string;
   tag?: string;
   isValid?: boolean;
+  diff?: string;
 }
 
 export interface UpdateApiResponse {

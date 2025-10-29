@@ -117,8 +117,10 @@ export function ApiEditorLayout() {
 
     try {
       if (selectedEndpoint && isEditMode) {
-        // 수정 로직 - path와 method는 변경 불가 (백엔드 제약)
+        // 수정 로직 - path와 method도 수정 가능 (백엔드 지원)
         const updateRequest = {
+          path: url, // path 수정 가능
+          method, // method 수정 가능
           summary: description,
           description,
           tags: tags ? tags.split(",").map((tag) => tag.trim()) : [],
@@ -138,15 +140,19 @@ export function ApiEditorLayout() {
           security: [],
         };
 
-        await updateRestApiSpec(selectedEndpoint.id, updateRequest);
+        const response = await updateRestApiSpec(
+          selectedEndpoint.id,
+          updateRequest
+        );
+
         alert("API 스펙이 수정되었습니다.");
         setIsEditMode(false);
 
         // 수정된 엔드포인트를 로컬 상태에 반영
         const updatedEndpoint = {
           id: selectedEndpoint.id,
-          method: selectedEndpoint.method, // path/method는 변경 불가
-          path: selectedEndpoint.path,
+          method, // 수정된 method 반영
+          path: url, // 수정된 path 반영
           description,
           implementationStatus: selectedEndpoint.implementationStatus,
           hasSpecError: selectedEndpoint.hasSpecError,
