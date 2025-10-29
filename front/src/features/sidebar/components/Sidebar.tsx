@@ -54,12 +54,23 @@ const mockEndpoints = {
   ],
 };
 
-export function Sidebar() {
+interface SidebarProps {
+  onAddNew?: () => void;
+}
+
+export function Sidebar({ onAddNew }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<"mock" | "completed">(
     "mock"
   );
-  const { isDarkMode, toggleDarkMode, isOpen, toggle } = useSidebarStore();
+  const {
+    isDarkMode,
+    toggleDarkMode,
+    isOpen,
+    toggle,
+    selectedEndpoint,
+    endpoints,
+  } = useSidebarStore();
 
   // 필터링된 엔드포인트
   const filteredEndpoints = useMemo(() => {
@@ -68,8 +79,8 @@ export function Sidebar() {
       Array<(typeof mockEndpoints.AUTH)[0] | (typeof mockEndpoints.USERS)[0]>
     > = {};
 
-    Object.entries(mockEndpoints).forEach(([group, endpoints]) => {
-      const groupEndpoints = endpoints.filter((endpoint) => {
+    Object.entries(endpoints).forEach(([group, groupEndpoints]) => {
+      const filteredGroupEndpoints = groupEndpoints.filter((endpoint) => {
         // 검색어 필터
         if (searchQuery) {
           const query = searchQuery.toLowerCase();
@@ -88,13 +99,13 @@ export function Sidebar() {
         }
       });
 
-      if (groupEndpoints.length > 0) {
-        filtered[group] = groupEndpoints;
+      if (filteredGroupEndpoints.length > 0) {
+        filtered[group] = filteredGroupEndpoints;
       }
     });
 
     return filtered;
-  }, [searchQuery, activeFilter]);
+  }, [searchQuery, activeFilter, endpoints]);
 
   return (
     <div className="h-full flex flex-col bg-white dark:bg-gray-800 transition-colors">
@@ -231,7 +242,10 @@ export function Sidebar() {
 
       {/* 추가 버튼 */}
       <div className="p-4 border-t dark:border-gray-700">
-        <button className="w-full bg-black dark:bg-gray-700 text-white py-2 px-4 rounded-lg hover:bg-gray-800 dark:hover:bg-gray-600 transition-colors">
+        <button
+          onClick={onAddNew}
+          className="w-full bg-black dark:bg-gray-700 text-white py-2 px-4 rounded-lg hover:bg-gray-800 dark:hover:bg-gray-600 transition-colors"
+        >
           + Add
         </button>
       </div>

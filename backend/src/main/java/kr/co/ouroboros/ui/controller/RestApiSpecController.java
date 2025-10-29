@@ -55,7 +55,7 @@ public class RestApiSpecController {
                     HttpStatus.BAD_REQUEST.value(),
                     "Failed to create REST API specification",
                     "INVALID_REQUEST",
-                    e.getMessage()
+                    "The API specification for this path and method already exists"
             );
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         } catch (Exception e) {
