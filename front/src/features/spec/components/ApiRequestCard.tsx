@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { FakerProviderSelect } from "./FakerProviderSelect";
 
 interface KeyValuePair {
   key: string;
@@ -280,22 +281,21 @@ export function ApiRequestCard({
                             />
                           </td>
                           <td className="px-4 py-3">
-                            <input
-                              type="text"
+                            <FakerProviderSelect
                               value={item.value}
-                              onChange={(e) => {
+                              onChange={(newVal) => {
                                 const updated = [...requestBody.fields!];
                                 updated[index] = {
                                   ...updated[index],
-                                  value: e.target.value,
+                                  value: newVal,
                                 };
                                 setRequestBody({
                                   ...requestBody,
                                   fields: updated,
                                 });
                               }}
-                              placeholder="Field value"
-                              className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              placeholder="Faker provider name"
+                              disabled={isReadOnly}
                             />
                           </td>
                           <td className="px-4 py-3">

@@ -1,0 +1,1642 @@
+{
+  "providers": [
+    {
+      "name": "Address",
+      "className": "Address",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Ancient",
+      "className": "Ancient",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Animal",
+      "className": "Animal",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "App",
+      "className": "App",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Appliance",
+      "className": "Appliance",
+      "category": "Base",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Aqua Teen Hunger Force",
+      "className": "AquaTeenHungerForce",
+      "category": "Entertainment",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Artist",
+      "className": "Artist",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Australia",
+      "className": "Australia",
+      "category": "Base",
+      "version": "1.2.0"
+    },
+    {
+      "name": "Avatar",
+      "className": "Avatar",
+      "category": "Entertainment",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Aviation",
+      "className": "Aviation",
+      "category": "Base",
+      "version": "0.8.0",
+      "description": "Generates aviation related strings."
+    },
+    {
+      "name": "Aws",
+      "className": "Aws",
+      "category": "Base",
+      "version": "1.3.0"
+    },
+    {
+      "name": "Azure",
+      "className": "Azure",
+      "category": "Base",
+      "version": "1.7.0",
+      "description": "Generates data for Azure services. This is based on the Azure best practices of naming conventions:"
+    },
+    {
+      "name": "Babylon5",
+      "className": "Babylon5",
+      "category": "Entertainment",
+      "version": "0.9.0"
+    },
+    {
+      "name": "Back To The Future",
+      "className": "BackToTheFuture",
+      "category": "Entertainment",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Barcode",
+      "className": "Barcode",
+      "category": "Base",
+      "version": "0.9.0"
+    },
+    {
+      "name": "Baseball",
+      "className": "Baseball",
+      "category": "Sport",
+      "version": "1.7.0",
+      "description": "Generate random components of baseball game, e.g. teams, coaches, positions and players."
+    },
+    {
+      "name": "Basketball",
+      "className": "Basketball",
+      "category": "Sport",
+      "version": "0.8.0",
+      "description": "Generate random components of basketball game, e.g. teams, coaches, positions and players."
+    },
+    {
+      "name": "Battlefield1",
+      "className": "Battlefield1",
+      "category": "Videogame",
+      "version": "1.4.0",
+      "description": "Battlefield 1 is a first-person shooter game developed by DICE and published by Electronic Arts."
+    },
+    {
+      "name": "Beer",
+      "className": "Beer",
+      "category": "Food",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Big Bang Theory",
+      "className": "BigBangTheory",
+      "category": "Entertainment",
+      "version": "1.5.0"
+    },
+    {
+      "name": "Blood Type",
+      "className": "BloodType",
+      "category": "Base",
+      "version": "1.4.0"
+    },
+    {
+      "name": "Boardgame",
+      "className": "Boardgame",
+      "category": "Entertainment",
+      "version": "2.3.0"
+    },
+    {
+      "name": "Bojack Horseman",
+      "className": "BojackHorseman",
+      "category": "Entertainment",
+      "version": "0.8.0",
+      "description": "Generate random parts in BojackHorseman."
+    },
+    {
+      "name": "Book",
+      "className": "Book",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Bool",
+      "className": "Bool",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Bossa Nova",
+      "className": "BossaNova",
+      "category": "Entertainment",
+      "version": "1.0.0",
+      "description": "Bossa nova is a style of samba developed in the late 1950s and early 1960s in Rio de Janeiro, Brazil."
+    },
+    {
+      "name": "Brand",
+      "className": "Brand",
+      "category": "Base",
+      "version": "1.8.0",
+      "description": "Generate random sport wearing brand, car brand or watch brand. Only generate brand by types of products."
+    },
+    {
+      "name": "Breaking Bad",
+      "className": "BreakingBad",
+      "category": "Entertainment",
+      "version": "1.0.0",
+      "description": "Breaking Bad is an American neo-Western crime drama television series."
+    },
+    {
+      "name": "Brooklyn Nine Nine",
+      "className": "BrooklynNineNine",
+      "category": "Entertainment",
+      "version": "1.3.0",
+      "description": "Brooklyn Nine-Nine is an American police procedural comedy television series."
+    },
+    {
+      "name": "Buffy",
+      "className": "Buffy",
+      "category": "Entertainment",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Business",
+      "className": "Business",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "CNPJ",
+      "className": "Cnpj",
+      "category": "Base",
+      "version": "1.1.0",
+      "description": "The Brazil National Registry of Legal Entities number (CNPJ) is a company identification number that must be obtained from the Department of Federal Revenue prior to the start of any business activities."
+    },
+    {
+      "name": "CPF",
+      "className": "Cpf",
+      "category": "Base",
+      "version": "0.8.0",
+      "description": "The CPF number (Cadastro de Pessoas Físicas, [sepeˈɛfi]; Portuguese for \"Natural Persons Register\")"
+    },
+    {
+      "name": "Camera",
+      "className": "Camera",
+      "category": "Base",
+      "version": "1.4.0"
+    },
+    {
+      "name": "Cannabis",
+      "className": "Cannabis",
+      "category": "Base",
+      "version": "1.5.0"
+    },
+    {
+      "name": "Care Provider",
+      "className": "CareProvider",
+      "category": "Healthcare",
+      "version": "2.3.0"
+    },
+    {
+      "name": "Cat",
+      "className": "Cat",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Chess",
+      "className": "Chess",
+      "category": "Sport",
+      "version": "1.8.0"
+    },
+    {
+      "name": "Chiquito",
+      "className": "Chiquito",
+      "category": "Base",
+      "version": "1.6.0"
+    },
+    {
+      "name": "Chuck Norris",
+      "className": "ChuckNorris",
+      "category": "Entertainment",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Clash Of Clans",
+      "className": "ClashOfClans",
+      "category": "Videogame",
+      "version": "1.6.0",
+      "description": "Clash of Clans is a 2012 free-to-play mobile strategy video game developed and published by Finnish game developer Supercell."
+    },
+    {
+      "name": "Code",
+      "className": "Code",
+      "category": "Base",
+      "version": "0.8.0",
+      "description": "Generates codes such as ISBN, gin, ean and others."
+    },
+    {
+      "name": "Coffee",
+      "className": "Coffee",
+      "category": "Food",
+      "version": "1.5.0"
+    },
+    {
+      "name": "Coin",
+      "className": "Coin",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Color",
+      "className": "Color",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Commerce",
+      "className": "Commerce",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Community",
+      "className": "Community",
+      "category": "Base",
+      "version": "1.6.0",
+      "description": "Community is an American television sitcom created by Dan Harmon."
+    },
+    {
+      "name": "Company",
+      "className": "Company",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Compass",
+      "className": "Compass",
+      "category": "Base",
+      "version": "1.7.0"
+    },
+    {
+      "name": "Computer",
+      "className": "Computer",
+      "category": "Base",
+      "version": "1.5.0",
+      "description": "Generates different attributes related to computers, such as operating systems, types, platforms and brands."
+    },
+    {
+      "name": "Construction",
+      "className": "Construction",
+      "category": "Base",
+      "version": "1.5.0"
+    },
+    {
+      "name": "Control",
+      "className": "Control",
+      "category": "Videogame",
+      "version": "1.7.0",
+      "description": "Control is an action-adventure game developed by Remedy Entertainment and published by 505 Games."
+    },
+    {
+      "name": "Cosmere",
+      "className": "Cosmere",
+      "category": "Base",
+      "version": "1.7.0",
+      "description": "The cosmere is a fictional shared universe where several of Brandon Sanderson's books take place."
+    },
+    {
+      "name": "Country",
+      "className": "Country",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Cowboy Bebop",
+      "className": "CowboyBebop",
+      "category": "Entertainment",
+      "version": "1.8.0",
+      "description": "Cowboy Bebop is a Japanese neo-noir science fiction anime television series, which originally ran from 1998 to 1999."
+    },
+    {
+      "name": "Credentials",
+      "className": "Credentials",
+      "category": "Base",
+      "version": "2.5.0",
+      "description": "Generates credentials such as usernames, uids and passwords."
+    },
+    {
+      "name": "Cricket",
+      "className": "Cricket",
+      "category": "Sport",
+      "version": "1.7.0"
+    },
+    {
+      "name": "Crypto Coin",
+      "className": "CryptoCoin",
+      "category": "Base",
+      "version": "1.3.0"
+    },
+    {
+      "name": "Culture Series",
+      "className": "CultureSeries",
+      "category": "Base",
+      "version": "1.7.0",
+      "description": "The Culture series is a science fiction series written by Scottish author Iain M. Banks and released from 1987 through to 2012."
+    },
+    {
+      "name": "Currency",
+      "className": "Currency",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Dark Souls",
+      "className": "DarkSouls",
+      "category": "Videogame",
+      "version": "1.5.0",
+      "description": "Dark Souls is a series of action role-playing games created by Hidetaka Miyazaki of FromSoftware and published by Bandai Namco Entertainment."
+    },
+    {
+      "name": "Date And Time",
+      "className": "DateAndTime",
+      "category": "Base",
+      "version": "0.8.0",
+      "description": "A generator of random dates."
+    },
+    {
+      "name": "Dc Comics",
+      "className": "DcComics",
+      "category": "Base",
+      "version": "1.5.0"
+    },
+    {
+      "name": "Demographic",
+      "className": "Demographic",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Departed",
+      "className": "Departed",
+      "category": "Entertainment",
+      "version": "1.5.0"
+    },
+    {
+      "name": "Dessert",
+      "className": "Dessert",
+      "category": "Food",
+      "version": "0.9.0"
+    },
+    {
+      "name": "Detective Conan",
+      "className": "DetectiveConan",
+      "category": "Entertainment",
+      "version": "1.7.0",
+      "description": "Case Closed, also known as Detective Conan, is a Japanese detective manga series written and illustrated by Gosho Aoyama."
+    },
+    {
+      "name": "Device",
+      "className": "Device",
+      "category": "Base",
+      "version": "1.4.0"
+    },
+    {
+      "name": "Disease",
+      "className": "Disease",
+      "category": "Healthcare",
+      "version": "0.8.0",
+      "description": "Generate random, different kinds of disease."
+    },
+    {
+      "name": "Doctor Who",
+      "className": "DoctorWho",
+      "category": "Entertainment",
+      "version": "1.8.0"
+    },
+    {
+      "name": "Dog",
+      "className": "Dog",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Domain",
+      "className": "Domain",
+      "category": "Base",
+      "version": "0.9.0",
+      "description": "A domain name generator."
+    },
+    {
+      "name": "Doraemon",
+      "className": "Doraemon",
+      "category": "Entertainment",
+      "version": "1.7.0"
+    },
+    {
+      "name": "Dota2",
+      "className": "Dota2",
+      "category": "Videogame",
+      "version": "2.4.0",
+      "description": "Dota 2 is a multiplayer online battle arena (MOBA) game developed and published by Valve Corporation."
+    },
+    {
+      "name": "Dragon Ball",
+      "className": "DragonBall",
+      "category": "Entertainment",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Driving License",
+      "className": "DrivingLicense",
+      "category": "Base",
+      "version": "1.5.0"
+    },
+    {
+      "name": "Drone",
+      "className": "Drone",
+      "category": "Base",
+      "version": "1.7.0",
+      "description": "An unmanned aerial vehicle (UAV), commonly known as a drone, is an aircraft without any human pilot, crew, or passengers on board."
+    },
+    {
+      "name": "Dumb And Dumber",
+      "className": "DumbAndDumber",
+      "category": "Entertainment",
+      "version": "1.6.0"
+    },
+    {
+      "name": "Dune",
+      "className": "Dune",
+      "category": "Entertainment",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Dungeons And Dragons",
+      "className": "DungeonsAndDragons",
+      "category": "Base",
+      "version": "1.7.0",
+      "description": "Dungeons and Dragons is a fantasy tabletop role-playing game originally designed by Gary Gygax and Dave Arneson."
+    },
+    {
+      "name": "Educator",
+      "className": "Educator",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Elden Ring",
+      "className": "EldenRing",
+      "category": "Videogame",
+      "version": "1.4.0",
+      "description": "Elden Ring is a 2022 action role-playing game developed by FromSoftware and published by Bandai Namco Entertainment."
+    },
+    {
+      "name": "Elder Scrolls",
+      "className": "ElderScrolls",
+      "category": "Videogame",
+      "version": "0.8.0",
+      "description": "The Elder Scrolls is a series of action role-playing video games primarily developed by Bethesda Game Studios and published by Bethesda Softworks."
+    },
+    {
+      "name": "Electrical Components",
+      "className": "ElectricalComponents",
+      "category": "Base",
+      "version": "1.4.0"
+    },
+    {
+      "name": "Emoji",
+      "className": "Emoji",
+      "category": "Base",
+      "version": "1.7.0",
+      "description": "Emojis picked from [Emoji 1.0](http://unicode.org/Public/emoji/1.0/emoji-data.txt)."
+    },
+    {
+      "name": "England Foot Ball",
+      "className": "EnglandFootBall",
+      "category": "Sport",
+      "version": "0.9.0"
+    },
+    {
+      "name": "Esports",
+      "className": "Esports",
+      "category": "Videogame",
+      "version": "0.8.0",
+      "description": "Esports, short for electronic sports, is a form of competition using video games."
+    },
+    {
+      "name": "Fake Duration",
+      "className": "FakeDuration",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Fallout",
+      "className": "Fallout",
+      "category": "Videogame",
+      "version": "1.6.0",
+      "description": "Fallout: A Post Nuclear Role Playing Game is a 1997 role-playing video game developed and published by Interplay Productions."
+    },
+    {
+      "name": "Family Guy",
+      "className": "FamilyGuy",
+      "category": "Entertainment",
+      "version": "1.7.0"
+    },
+    {
+      "name": "Famous Last Words",
+      "className": "FamousLastWords",
+      "category": "Base",
+      "version": "1.5.0"
+    },
+    {
+      "name": "File",
+      "className": "File",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Final Fantasy XIV",
+      "className": "FinalFantasyXiv",
+      "category": "Videogame",
+      "version": "2.0.0",
+      "description": "Final Fantasy XIV is an MMORPG and features a persistent world in which players can interact with each other and the environment."
+    },
+    {
+      "name": "Final Space",
+      "className": "FinalSpace",
+      "category": "Entertainment",
+      "version": "1.6.0",
+      "description": "Final Space is an adult animated space opera comedy drama television series."
+    },
+    {
+      "name": "Finance",
+      "className": "Finance",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Financial Terms",
+      "className": "FinancialTerms",
+      "category": "Base",
+      "version": "2.4.0",
+      "description": "Provides financial terms."
+    },
+    {
+      "name": "Food",
+      "className": "Food",
+      "category": "Food",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Football",
+      "className": "Football",
+      "category": "Sport",
+      "version": "1.5.0"
+    },
+    {
+      "name": "Formula1",
+      "className": "Formula1",
+      "category": "Sport",
+      "version": "1.2.0"
+    },
+    {
+      "name": "Fresh Prince Of Bel Air",
+      "className": "FreshPrinceOfBelAir",
+      "category": "Entertainment",
+      "version": "1.7.0",
+      "description": "The Fresh Prince of Bel-Air is an American television sitcom created by Andy and Susan Borowitz for NBC."
+    },
+    {
+      "name": "Friends",
+      "className": "Friends",
+      "category": "Entertainment",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Fullmetal Alchemist",
+      "className": "FullmetalAlchemist",
+      "category": "Entertainment",
+      "version": "1.7.0"
+    },
+    {
+      "name": "Funny Name",
+      "className": "FunnyName",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Futurama",
+      "className": "Futurama",
+      "category": "Entertainment",
+      "version": "1.8.0",
+      "description": "Futurama is an American animated science fiction sitcom created by Matt Groening for the Fox Broadcasting Company."
+    },
+    {
+      "name": "Game Of Thrones",
+      "className": "GameOfThrones",
+      "category": "Entertainment",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Garment Size",
+      "className": "GarmentSize",
+      "category": "Base",
+      "version": "1.6.0",
+      "description": "This class is used to generate garments sizes randomly."
+    },
+    {
+      "name": "Gender",
+      "className": "Gender",
+      "category": "Base",
+      "version": "0.8.0",
+      "description": "This class is used to generate gender randomly."
+    },
+    {
+      "name": "Ghostbusters",
+      "className": "Ghostbusters",
+      "category": "Entertainment",
+      "version": "1.5.0"
+    },
+    {
+      "name": "Grateful Dead",
+      "className": "GratefulDead",
+      "category": "Entertainment",
+      "version": "1.4.0",
+      "description": "The Grateful Dead was an American rock band formed in 1965 in Palo Alto, California."
+    },
+    {
+      "name": "Greek Philosopher",
+      "className": "GreekPhilosopher",
+      "category": "Base",
+      "version": "1.5.0"
+    },
+    {
+      "name": "Hacker",
+      "className": "Hacker",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Half Life",
+      "className": "HalfLife",
+      "category": "Videogame",
+      "version": "1.8.0",
+      "description": "Half-Life is a series of first-person shooter games developed and published by Valve."
+    },
+    {
+      "name": "Harry Potter",
+      "className": "HarryPotter",
+      "category": "Entertainment",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Hashing",
+      "className": "Hashing",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Hearthstone",
+      "className": "Hearthstone",
+      "category": "Videogame",
+      "version": "0.9.0",
+      "description": "Hearthstone is a free-to-play online digital collectible card game developed and published by Blizzard Entertainment."
+    },
+    {
+      "name": "Heroes Of The Storm",
+      "className": "HeroesOfTheStorm",
+      "category": "Videogame",
+      "version": "1.7.0",
+      "description": "Heroes of the Storm is a crossover multiplayer online battle arena video game developed and published by Blizzard Entertainment."
+    },
+    {
+      "name": "Hey Arnold",
+      "className": "HeyArnold",
+      "category": "Entertainment",
+      "version": "1.4.0",
+      "description": "Hey Arnold! is an American animated comedy television series created by Craig Bartlett."
+    },
+    {
+      "name": "Hipster",
+      "className": "Hipster",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Hitchhikers Guide To The Galaxy",
+      "className": "HitchhikersGuideToTheGalaxy",
+      "category": "Entertainment",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Hobbit",
+      "className": "Hobbit",
+      "category": "Entertainment",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Hobby",
+      "className": "Hobby",
+      "category": "Base",
+      "version": "1.3.0"
+    },
+    {
+      "name": "Hololive",
+      "className": "Hololive",
+      "category": "Base",
+      "version": "1.5.0"
+    },
+    {
+      "name": "Horse",
+      "className": "Horse",
+      "category": "Base",
+      "version": "1.3.0"
+    },
+    {
+      "name": "House",
+      "className": "House",
+      "category": "Base",
+      "version": "1.5.0"
+    },
+    {
+      "name": "How IMet Your Mother",
+      "className": "HowImetYourMother",
+      "category": "Entertainment",
+      "version": "0.8.0"
+    },
+    {
+      "name": "How To Train Your Dragon",
+      "className": "HowToTrainYourDragon",
+      "category": "Entertainment",
+      "version": "1.8.0",
+      "description": "How to Train Your Dragon is a 2010 American computer-animated action fantasy film loosely based on the 2003 book of the same name by Cressida Cowell."
+    },
+    {
+      "name": "Id Number",
+      "className": "IdNumber",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Image",
+      "className": "Image",
+      "category": "Base",
+      "version": "2.3.0",
+      "description": "Generates base64 encoded raster and vector images."
+    },
+    {
+      "name": "Industry Segments",
+      "className": "IndustrySegments",
+      "category": "Base",
+      "version": "1.5.0"
+    },
+    {
+      "name": "Internet",
+      "className": "Internet",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Job",
+      "className": "Job",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Joke",
+      "className": "Joke",
+      "category": "Entertainment",
+      "version": "2.1.0"
+    },
+    {
+      "name": "Kaamelott",
+      "className": "Kaamelott",
+      "category": "Entertainment",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Kpop",
+      "className": "Kpop",
+      "category": "Base",
+      "version": "1.3.0",
+      "description": "K-pop, short for Korean popular music, is a genre of music originating in South Korea as part of South Korean culture."
+    },
+    {
+      "name": "Language Code",
+      "className": "LanguageCode",
+      "category": "Base",
+      "version": "2.0.3"
+    },
+    {
+      "name": "Large Language Model",
+      "className": "LargeLanguageModel",
+      "category": "Base",
+      "version": "2.3.0",
+      "description": "Providers related to Large Language Models (LLMs)"
+    },
+    {
+      "name": "League Of Legends",
+      "className": "LeagueOfLegends",
+      "category": "Videogame",
+      "version": "0.8.0",
+      "description": "League of Legends is a 2009 multiplayer online battle arena video game developed and published by Riot Games."
+    },
+    {
+      "name": "Lebowski",
+      "className": "Lebowski",
+      "category": "Entertainment",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Locality",
+      "className": "Locality",
+      "category": "Base",
+      "version": "1.7.0",
+      "description": "Generates random locales in different forms."
+    },
+    {
+      "name": "Location",
+      "className": "Location",
+      "category": "Base",
+      "version": "2.3.0"
+    },
+    {
+      "name": "Lord Of The Rings",
+      "className": "LordOfTheRings",
+      "category": "Entertainment",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Lorem",
+      "className": "Lorem",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Marketing",
+      "className": "Marketing",
+      "category": "Base",
+      "version": "1.2.0",
+      "description": "Generates marketing buzzwords."
+    },
+    {
+      "name": "Martial Art",
+      "className": "MartialArt",
+      "category": "Sport",
+      "version": "2.4.4",
+      "description": "Custom Faker provider for martial arts."
+    },
+    {
+      "name": "Marvel Snap",
+      "className": "MarvelSnap",
+      "category": "Videogame",
+      "version": "1.8.0",
+      "description": "Marvel Snap is a digital collectible card game developed by Second Dinner and published by Nuverse for Microsoft Windows, Android and iOS."
+    },
+    {
+      "name": "Mass Effect",
+      "className": "MassEffect",
+      "category": "Videogame",
+      "version": "1.6.0",
+      "description": "Mass Effect is a military science fiction media franchise."
+    },
+    {
+      "name": "Matz",
+      "className": "Matz",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Mbti",
+      "className": "Mbti",
+      "category": "Base",
+      "version": "1.5.0",
+      "description": "Myers-Briggs Type Indicator"
+    },
+    {
+      "name": "Measurement",
+      "className": "Measurement",
+      "category": "Base",
+      "version": "1.5.0"
+    },
+    {
+      "name": "Medical",
+      "className": "Medical",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Medical Procedure",
+      "className": "MedicalProcedure",
+      "category": "Healthcare",
+      "version": "2.3.0"
+    },
+    {
+      "name": "Medication",
+      "className": "Medication",
+      "category": "Healthcare",
+      "version": "2.3.0"
+    },
+    {
+      "name": "Military",
+      "className": "Military",
+      "category": "Base",
+      "version": "1.2.0",
+      "description": "Military ranks."
+    },
+    {
+      "name": "Minecraft",
+      "className": "Minecraft",
+      "category": "Videogame",
+      "version": "0.9.0",
+      "description": "Minecraft is a sandbox game developed by Mojang Studios."
+    },
+    {
+      "name": "Money",
+      "className": "Money",
+      "category": "Base",
+      "version": "1.5.0",
+      "description": "Support for different kind of money currencies."
+    },
+    {
+      "name": "Money Heist",
+      "className": "MoneyHeist",
+      "category": "Entertainment",
+      "version": "1.7.0"
+    },
+    {
+      "name": "Mood",
+      "className": "Mood",
+      "category": "Base",
+      "version": "0.9.0"
+    },
+    {
+      "name": "Mountain",
+      "className": "Mountain",
+      "category": "Base",
+      "version": "1.1.0",
+      "description": "A generator for Mountain names and ranges."
+    },
+    {
+      "name": "Mountaineering",
+      "className": "Mountaineering",
+      "category": "Base",
+      "version": "1.4.0",
+      "description": "Mountaineering, or alpinism, is the set of outdoor activities that involves ascending tall mountains."
+    },
+    {
+      "name": "Movie",
+      "className": "Movie",
+      "category": "Entertainment",
+      "version": "1.5.0"
+    },
+    {
+      "name": "Music",
+      "className": "Music",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Myst",
+      "className": "Myst",
+      "category": "Videogame",
+      "version": "1.8.0",
+      "description": "Myst is a graphic adventure/puzzle video game designed by the Miller brothers, Robyn and Rand."
+    },
+    {
+      "name": "Name",
+      "className": "Name",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Naruto",
+      "className": "Naruto",
+      "category": "Entertainment",
+      "version": "1.8.0",
+      "description": "Naruto is a Japanese manga series written and illustrated by Masashi Kishimoto, that tells the story of Naruto Uzumaki."
+    },
+    {
+      "name": "Nation",
+      "className": "Nation",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Nato Phonetic Alphabet",
+      "className": "NatoPhoneticAlphabet",
+      "category": "Base",
+      "version": "1.2.0",
+      "description": "The NATO phonetic alphabet is the most widely used radiotelephone spelling alphabet."
+    },
+    {
+      "name": "New Girl",
+      "className": "NewGirl",
+      "category": "Entertainment",
+      "version": "1.8.0",
+      "description": "New Girl is an American television sitcom created by Elizabeth Meriwether."
+    },
+    {
+      "name": "Nigeria",
+      "className": "Nigeria",
+      "category": "Base",
+      "version": "1.2.0",
+      "description": "Nigeria, officially the Federal Republic of Nigeria, is a country in West Africa."
+    },
+    {
+      "name": "Number",
+      "className": "Number",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Observation",
+      "className": "Observation",
+      "category": "Healthcare",
+      "version": "2.3.0"
+    },
+    {
+      "name": "Olympic Sport",
+      "className": "OlympicSport",
+      "category": "Base",
+      "version": "1.8.0"
+    },
+    {
+      "name": "One Piece",
+      "className": "OnePiece",
+      "category": "Entertainment",
+      "version": "1.7.0"
+    },
+    {
+      "name": "Options",
+      "className": "Options",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Oscar Movie",
+      "className": "OscarMovie",
+      "category": "Entertainment",
+      "version": "1.4.0",
+      "description": "The Academy Awards, popularly known as the Oscars, are awards for artistic and technical merit in the film industry."
+    },
+    {
+      "name": "Overwatch",
+      "className": "Overwatch",
+      "category": "Videogame",
+      "version": "0.8.0",
+      "description": "Overwatch is a free-to-play, team-based action game set in the optimistic future."
+    },
+    {
+      "name": "Passport",
+      "className": "Passport",
+      "category": "Base",
+      "version": "0.9.0"
+    },
+    {
+      "name": "Phone Number",
+      "className": "PhoneNumber",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Photography",
+      "className": "Photography",
+      "category": "Base",
+      "version": "0.8.0",
+      "description": "Provides photography related strings."
+    },
+    {
+      "name": "Planet",
+      "className": "Planet",
+      "category": "Base",
+      "version": "2.2.0",
+      "description": "Provides planet specific metadata like length of the day, radius, mass etc."
+    },
+    {
+      "name": "Pokemon",
+      "className": "Pokemon",
+      "category": "Entertainment",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Princess Bride",
+      "className": "PrincessBride",
+      "category": "Entertainment",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Programming Language",
+      "className": "ProgrammingLanguage",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Pronouns",
+      "className": "Pronouns",
+      "category": "Base",
+      "version": "2.2.0",
+      "description": "This class generates gender neutral pronouns"
+    },
+    {
+      "name": "Red Dead Redemption2",
+      "className": "RedDeadRedemption2",
+      "category": "Videogame",
+      "version": "2.0.0",
+      "description": "Red Dead Redemption 2 is an action-adventure game developed and published by Rockstar Games."
+    },
+    {
+      "name": "Relationship",
+      "className": "Relationship",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Resident Evil",
+      "className": "ResidentEvil",
+      "category": "Entertainment",
+      "version": "0.9.0",
+      "description": "A class for generating random value of ResidentEvil series."
+    },
+    {
+      "name": "Restaurant",
+      "className": "Restaurant",
+      "category": "Base",
+      "version": "1.2.0"
+    },
+    {
+      "name": "Rick And Morty",
+      "className": "RickAndMorty",
+      "category": "Entertainment",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Robin",
+      "className": "Robin",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Rock Band",
+      "className": "RockBand",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Ru Paul Drag Race",
+      "className": "RuPaulDragRace",
+      "category": "Entertainment",
+      "version": "1.0.0",
+      "description": "RuPaul's Drag Race is a reality competition series produced by World of Wonder for the Logo TV Network."
+    },
+    {
+      "name": "Science",
+      "className": "Science",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Seinfeld",
+      "className": "Seinfeld",
+      "category": "Entertainment",
+      "version": "1.4.0",
+      "description": "Seinfeld is an American sitcom television series created by Larry David and Jerry Seinfeld."
+    },
+    {
+      "name": "Severance",
+      "className": "Severance",
+      "category": "Entertainment",
+      "version": "2.4.4",
+      "description": "Severance is an American science fiction psychological thriller television series"
+    },
+    {
+      "name": "Shakespeare",
+      "className": "Shakespeare",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Show",
+      "className": "Show",
+      "category": "Entertainment",
+      "version": "1.8.0"
+    },
+    {
+      "name": "Silicon Valley",
+      "className": "SiliconValley",
+      "category": "Entertainment",
+      "version": "1.8.0"
+    },
+    {
+      "name": "Simpsons",
+      "className": "Simpsons",
+      "category": "Entertainment",
+      "version": "1.5.0"
+    },
+    {
+      "name": "Sip",
+      "className": "Sip",
+      "category": "Base",
+      "version": "0.8.0",
+      "description": "Faker class for generating Session Initiation Protocol (SIP) related data."
+    },
+    {
+      "name": "Size",
+      "className": "Size",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Slack Emoji",
+      "className": "SlackEmoji",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Sonic The Hedgehog",
+      "className": "SonicTheHedgehog",
+      "category": "Videogame",
+      "version": "1.8.0",
+      "description": "Sonic the Hedgehog is a Japanese video game series and media franchise created by Sega."
+    },
+    {
+      "name": "Soul Knight",
+      "className": "SoulKnight",
+      "category": "Videogame",
+      "version": "1.4.0",
+      "description": "Soul Knight is a game made by ChillyRoom Inc."
+    },
+    {
+      "name": "South Park",
+      "className": "SouthPark",
+      "category": "Entertainment",
+      "version": "1.8.0",
+      "description": "South Park is an American animated television series created by Trey Parker and Matt Stone."
+    },
+    {
+      "name": "Space",
+      "className": "Space",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Spongebob",
+      "className": "Spongebob",
+      "category": "Entertainment",
+      "version": "1.8.0",
+      "description": "SpongeBob SquarePants (or simply SpongeBob) is an American animated comedy television series created by marine science educator and animator Stephen Hillenburg for Nickelodeon."
+    },
+    {
+      "name": "Star Craft",
+      "className": "StarCraft",
+      "category": "Videogame",
+      "version": "0.8.0",
+      "description": "StarCraft is a 1998 military science fiction real-time strategy game developed and published by Blizzard Entertainment."
+    },
+    {
+      "name": "Star Trek",
+      "className": "StarTrek",
+      "category": "Entertainment",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Star Wars",
+      "className": "StarWars",
+      "category": "Entertainment",
+      "version": "1.6.0"
+    },
+    {
+      "name": "Stargate",
+      "className": "Stargate",
+      "category": "Entertainment",
+      "version": "1.8.0",
+      "description": "Stargate is a military science fiction media franchise."
+    },
+    {
+      "name": "Stock",
+      "className": "Stock",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Stranger Things",
+      "className": "StrangerThings",
+      "category": "Entertainment",
+      "version": "1.8.0",
+      "description": "Stranger Things is an American sci-fi television series created by the Duffer Brothers."
+    },
+    {
+      "name": "Street Fighter",
+      "className": "StreetFighter",
+      "category": "Videogame",
+      "version": "1.8.0",
+      "description": "Street Fighter is a Japanese media franchise centered on a series of fighting video and arcade games developed and published by Capcom."
+    },
+    {
+      "name": "Studio Ghibli",
+      "className": "StudioGhibli",
+      "category": "Entertainment",
+      "version": "1.7.0"
+    },
+    {
+      "name": "Subscription",
+      "className": "Subscription",
+      "category": "Base",
+      "version": "1.3.0"
+    },
+    {
+      "name": "Suits",
+      "className": "Suits",
+      "category": "Entertainment",
+      "version": "1.8.0",
+      "description": "Suits is an American legal drama television series created and written by Aaron Korsh."
+    },
+    {
+      "name": "Super Mario",
+      "className": "SuperMario",
+      "category": "Videogame",
+      "version": "1.3.0",
+      "description": "Super Mario is a platform game series created by Nintendo starring their mascot, Mario."
+    },
+    {
+      "name": "Super Smash Bros",
+      "className": "SuperSmashBros",
+      "category": "Videogame",
+      "version": "1.8.0",
+      "description": "Super Smash Bros. is a crossover fighting game series published by Nintendo."
+    },
+    {
+      "name": "Superhero",
+      "className": "Superhero",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Supernatural",
+      "className": "Supernatural",
+      "category": "Entertainment",
+      "version": "1.8.0",
+      "description": "Supernatural is an American dark fantasy drama television series created by Eric Kripke."
+    },
+    {
+      "name": "Sword Art Online",
+      "className": "SwordArtOnline",
+      "category": "Entertainment",
+      "version": "1.8.0",
+      "description": "Sword Art Online is a Japanese light novel series written by Reki Kawahara and illustrated by abec."
+    },
+    {
+      "name": "Tea",
+      "className": "Tea",
+      "category": "Food",
+      "version": "1.4.0"
+    },
+    {
+      "name": "Team",
+      "className": "Team",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Text",
+      "className": "Text",
+      "category": "Base",
+      "version": "1.7.0",
+      "description": "Generates random text in a flexible way."
+    },
+    {
+      "name": "The Expanse",
+      "className": "TheExpanse",
+      "category": "Entertainment",
+      "version": "1.8.0",
+      "description": "The Expanse is an American science fiction television series developed by Mark Fergus and Hawk Ostby for the Syfy network."
+    },
+    {
+      "name": "The It Crowd",
+      "className": "TheItCrowd",
+      "category": "Entertainment",
+      "version": "0.8.0"
+    },
+    {
+      "name": "The Kingkiller Chronicle",
+      "className": "TheKingkillerChronicle",
+      "category": "Entertainment",
+      "version": "1.8.0",
+      "description": "The Kingkiller Chronicle is a fantasy trilogy by the American writer Patrick Rothfuss."
+    },
+    {
+      "name": "The Room",
+      "className": "TheRoom",
+      "category": "Entertainment",
+      "version": "1.8.0",
+      "description": "The Room is a 2003 American drama film written, produced, executive produced and directed by Tommy Wiseau."
+    },
+    {
+      "name": "The Thick Of It",
+      "className": "TheThickOfIt",
+      "category": "Entertainment",
+      "version": "1.8.0"
+    },
+    {
+      "name": "The Venture Bros",
+      "className": "TheVentureBros",
+      "category": "Entertainment",
+      "version": "1.8.0",
+      "description": "The Venture Bros. is an American adult animated action comedy TV series."
+    },
+    {
+      "name": "Time",
+      "className": "Time",
+      "category": "Base",
+      "version": "1.4.0"
+    },
+    {
+      "name": "Time And Date",
+      "className": "TimeAndDate",
+      "category": "Base",
+      "version": "2.3.0",
+      "description": "A generator of random times and dates."
+    },
+    {
+      "name": "Tire",
+      "className": "Tire",
+      "category": "Base",
+      "version": "2.0.2",
+      "description": "Sources:"
+    },
+    {
+      "name": "Touhou",
+      "className": "Touhou",
+      "category": "Videogame",
+      "version": "0.9.0",
+      "description": "The Touhou Project, also known simply as Touhou, is a bullet hell shoot 'em up video game series created by one-man independent Japanese doujin soft developer Team Shanghai Alice."
+    },
+    {
+      "name": "Transport",
+      "className": "Transport",
+      "category": "Base",
+      "version": "2.0.0",
+      "description": "Provides different kind of transport."
+    },
+    {
+      "name": "Tron",
+      "className": "Tron",
+      "category": "Entertainment",
+      "version": "1.4.0",
+      "description": "Tron is a 1982 American science fiction action-adventure film."
+    },
+    {
+      "name": "Twin Peaks",
+      "className": "TwinPeaks",
+      "category": "Entertainment",
+      "version": "0.8.0",
+      "description": "Twin Peaks is an American mystery serial drama television series created by Mark Frost and David Lynch."
+    },
+    {
+      "name": "Twitter",
+      "className": "Twitter",
+      "category": "Base",
+      "version": "0.9.0",
+      "description": "Creates fake Twitter messages."
+    },
+    {
+      "name": "Unique",
+      "className": "Unique",
+      "category": "Base",
+      "version": "1.6.0",
+      "description": "This class contains methods that ensure uniqueness across separate invocations."
+    },
+    {
+      "name": "University",
+      "className": "University",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "VFor Vendetta",
+      "className": "VforVendetta",
+      "category": "Entertainment",
+      "version": "1.8.0",
+      "description": "V for Vendetta is a 2005 dystopian political action film directed by James McTeigue from a screenplay by the Wachowskis."
+    },
+    {
+      "name": "Vehicle",
+      "className": "Vehicle",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Verb",
+      "className": "Verb",
+      "category": "Base",
+      "version": "1.5.0"
+    },
+    {
+      "name": "Video Game",
+      "className": "VideoGame",
+      "category": "Videogame",
+      "version": "1.8.0",
+      "description": "Video games are electronic games that involve interaction with a user interface or input device."
+    },
+    {
+      "name": "Volleyball",
+      "className": "Volleyball",
+      "category": "Sport",
+      "version": "1.3.0"
+    },
+    {
+      "name": "Warhammer Fantasy",
+      "className": "WarhammerFantasy",
+      "category": "Videogame",
+      "version": "1.8.0",
+      "description": "Warhammer Fantasy is a tabletop miniature wargame with a medieval fantasy theme."
+    },
+    {
+      "name": "Weather",
+      "className": "Weather",
+      "category": "Base",
+      "version": "0.8.0",
+      "description": "A generator for weather data."
+    },
+    {
+      "name": "Witcher",
+      "className": "Witcher",
+      "category": "Entertainment",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Word",
+      "className": "Word",
+      "category": "Base",
+      "version": "2.4.0"
+    },
+    {
+      "name": "World Of Warcraft",
+      "className": "WorldOfWarcraft",
+      "category": "Videogame",
+      "version": "1.8.0",
+      "description": "World of Warcraft is a massively multiplayer online role-playing game released in 2004 by Blizzard Entertainment."
+    },
+    {
+      "name": "Yoda",
+      "className": "Yoda",
+      "category": "Base",
+      "version": "0.8.0"
+    },
+    {
+      "name": "Zelda",
+      "className": "Zelda",
+      "category": "Videogame",
+      "version": "0.8.0",
+      "description": "The Legend of Zelda is an action-adventure game franchise created by the Japanese game designers Shigeru Miyamoto and Takashi Tezuka."
+    },
+    {
+      "name": "Zodiac",
+      "className": "Zodiac",
+      "category": "Base",
+      "version": "1.8.0",
+      "description": "This class is used to generate Zodiac signs randomly."
+    }
+  ],
+  "total": 253,
+  "categories": [
+    "Sport",
+    "Base",
+    "Entertainment",
+    "Videogame",
+    "Healthcare",
+    "Food"
+  ]
+}
