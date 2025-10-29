@@ -6,9 +6,9 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * Represents an HTTP header specification.
+ * Represents an HTTP response header specification.
  * <p>
- * Defines response headers with their schemas and descriptions.
+ * Defines response headers with their schemas, descriptions, and requirement status.
  * Conforms to OpenAPI 3.1.0 Header Object.
  *
  * @since 0.0.1
@@ -18,6 +18,19 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class Header {
+
+    /**
+     * Header description
+     */
     private String description;
+
+    /**
+     * Whether this header is required in the response (default: false)
+     */
+    private boolean required;
+
+    /**
+     * Header value schema
+     */
     private Schema schema;
 }

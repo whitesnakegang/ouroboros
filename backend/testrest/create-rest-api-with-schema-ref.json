@@ -1,0 +1,35 @@
+{
+  "path": "/api/users",
+  "method": "POST",
+  "summary": "Create a new user",
+  "description": "Creates a new user in the system",
+  "tags": ["Users"],
+  "requestBody": {
+    "description": "User object to be created",
+    "required": true,
+    "content": {
+      "application/json": {
+        "schema": {
+          "$ref": "#/components/schemas/User"
+        }
+      }
+    }
+  },
+  "responses": {
+    "201": {
+      "description": "User created successfully",
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/User"
+          }
+        }
+      }
+    },
+    "400": {
+      "description": "Invalid input"
+    }
+  },
+  "progress": "mock",
+  "tag": "implementing"
+}

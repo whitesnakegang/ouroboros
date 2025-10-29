@@ -10,6 +10,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * Implementation of {@link SchemaService}.
@@ -25,135 +27,161 @@ import java.util.*;
 public class SchemaServiceImpl implements SchemaService {
 
     private final RestApiYamlParser yamlParser;
+    private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
     @Override
     public SchemaResponse createSchema(CreateSchemaRequest request) throws Exception {
-        // Read existing document or create new one
-        Map<String, Object> openApiDoc = yamlParser.readOrCreateDocument();
+        lock.writeLock().lock();
+        try {
+            // Read existing document or create new one
+            Map<String, Object> openApiDoc = yamlParser.readOrCreateDocument();
 
-        // Check for duplicate schema name
-        if (yamlParser.schemaExists(openApiDoc, request.getSchemaName())) {
-            throw new IllegalArgumentException("Schema '" + request.getSchemaName() + "' already exists");
+            // Check for duplicate schema name
+            if (yamlParser.schemaExists(openApiDoc, request.getSchemaName())) {
+                throw new IllegalArgumentException("Schema '" + request.getSchemaName() + "' already exists");
+            }
+
+            // Build schema definition
+            Map<String, Object> schemaDefinition = buildSchemaDefinition(request);
+
+            // Add schema to document
+            yamlParser.putSchema(openApiDoc, request.getSchemaName(), schemaDefinition);
+
+            // Write back to file
+            yamlParser.writeDocument(openApiDoc);
+
+            log.info("Created schema: {}", request.getSchemaName());
+
+            return convertToResponse(request.getSchemaName(), schemaDefinition);
+        } finally {
+            lock.writeLock().unlock();
         }
-
-        // Build schema definition
-        Map<String, Object> schemaDefinition = buildSchemaDefinition(request);
-
-        // Add schema to document
-        yamlParser.putSchema(openApiDoc, request.getSchemaName(), schemaDefinition);
-
-        // Write back to file
-        yamlParser.writeDocument(openApiDoc);
-
-        log.info("Created schema: {}", request.getSchemaName());
-
-        return convertToResponse(request.getSchemaName(), schemaDefinition);
     }
 
     @Override
     public List<SchemaResponse> getAllSchemas() throws Exception {
-        if (!yamlParser.fileExists()) {
-            return new ArrayList<>();
+        lock.readLock().lock();
+        try {
+            if (!yamlParser.fileExists()) {
+                return new ArrayList<>();
+            }
+
+            Map<String, Object> openApiDoc = yamlParser.readDocument();
+            Map<String, Object> schemas = yamlParser.getSchemas(openApiDoc);
+
+            if (schemas == null || schemas.isEmpty()) {
+                return new ArrayList<>();
+            }
+
+            List<SchemaResponse> responses = new ArrayList<>();
+            for (Map.Entry<String, Object> entry : schemas.entrySet()) {
+                String schemaName = entry.getKey();
+                @SuppressWarnings("unchecked")
+                Map<String, Object> schemaDefinition = (Map<String, Object>) entry.getValue();
+                responses.add(convertToResponse(schemaName, schemaDefinition));
+            }
+
+            return responses;
+        } finally {
+            lock.readLock().unlock();
         }
-
-        Map<String, Object> openApiDoc = yamlParser.readDocument();
-        Map<String, Object> schemas = yamlParser.getSchemas(openApiDoc);
-
-        if (schemas == null || schemas.isEmpty()) {
-            return new ArrayList<>();
-        }
-
-        List<SchemaResponse> responses = new ArrayList<>();
-        for (Map.Entry<String, Object> entry : schemas.entrySet()) {
-            String schemaName = entry.getKey();
-            @SuppressWarnings("unchecked")
-            Map<String, Object> schemaDefinition = (Map<String, Object>) entry.getValue();
-            responses.add(convertToResponse(schemaName, schemaDefinition));
-        }
-
-        return responses;
     }
 
     @Override
     public SchemaResponse getSchema(String schemaName) throws Exception {
-        if (!yamlParser.fileExists()) {
-            throw new IllegalArgumentException("No schemas found. The specification file does not exist.");
+        lock.readLock().lock();
+        try {
+            if (!yamlParser.fileExists()) {
+                throw new IllegalArgumentException("No schemas found. The specification file does not exist.");
+            }
+
+            Map<String, Object> openApiDoc = yamlParser.readDocument();
+            Map<String, Object> schemaDefinition = yamlParser.getSchema(openApiDoc, schemaName);
+
+            if (schemaDefinition == null) {
+                throw new IllegalArgumentException("Schema '" + schemaName + "' not found");
+            }
+
+            return convertToResponse(schemaName, schemaDefinition);
+        } finally {
+            lock.readLock().unlock();
         }
-
-        Map<String, Object> openApiDoc = yamlParser.readDocument();
-        Map<String, Object> schemaDefinition = yamlParser.getSchema(openApiDoc, schemaName);
-
-        if (schemaDefinition == null) {
-            throw new IllegalArgumentException("Schema '" + schemaName + "' not found");
-        }
-
-        return convertToResponse(schemaName, schemaDefinition);
     }
 
     @Override
     public SchemaResponse updateSchema(String schemaName, UpdateSchemaRequest request) throws Exception {
-        if (!yamlParser.fileExists()) {
-            throw new IllegalArgumentException("No schemas found. The specification file does not exist.");
-        }
+        lock.writeLock().lock();
+        try {
+            if (!yamlParser.fileExists()) {
+                throw new IllegalArgumentException("No schemas found. The specification file does not exist.");
+            }
 
-        Map<String, Object> openApiDoc = yamlParser.readDocument();
-        Map<String, Object> existingSchema = yamlParser.getSchema(openApiDoc, schemaName);
+            Map<String, Object> openApiDoc = yamlParser.readDocument();
+            Map<String, Object> existingSchema = yamlParser.getSchema(openApiDoc, schemaName);
 
-        if (existingSchema == null) {
-            throw new IllegalArgumentException("Schema '" + schemaName + "' not found");
-        }
+            if (existingSchema == null) {
+                throw new IllegalArgumentException("Schema '" + schemaName + "' not found");
+            }
 
-        // Update only provided fields
-        if (request.getType() != null) {
-            existingSchema.put("type", request.getType());
-        }
-        if (request.getTitle() != null) {
-            existingSchema.put("title", request.getTitle());
-        }
-        if (request.getDescription() != null) {
-            existingSchema.put("description", request.getDescription());
-        }
-        if (request.getProperties() != null) {
-            existingSchema.put("properties", buildProperties(request.getProperties()));
-        }
-        if (request.getRequired() != null) {
-            existingSchema.put("required", request.getRequired());
-        }
-        if (request.getOrders() != null) {
-            existingSchema.put("x-ouroboros-orders", request.getOrders());
-        }
-        if (request.getXmlName() != null) {
-            Map<String, Object> xml = new LinkedHashMap<>();
-            xml.put("name", request.getXmlName());
-            existingSchema.put("xml", xml);
-        }
+            // Update only provided fields
+            if (request.getType() != null) {
+                existingSchema.put("type", request.getType());
+            }
+            if (request.getTitle() != null) {
+                existingSchema.put("title", request.getTitle());
+            }
+            if (request.getDescription() != null) {
+                existingSchema.put("description", request.getDescription());
+            }
+            if (request.getProperties() != null) {
+                existingSchema.put("properties", buildProperties(request.getProperties()));
+            }
+            if (request.getRequired() != null) {
+                existingSchema.put("required", request.getRequired());
+            }
+            if (request.getOrders() != null) {
+                existingSchema.put("x-ouroboros-orders", request.getOrders());
+            }
+            if (request.getXmlName() != null) {
+                Map<String, Object> xml = new LinkedHashMap<>();
+                xml.put("name", request.getXmlName());
+                existingSchema.put("xml", xml);
+            }
 
-        // Write back to file
-        yamlParser.writeDocument(openApiDoc);
+            // Write back to file
+            yamlParser.writeDocument(openApiDoc);
 
-        log.info("Updated schema: {}", schemaName);
+            log.info("Updated schema: {}", schemaName);
 
-        return convertToResponse(schemaName, existingSchema);
+            return convertToResponse(schemaName, existingSchema);
+        } finally {
+            lock.writeLock().unlock();
+        }
     }
 
     @Override
     public void deleteSchema(String schemaName) throws Exception {
-        if (!yamlParser.fileExists()) {
-            throw new IllegalArgumentException("No schemas found. The specification file does not exist.");
+        lock.writeLock().lock();
+        try {
+            if (!yamlParser.fileExists()) {
+                throw new IllegalArgumentException("No schemas found. The specification file does not exist.");
+            }
+
+            Map<String, Object> openApiDoc = yamlParser.readDocument();
+
+            boolean removed = yamlParser.removeSchema(openApiDoc, schemaName);
+
+            if (!removed) {
+                throw new IllegalArgumentException("Schema '" + schemaName + "' not found");
+            }
+
+            // Write back to file
+            yamlParser.writeDocument(openApiDoc);
+
+            log.info("Deleted schema: {}", schemaName);
+        } finally {
+            lock.writeLock().unlock();
         }
-
-        Map<String, Object> openApiDoc = yamlParser.readDocument();
-
-        boolean removed = yamlParser.removeSchema(openApiDoc, schemaName);
-
-        if (!removed) {
-            throw new IllegalArgumentException("Schema '" + schemaName + "' not found");
-        }
-
-        // Write back to file
-        yamlParser.writeDocument(openApiDoc);
-
-        log.info("Deleted schema: {}", schemaName);
     }
 
     // Helper methods for building schema structures

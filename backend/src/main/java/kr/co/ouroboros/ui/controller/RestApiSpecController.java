@@ -1,10 +1,9 @@
 package kr.co.ouroboros.ui.controller;
 
-import kr.co.ouroboros.core.global.exception.DuplicateApiSpecException;
 import kr.co.ouroboros.core.global.response.GlobalApiResponse;
 import kr.co.ouroboros.core.rest.spec.dto.CreateRestApiRequest;
-import kr.co.ouroboros.core.rest.spec.dto.CreateRestApiResponse;
-import kr.co.ouroboros.core.rest.spec.dto.GetRestApiSpecsResponse;
+import kr.co.ouroboros.core.rest.spec.dto.RestApiSpecResponse;
+import kr.co.ouroboros.core.rest.spec.dto.UpdateRestApiRequest;
 import kr.co.ouroboros.core.rest.spec.service.RestApiSpecService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,11 +11,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 /**
  * REST controller for managing REST API specifications.
  * <p>
- * Provides endpoints for creating, validating, and managing REST API specifications
- * in OpenAPI 3.1.0 format. All endpoints are prefixed with {@code /ouro/rest-specs}.
+ * Provides CRUD operations for REST API endpoint specifications.
+ * All endpoints are prefixed with {@code /ouro/rest-specs}.
  * All responses follow the standard {@link GlobalApiResponse} format.
  *
  * @since 0.0.1
@@ -32,38 +33,38 @@ public class RestApiSpecController {
     /**
      * Creates a new REST API specification.
      * <p>
-     * Accepts API specification details via JSON and generates an OpenAPI 3.1.0 YAML file.
-     * Automatically generates a UUID if not provided in the request.
+     * Validates uniqueness of path+method combination and automatically generates
+     * a UUID if not provided. Supports both schema references and inline schemas.
      *
-     * @param request the API specification details (JSON format only)
-     * @return standard API response with creation result
+     * @param request API specification details
+     * @return created specification with generated ID
      */
     @PostMapping
-    public ResponseEntity<GlobalApiResponse<CreateRestApiResponse>> createRestApiSpec(
+    public ResponseEntity<GlobalApiResponse<RestApiSpecResponse>> createRestApiSpec(
             @RequestBody CreateRestApiRequest request) {
         try {
-            CreateRestApiResponse data = restApiSpecService.createRestApiSpec(request);
-            GlobalApiResponse<CreateRestApiResponse> response = GlobalApiResponse.success(
+            RestApiSpecResponse data = restApiSpecService.createRestApiSpec(request);
+            GlobalApiResponse<RestApiSpecResponse> response = GlobalApiResponse.success(
                     data,
                     "REST API specification created successfully"
             );
             return ResponseEntity.ok(response);
-        } catch (DuplicateApiSpecException e) {
-            log.warn("Duplicate API specification: {} {}", e.getMethod(), e.getPath(), e);
-            GlobalApiResponse<CreateRestApiResponse> response = GlobalApiResponse.error(
-                    HttpStatus.CONFLICT.value(),
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid REST API spec request: {}", e.getMessage(), e);
+            GlobalApiResponse<RestApiSpecResponse> response = GlobalApiResponse.error(
+                    HttpStatus.BAD_REQUEST.value(),
                     "Failed to create REST API specification",
-                    "DUPLICATE_API",
+                    "INVALID_REQUEST",
                     "The API specification for this path and method already exists"
             );
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         } catch (Exception e) {
             log.error("Failed to create REST API specification", e);
-            GlobalApiResponse<CreateRestApiResponse> response = GlobalApiResponse.error(
+            GlobalApiResponse<RestApiSpecResponse> response = GlobalApiResponse.error(
                     HttpStatus.INTERNAL_SERVER_ERROR.value(),
                     "Failed to create REST API specification",
                     "INTERNAL_ERROR",
-                    "An internal error occurred while creating the API specification"
+                    "An internal error occurred while creating the specification"
             );
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
@@ -72,40 +73,160 @@ public class RestApiSpecController {
     /**
      * Retrieves all REST API specifications.
      * <p>
-     * Reads the ourorest.yml file and returns server information and summary data
-     * for all API specifications. Returns 404 if the file does not exist.
+     * Returns a list of all API specifications from the OpenAPI YAML file.
+     * Returns 404 if no specifications exist.
      *
-     * @return server information and all API specification summaries
+     * @return list of all specifications
      */
     @GetMapping
-    public ResponseEntity<GlobalApiResponse<GetRestApiSpecsResponse>> getAllRestApiSpecs() {
+    public ResponseEntity<GlobalApiResponse<List<RestApiSpecResponse>>> getAllRestApiSpecs() {
         try {
-            GetRestApiSpecsResponse data = restApiSpecService.getAllRestApiSpecs();
+            List<RestApiSpecResponse> data = restApiSpecService.getAllRestApiSpecs();
 
-            // Return 404 if no specifications exist (file not found or empty)
-            if (data.getSpecs() == null || data.getSpecs().isEmpty()) {
-                log.info("No API specifications found");
-                GlobalApiResponse<GetRestApiSpecsResponse> response = GlobalApiResponse.error(
+            if (data.isEmpty()) {
+                log.info("No REST API specifications found");
+                GlobalApiResponse<List<RestApiSpecResponse>> response = GlobalApiResponse.error(
                         HttpStatus.NOT_FOUND.value(),
-                        "No API specifications found",
+                        "No REST API specifications found",
                         "SPEC_NOT_FOUND",
-                        "No API specification file exists yet. Create your first API specification to get started."
+                        "No API specifications exist yet. Create your first specification to get started."
                 );
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
             }
 
-            GlobalApiResponse<GetRestApiSpecsResponse> response = GlobalApiResponse.success(
+            GlobalApiResponse<List<RestApiSpecResponse>> response = GlobalApiResponse.success(
                     data,
                     "REST API specifications retrieved successfully"
             );
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             log.error("Failed to retrieve REST API specifications", e);
-            GlobalApiResponse<GetRestApiSpecsResponse> response = GlobalApiResponse.error(
+            GlobalApiResponse<List<RestApiSpecResponse>> response = GlobalApiResponse.error(
                     HttpStatus.INTERNAL_SERVER_ERROR.value(),
                     "Failed to retrieve REST API specifications",
                     "INTERNAL_ERROR",
-                    "An internal error occurred while retrieving API specifications"
+                    "An internal error occurred while retrieving specifications"
+            );
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    /**
+     * Retrieves a specific REST API specification by ID.
+     * <p>
+     * Searches through all paths and methods to find the specification with the given UUID.
+     *
+     * @param id specification UUID
+     * @return specification details
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<GlobalApiResponse<RestApiSpecResponse>> getRestApiSpec(
+            @PathVariable("id") String id) {
+        try {
+            RestApiSpecResponse data = restApiSpecService.getRestApiSpec(id);
+            GlobalApiResponse<RestApiSpecResponse> response = GlobalApiResponse.success(
+                    data,
+                    "REST API specification retrieved successfully"
+            );
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            log.warn("REST API specification not found: {}", id, e);
+            GlobalApiResponse<RestApiSpecResponse> response = GlobalApiResponse.error(
+                    HttpStatus.NOT_FOUND.value(),
+                    "REST API specification not found",
+                    "SPEC_NOT_FOUND",
+                    e.getMessage()
+            );
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        } catch (Exception e) {
+            log.error("Failed to retrieve REST API specification: {}", id, e);
+            GlobalApiResponse<RestApiSpecResponse> response = GlobalApiResponse.error(
+                    HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                    "Failed to retrieve REST API specification",
+                    "INTERNAL_ERROR",
+                    "An internal error occurred while retrieving the specification"
+            );
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    /**
+     * Updates an existing REST API specification.
+     * <p>
+     * Only provided fields will be updated. Path and method cannot be changed
+     * (use delete + create instead to change these).
+     *
+     * @param id specification UUID
+     * @param request updated specification details
+     * @return updated specification
+     */
+    @PutMapping("/{id}")
+    public ResponseEntity<GlobalApiResponse<RestApiSpecResponse>> updateRestApiSpec(
+            @PathVariable("id") String id,
+            @RequestBody UpdateRestApiRequest request) {
+        try {
+            RestApiSpecResponse data = restApiSpecService.updateRestApiSpec(id, request);
+            GlobalApiResponse<RestApiSpecResponse> response = GlobalApiResponse.success(
+                    data,
+                    "REST API specification updated successfully"
+            );
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            log.warn("REST API specification not found: {}", id, e);
+            GlobalApiResponse<RestApiSpecResponse> response = GlobalApiResponse.error(
+                    HttpStatus.NOT_FOUND.value(),
+                    "REST API specification not found",
+                    "SPEC_NOT_FOUND",
+                    e.getMessage()
+            );
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        } catch (Exception e) {
+            log.error("Failed to update REST API specification: {}", id, e);
+            GlobalApiResponse<RestApiSpecResponse> response = GlobalApiResponse.error(
+                    HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                    "Failed to update REST API specification",
+                    "INTERNAL_ERROR",
+                    "An internal error occurred while updating the specification"
+            );
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    /**
+     * Deletes a REST API specification.
+     * <p>
+     * Removes the specification from the OpenAPI YAML file.
+     * If the path has no remaining methods, the entire path is removed.
+     *
+     * @param id specification UUID
+     * @return success response
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<GlobalApiResponse<Void>> deleteRestApiSpec(
+            @PathVariable("id") String id) {
+        try {
+            restApiSpecService.deleteRestApiSpec(id);
+            GlobalApiResponse<Void> response = GlobalApiResponse.success(
+                    null,
+                    "REST API specification deleted successfully"
+            );
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            log.warn("REST API specification not found: {}", id, e);
+            GlobalApiResponse<Void> response = GlobalApiResponse.error(
+                    HttpStatus.NOT_FOUND.value(),
+                    "REST API specification not found",
+                    "SPEC_NOT_FOUND",
+                    e.getMessage()
+            );
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        } catch (Exception e) {
+            log.error("Failed to delete REST API specification: {}", id, e);
+            GlobalApiResponse<Void> response = GlobalApiResponse.error(
+                    HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                    "Failed to delete REST API specification",
+                    "INTERNAL_ERROR",
+                    "An internal error occurred while deleting the specification"
             );
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
