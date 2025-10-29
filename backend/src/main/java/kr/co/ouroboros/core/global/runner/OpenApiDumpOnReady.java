@@ -17,6 +17,13 @@ public class OpenApiDumpOnReady {
     private final OuroApiSpecManager specManager;
     private final List<OuroProtocolHandler> handlers;
 
+    /**
+     * Initializes API specifications and protocol handlers once the application is ready.
+     *
+     * <p>Fetches the local OpenAPI JSON from /v3/api-docs and logs its size, then invokes
+     * {@code specManager.initializeProtocolOnStartup} for each registered {@code OuroProtocolHandler},
+     * logging any per-handler initialization failures without aborting the overall process.</p>
+     */
     @EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
     public void onReady() {
         int port = webCtx.getWebServer().getPort();
@@ -39,4 +46,3 @@ public class OpenApiDumpOnReady {
         }
     }
 }
-

@@ -23,10 +23,11 @@ public class OuroApiSpecStartUpRunner implements ApplicationRunner {
     private final List<OuroProtocolHandler> handlers;
 
     /**
-     * Runs protocol initialization for all registered protocol handlers on application startup.
+     * Initializes OpenAPI for Locale.KOREA and invokes protocol initialization for each registered handler on application startup.
      *
-     * Delegates initialization of each handler's protocol to the spec manager; if initialization for a protocol fails,
-     * the exception is caught and logged and processing continues for remaining handlers.
+     * For each handler, delegates initialization to the spec manager and logs errors for any handler that fails without preventing remaining handlers from being processed.
+     *
+     * @param args the application arguments provided at startup
      */
     @Override
     public void run(ApplicationArguments args) throws Exception {

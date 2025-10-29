@@ -40,7 +40,11 @@ public class TestController {
     }
 
     /**
-     * 사용자 목록을 조회하는 API
+     * Retrieve a list of users.
+     *
+     * The response body contains a `"message"` with a success description and a `"data"` array of user names.
+     *
+     * @return a map with keys `"message"` (success message) and `"data"` (array of user names)
      */
     @GetMapping("/users")
     @ApiState(state = State.COMPLETED)
@@ -52,7 +56,10 @@ public class TestController {
     }
 
     /**
-     * 새로운 사용자를 등록하는 API
+     * Create a new user.
+     *
+     * @param user the user payload from the request body
+     * @return the created User object
      */
     @PostMapping("/users")
     @ApiState(state = State.COMPLETED)
@@ -61,7 +68,11 @@ public class TestController {
     }
 
     /**
-     * 특정 사용자 정보를 수정하는 API
+     * Update a user's information identified by the given ID.
+     *
+     * @param id the ID of the user to update
+     * @param request a map containing fields to update and their new values
+     * @return a map containing "message" (operation result), "userId" (the user ID), and "updatedData" (the provided request)
      */
     @PutMapping("/users/{id}")
     @ApiState(state = State.BUG_FIXING)
@@ -86,8 +97,14 @@ public class TestController {
     }
 
     /**
-     * 사용자 검색 API
-     * <p>이름(name)이나 나이(age)로 사용자를 필터링합니다.</p>
+     * Searches for users using optional name and/or age filters.
+     *
+     * @param name optional name filter; when provided, results are filtered by this name
+     * @param age  optional age filter; when provided, results are filtered by this age
+     * @return a map containing:
+     *         - "message": a status message,
+     *         - "filter": the provided filter values,
+     *         - "data": an array of matching user names
      */
     @GetMapping("/users/search")
     @ApiState(state = State.COMPLETED)
