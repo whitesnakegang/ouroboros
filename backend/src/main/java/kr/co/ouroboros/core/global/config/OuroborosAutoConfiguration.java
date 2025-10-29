@@ -60,9 +60,9 @@ public class OuroborosAutoConfiguration {
      *
      * @return the operation customizer that adds API state metadata
      */
-    @Bean
-    @ConditionalOnMissingBean
-    public OperationCustomizer apiOperationCustomizer() {
-        return new OpenApiCustomizerConfig().apiOperationCustomizer();
-    }
+//    @Bean
+//    @ConditionalOnMissingBean
+//    public OperationCustomizer apiOperationCustomizer() {
+//        return new OpenApiCustomizerConfig().apiOperationCustomizer();
+//    }
 }
