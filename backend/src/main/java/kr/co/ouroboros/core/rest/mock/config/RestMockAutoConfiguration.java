@@ -4,19 +4,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import kr.co.ouroboros.core.global.mock.service.SchemaMockBuilder;
 import kr.co.ouroboros.core.rest.mock.filter.*;
-import kr.co.ouroboros.core.rest.mock.model.EndpointMeta;
 import kr.co.ouroboros.core.rest.mock.registry.RestMockRegistry;
-import kr.co.ouroboros.core.rest.mock.service.RestMockLoaderService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-
-import java.util.Map;
 
 
 @Configuration
@@ -59,17 +54,4 @@ public class RestMockAutoConfiguration {
         return new XmlMapper(); // MVC 환경 fallback
     }
 
-    @Bean
-    public CommandLineRunner loadMockRegistry(RestMockLoaderService loaderService, RestMockRegistry registry) {
-        return args -> {
-            try {
-                log.info("Loading mock endpoints from YAML...");
-                Map<String, EndpointMeta> endpoints = loaderService.loadFromYaml();
-                endpoints.values().forEach(registry::register);
-                log.info("Successfully loaded {} mock endpoints into registry", endpoints.size());
-            } catch (Exception e) {
-                log.error("Failed to load mock registry", e);
-            }
-        };
-    }
 }
