@@ -7,7 +7,7 @@ import java.util.*;
 @RequiredArgsConstructor
 public class SchemaMockBuilder {
     private final DummyDataGenerator generator;
-    private final Random random = new Random();
+    private static final Random random = new Random();
 
     public Object build(Map<String, Object> schema) {
         if (schema == null) return Collections.emptyMap();
