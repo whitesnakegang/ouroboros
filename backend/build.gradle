@@ -44,16 +44,14 @@ dependencies {
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'
 	
-	// OpenTelemetry - API and SDK
-	implementation 'io.opentelemetry:opentelemetry-api:1.45.0'
-	implementation 'io.opentelemetry:opentelemetry-sdk:1.45.0'
-	implementation 'io.opentelemetry:opentelemetry-sdk-trace:1.45.0'
-	implementation 'io.opentelemetry:opentelemetry-exporter-otlp:1.45.0'
-	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	// Spring Boot Actuator (OpenTelemetry 자동 설정 포함)
+	api 'org.springframework.boot:spring-boot-starter-actuator'
 
-	// Micrometer - Tracing Bridge
-	implementation 'io.micrometer:micrometer-tracing-bridge-otel'
-	implementation 'io.micrometer:micrometer-registry-otlp'
+	// OpenTelemetry OTLP Exporter (Tempo로 trace 전송)
+	api 'io.opentelemetry:opentelemetry-exporter-otlp'
+	
+	// Micrometer - Tracing Bridge (Spring Boot가 관리하는 버전 사용)
+	api 'io.micrometer:micrometer-tracing-bridge-otel'
 	
 	// Testing
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'

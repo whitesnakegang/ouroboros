@@ -46,4 +46,51 @@ class TryControllerIntegrationTest {
                 .andExpect(jsonPath("$.status").value("PENDING"));
     }
 
+    @Test
+    @DisplayName("Try 헤더 포함 시 응답 body에 tryId 반환")
+    void testTryHeader_returnsTryIdInResponseBody() throws Exception {
+        mockMvc.perform(get("/ouroboros/tries/550e8400-e29b-41d4-a716-446655440000")
+                .header("X-Ouroboros-Try", "on"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$._ouroborosTryId").exists())
+                .andExpect(jsonPath("$._ouroborosTryId").isNotEmpty());
+    }
+
+    @Test
+    @DisplayName("Try 헤더 없을 때 응답 body에 tryId 없음")
+    void testNoTryHeader_noTryIdInResponseBody() throws Exception {
+        mockMvc.perform(get("/ouroboros/tries/550e8400-e29b-41d4-a716-446655440000"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$._ouroborosTryId").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("Try 헤더 대소문자 무시 - ON")
+    void testTryHeaderCaseInsensitive_ON() throws Exception {
+        mockMvc.perform(get("/ouroboros/tries/550e8400-e29b-41d4-a716-446655440000")
+                .header("X-Ouroboros-Try", "ON"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$._ouroborosTryId").exists())
+                .andExpect(jsonPath("$._ouroborosTryId").isNotEmpty());
+    }
+
+    @Test
+    @DisplayName("Try 헤더 대소문자 무시 - On")
+    void testTryHeaderCaseInsensitive_On() throws Exception {
+        mockMvc.perform(get("/ouroboros/tries/550e8400-e29b-41d4-a716-446655440000")
+                .header("X-Ouroboros-Try", "On"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$._ouroborosTryId").exists())
+                .andExpect(jsonPath("$._ouroborosTryId").isNotEmpty());
+    }
+
+    @Test
+    @DisplayName("Try 헤더 잘못된 값 - off")
+    void testTryHeaderInvalidValue_off() throws Exception {
+        mockMvc.perform(get("/ouroboros/tries/550e8400-e29b-41d4-a716-446655440000")
+                .header("X-Ouroboros-Try", "off"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$._ouroborosTryId").doesNotExist());
+    }
+
 }

@@ -1,6 +1,7 @@
 package kr.co.ouroboros.core.rest.tryit.filter;
 
 import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import kr.co.ouroboros.core.rest.tryit.util.TryContext;
@@ -12,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.io.IOException;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.*;
@@ -39,42 +41,30 @@ class TryFilterTest {
         void noHeader_null() throws Exception {
             when(request.getHeader("X-Ouroboros-Try")).thenReturn(null);
 
-            try (MockedStatic<TryContext> ctx = mockStatic(TryContext.class)) {
-                filter.doFilterInternal(request, response, filterChain);
+            filter.doFilterInternal(request, response, filterChain);
 
-                verify(filterChain).doFilter(request, response);
-                verify(response, never()).setHeader(anyString(), anyString());
-                ctx.verify(TryContext::clear, times(1));
-                ctx.verifyNoMoreInteractions();
-            }
+            verify(filterChain).doFilter(request, response);
+            verifyNoInteractions(response);
         }
 
         @Test
         void noHeader_emptyString() throws Exception {
             when(request.getHeader("X-Ouroboros-Try")).thenReturn("");
 
-            try (MockedStatic<TryContext> ctx = mockStatic(TryContext.class)) {
-                filter.doFilterInternal(request, response, filterChain);
+            filter.doFilterInternal(request, response, filterChain);
 
-                verify(filterChain).doFilter(request, response);
-                verify(response, never()).setHeader(anyString(), anyString());
-                ctx.verify(TryContext::clear, times(1));
-                ctx.verifyNoMoreInteractions();
-            }
+            verify(filterChain).doFilter(request, response);
+            verifyNoInteractions(response);
         }
 
         @Test
         void headerNotOn() throws Exception {
             when(request.getHeader("X-Ouroboros-Try")).thenReturn("off");
 
-            try (MockedStatic<TryContext> ctx = mockStatic(TryContext.class)) {
-                filter.doFilterInternal(request, response, filterChain);
+            filter.doFilterInternal(request, response, filterChain);
 
-                verify(filterChain).doFilter(request, response);
-                verify(response, never()).setHeader(anyString(), anyString());
-                ctx.verify(TryContext::clear, times(1));
-                ctx.verifyNoMoreInteractions();
-            }
+            verify(filterChain).doFilter(request, response);
+            verifyNoInteractions(response);
         }
     }
 
@@ -88,9 +78,9 @@ class TryFilterTest {
             try (MockedStatic<TryContext> ctx = mockStatic(TryContext.class)) {
                 filter.doFilterInternal(request, response, filterChain);
 
+                // Verify that filterChain.doFilter is called with original response
                 verify(filterChain).doFilter(request, response);
                 ctx.verify(() -> TryContext.setTryId(any(UUID.class)), times(1));
-                verify(response).setHeader(eq("X-Ouroboros-Try-Id"), anyString());
                 ctx.verify(TryContext::clear, times(1));
             }
         }
@@ -104,7 +94,6 @@ class TryFilterTest {
 
                 verify(filterChain).doFilter(request, response);
                 ctx.verify(() -> TryContext.setTryId(any(UUID.class)), times(1));
-                verify(response).setHeader(eq("X-Ouroboros-Try-Id"), anyString());
                 ctx.verify(TryContext::clear, times(1));
             }
         }
@@ -118,7 +107,6 @@ class TryFilterTest {
 
                 verify(filterChain).doFilter(request, response);
                 ctx.verify(() -> TryContext.setTryId(any(UUID.class)), times(1));
-                verify(response).setHeader(eq("X-Ouroboros-Try-Id"), anyString());
                 ctx.verify(TryContext::clear, times(1));
             }
         }

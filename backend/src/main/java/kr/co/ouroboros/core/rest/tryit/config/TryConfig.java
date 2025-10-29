@@ -8,6 +8,8 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.scheduling.annotation.EnableScheduling;
+import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.trace.Tracer;
 
 /**
  * Try session management configuration.
@@ -34,5 +36,17 @@ public class TryConfig {
     @ConditionalOnMissingBean
     public Sampler trySampler() {
         return new TrySampler();
+    }
+    
+    /**
+     * Provides Tracer bean for TryFilter.
+     * 
+     * @param openTelemetry OpenTelemetry instance
+     * @return Tracer instance
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public Tracer tracer(OpenTelemetry openTelemetry) {
+        return openTelemetry.getTracer("ouroboros-try-filter");
     }
 }
