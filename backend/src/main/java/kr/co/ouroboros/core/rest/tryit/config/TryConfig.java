@@ -1,15 +1,11 @@
 package kr.co.ouroboros.core.rest.tryit.config;
 
-import io.opentelemetry.sdk.trace.samplers.Sampler;
-import kr.co.ouroboros.core.rest.tryit.sampling.TrySampler;
 import kr.co.ouroboros.core.rest.tryit.span.TrySpanProcessor;
-import kr.co.ouroboros.core.rest.tryit.aop.MethodTracingAspect;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
-import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.trace.Tracer;
@@ -30,20 +26,7 @@ import io.opentelemetry.sdk.trace.SpanProcessor;
 })
 @ComponentScan(basePackages = "kr.co.ouroboros")
 @EnableScheduling
-@EnableAspectJAutoProxy
 public class TryConfig {
-    
-    /**
-     * Registers the custom Try sampler.
-     * This sampler ensures that traces are only created for requests with X-Ouroboros-Try header.
-     * 
-     * @return TrySampler instance
-     */
-    @Bean
-    @ConditionalOnMissingBean
-    public Sampler trySampler() {
-        return TrySampler.createParentBased();
-    }
     
     /**
      * Provides Tracer bean for TryFilter.
@@ -68,15 +51,4 @@ public class TryConfig {
         return new TrySpanProcessor();
     }
     
-    /**
-     * Registers the MethodTracingAspect for automatic method tracing.
-     * 
-     * @param tracer Tracer instance
-     * @return MethodTracingAspect instance
-     */
-    @Bean
-    @ConditionalOnMissingBean
-    public MethodTracingAspect methodTracingAspect(Tracer tracer) {
-        return new MethodTracingAspect(tracer);
-    }
 }

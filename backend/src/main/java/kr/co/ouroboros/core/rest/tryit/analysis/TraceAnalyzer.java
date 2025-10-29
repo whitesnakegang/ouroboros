@@ -99,6 +99,28 @@ public class TraceAnalyzer {
                     info.durationNanos = span.getDurationNanos();
                     info.durationMs = span.getDurationNanos() != null ? span.getDurationNanos() / 1_000_000 : 0L;
                     
+                    // Extract attributes
+                    info.attributes = new HashMap<>();
+                    if (span.getAttributes() != null) {
+                        for (TraceDTO.AttributeDTO attr : span.getAttributes()) {
+                            if (attr.getKey() != null && attr.getValue() != null) {
+                                String value = null;
+                                if (attr.getValue().getStringValue() != null) {
+                                    value = attr.getValue().getStringValue();
+                                } else if (attr.getValue().getIntValue() != null) {
+                                    value = String.valueOf(attr.getValue().getIntValue());
+                                } else if (attr.getValue().getDoubleValue() != null) {
+                                    value = String.valueOf(attr.getValue().getDoubleValue());
+                                } else if (attr.getValue().getBoolValue() != null) {
+                                    value = String.valueOf(attr.getValue().getBoolValue());
+                                }
+                                if (value != null) {
+                                    info.attributes.put(attr.getKey(), value);
+                                }
+                            }
+                        }
+                    }
+                    
                     spans.add(info);
                 }
             }
@@ -183,7 +205,7 @@ public class TraceAnalyzer {
         double percentage = totalDurationMs > 0 ? (durationMs * 100.0 / totalDurationMs) : 0;
         
         // Parse class name and method signature
-        MethodInfo methodInfo = parseMethodSignature(span.name);
+        MethodInfo methodInfo = parseMethodSignature(span.name, span.attributes);
         
         // Get children
         List<TryResultResponse.SpanNode> children = new ArrayList<>();
@@ -341,7 +363,7 @@ public class TraceAnalyzer {
      * @param spanName Full span name (e.g., "OrderController.getOrder")
      * @return Parsed info containing className, methodName, and parameters
      */
-    private MethodInfo parseMethodSignature(String spanName) {
+    private MethodInfo parseMethodSignature(String spanName, Map<String, String> attributes) {
         MethodInfo info = new MethodInfo();
         
         if (spanName == null || spanName.isEmpty()) {
@@ -349,9 +371,30 @@ public class TraceAnalyzer {
         }
         
         // Handle HTTP span names (e.g., "http get /api/users/{id}")
-        if (spanName.startsWith("http ")) {
+        if (spanName.toLowerCase().startsWith("http ")) {
             info.className = "HTTP";
-            info.methodName = spanName;
+            
+            // Try to extract better information from attributes
+            String method = attributes != null ? attributes.get("method") : null;
+            String uri = attributes != null ? attributes.get("uri") : null;
+            String httpUrl = attributes != null ? attributes.get("http.url") : null;
+            
+            if (method != null && uri != null) {
+                info.methodName = method + " " + uri;
+            } else if (method != null && httpUrl != null) {
+                // Extract path from full URL
+                try {
+                    java.net.URL url = new java.net.URL(httpUrl);
+                    info.methodName = method + " " + url.getPath();
+                } catch (Exception e) {
+                    info.methodName = method + " " + httpUrl;
+                }
+            } else if (uri != null) {
+                info.methodName = spanName.contains(" ") ? spanName.substring(spanName.indexOf(' ') + 1) + " " + uri : uri;
+            } else {
+                info.methodName = spanName;
+            }
+            
             return info;
         }
         
@@ -457,6 +500,7 @@ public class TraceAnalyzer {
         Long endTimeNanos;
         Long durationNanos;
         Long durationMs;
+        Map<String, String> attributes; // Store span attributes
     }
 }
 
