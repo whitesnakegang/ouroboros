@@ -74,7 +74,7 @@ public class RestApiSpecController {
      * Retrieves all REST API specifications.
      * <p>
      * Returns a list of all API specifications from the OpenAPI YAML file.
-     * Returns an empty list if no specifications exist.
+     * Returns 404 if no specifications exist.
      *
      * @return list of all specifications
      */

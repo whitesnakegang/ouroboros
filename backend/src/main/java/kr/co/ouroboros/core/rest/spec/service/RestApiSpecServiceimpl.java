@@ -10,6 +10,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * Implementation of {@link RestApiSpecService}.
@@ -26,185 +28,211 @@ import java.util.*;
 public class RestApiSpecServiceimpl implements RestApiSpecService {
 
     private final RestApiYamlParser yamlParser;
+    private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
     @Override
     public RestApiSpecResponse createRestApiSpec(CreateRestApiRequest request) throws Exception {
-        // Generate UUID if not provided
-        String id = request.getId() != null ? request.getId() : UUID.randomUUID().toString();
+        lock.writeLock().lock();
+        try {
+            // Generate UUID if not provided
+            String id = request.getId() != null ? request.getId() : UUID.randomUUID().toString();
 
-        // Read existing document or create new one
-        Map<String, Object> openApiDoc = yamlParser.readOrCreateDocument();
+            // Read existing document or create new one
+            Map<String, Object> openApiDoc = yamlParser.readOrCreateDocument();
 
-        // Check for duplicate path+method
-        if (yamlParser.operationExists(openApiDoc, request.getPath(), request.getMethod())) {
-            throw new IllegalArgumentException(
-                    "API specification already exists for " + request.getMethod().toUpperCase() + " " + request.getPath()
-            );
+            // Check for duplicate path+method
+            if (yamlParser.operationExists(openApiDoc, request.getPath(), request.getMethod())) {
+                throw new IllegalArgumentException(
+                        "API specification already exists for " + request.getMethod().toUpperCase() + " " + request.getPath()
+                );
+            }
+
+            // Build operation definition
+            Map<String, Object> operation = buildOperation(id, request);
+
+            // Add operation to document
+            yamlParser.putOperation(openApiDoc, request.getPath(), request.getMethod(), operation);
+
+            // Write back to file
+            yamlParser.writeDocument(openApiDoc);
+
+            log.info("Created REST API spec: {} {} (ID: {})", request.getMethod().toUpperCase(), request.getPath(), id);
+
+            return convertToResponse(id, request.getPath(), request.getMethod(), operation);
+        } finally {
+            lock.writeLock().unlock();
         }
-
-        // Build operation definition
-        Map<String, Object> operation = buildOperation(id, request);
-
-        // Add operation to document
-        yamlParser.putOperation(openApiDoc, request.getPath(), request.getMethod(), operation);
-
-        // Write back to file
-        yamlParser.writeDocument(openApiDoc);
-
-        log.info("Created REST API spec: {} {} (ID: {})", request.getMethod().toUpperCase(), request.getPath(), id);
-
-        return convertToResponse(id, request.getPath(), request.getMethod(), operation);
     }
 
     @Override
     public List<RestApiSpecResponse> getAllRestApiSpecs() throws Exception {
-        if (!yamlParser.fileExists()) {
-            return new ArrayList<>();
-        }
+        lock.readLock().lock();
+        try {
+            if (!yamlParser.fileExists()) {
+                return new ArrayList<>();
+            }
 
-        Map<String, Object> openApiDoc = yamlParser.readDocument();
-        Map<String, Object> paths = yamlParser.getOrCreatePaths(openApiDoc);
+            Map<String, Object> openApiDoc = yamlParser.readDocument();
+            Map<String, Object> paths = yamlParser.getOrCreatePaths(openApiDoc);
 
-        List<RestApiSpecResponse> responses = new ArrayList<>();
+            List<RestApiSpecResponse> responses = new ArrayList<>();
 
-        for (Map.Entry<String, Object> pathEntry : paths.entrySet()) {
-            String path = pathEntry.getKey();
-            @SuppressWarnings("unchecked")
-            Map<String, Object> methods = (Map<String, Object>) pathEntry.getValue();
-
-            for (Map.Entry<String, Object> methodEntry : methods.entrySet()) {
-                String method = methodEntry.getKey();
+            for (Map.Entry<String, Object> pathEntry : paths.entrySet()) {
+                String path = pathEntry.getKey();
                 @SuppressWarnings("unchecked")
-                Map<String, Object> operation = (Map<String, Object>) methodEntry.getValue();
+                Map<String, Object> methods = (Map<String, Object>) pathEntry.getValue();
 
-                String id = (String) operation.get("x-ouroboros-id");
-                if (id != null) {
-                    responses.add(convertToResponse(id, path, method, operation));
+                for (Map.Entry<String, Object> methodEntry : methods.entrySet()) {
+                    String method = methodEntry.getKey();
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> operation = (Map<String, Object>) methodEntry.getValue();
+
+                    String id = (String) operation.get("x-ouroboros-id");
+                    if (id != null) {
+                        responses.add(convertToResponse(id, path, method, operation));
+                    }
                 }
             }
-        }
 
-        return responses;
+            return responses;
+        } finally {
+            lock.readLock().unlock();
+        }
     }
 
     @Override
     public RestApiSpecResponse getRestApiSpec(String id) throws Exception {
-        if (!yamlParser.fileExists()) {
-            throw new IllegalArgumentException("No API specifications found. The specification file does not exist.");
-        }
+        lock.readLock().lock();
+        try {
+            if (!yamlParser.fileExists()) {
+                throw new IllegalArgumentException("No API specifications found. The specification file does not exist.");
+            }
 
-        Map<String, Object> openApiDoc = yamlParser.readDocument();
-        Map<String, Object> paths = yamlParser.getOrCreatePaths(openApiDoc);
+            Map<String, Object> openApiDoc = yamlParser.readDocument();
+            Map<String, Object> paths = yamlParser.getOrCreatePaths(openApiDoc);
 
-        // Search for operation with matching ID
-        for (Map.Entry<String, Object> pathEntry : paths.entrySet()) {
-            String path = pathEntry.getKey();
-            @SuppressWarnings("unchecked")
-            Map<String, Object> methods = (Map<String, Object>) pathEntry.getValue();
-
-            for (Map.Entry<String, Object> methodEntry : methods.entrySet()) {
-                String method = methodEntry.getKey();
+            // Search for operation with matching ID
+            for (Map.Entry<String, Object> pathEntry : paths.entrySet()) {
+                String path = pathEntry.getKey();
                 @SuppressWarnings("unchecked")
-                Map<String, Object> operation = (Map<String, Object>) methodEntry.getValue();
+                Map<String, Object> methods = (Map<String, Object>) pathEntry.getValue();
 
-                String operationId = (String) operation.get("x-ouroboros-id");
-                if (id.equals(operationId)) {
-                    return convertToResponse(id, path, method, operation);
+                for (Map.Entry<String, Object> methodEntry : methods.entrySet()) {
+                    String method = methodEntry.getKey();
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> operation = (Map<String, Object>) methodEntry.getValue();
+
+                    String operationId = (String) operation.get("x-ouroboros-id");
+                    if (id.equals(operationId)) {
+                        return convertToResponse(id, path, method, operation);
+                    }
                 }
             }
-        }
 
-        throw new IllegalArgumentException("REST API specification with ID '" + id + "' not found");
+            throw new IllegalArgumentException("REST API specification with ID '" + id + "' not found");
+        } finally {
+            lock.readLock().unlock();
+        }
     }
 
     @Override
     public RestApiSpecResponse updateRestApiSpec(String id, UpdateRestApiRequest request) throws Exception {
-        if (!yamlParser.fileExists()) {
-            throw new IllegalArgumentException("No API specifications found. The specification file does not exist.");
-        }
-
-        Map<String, Object> openApiDoc = yamlParser.readDocument();
-        Map<String, Object> paths = yamlParser.getOrCreatePaths(openApiDoc);
-
-        // Find operation with matching ID
-        String foundPath = null;
-        String foundMethod = null;
-        Map<String, Object> operation = null;
-
-        for (Map.Entry<String, Object> pathEntry : paths.entrySet()) {
-            String path = pathEntry.getKey();
-            @SuppressWarnings("unchecked")
-            Map<String, Object> methods = (Map<String, Object>) pathEntry.getValue();
-
-            for (Map.Entry<String, Object> methodEntry : methods.entrySet()) {
-                String method = methodEntry.getKey();
-                @SuppressWarnings("unchecked")
-                Map<String, Object> op = (Map<String, Object>) methodEntry.getValue();
-
-                String operationId = (String) op.get("x-ouroboros-id");
-                if (id.equals(operationId)) {
-                    foundPath = path;
-                    foundMethod = method;
-                    operation = op;
-                    break;
-                }
+        lock.writeLock().lock();
+        try {
+            if (!yamlParser.fileExists()) {
+                throw new IllegalArgumentException("No API specifications found. The specification file does not exist.");
             }
-            if (operation != null) break;
+
+            Map<String, Object> openApiDoc = yamlParser.readDocument();
+            Map<String, Object> paths = yamlParser.getOrCreatePaths(openApiDoc);
+
+            // Find operation with matching ID
+            String foundPath = null;
+            String foundMethod = null;
+            Map<String, Object> operation = null;
+
+            for (Map.Entry<String, Object> pathEntry : paths.entrySet()) {
+                String path = pathEntry.getKey();
+                @SuppressWarnings("unchecked")
+                Map<String, Object> methods = (Map<String, Object>) pathEntry.getValue();
+
+                for (Map.Entry<String, Object> methodEntry : methods.entrySet()) {
+                    String method = methodEntry.getKey();
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> op = (Map<String, Object>) methodEntry.getValue();
+
+                    String operationId = (String) op.get("x-ouroboros-id");
+                    if (id.equals(operationId)) {
+                        foundPath = path;
+                        foundMethod = method;
+                        operation = op;
+                        break;
+                    }
+                }
+                if (operation != null) break;
+            }
+
+            if (operation == null) {
+                throw new IllegalArgumentException("REST API specification with ID '" + id + "' not found");
+            }
+
+            // Update only provided fields
+            updateOperationFields(operation, request);
+
+            // Write back to file
+            yamlParser.writeDocument(openApiDoc);
+
+            log.info("Updated REST API spec: {} {} (ID: {})", foundMethod.toUpperCase(), foundPath, id);
+
+            return convertToResponse(id, foundPath, foundMethod, operation);
+        } finally {
+            lock.writeLock().unlock();
         }
-
-        if (operation == null) {
-            throw new IllegalArgumentException("REST API specification with ID '" + id + "' not found");
-        }
-
-        // Update only provided fields
-        updateOperationFields(operation, request);
-
-        // Write back to file
-        yamlParser.writeDocument(openApiDoc);
-
-        log.info("Updated REST API spec: {} {} (ID: {})", foundMethod.toUpperCase(), foundPath, id);
-
-        return convertToResponse(id, foundPath, foundMethod, operation);
     }
 
     @Override
     public void deleteRestApiSpec(String id) throws Exception {
-        if (!yamlParser.fileExists()) {
-            throw new IllegalArgumentException("No API specifications found. The specification file does not exist.");
-        }
-
-        Map<String, Object> openApiDoc = yamlParser.readDocument();
-        Map<String, Object> paths = yamlParser.getOrCreatePaths(openApiDoc);
-
-        // Find and remove operation with matching ID
-        boolean found = false;
-        for (Map.Entry<String, Object> pathEntry : paths.entrySet()) {
-            String path = pathEntry.getKey();
-            @SuppressWarnings("unchecked")
-            Map<String, Object> methods = (Map<String, Object>) pathEntry.getValue();
-
-            for (Map.Entry<String, Object> methodEntry : methods.entrySet()) {
-                String method = methodEntry.getKey();
-                @SuppressWarnings("unchecked")
-                Map<String, Object> operation = (Map<String, Object>) methodEntry.getValue();
-
-                String operationId = (String) operation.get("x-ouroboros-id");
-                if (id.equals(operationId)) {
-                    yamlParser.removeOperation(openApiDoc, path, method);
-                    found = true;
-                    log.info("Deleted REST API spec: {} {} (ID: {})", method.toUpperCase(), path, id);
-                    break;
-                }
+        lock.writeLock().lock();
+        try {
+            if (!yamlParser.fileExists()) {
+                throw new IllegalArgumentException("No API specifications found. The specification file does not exist.");
             }
-            if (found) break;
-        }
 
-        if (!found) {
-            throw new IllegalArgumentException("REST API specification with ID '" + id + "' not found");
-        }
+            Map<String, Object> openApiDoc = yamlParser.readDocument();
+            Map<String, Object> paths = yamlParser.getOrCreatePaths(openApiDoc);
 
-        // Write back to file
-        yamlParser.writeDocument(openApiDoc);
+            // Find and remove operation with matching ID
+            boolean found = false;
+            for (Map.Entry<String, Object> pathEntry : paths.entrySet()) {
+                String path = pathEntry.getKey();
+                @SuppressWarnings("unchecked")
+                Map<String, Object> methods = (Map<String, Object>) pathEntry.getValue();
+
+                for (Map.Entry<String, Object> methodEntry : methods.entrySet()) {
+                    String method = methodEntry.getKey();
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> operation = (Map<String, Object>) methodEntry.getValue();
+
+                    String operationId = (String) operation.get("x-ouroboros-id");
+                    if (id.equals(operationId)) {
+                        yamlParser.removeOperation(openApiDoc, path, method);
+                        found = true;
+                        log.info("Deleted REST API spec: {} {} (ID: {})", method.toUpperCase(), path, id);
+                        break;
+                    }
+                }
+                if (found) break;
+            }
+
+            if (!found) {
+                throw new IllegalArgumentException("REST API specification with ID '" + id + "' not found");
+            }
+
+            // Write back to file
+            yamlParser.writeDocument(openApiDoc);
+        } finally {
+            lock.writeLock().unlock();
+        }
     }
 
     // Helper methods
