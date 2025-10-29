@@ -71,7 +71,7 @@ public class OuroRestHandler implements OuroProtocolHandler {
     }
 
     @Override
-    public OuroApiSpec validate(OuroApiSpec fileSpec, OuroApiSpec scannedSpec) {
+    public OuroApiSpec synchronize(OuroApiSpec fileSpec, OuroApiSpec scannedSpec) {
         return null;
     }
 

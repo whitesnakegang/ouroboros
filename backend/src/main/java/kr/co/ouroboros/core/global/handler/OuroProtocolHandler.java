@@ -47,7 +47,7 @@ public interface OuroProtocolHandler {
      * @return an OuroApiSpec representing validation results—detailing differences between the
      * provided fileSpec and scannedSpec
      */
-    OuroApiSpec validate(OuroApiSpec fileSpec, OuroApiSpec scannedSpec);
+    OuroApiSpec synchronize(OuroApiSpec fileSpec, OuroApiSpec scannedSpec);
 
     /**
      * Serialize the given OuroApiSpec into a YAML-formatted string for persistence.
