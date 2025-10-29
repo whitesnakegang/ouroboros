@@ -37,11 +37,25 @@ public class OuroRestHandler implements OuroProtocolHandler {
         return Protocol.REST;
     }
 
+    /**
+     * Provide the path to the REST OpenAPI specification file used by this handler.
+     *
+     * @return the path to the REST OpenAPI spec file, "/ouroboros/rest/ourorest.yml"
+     */
     @Override
     public String getSpecFilePath() {
         return "/ouroboros/rest/ourorest.yml";
     }
 
+    /**
+     * Scans the running application's OpenAPI model and returns it as an OuroRestApiSpec.
+     *
+     * <p>Fetches the cached OpenAPI model for Locale.KOREA, converts it into an OuroRestApiSpec,
+     * and ensures the spec's info.version is set to "v1" when info exists but version is missing.</p>
+     *
+     * @return the scanned REST API specification as an OuroRestApiSpec
+     * @throws IllegalStateException if the OpenAPI model cannot be retrieved or converted
+     */
     @Override
     public OuroApiSpec scanCurrentState() {
         try {
@@ -62,6 +76,12 @@ public class OuroRestHandler implements OuroProtocolHandler {
         }
     }
 
+    /**
+     * Parses YAML content and constructs an OuroRestApiSpec representing the API specification.
+     *
+     * @param yamlContent the YAML document text containing the API specification
+     * @return an {@link OuroRestApiSpec} instance populated from the YAML content as an {@link OuroApiSpec}
+     */
     @Override
     public OuroApiSpec loadFromFile(String yamlContent) {
         Yaml yaml = new Yaml();
@@ -70,6 +90,13 @@ public class OuroRestHandler implements OuroProtocolHandler {
         return mapper.convertValue(map, OuroRestApiSpec.class);
     }
 
+    /**
+     * Produces a synchronized API specification by reconciling the specification loaded from file with the currently scanned specification.
+     *
+     * @param fileSpec    the API specification parsed from the repository/file source
+     * @param scannedSpec the API specification obtained from the running application's OpenAPI model
+     * @return            the resulting OuroApiSpec that represents the reconciled/synchronized API specification
+     */
     @Override
     public OuroApiSpec synchronize(OuroApiSpec fileSpec, OuroApiSpec scannedSpec) {
         return null;

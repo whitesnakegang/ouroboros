@@ -13,15 +13,16 @@ import org.springframework.context.annotation.Configuration;
 public class OpenApiCustomizerConfig {
 
     /**
-         * Adds ApiState-derived metadata to an OpenAPI Operation's extensions when a handler method is annotated with {@code ApiState}.
-         *
-         * <p>If the handler method has an {@code ApiState} annotation, the returned customizer attaches a map under the extension key
-         * {@code "ouro-api-state"} containing the keys {@code state} and {@code tag}. {@code state} is the annotation's enum name; for
-         * non-COMPLETED states the customizer sets {@code state} to {@code "Mock"} and places the enum name in {@code tag}. If the
-         * annotation is absent, the Operation is returned unchanged.
-         *
-         * @return the {@code OperationCustomizer} that injects the {@code "ouro-api-state"} metadata map into an Operation's extensions
-         */
+     * Attach ApiState-derived extensions to an OpenAPI operation when the handler method is annotated with {@code ApiState}.
+     *
+     * Adds or initializes operation extensions and sets:
+     * - {@code x-ouroboros-progress} to {@code "COMPLETED"} when the annotation's state is {@code State.COMPLETED}, otherwise {@code "MOCK"}.
+     * - {@code x-ouroboros-tag} to an empty string for {@code State.COMPLETED}, otherwise to the annotation state's name.
+     *
+     * The operation is returned unchanged if the handler method has no {@code ApiState} annotation.
+     *
+     * @return an {@code OperationCustomizer} that injects the {@code x-ouroboros-progress} and {@code x-ouroboros-tag} extensions based on {@code ApiState}
+     */
 
     @Bean
     public OperationCustomizer apiOperationCustomizer() {

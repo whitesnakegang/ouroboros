@@ -19,11 +19,21 @@ public class OuroRestApiSpec implements OuroApiSpec {
     private List<Server> servers;
     private List<Map<String, List<String>>> security;
 
+    /**
+     * Provide the API protocol identifier.
+     *
+     * @return the protocol identifier "rest"
+     */
     @Override
     public String getProtocol() {
         return "rest";
     }
 
+    /**
+     * Get the API version declared in this specification.
+     *
+     * @return the version string from {@code info}, or an empty string if {@code info} is null
+     */
     @Override
     public String getVersion() {
         return info != null ? info.getVersion() : "";
