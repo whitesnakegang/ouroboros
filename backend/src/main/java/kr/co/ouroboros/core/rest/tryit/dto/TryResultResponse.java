@@ -152,11 +152,6 @@ public class TryResultResponse {
          * Span kind (e.g., SERVER, CLIENT, INTERNAL).
          */
         private String kind;
-        
-        /**
-         * Additional attributes (e.g., HTTP method, status code, DB query).
-         */
-        private List<String> attributes;
     }
     
     /**

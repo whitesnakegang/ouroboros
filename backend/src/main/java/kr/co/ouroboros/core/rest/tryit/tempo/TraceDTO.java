@@ -65,7 +65,7 @@ public class TraceDTO {
         private String name;
         
         @JsonProperty("kind")
-        private Integer kind;
+        private String kind;
         
         @JsonProperty("startTimeUnixNano")
         private Long startTimeUnixNano;

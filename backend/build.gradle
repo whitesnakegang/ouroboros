@@ -46,6 +46,9 @@ dependencies {
 	
 	// Spring Boot Actuator (OpenTelemetry 자동 설정 포함)
 	api 'org.springframework.boot:spring-boot-starter-actuator'
+	
+	// Spring AOP (메서드 추적용)
+	api 'org.springframework.boot:spring-boot-starter-aop'
 
 	// OpenTelemetry OTLP Exporter (Tempo로 trace 전송)
 	api 'io.opentelemetry:opentelemetry-exporter-otlp'

@@ -97,7 +97,7 @@ public class TraceAnalyzer {
                     info.startTimeNanos = span.getStartTimeUnixNano();
                     info.endTimeNanos = span.getEndTimeUnixNano();
                     info.durationNanos = span.getDurationNanos();
-                    info.attributes = extractAttributes(span.getAttributes());
+                    info.durationMs = span.getDurationNanos() != null ? span.getDurationNanos() / 1_000_000 : 0L;
                     
                     spans.add(info);
                 }
@@ -113,62 +113,22 @@ public class TraceAnalyzer {
      * @param kind Kind integer
      * @return Kind string
      */
-    private String mapSpanKind(Integer kind) {
+    private String mapSpanKind(String kind) {
         if (kind == null) {
             return "INTERNAL";
         }
-        // OpenTelemetry SpanKind constants
+        // Convert Tempo's span kind format to our internal format
         switch (kind) {
-            case 0: return "UNSPECIFIED";
-            case 1: return "INTERNAL";
-            case 2: return "SERVER";
-            case 3: return "CLIENT";
-            case 4: return "PRODUCER";
-            case 5: return "CONSUMER";
+            case "SPAN_KIND_UNSPECIFIED": return "UNSPECIFIED";
+            case "SPAN_KIND_INTERNAL": return "INTERNAL";
+            case "SPAN_KIND_SERVER": return "SERVER";
+            case "SPAN_KIND_CLIENT": return "CLIENT";
+            case "SPAN_KIND_PRODUCER": return "PRODUCER";
+            case "SPAN_KIND_CONSUMER": return "CONSUMER";
             default: return "INTERNAL";
         }
     }
     
-    /**
-     * Extracts attributes from span.
-     * 
-     * @param attributes List of attributes
-     * @return List of attribute strings
-     */
-    private List<String> extractAttributes(List<TraceDTO.AttributeDTO> attributes) {
-        if (attributes == null) {
-            return new ArrayList<>();
-        }
-        
-        return attributes.stream()
-                .map(attr -> {
-                    TraceDTO.ValueDTO value = attr.getValue();
-                    if (value == null) {
-                        return null;
-                    }
-                    
-                    String val = value.getStringValue();
-                    if (val != null) {
-                        return attr.getKey() + "=" + val;
-                    }
-                    
-                    if (value.getIntValue() != null) {
-                        return attr.getKey() + "=" + value.getIntValue();
-                    }
-                    
-                    if (value.getDoubleValue() != null) {
-                        return attr.getKey() + "=" + value.getDoubleValue();
-                    }
-                    
-                    if (value.getBoolValue() != null) {
-                        return attr.getKey() + "=" + value.getBoolValue();
-                    }
-                    
-                    return null;
-                })
-                .filter(s -> s != null)
-                .collect(Collectors.toList());
-    }
     
     /**
      * Builds hierarchical span tree from flat span list.
@@ -219,7 +179,7 @@ public class TraceAnalyzer {
             Map<String, List<SpanInfo>> childrenMap,
             long totalDurationMs
     ) {
-        long durationMs = span.durationNanos != null ? span.durationNanos / 1_000_000 : 0;
+        long durationMs = span.durationMs != null ? span.durationMs : 0;
         double percentage = totalDurationMs > 0 ? (durationMs * 100.0 / totalDurationMs) : 0;
         
         // Parse class name and method signature
@@ -254,7 +214,6 @@ public class TraceAnalyzer {
                 .percentage(percentage)
                 .selfPercentage(selfPercentage)
                 .kind(span.kind)
-                .attributes(span.attributes)
                 .children(children)
                 .build();
     }
@@ -327,7 +286,7 @@ public class TraceAnalyzer {
                span.name.toLowerCase().contains("jdbc") ||
                span.name.toLowerCase().contains("query") ||
                span.name.toLowerCase().contains("execute") ||
-               span.attributes.stream().anyMatch(a -> a.toLowerCase().contains("db"));
+               span.name.toLowerCase().contains("db");
     }
     
     /**
@@ -338,9 +297,9 @@ public class TraceAnalyzer {
      */
     private boolean isHttpSpan(SpanInfo span) {
         return span.name.startsWith("HTTP") ||
-               span.attributes.stream().anyMatch(a -> 
-                   a.toLowerCase().contains("http.method") ||
-                   a.toLowerCase().contains("http.status_code"));
+               span.name.startsWith("http") ||
+               span.name.toLowerCase().contains("http.method") ||
+               span.name.toLowerCase().contains("http.status_code");
     }
     
     /**
@@ -371,11 +330,7 @@ public class TraceAnalyzer {
         List<String> evidence = new ArrayList<>();
         evidence.add("duration: " + (span.durationNanos != null ? span.durationNanos / 1_000_000 + "ms" : "unknown"));
         evidence.add("kind: " + span.kind);
-        
-        // Add relevant attributes as evidence
-        if (span.attributes != null && !span.attributes.isEmpty()) {
-            evidence.addAll(span.attributes);
-        }
+        evidence.add("name: " + span.name);
         
         return evidence;
     }
@@ -390,6 +345,13 @@ public class TraceAnalyzer {
         MethodInfo info = new MethodInfo();
         
         if (spanName == null || spanName.isEmpty()) {
+            return info;
+        }
+        
+        // Handle HTTP span names (e.g., "http get /api/users/{id}")
+        if (spanName.startsWith("http ")) {
+            info.className = "HTTP";
+            info.methodName = spanName;
             return info;
         }
         
@@ -494,7 +456,7 @@ public class TraceAnalyzer {
         Long startTimeNanos;
         Long endTimeNanos;
         Long durationNanos;
-        List<String> attributes;
+        Long durationMs;
     }
 }
 

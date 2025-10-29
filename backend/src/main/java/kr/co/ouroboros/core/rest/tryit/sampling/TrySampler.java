@@ -7,6 +7,7 @@ import io.opentelemetry.api.trace.TraceFlags;
 import io.opentelemetry.api.trace.TraceState;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.sdk.trace.data.LinkData;
+import io.opentelemetry.sdk.trace.samplers.ParentBasedSampler;
 import io.opentelemetry.sdk.trace.samplers.Sampler;
 import io.opentelemetry.sdk.trace.samplers.SamplingDecision;
 import io.opentelemetry.sdk.trace.samplers.SamplingResult;
@@ -20,6 +21,9 @@ import lombok.extern.slf4j.Slf4j;
  * - If ouro.try_id does not exist: Drop (Normal request)
  * 
  * This ensures that traces are only created for requests with X-Ouroboros-Try header.
+ * 
+ * The sampler is wrapped with ParentBasedSampler to ensure child spans are also sampled
+ * when the parent span is sampled.
  */
 @Slf4j
 public class TrySampler implements Sampler {
@@ -75,6 +79,17 @@ public class TrySampler implements Sampler {
     @Override
     public String getDescription() {
         return "TrySampler (records only Try requests)";
+    }
+    
+    /**
+     * Creates a ParentBasedSampler that wraps this TrySampler.
+     * This ensures that child spans are automatically sampled when the parent span is sampled.
+     * 
+     * @return ParentBasedSampler wrapping this TrySampler
+     */
+    public static Sampler createParentBased() {
+        TrySampler rootSampler = new TrySampler();
+        return ParentBasedSampler.create(rootSampler);
     }
 }
 
