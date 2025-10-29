@@ -20,7 +20,12 @@ public class DummyDataGenerator {
         // faker DSL
         if (mockValue instanceof String str && str.startsWith("{{$") && str.endsWith("}}")) {
             Object parsed = parser.parse(str);
-            if (parsed != null) return parsed;
+            if (parsed != null) {
+                return parsed;
+            }
+
+            // 파싱 실패 시 로그 및 에러 메시지 반환
+            return "[FAKER_ERROR] " + str;
         }
 
         // faker 형식이 아니고 값이 존재하면 그대로 반환
