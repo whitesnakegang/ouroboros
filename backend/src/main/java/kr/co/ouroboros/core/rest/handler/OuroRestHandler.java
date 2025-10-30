@@ -48,10 +48,10 @@ public class OuroRestHandler implements OuroProtocolHandler {
     }
 
     /**
-     * Scans the running application's OpenAPI model and returns it as an OuroRestApiSpec.
+     * Scan the running application's OpenAPI model and produce a normalized REST API specification.
      *
      * <p>Fetches the cached OpenAPI model for Locale.KOREA, converts it into an OuroRestApiSpec,
-     * and ensures the spec's info.version is set to "v1" when info exists but version is missing.</p>
+     * and if the spec contains an info object with a missing version, sets that version to "v1".</p>
      *
      * @return the scanned REST API specification as an OuroRestApiSpec
      * @throws IllegalStateException if the OpenAPI model cannot be retrieved or converted

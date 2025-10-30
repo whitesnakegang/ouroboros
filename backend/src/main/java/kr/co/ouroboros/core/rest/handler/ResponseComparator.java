@@ -22,13 +22,13 @@ import org.springframework.stereotype.Component;
 public class ResponseComparator {
 
     /**
-     * 특정 HTTP 메서드에 대한 응답을 비교합니다.
+     * Compares responses for a given HTTP method between a scanned operation and a file-based operation, logging matches and recording differences.
      *
-     * @param method HTTP 메서드명
-     * @param scannedOperation 스캔된 Operation (기준)
-     * @param fileOperation 파일 기반 Operation (비교 대상)
-     * @param endpoint 엔드포인트 경로
-     * @param schemaMatchResults 스키마별 일치 여부 Map
+     * @param method the HTTP method name (e.g., "GET", "POST")
+     * @param scannedOperation the operation from the scanned (baseline) document
+     * @param fileOperation the operation from the file (reference) document; may be annotated when differences are found
+     * @param endpoint the endpoint path being compared
+     * @param schemaMatchResults map from schema name to a boolean indicating whether that schema was determined to match
      */
     public void compareResponsesForMethod(String method, Operation scannedOperation, Operation fileOperation, String endpoint, Map<String, Boolean> schemaMatchResults) {
         if (scannedOperation == null || fileOperation == null) {
@@ -73,15 +73,10 @@ public class ResponseComparator {
     }
 
     /**
-     * 두 응답의 스키마를 비교합니다.
+     * Compare the response schemas of two Response objects for a specific method, endpoint, and status code.
      *
-     * @param scannedResponse 스캔된 응답 (기준)
-     * @param fileResponse 파일 기반 응답 (비교 대상)
-     * @param method HTTP 메서드
-     * @param endpoint 엔드포인트
-     * @param statusCode 상태코드
-     * @param schemaMatchResults 스키마별 일치 여부 Map
-     * @return 스키마가 일치하면 true, 그렇지 않으면 false
+     * @param schemaMatchResults map of schema name to a boolean indicating whether that named schema matched; used to consider referenced schemas during comparison
+     * @return `true` if the responses' content (content types and their schemas) are considered matching, `false` otherwise
      */
     private boolean compareResponseSchemas(Response scannedResponse, Response fileResponse, String method, String endpoint, String statusCode, Map<String, Boolean> schemaMatchResults) {
         if (scannedResponse == null && fileResponse == null) {
@@ -100,15 +95,20 @@ public class ResponseComparator {
     }
 
     /**
-     * Content Map을 비교합니다.
+     * Compare two content maps (content type -> MediaType) for a response and determine if they match.
      *
-     * @param scannedContent 스캔된 Content (기준)
-     * @param fileContent 파일 기반 Content (비교 대상)
-     * @param method HTTP 메서드
-     * @param endpoint 엔드포인트
-     * @param statusCode 상태코드
-     * @param schemaMatchResults 스키마별 일치 여부 Map
-     * @return Content가 일치하면 true, 그렇지 않으면 false
+     * Compares each content type in the scanned map against the file-based map, treating the scanned entry
+     * with content type "*/*" as a wildcard that matches any file content type. If any required content
+     * type or media type schema differs, the method returns false.
+     *
+     * @param scannedContent    map of content types to MediaType from the scanned (baseline) operation
+     * @param fileContent       map of content types to MediaType from the file-based (reference) operation
+     * @param method            the HTTP method being compared (for logging/context)
+     * @param endpoint          the endpoint being compared (for logging/context)
+     * @param statusCode        the response status code being compared (for logging/context)
+     * @param schemaMatchResults map that records per-schema match results keyed by schema name; used to consult
+     *                           previously computed schema comparisons when resolving $ref references
+     * @return                  `true` if the content maps are considered equivalent, `false` otherwise
      */
     private boolean compareContent(Map<String, MediaType> scannedContent, Map<String, MediaType> fileContent, String method, String endpoint, String statusCode, Map<String, Boolean> schemaMatchResults) {
         if (scannedContent == null && fileContent == null) {
@@ -145,16 +145,16 @@ public class ResponseComparator {
     }
 
     /**
-     * MediaType을 비교합니다.
+     * Compare two MediaType objects' schemas for a given response context.
      *
-     * @param scannedMediaType 스캔된 MediaType (기준)
-     * @param fileMediaType 파일 기반 MediaType (비교 대상)
-     * @param method HTTP 메서드
-     * @param endpoint 엔드포인트
-     * @param statusCode 상태코드
-     * @param contentType Content-Type
-     * @param schemaMatchResults 스키마별 일치 여부 Map
-     * @return MediaType이 일치하면 true, 그렇지 않으면 false
+     * @param scannedMediaType   the scanned (baseline) MediaType
+     * @param fileMediaType      the file-based MediaType to compare against
+     * @param method             the HTTP method of the response
+     * @param endpoint           the endpoint path of the response
+     * @param statusCode         the HTTP status code of the response
+     * @param contentType        the Content-Type being compared
+     * @param schemaMatchResults a map of schema name to match result used to short-circuit referenced-schema comparisons
+     * @return                   `true` if the MediaType schemas match, `false` otherwise
      */
     private boolean compareMediaTypes(MediaType scannedMediaType, MediaType fileMediaType, String method, String endpoint, String statusCode, String contentType, Map<String, Boolean> schemaMatchResults) {
         if (scannedMediaType == null && fileMediaType == null) {
@@ -168,16 +168,20 @@ public class ResponseComparator {
     }
 
     /**
-     * Schema를 비교합니다. ($ref와 type만 비교)
+     * Compare two response schemas by their `$ref` reference or primitive `type`.
      *
-     * @param scannedSchema 스캔된 Schema (기준)
-     * @param fileSchema 파일 기반 Schema (비교 대상)
-     * @param method HTTP 메서드
-     * @param endpoint 엔드포인트
-     * @param statusCode 상태코드
-     * @param contentType Content-Type
-     * @param schemaMatchResults 스키마별 일치 여부 Map
-     * @return Schema가 일치하면 true, 그렇지 않으면 false
+     * Compares the scanned (baseline) schema and the file-based (reference) schema: if either schema uses a `$ref`
+     * the `$ref` values must match and referenced schema match status is consulted via `schemaMatchResults`; otherwise
+     * the schemas' `type` values must be equal.
+     *
+     * @param scannedSchema the scanned (baseline) Schema to compare
+     * @param fileSchema the file-based (reference) Schema to compare against
+     * @param method the HTTP method associated with the response being compared
+     * @param endpoint the endpoint path associated with the response being compared
+     * @param statusCode the HTTP status code associated with the response being compared
+     * @param contentType the response Content-Type associated with the schema being compared
+     * @param schemaMatchResults map from schema name (extracted from `$ref`) to a boolean indicating whether that referenced schema matched previously
+     * @return `true` if the schemas are considered matching, `false` otherwise
      */
     private boolean compareSchemas(Schema scannedSchema, Schema fileSchema, String method, String endpoint, String statusCode, String contentType, Map<String, Boolean> schemaMatchResults) {
         if (scannedSchema == null && fileSchema == null) {
@@ -223,11 +227,10 @@ public class ResponseComparator {
     }
     
     /**
-     * $ref에서 스키마명을 추출합니다.
-     * 예: "#/components/schemas/User" -> "User"
+     * Extracts the schema name from a JSON Reference ($ref) string.
      *
-     * @param ref $ref 값
-     * @return 스키마명, 추출할 수 없으면 null
+     * @param ref a $ref string expected in the form "#/components/schemas/SchemaName"
+     * @return the schema name (for example, "User"), or {@code null} if {@code ref} is {@code null} or not in the expected form
      */
     private String extractSchemaNameFromRef(String ref) {
         if (ref == null || !ref.startsWith("#/components/schemas/")) {
