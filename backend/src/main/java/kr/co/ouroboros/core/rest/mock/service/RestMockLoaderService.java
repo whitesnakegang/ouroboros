@@ -37,6 +37,9 @@ public class RestMockLoaderService {
                 schemas = Collections.emptyMap();
             }
 
+            // 3-1. components/securitySchemes 추출
+            Map<String, Object> securitySchemes = extractSecuritySchemes(openApiDoc);
+
             // 4. paths 추출
             @SuppressWarnings("unchecked")
             Map<String, Object> paths = (Map<String, Object>) openApiDoc.get("paths");
@@ -63,7 +66,7 @@ public class RestMockLoaderService {
 
                     @SuppressWarnings("unchecked")
                     Map<String, Object> operation = (Map<String, Object>) methodEntry.getValue();
-                    EndpointMeta meta = parseOperation(path, method, operation, schemas);
+                    EndpointMeta meta = parseOperation(path, method, operation, schemas, securitySchemes);
 
                     if (meta != null) {
                         String key = method.toUpperCase() + ":" + path;
@@ -87,7 +90,8 @@ public class RestMockLoaderService {
      * Endpoint 파싱
      */
     @SuppressWarnings("unchecked")
-    private EndpointMeta parseOperation(String path, String method, Map<String, Object> operation, Map<String, Object> schemas) {
+    private EndpointMeta parseOperation(String path, String method, Map<String, Object> operation,
+                                       Map<String, Object> schemas, Map<String, Object> securitySchemes) {
         // Extract Ouroboros custom fields
         String id = (String) operation.get("x-ouroboros-id");
         String progress = (String) operation.get("x-ouroboros-progress");
@@ -117,10 +121,26 @@ public class RestMockLoaderService {
             }
         }
 
-        // Check for security requirements (auth headers)
+        // Parse security requirements and resolve actual header names from securitySchemes
         List<Map<String, Object>> security = (List<Map<String, Object>>) operation.get("security");
         if (security != null && !security.isEmpty()) {
-            authHeaders.add("Authorization");
+            for (Map<String, Object> requirement : security) {
+                for (String schemeName : requirement.keySet()) {
+                    Map<String, Object> scheme = (Map<String, Object>) securitySchemes.getOrDefault(schemeName, Collections.emptyMap());
+                    String type = (String) scheme.get("type");
+
+                    if ("http".equals(type)) {
+                        // HTTP authentication (Bearer, Basic, etc.): always uses Authorization header
+                        authHeaders.add("Authorization");
+                    } else if ("apiKey".equals(type) && "header".equals(scheme.get("in"))) {
+                        // API Key authentication: use custom header name from scheme definition
+                        authHeaders.add((String) scheme.get("name"));
+                    } else if ("oauth2".equals(type) || "openIdConnect".equals(type)) {
+                        // OAuth2 and OpenID Connect: use Authorization header
+                        authHeaders.add("Authorization");
+                    }
+                }
+            }
         }
 
         // Parse responses
@@ -285,5 +305,22 @@ public class RestMockLoaderService {
      */
     private boolean isHttpMethod(String method) {
         return method.matches("get|post|put|delete|patch|options|head|trace");
+    }
+
+    /**
+     * Extract securitySchemes from components.
+     *
+     * @param openApiDoc the OpenAPI document
+     * @return map of security scheme name to scheme definition
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> extractSecuritySchemes(Map<String, Object> openApiDoc) {
+        Map<String, Object> components = (Map<String, Object>) openApiDoc.get("components");
+        if (components == null) {
+            return Collections.emptyMap();
+        }
+
+        Map<String, Object> schemes = (Map<String, Object>) components.get("securitySchemes");
+        return schemes != null ? schemes : Collections.emptyMap();
     }
 }
