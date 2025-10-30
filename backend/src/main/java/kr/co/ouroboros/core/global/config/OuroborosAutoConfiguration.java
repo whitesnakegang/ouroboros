@@ -3,8 +3,6 @@ package kr.co.ouroboros.core.global.config;
 
 import kr.co.ouroboros.core.global.properties.OuroborosProperties;
 import kr.co.ouroboros.core.rest.filter.ApiStateGlobalMethodFilter;
-import kr.co.ouroboros.core.rest.config.OpenApiCustomizerConfig;
-import org.springdoc.core.customizers.OperationCustomizer;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -20,6 +18,8 @@ import org.springframework.context.annotation.FilterType;
  * including services, controllers, and OpenAPI customizers.
  * Uses component scanning for most beans, but excludes the annotation package
  * to avoid scanning internal annotation classes (e.g., {@code ApiState$State}).
+ * OpenAPI customizers are automatically registered through component scanning
+ * of the {@code OpenApiCustomizerConfig} class.
  * <p>
  * This configuration can be disabled by setting {@code ouroboros.enabled=false}
  * in application.properties or application.yml.
@@ -51,18 +51,4 @@ public class OuroborosAutoConfiguration {
     public ApiStateGlobalMethodFilter apiStateGlobalMethodFilter() {
         return new ApiStateGlobalMethodFilter();
     }
-
-    /**
-     * Registers the OpenAPI operation customizer for {@code @ApiState} annotations.
-     * <p>
-     * This bean is registered explicitly because the annotation package is excluded
-     * from component scanning.
-     *
-     * @return the operation customizer that adds API state metadata
-     */
-//    @Bean
-//    @ConditionalOnMissingBean
-//    public OperationCustomizer apiOperationCustomizer() {
-//        return new OpenApiCustomizerConfig().apiOperationCustomizer();
-//    }
 }
