@@ -75,10 +75,10 @@ public class TestController {
     }
 
     /**
-     * Create a new user.
+     * Create a new user resource.
      *
-     * @param user the user payload from the request body
-     * @return the created User object
+     * @param user the user data from the request body
+     * @return the created User
      */
     @PostMapping("/users")
     @ApiState(state = State.COMPLETED)
@@ -146,6 +146,13 @@ public class TestController {
         ));
     }
 
+    /**
+     * Provide a plain "성공" response for the /response endpoint.
+     *
+     * @param name optional query parameter for a user name filter
+     * @param age  optional query parameter for a user age filter
+     * @return     the literal string "성공"
+     */
     @GetMapping("/response")
     @ApiState(state = State.COMPLETED)
     public ResponseEntity<String> response(

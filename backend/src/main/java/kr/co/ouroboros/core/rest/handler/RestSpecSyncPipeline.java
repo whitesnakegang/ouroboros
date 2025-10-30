@@ -51,35 +51,41 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
     }
 
     /**
-     * 두 스펙의 components.schemas를 비교합니다.
+     * Compare component schemas between the file-backed and scanned REST API specifications.
      *
-     * @param restFileSpec    파일 기반 스펙
-     * @param restScannedSpec 스캔된 스펙
-     * @return 스키마명을 키로 하고 일치 여부를 값으로 하는 Map
+     * @param restFileSpec    the file-based REST API specification to update
+     * @param restScannedSpec the runtime-scanned REST API specification to compare against
+     * @return a map keyed by schema name with `true` if the scanned schema matches the file schema, `false` otherwise
      */
     private Map<String, Boolean> compareSchemas(OuroRestApiSpec restFileSpec, OuroRestApiSpec restScannedSpec) {
         return schemaComparator.compareSchemas(restScannedSpec.getComponents(), restFileSpec.getComponents());
     }
 
     /**
-     * Compare request-side API definitions for the given path key and update the provided file-based spec as needed.
-     *
-     * @param key                the path key to compare (for example "/users/{id}")
-     * @param restFileSpec       the file-based REST API specification to compare against and modify as required
-     * @param restScannedSpec    the scanned specification used as the source of truth
-     * @param schemaMatchResults 스키마별 일치 여부 Map
-     */
+         * Compare request-side API definitions for the given path and update the file-based REST spec when differences are detected.
+         *
+         * Compares request parameters, request bodies, and related request-level metadata for the specified path key between the scanned spec (source of truth)
+         * and the file-backed spec, and mutates restFileSpec to reflect accepted changes.
+         *
+         * @param key                 the path key to compare (for example "/users/{id}")
+         * @param restFileSpec        the file-based REST API specification to compare against and modify as required
+         * @param restScannedSpec     the scanned specification used as the source of truth
+         * @param schemaMatchResults  map of schema name to `true` if the scanned and file schemas match, `false` otherwise
+         */
     private void reqCompare(String key, OuroRestApiSpec restFileSpec, OuroRestApiSpec restScannedSpec, Map<String, Boolean> schemaMatchResults) {
 
     }
 
     /**
-     * Compare and synchronize response definitions for the given API path in the file-backed REST spec.
+     * Synchronizes response definitions for a specific API path by comparing the scanned spec against the file-backed spec.
+     *
+     * For each HTTP method present in the scanned path, compares responses and updates the file-based definition as needed,
+     * using schemaMatchResults to determine per-schema compatibility.
      *
      * @param key                the path key identifying the endpoint (for example "/users/{id}")
-     * @param restFileSpec       the file-based REST API specification to compare and update
-     * @param restScannedSpec    the scanned specification used as the source of truth
-     * @param schemaMatchResults 스키마별 일치 여부 Map
+     * @param restFileSpec       the file-based REST API specification to be updated
+     * @param restScannedSpec    the scanned REST API specification used as the source of truth
+     * @param schemaMatchResults a map of schema name to boolean indicating whether each schema matches between scanned and file specs
      */
     private void resCompare(String key, OuroRestApiSpec restFileSpec, OuroRestApiSpec restScannedSpec, Map<String, Boolean> schemaMatchResults) {
         Map<String, PathItem> pathsScanned = restScannedSpec.getPaths();

@@ -19,11 +19,11 @@ import org.springframework.stereotype.Component;
 public class SchemaComparator {
 
     /**
-     * 두 스펙의 components.schemas를 비교하여 일치 여부를 반환합니다.
+     * Compare the components.schemas of two OpenAPI Components and report per-schema match results.
      *
-     * @param scannedComponents 스캔된 문서의 Components (기준)
-     * @param fileComponents 파일 기반 문서의 Components (비교 대상)
-     * @return 스키마명을 키로 하고 일치 여부를 값으로 하는 Map
+     * @param scannedComponents the scanned (baseline) document's Components to compare from
+     * @param fileComponents the file-based document's Components to compare against
+     * @return a map from schema name to `true` if the scanned and file schema match, `false` otherwise
      */
     public Map<String, Boolean> compareSchemas(Components scannedComponents, Components fileComponents) {
         Map<String, Boolean> schemaMatchResults = new HashMap<>();
@@ -81,12 +81,14 @@ public class SchemaComparator {
     }
     
     /**
-     * 두 스키마의 상세 내용을 재귀적으로 비교합니다.
+     * Recursively compares the detailed content of two Schema objects for equivalence.
      *
-     * @param scannedSchema 스캔된 스키마 (기준)
-     * @param fileSchema 파일 기반 스키마 (비교 대상)
-     * @param schemaName 스키마명 (로깅용)
-     * @return 스키마가 일치하면 true, 그렇지 않으면 false
+     * Compares type, `$ref`, format, properties, items (for arrays), required list, and additionalProperties.
+     *
+     * @param scannedSchema the scanned (reference) schema to compare from
+     * @param fileSchema the file-based schema to compare against
+     * @param schemaName the schema name used for logging/context
+     * @return `true` if the two schemas are equivalent in type, `$ref`, format, properties, items, required, and additionalProperties; `false` otherwise
      */
     private boolean compareSchemaDetails(Schema scannedSchema, Schema fileSchema, String schemaName) {
         if (scannedSchema == null && fileSchema == null) {
@@ -149,12 +151,15 @@ public class SchemaComparator {
     }
     
     /**
-     * 스키마의 Properties를 비교합니다.
+     * Compare two schema property maps and determine whether they are equivalent.
      *
-     * @param scannedProperties 스캔된 Properties (기준)
-     * @param fileProperties 파일 기반 Properties (비교 대상)
-     * @param schemaName 스키마명 (로깅용)
-     * @return Properties가 일치하면 true, 그렇지 않으면 false
+     * Compares keys and recursively compares each property's Schema; logs and returns false on any missing,
+     * extra, or differing property schema. The schemaName is used only for logging context.
+     *
+     * @param scannedProperties the properties from the scanned document (baseline)
+     * @param fileProperties the properties from the file-based document (to compare against)
+     * @param schemaName schema name used for log messages and property path construction
+     * @return {@code true} if both property maps contain the same keys and corresponding property schemas match, {@code false} otherwise
      */
     private boolean compareSchemaProperties(Map<String, Schema> scannedProperties, Map<String, Schema> fileProperties, String schemaName) {
         if (scannedProperties == null && fileProperties == null) {
