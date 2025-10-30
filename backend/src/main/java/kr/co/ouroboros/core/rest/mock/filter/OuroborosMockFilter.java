@@ -41,6 +41,21 @@ public class OuroborosMockFilter implements Filter{
     private final ObjectMapper objectMapper;
     private final XmlMapper xmlMapper;
 
+    /**
+     * Intercepts incoming HTTP requests to route, validate, and serve mock responses for registered endpoints,
+     * or delegates to the next filter when no mock matches.
+     *
+     * If a matching mock endpoint is found the method validates the request and, on success, generates and writes
+     * the configured mock response (including headers, status, and serialized body). If validation fails it sends
+     * an error response and does not continue the filter chain. If no mock endpoint is found this filter delegates
+     * to the provided FilterChain.
+     *
+     * @param req   the incoming ServletRequest (expected to be an HttpServletRequest)
+     * @param res   the outgoing ServletResponse (expected to be an HttpServletResponse)
+     * @param chain the filter chain to invoke when no mock endpoint is matched
+     * @throws IOException      if an I/O error occurs while writing the response
+     * @throws ServletException if the request could not be handled by the filter chain
+     */
     @Override
     public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
             throws IOException, ServletException {
@@ -75,12 +90,15 @@ public class OuroborosMockFilter implements Filter{
     }
 
     /**
-     * Generates mock response based on schema and sends to client.
+     * Generate and send a mock HTTP response for the given endpoint metadata.
      *
-     * @param response the HTTP response
-     * @param request  the HTTP request (for Accept header)
-     * @param meta     the endpoint metadata
-     * @throws IOException if response writing fails
+     * Selects the endpoint's 200 response definition, builds a mock body from its schema (if defined),
+     * applies defined headers and status, determines the response content type (falling back to the
+     * request's Accept header when needed), serializes the body to JSON or XML, and writes it to the response.
+     *
+     * @param request the HTTP request; used to inspect the Accept header when content type is not specified
+     * @param meta    endpoint metadata containing response definitions, headers, body schema, and status code
+     * @throws IOException if writing the response fails
      */
     private void respond(HttpServletResponse response, HttpServletRequest request, EndpointMeta meta)
             throws IOException {

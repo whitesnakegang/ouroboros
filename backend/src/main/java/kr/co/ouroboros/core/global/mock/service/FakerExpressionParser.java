@@ -17,6 +17,17 @@ public class FakerExpressionParser {
 
     private final Faker faker;
 
+    /**
+     * Parses a DSL expression of the form {{$(category.method(...))}} and evaluates it against the injected Faker instance.
+     *
+     * The expression must match the pattern {{$(<category>.<method>[(<key>=<value>[,...])])}}. Supported special mappings:
+     *   - `int` is treated as `numberBetween` (expects `min` and `max`).
+     *   - `decimal` is treated as `randomDouble` (expects `min` and `max`).
+     * For `numberBetween`, `min` defaults to 1 and `max` defaults to 100. For `randomDouble`, `min` defaults to 1000 and `max` defaults to 100000.
+     *
+     * @param expression the DSL expression to parse and evaluate; may be null or blank
+     * @return the value produced by invoking the specified Faker category method, or `null` if the input is invalid or evaluation fails
+     */
     public Object parse(String expression) {
         if (expression == null || expression.isBlank()) return null;
         Matcher matcher = FAKER_PATTERN.matcher(expression.trim());
@@ -61,6 +72,12 @@ public class FakerExpressionParser {
         }
     }
 
+    /**
+     * Parse a raw parameter substring into a map of parameter names to their values with surrounding quotes removed.
+     *
+     * @param raw the raw parameters string (e.g., "min=1,max='10'") to parse for key=value pairs
+     * @return a map where each key is a parameter name and each value is the parsed parameter value as a String (quotes stripped)
+     */
     private Map<String, Object> parseParams(String raw) {
         Map<String, Object> map = new HashMap<>();
         Matcher m = PARAM_PATTERN.matcher(raw);

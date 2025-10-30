@@ -39,13 +39,12 @@ import org.springframework.context.annotation.FilterType;
 public class OuroborosAutoConfiguration {
 
     /**
-     * Registers the global OpenAPI method filter for {@code @ApiState} annotations.
-     * <p>
-     * This bean is registered explicitly because the annotation package is excluded
-     * from component scanning.
-     *
-     * @return the API state global method filter
-     */
+         * Create and register a global method filter that applies {@code @ApiState} annotations to API operation metadata.
+         * <p>
+         * This bean is declared explicitly because the package containing the {@code @ApiState} annotation is excluded from component scanning.
+         *
+         * @return an {@link ApiStateGlobalMethodFilter} instance that applies {@code @ApiState} annotations globally
+         */
     @Bean
     @ConditionalOnMissingBean
     public ApiStateGlobalMethodFilter apiStateGlobalMethodFilter() {

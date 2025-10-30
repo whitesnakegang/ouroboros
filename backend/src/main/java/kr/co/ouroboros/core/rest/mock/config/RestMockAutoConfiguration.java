@@ -23,6 +23,14 @@ import org.springframework.core.Ordered;
 public class RestMockAutoConfiguration {
     private static final int MOCK_FILTER_ORDER = Ordered.HIGHEST_PRECEDENCE;
 
+    /**
+     * Register a high-priority OuroborosMockFilter in the servlet filter chain.
+     *
+     * Creates and configures a FilterRegistrationBean that wraps an OuroborosMockFilter
+     * wired with the provided registry, validation service, schema builder, and mappers.
+     *
+     * @return a FilterRegistrationBean that registers an OuroborosMockFilter ordered at MOCK_FILTER_ORDER
+     */
     @Bean
     public FilterRegistrationBean<OuroborosMockFilter> ouroborosMockFilter(
             RestMockRegistry registry,
@@ -47,6 +55,11 @@ public class RestMockAutoConfiguration {
         return reg;
     }
 
+    /**
+     * Provide an XmlMapper instance as a fallback for MVC environments.
+     *
+     * @return a new XmlMapper instance
+     */
     @Bean
     @ConditionalOnMissingBean(XmlMapper.class)
     public XmlMapper xmlMapper() {

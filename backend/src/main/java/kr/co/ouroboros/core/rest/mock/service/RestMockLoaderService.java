@@ -83,8 +83,15 @@ public class RestMockLoaderService {
     }
 
     /**
-     * Parse a single operation to create EndpointMeta.
-     * Endpoint 파싱
+     * Create an EndpointMeta for a single OpenAPI operation if it's configured for mocking.
+     *
+     * @param path      the API path (e.g., "/pets")
+     * @param method    the HTTP method (e.g., "get", "post")
+     * @param operation the operation object from the OpenAPI document; may contain parameters, responses,
+     *                  and custom fields such as `x-ouroboros-id` and `x-ouroboros-progress`
+     * @param schemas   the components/schemas map used to resolve `$ref` references in response schemas
+     * @return          the constructed EndpointMeta, or `null` when the operation is not marked with
+     *                  `x-ouroboros-progress: mock`
      */
     @SuppressWarnings("unchecked")
     private EndpointMeta parseOperation(String path, String method, Map<String, Object> operation, Map<String, Object> schemas) {
@@ -155,9 +162,17 @@ public class RestMockLoaderService {
     }
 
     /**
-     * Parse a single response to create ResponseMeta.
-     * Response 스키마 파싱
-     */
+         * Create a ResponseMeta for the given HTTP status from an OpenAPI response object.
+         *
+         * Supports "application/json" and "application/xml" media types and resolves `$ref` references
+         * against the provided components/schemas map.
+         *
+         * @param statusCode the HTTP status code of the response
+         * @param response   the OpenAPI response object map (expected to contain a "content" map with media types)
+         * @param schemas    the components/schemas map used to resolve `$ref` references
+         * @return a ResponseMeta containing the statusCode, resolved body schema, and contentType; `null` if the response
+         *         has no content, no supported schema, or the schema could not be resolved
+         */
     @SuppressWarnings("unchecked")
     private ResponseMeta parseResponse(int statusCode, Map<String, Object> response, Map<String, Object> schemas) {
         Map<String, Object> content = (Map<String, Object>) response.get("content");
@@ -281,7 +296,12 @@ public class RestMockLoaderService {
     }
 
     /**
-     * Check if the string is an HTTP method.
+     * Determine whether a string represents a valid HTTP method name.
+     *
+     * Comparison is case-sensitive and expects the method name in lowercase.
+     *
+     * @param method the candidate HTTP method name (expected lowercased)
+     * @return `true` if the string is one of: get, post, put, delete, patch, options, head, trace; `false` otherwise
      */
     private boolean isHttpMethod(String method) {
         return method.matches("get|post|put|delete|patch|options|head|trace");

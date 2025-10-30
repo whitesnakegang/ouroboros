@@ -11,16 +11,14 @@ import org.springframework.stereotype.Service;
 @Service
 public class MockValidationService {
     /**
-     * Validates the request against endpoint requirements.
-     * Priority order:
-     * 1. X-Ouroboros-Error header (forced error response)
-     * 2. Authentication headers (401 if missing)
-     * 3. Required headers (400 if missing)
-     * 4. Required query parameters (400 if missing)
+     * Validate an HTTP request against the endpoint's requirements.
      *
-     * @param request the HTTP request
-     * @param meta    the endpoint metadata
-     * @return validation result
+     * Performs prioritized checks in the following order: forced error header, authentication headers,
+     * required headers, and required query parameters.
+     *
+     * @param request the incoming HTTP servlet request
+     * @param meta    endpoint metadata describing required authentication headers, headers, and parameters
+     * @return a ValidationResult describing success or an error with the HTTP status code and message
      */
     public ValidationResult validate(HttpServletRequest request, EndpointMeta meta) {
         // Priority 1: Check for forced error via X-Ouroboros-Error header
@@ -79,10 +77,22 @@ public class MockValidationService {
         private final int statusCode;
         private final String message;
 
+        /**
+         * Create a ValidationResult representing a successful validation.
+         *
+         * @return a ValidationResult with valid set to true, statusCode set to 0, and message set to null.
+         */
         public static ValidationResult success() {
             return new ValidationResult(true, 0, null);
         }
 
+        /**
+         * Create a ValidationResult representing a failed validation with the given HTTP status and message.
+         *
+         * @param statusCode the HTTP status code describing the failure
+         * @param message    a human-readable message explaining the failure
+         * @return           a ValidationResult with valid=false, the provided statusCode, and message
+         */
         public static ValidationResult error(int statusCode, String message) {
             return new ValidationResult(false, statusCode, message);
         }

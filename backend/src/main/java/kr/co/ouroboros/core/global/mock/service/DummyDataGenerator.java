@@ -11,6 +11,25 @@ public class DummyDataGenerator {
     private final Faker faker;
     private final FakerExpressionParser parser;
 
+    /**
+     * Generate a mock value based on the provided schema map.
+     *
+     * <p>If {@code schema} is {@code null} this returns {@code null}. If the schema contains
+     * an {@code "x-ouroboros-mock"} entry with a Faker DSL expression of the form
+     * {@code {{$...}}} the method attempts to parse and return its value; on parse failure
+     * it returns a string prefixed with {@code "[FAKER_ERROR] "}. If {@code "x-ouroboros-mock"}
+     * exists and is non-blank its string representation is returned. If it exists and is blank
+     * an empty string is returned. Otherwise a default value is produced according to the
+     * schema's {@code "type"} (defaults to {@code "string"}): integer/number => random int,
+     * boolean => random boolean, array => two-word list, object => map with a message, default =>
+     * a word.
+     *
+     * @param schema a map representation of a JSON schema; recognizes the keys {@code "x-ouroboros-mock"}
+     *               and {@code "type"} to determine the returned mock value
+     * @return {@code null} when {@code schema} is {@code null}; otherwise a mock value which may be
+     *         a parsed Faker value, a {@code String}, a {@link Number}, a {@link Boolean},
+     *         a {@link java.util.List} of {@link String}, or a {@link java.util.Map} depending on the schema
+     */
     public Object generateValue(Map<String, Object> schema) {
         if (schema == null) return null;
 
