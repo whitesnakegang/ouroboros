@@ -1,9 +1,14 @@
 package kr.co.ouroboros.core.global.runner;
 
 import java.util.List;
+import java.util.Map;
+
 import kr.co.ouroboros.core.global.handler.OuroProtocolHandler;
 import kr.co.ouroboros.core.global.manager.OuroApiSpecManager;
 import kr.co.ouroboros.core.rest.spec.validator.OurorestYamlValidator;
+import kr.co.ouroboros.core.rest.mock.model.EndpointMeta;
+import kr.co.ouroboros.core.rest.mock.registry.RestMockRegistry;
+import kr.co.ouroboros.core.rest.mock.service.RestMockLoaderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
@@ -17,6 +22,8 @@ public class OpenApiDumpOnReady {
     private final org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext webCtx;
     private final OuroApiSpecManager specManager;
     private final List<OuroProtocolHandler> handlers;
+    private final RestMockLoaderService mockLoaderService;
+    private final RestMockRegistry mockRegistry;
     private final OurorestYamlValidator validator;
 
     /**
@@ -58,6 +65,16 @@ public class OpenApiDumpOnReady {
             } catch (Exception e) {
                 log.error("[{}] 초기화 실패: {}", h.getProtocol(), e.getMessage(), e);
             }
+        }
+
+        // Load mock endpoints from YAML into registry
+        try {
+            log.info("Loading mock endpoints from YAML...");
+            Map<String, EndpointMeta> endpoints = mockLoaderService.loadFromYaml();
+            endpoints.values().forEach(mockRegistry::register);
+            log.info("Successfully loaded {} mock endpoints into registry", endpoints.size());
+        } catch (Exception e) {
+            log.error("Failed to load mock registry", e);
         }
     }
 }
