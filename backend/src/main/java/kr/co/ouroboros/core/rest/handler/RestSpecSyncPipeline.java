@@ -74,23 +74,6 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
     }
 
     /**
-     * 특정 HTTP 메서드에 대한 요청을 비교합니다.
-     *
-     * @param method             HTTP 메서드명
-     * @param scannedOperation   스캔된 Operation (기준)
-     * @param fileOperation      파일 기반 Operation (비교 대상)
-     * @param endpoint           엔드포인트 경로
-     * @param schemaMatchResults 스키마별 일치 여부 Map
-     */
-    private void compareRequestForMethod(String method, kr.co.ouroboros.core.rest.common.dto.Operation scannedOperation,
-            kr.co.ouroboros.core.rest.common.dto.Operation fileOperation,
-            String endpoint, Map<String, Boolean> schemaMatchResults) {
-        // TODO: 요청 비교 로직 구현 예정 (스키마 매칭 결과 활용)
-        System.out.println(String.format("[REQUEST METHOD COMPARE] %s %s - 스키마 매칭 결과: %s",
-                method, endpoint, schemaMatchResults));
-    }
-
-    /**
      * Compare and synchronize response definitions for the given API path in the file-backed REST spec.
      *
      * @param key                the path key identifying the endpoint (for example "/users/{id}")
