@@ -151,7 +151,7 @@ export function ApiRequestCard({
                     type="text"
                     value={header.key}
                     onChange={(e) => updateHeader(index, "key", e.target.value)}
-                    placeholder="Key"
+                    placeholder="Header Name (e.g., Content-Type)"
                     className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <input
@@ -160,7 +160,7 @@ export function ApiRequestCard({
                     onChange={(e) =>
                       updateHeader(index, "value", e.target.value)
                     }
-                    placeholder="Value"
+                    placeholder="Header Value (e.g., application/json)"
                     className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <button
@@ -276,7 +276,7 @@ export function ApiRequestCard({
                                   fields: updated,
                                 });
                               }}
-                              placeholder="Field name"
+                              placeholder="예: username, password"
                               className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                           </td>
@@ -294,7 +294,7 @@ export function ApiRequestCard({
                                   fields: updated,
                                 });
                               }}
-                              placeholder="Faker provider name"
+                              placeholder="DataFaker 값만 선택 (예: $internet.email)"
                               disabled={isReadOnly}
                             />
                           </td>

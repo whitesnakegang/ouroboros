@@ -275,14 +275,16 @@ export function ApiEditorLayout() {
     // 새 작성 폼으로 전환
     setSelectedEndpoint(null);
     setMethod("POST");
-    setUrl("/api/auth/login");
-    setTags("AUTH");
-    setDescription("사용자 로그인");
-    setOwner("SMART-TEAM");
+    // 값은 비워 placeholder가 보이도록 처리
+    setUrl("");
+    setTags("");
+    setDescription("");
+    setOwner("");
+    setRequestHeaders([]);
     setRequestBody({
       type: "json",
       contentType: "application/json",
-      fields: [{ key: "email", value: "string", type: "string" }],
+      fields: [],
     });
     setStatusCodes([]);
   }, [setSelectedEndpoint]);
@@ -600,7 +602,7 @@ export function ApiEditorLayout() {
                       type="text"
                       value={url}
                       onChange={(e) => setUrl(e.target.value)}
-                      placeholder="/api/endpoint"
+                      placeholder="예: /api/users, /api/auth/login"
                       disabled={!!(selectedEndpoint && !isEditMode)}
                       className={`flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 font-mono ${
                         selectedEndpoint && !isEditMode
@@ -641,7 +643,7 @@ export function ApiEditorLayout() {
                         type="text"
                         value={tags}
                         onChange={(e) => setTags(e.target.value)}
-                        placeholder="AUTH, USER, PRODUCT, etc."
+                        placeholder="예: AUTH, USER, PRODUCT, ORDER"
                         disabled={!!(selectedEndpoint && !isEditMode)}
                         className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
                           selectedEndpoint && !isEditMode
@@ -661,7 +663,7 @@ export function ApiEditorLayout() {
                         type="text"
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
-                        placeholder="API의 목적과 기능을 설명하세요"
+                        placeholder="예: 사용자 로그인, 상품 목록 조회, 주문 생성"
                         disabled={!!(selectedEndpoint && !isEditMode)}
                         className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
                           selectedEndpoint && !isEditMode
@@ -678,7 +680,7 @@ export function ApiEditorLayout() {
                         type="text"
                         value={owner}
                         onChange={(e) => setOwner(e.target.value)}
-                        placeholder="팀명 또는 담당자"
+                        placeholder="예: SMART-TEAM, 김개발, 백엔드팀"
                         disabled={!!(selectedEndpoint && !isEditMode)}
                         className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
                           selectedEndpoint && !isEditMode

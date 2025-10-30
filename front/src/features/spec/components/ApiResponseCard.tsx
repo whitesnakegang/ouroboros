@@ -340,7 +340,7 @@ export function ApiResponseCard({
                           onChange={(e) =>
                             updateStatusCode(index, "message", e.target.value)
                           }
-                          placeholder="메시지 또는 설명"
+                          placeholder="예: 요청이 성공적으로 처리됨"
                           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
                         />
                       </td>
@@ -393,7 +393,7 @@ export function ApiResponseCard({
                   onClick={() => setIsSchemaModalOpen(true)}
                   className="px-4 py-2 bg-purple-600 hover:bg-purple-700 dark:bg-purple-700 dark:hover:bg-purple-600 text-white rounded-lg text-sm font-medium transition-colors"
                 >
-                  📦 Schema 관리
+                  Schema 관리
                 </button>
               </div>
             </div>
