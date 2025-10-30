@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service;
  * authentication, and query parameter conditions before a
  * mock response is generated.</p>
  *
- * <h3>Validation Priority</h3>
+ * <h2>Validation Priority</h2>
  * <ol>
  *     <li><b>X-Ouroboros-Error</b> header — Forces an error response if present.</li>
  *     <li><b>Authentication headers</b> — 401 Unauthorized if required headers are missing.</li>
@@ -25,7 +25,7 @@ import org.springframework.stereotype.Service;
  *
  * <p>If all validations pass, the request is considered valid and
  * mock generation continues normally.</p>
-
+ *
  * @since 0.1.0
  */
 @Slf4j

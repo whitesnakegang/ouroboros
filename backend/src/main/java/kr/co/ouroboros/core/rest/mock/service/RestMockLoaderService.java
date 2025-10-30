@@ -18,7 +18,7 @@ import java.util.*;
  * security requirements, and responses, resolving any schema references
  * ({@code $ref}) recursively into concrete mockable definitions.</p>
  *
- * <h3>Main responsibilities</h3>
+ * <h2>Main Responsibilities</h2>
  * <ul>
  *     <li>Reads the OpenAPI YAML document via {@link RestApiYamlParser}.</li>
  *     <li>Resolves <b>$ref</b> schemas inside components/schemas.</li>
