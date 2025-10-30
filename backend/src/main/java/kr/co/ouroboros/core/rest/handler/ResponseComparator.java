@@ -98,7 +98,7 @@ public class ResponseComparator {
      * Compare two content maps (content type -> MediaType) for a response and determine if they match.
      *
      * Compares each content type in the scanned map against the file-based map, treating the scanned entry
-     * with content type "*/*" as a wildcard that matches any file content type. If any required content
+     * with content type as a wildcard that matches any file content type. If any required content
      * type or media type schema differs, the method returns false.
      *
      * @param scannedContent    map of content types to MediaType from the scanned (baseline) operation
