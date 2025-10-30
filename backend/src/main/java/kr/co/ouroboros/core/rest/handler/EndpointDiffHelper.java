@@ -1,6 +1,7 @@
 package kr.co.ouroboros.core.rest.handler;
 
-import kr.co.ouroboros.core.rest.common.dto.OuroRestApiSpec;
+import java.util.Map;
+import kr.co.ouroboros.core.rest.common.dto.Operation;
 import kr.co.ouroboros.core.rest.common.dto.PathItem;
 
 import static kr.co.ouroboros.core.rest.handler.RequestDiffHelper.*;
@@ -17,82 +18,51 @@ public final class EndpointDiffHelper {
     private EndpointDiffHelper() {
     }
 
-    /**
-     * Compare endpoints between file and scan specs. If the URL path is different or the HTTP
-     * methods differ, marks the scanned endpoint as DIFF_ENDPOINT and returns true to skip further
-     * comparison.
-     *
-     * @param path the API path to compare
-     * @param file the file-based REST API specification to update/mark
-     * @param scan the scanned runtime REST API specification used as the source of truth
-     * @return true if endpoint diff exists (path or methods differ), false if endpoints match
-     */
-    public static boolean compareEndpoint(String path, OuroRestApiSpec file, OuroRestApiSpec scan) {
-        PathItem scanPathItem = safe(scan.getPaths()).get(path);
-        if (scanPathItem == null) {
+
+    public static boolean isDiffUrl(String url, Map<String, PathItem> pathsFile, Map<String, PathItem> pathsScanned) {
+
+        // url에 해당하는 ENDPOINT가 명세에 있는 경우
+        if (pathsFile.get(url) != null) {
             return false;
         }
 
-        PathItem filePathItem = safe(file.getPaths()).get(path);
-
-        // 파일에 path가 없으면: 스캔의 모든 메서드를 endpoint로 마킹
-        if (filePathItem == null) {
-            markAllMethodsAsEndpoint(scanPathItem, file, scan, path);
-            return true;
+        pathsFile.put(url, pathsScanned.get(url));
+        PathItem addedPath = pathsFile.get(url);
+        for (RequestDiffHelper.HttpMethod method : RequestDiffHelper.HttpMethod.values()) {
+            Operation op = getOperationByMethod(addedPath, method);
+            if (op != null) {
+                op.setXOuroborosDiff("endpoint");
+            }
         }
 
-        // 같은 path에서 메서드별 비교
-        boolean hasEndpointDiff = false;
-
-        // 각 메서드 체크 (스캔에 있는 메서드만)
-        if (scanPathItem.getGet() != null && filePathItem.getGet() == null) {
-            markEndpointAndOverwrite(file, scan, path, HttpMethod.GET);
-            hasEndpointDiff = true;
-        }
-        if (scanPathItem.getPost() != null && filePathItem.getPost() == null) {
-            markEndpointAndOverwrite(file, scan, path, HttpMethod.POST);
-            hasEndpointDiff = true;
-        }
-        if (scanPathItem.getPut() != null && filePathItem.getPut() == null) {
-            markEndpointAndOverwrite(file, scan, path, HttpMethod.PUT);
-            hasEndpointDiff = true;
-        }
-        if (scanPathItem.getPatch() != null && filePathItem.getPatch() == null) {
-            markEndpointAndOverwrite(file, scan, path, HttpMethod.PATCH);
-            hasEndpointDiff = true;
-        }
-        if (scanPathItem.getDelete() != null && filePathItem.getDelete() == null) {
-            markEndpointAndOverwrite(file, scan, path, HttpMethod.DELETE);
-            hasEndpointDiff = true;
-        }
-
-        return hasEndpointDiff;
+        return true;
     }
 
-    /**
-     * Marks all HTTP methods in the scanned path item as endpoints in the file spec.
-     *
-     * @param scanPathItem the PathItem from the scanned spec containing all methods to mark
-     * @param file         the file-based REST API specification to update
-     * @param scan         the scanned REST API specification to copy from
-     * @param path         the API path being processed
-     */
-    private static void markAllMethodsAsEndpoint(PathItem scanPathItem, OuroRestApiSpec file,
-            OuroRestApiSpec scan, String path) {
-        if (scanPathItem.getGet() != null) {
-            markEndpointAndOverwrite(file, scan, path, HttpMethod.GET);
-        }
-        if (scanPathItem.getPost() != null) {
-            markEndpointAndOverwrite(file, scan, path, HttpMethod.POST);
-        }
-        if (scanPathItem.getPut() != null) {
-            markEndpointAndOverwrite(file, scan, path, HttpMethod.PUT);
-        }
-        if (scanPathItem.getPatch() != null) {
-            markEndpointAndOverwrite(file, scan, path, HttpMethod.PATCH);
-        }
-        if (scanPathItem.getDelete() != null) {
-            markEndpointAndOverwrite(file, scan, path, HttpMethod.DELETE);
+
+    public static void markDiffEndpoint(String url, Operation scanOp, Map<String, PathItem> restFileSpec, HttpMethod method) {
+        PathItem pathItem = restFileSpec.get(url);
+        setOperationByMethod(pathItem, method, scanOp);
+        Operation operationByMethod = getOperationByMethod(pathItem, method);
+        operationByMethod.setXOuroborosDiff("endpoint");
+    }
+
+    private static Operation getOperationByMethod(PathItem item, HttpMethod httpMethod) {
+        return switch (httpMethod) {
+            case GET -> item.getGet();
+            case POST -> item.getPost();
+            case PUT -> item.getPut();
+            case PATCH -> item.getPatch();
+            case DELETE -> item.getDelete();
+        };
+    }
+
+    private static void setOperationByMethod(PathItem item, HttpMethod httpMethod, Operation scanOp) {
+        switch (httpMethod) {
+            case GET: item.setGet(scanOp); break;
+            case POST: item.setPost(scanOp); break;
+            case PUT: item.setPut(scanOp); break;
+            case PATCH: item.setPatch(scanOp); break;
+            case DELETE: item.setDelete(scanOp); break;
         }
     }
 }
