@@ -31,7 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>Swagger에서 자동 스캔되어 /swagger-ui.html 또는 /v3/api-docs 에 표시됨.</p>
  */
 @RestController
-@RequestMapping("/ouro/test")
+@RequestMapping("/api/test")
 @RequiredArgsConstructor
 public class TestController {
 
