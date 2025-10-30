@@ -1,13 +1,13 @@
 package kr.co.ouroboros.core.global.mock.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.*;
 
 @Service
 @RequiredArgsConstructor
 public class SchemaMockBuilder {
     private final DummyDataGenerator generator;
-    private static final Random random = new Random();
 
     public Object build(Map<String, Object> schema) {
         if (schema == null) return Collections.emptyMap();
@@ -30,7 +30,7 @@ public class SchemaMockBuilder {
                 int minItems = ((Number) schema.getOrDefault("minItems", 1)).intValue();
                 int maxItems = ((Number) schema.getOrDefault("maxItems", 3)).intValue();
 
-                int size = random.nextInt(maxItems - minItems + 1) + minItems;
+                int size = ThreadLocalRandom.current().nextInt(minItems, maxItems + 1);
                 List<Object> arr = new ArrayList<>(size);
 
                 for (int i = 0; i < size; i++) {
