@@ -5,6 +5,8 @@ import kr.co.ouroboros.core.rest.tryit.util.TryContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.MethodParameter;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.http.server.ServerHttpRequest;
@@ -26,6 +28,7 @@ import java.util.UUID;
  */
 @Slf4j
 @ControllerAdvice
+@Order(Ordered.LOWEST_PRECEDENCE)
 @RequiredArgsConstructor
 public class TryResponseBodyAdvice implements ResponseBodyAdvice<Object> {
 
@@ -50,9 +53,22 @@ public class TryResponseBodyAdvice implements ResponseBodyAdvice<Object> {
         UUID tryId = TryContext.getTryId();
         log.debug("Adding tryId to response body: {}", tryId);
 
+        // Always set response header at the latest stage to avoid being overwritten
+        try {
+            var headers = response.getHeaders();
+            if (!headers.containsKey("X-Ouroboros-Try-Id")) {
+                headers.add("X-Ouroboros-Try-Id", tryId.toString());
+            } else {
+                headers.set("X-Ouroboros-Try-Id", tryId.toString());
+            }
+        } catch (Exception e) {
+            log.warn("Failed to set X-Ouroboros-Try-Id header: {}", e.getMessage());
+        }
+
         try {
             // Map 타입인 경우 직접 추가
-            if (body instanceof Map) {
+            if (body instanceof Map<?, ?>) {
+                @SuppressWarnings("unchecked")
                 Map<String, Object> map = (Map<String, Object>) body;
                 
                 // 이미 tryId가 있으면 중복 추가 방지
