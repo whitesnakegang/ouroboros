@@ -9,7 +9,10 @@ import kr.co.ouroboros.core.rest.common.dto.Schema;
 
 public final class RequestDiffHelper {
 
-    private RequestDiffHelper() {}
+    /**
+ * Prevents instantiation of this utility class.
+ */
+private RequestDiffHelper() {}
 
     // diff states
     public static final String DIFF_NONE     = "none";
@@ -21,7 +24,14 @@ public final class RequestDiffHelper {
     // 메서드 타입
     public enum HttpMethod { GET, POST, PUT, PATCH, DELETE }
 
-    /** 파일에 스캔의 특정 메서드를 추가하고 endpoint로 마킹 (null-safe) */
+    /**
+     * Copy the operation for the given path and HTTP method from the scan spec into the file spec and mark it as an endpoint.
+     *
+     * @param file target API spec to update (modified in place)
+     * @param scan source API spec to copy the operation from
+     * @param path path key identifying the PathItem to operate on
+     * @param method HTTP method identifying which operation to copy and mark
+     */
     public static void markEndpointAndOverwrite(OuroRestApiSpec file, OuroRestApiSpec scan, String path, HttpMethod method) {
         PathItem scanPI = safe(scan.getPaths()).get(path);
         if (scanPI == null) return;
@@ -43,7 +53,15 @@ public final class RequestDiffHelper {
         }
     }
 
-    /** 파일/스캔 Operation의 Request parameter만 비교하여 diff 마킹 */
+    /**
+     * Compare request path/query parameters between two operations and update the diff state on the file operation.
+     *
+     * Compares only parameters whose `in` is "path" or "query". If a difference is detected, merges `DIFF_REQUEST`
+     * into `fileOp`'s XOuroborosDiff; otherwise merges `DIFF_NONE`. Does nothing if either argument is null.
+     *
+     * @param fileOp the Operation from the file spec whose diff marker will be updated
+     * @param scanOp the Operation from the scanned spec to compare against
+     */
     public static void compareAndMarkRequest(Operation fileOp, Operation scanOp) {
         if (scanOp == null) return;   // 스캔본에 메서드가 없으면 비교 스킵
         if (fileOp == null)  return;  // 파일에 메서드가 없을 때는 호출측에서 endpoint 처리
@@ -55,9 +73,16 @@ public final class RequestDiffHelper {
 
     // ==================== 내부 비교 유틸 ====================
 
-    /** parameters 중 in=path|query만 비교
-     * 1. parameter 개수가 다른 경우
-     * 2. parameter 타입의 개수가 다른 경우 (확장성 고려)
+    /**
+     * Compare path and query parameters between two parameter lists for any differences.
+     *
+     * Compares only parameters whose `in` is "path" or "query". A difference is reported if
+     * the filtered parameter counts differ or if the distribution of parameter schema types
+     * (including refs, formats, and unknowns) differs between the two lists.
+     *
+     * @param fileParams  parameters from the file specification (may be null)
+     * @param scanParams  parameters from the scanned specification (may be null)
+     * @return `true` if the path/query parameters differ by count or by type distribution, `false` otherwise
      */
     private static boolean diffPathQueryParams(List<Parameter> fileParams, List<Parameter> scanParams) {
         List<Parameter> fileFiltered = filterPathOrQuery(safeList(fileParams));
@@ -80,9 +105,15 @@ public final class RequestDiffHelper {
         return false;
     }
 
-    /** 파라미터 리스트에서 타입별 개수를 세어 Map으로 반환 (확장성 고려)
-     * key: 타입명 (예: "string", "integer", "number" 등)
-     * value: 해당 타입의 개수
+    /**
+     * Count parameters by their schema-derived type and return a map of type names to occurrence counts.
+     *
+     * This treats parameters with a null Parameter or null Schema as type "unknown". Types are determined
+     * by the schema classification returned from {@code extractType}, which may produce values such as
+     * "string", "integer", "ref", "type:format", or "unknown".
+     *
+     * @param params the list of parameters to analyze
+     * @return a map where each key is a type identifier and each value is the number of parameters of that type
      */
     private static Map<String, Integer> countTypesByType(List<Parameter> params) {
         Map<String, Integer> typeCounts = new HashMap<>();
@@ -100,10 +131,17 @@ public final class RequestDiffHelper {
         return typeCounts;
     }
 
-    /** Schema에서 타입을 추출 (확장성 고려)
-     * - $ref가 있으면 "ref"로 처리
-     * - type이 있으면 type 사용 (format이 있으면 함께 고려)
-     * - 둘 다 없으면 "unknown"
+    /**
+     * Derives a compact type identifier from a Schema for use in diffing.
+     *
+     * The identifier is:
+     * - "ref" if the schema contains a $ref,
+     * - "type:format" if the schema has both type and format,
+     * - "type" if the schema has type but no format,
+     * - "unknown" if the schema is null or lacks both $ref and type.
+     *
+     * @param schema the Schema to inspect
+     * @return a short string identifying the schema ("ref", "unknown", "type" or "type:format")
      */
     private static String extractType(Schema schema) {
         if (schema == null) {
@@ -131,6 +169,12 @@ public final class RequestDiffHelper {
         return type;
     }
 
+    /**
+     * Filter a list of parameters to those whose `in` value is "path" or "query".
+     *
+     * @param list the input list of Parameter objects to filter
+     * @return a new list containing only parameters with `in` equal to "path" or "query", in original order
+     */
     private static List<Parameter> filterPathOrQuery(List<Parameter> list) {
         List<Parameter> out = new ArrayList<>();
         for (Parameter p : list) {
@@ -140,7 +184,19 @@ public final class RequestDiffHelper {
         return out;
     }
 
-    // 얕은 fingerprint: type + format + (object=required/properties키), (array=items.type), (prim=type)
+    /**
+     * Produce a compact fingerprint string representing the salient characteristics of the given Schema.
+     *
+     * The fingerprint encodes observable schema identity in a short, stable form:
+     * - If `s` is null the result is the literal string `"null"`.
+     * - If the schema has a `$ref` the result is `ref{<ref>}`.
+     * - For an object schema the result includes sorted required property names and sorted property keys, and includes the schema format if present: `obj{req=<req-list>;props=<prop-list>|fmt=<format>}` (the `|fmt=...` part is omitted when format is absent).
+     * - For an array schema the result describes the items by reference (`arr{item=ref{<ref>}}`) or by type and optional format (`arr{item=<type>|fmt=<format>}`), or `arr{item=}` when items are not specified.
+     * - For primitive schemas the result is `prim{<type>|fmt=<format>}` with the `|fmt=...` part omitted when format is absent.
+     *
+     * @param s the Schema to fingerprint (may be null)
+     * @return a short, human-readable fingerprint string that captures type/ref, and when applicable required keys, property names, item type/ref, and format
+     */
     private static String schemaFingerprint(Schema s) {
         if (s == null) return "null";
         
@@ -179,7 +235,19 @@ public final class RequestDiffHelper {
         return "prim{" + t + formatPart + "}";
     }
 
-    /** diff 병합: none|request|response|endpoint|both */
+    /**
+     * Merge two diff state strings resolving precedence into a single canonical diff state.
+     *
+     * The incoming state has higher precedence: `DIFF_ENDPOINT` always wins;
+     * `DIFF_REQUEST` merges with an existing `DIFF_RESPONSE` to produce `DIFF_BOTH`
+     * and preserves an existing `DIFF_ENDPOINT`; `DIFF_REQUEST` otherwise becomes the result.
+     * An incoming `DIFF_NONE` (or unknown) yields the normalized existing state if present,
+     * or `DIFF_NONE` when nothing valid exists.
+     *
+     * @param existing an existing diff state string (may be null or unnormalized)
+     * @param incoming a new diff state string to merge (expected to be one of the DIFF_* constants)
+     * @return a canonical diff state: one of DIFF_ENDPOINT, DIFF_BOTH, DIFF_REQUEST, or DIFF_NONE
+     */
     public static String mergeDiff(String existing, String incoming) {
         String curr = norm(existing);
         switch (incoming) {
@@ -195,6 +263,12 @@ public final class RequestDiffHelper {
         }
     }
 
+    /**
+     * Normalize a diff-state string to a canonical lowercase value.
+     *
+     * @param s the input diff-state string (expected values: {@code DIFF_NONE}, {@code DIFF_REQUEST}, {@code DIFF_RESPONSE}, {@code DIFF_ENDPOINT}, {@code DIFF_BOTH})
+     * @return the normalized lowercase diff-state constant if recognized, otherwise an empty string
+     */
     private static String norm(String s) {
         if (s == null) return "";
         String v = s.trim().toLowerCase();
@@ -204,7 +278,13 @@ public final class RequestDiffHelper {
         };
     }
 
-    // ==================== 공통 접근 유틸 ====================
+    /**
+     * Retrieve the Operation for the given HTTP method from a PathItem.
+     *
+     * @param p the PathItem to read the operation from (may be null)
+     * @param m the HTTP method whose Operation to retrieve
+     * @return the Operation for the specified method, or {@code null} if the PathItem is null or the operation is not present
+     */
 
     public static Operation getOp(PathItem p, HttpMethod m) {
         if (p == null) return null;
@@ -217,6 +297,13 @@ public final class RequestDiffHelper {
         };
     }
 
+    /**
+     * Set the Operation for the specified HTTP method on the given PathItem.
+     *
+     * @param p   the PathItem to modify; no action is taken if this is {@code null}
+     * @param m   the HTTP method whose operation should be set
+     * @param op  the Operation to assign for the method (may be {@code null} to clear)
+     */
     public static void setOp(PathItem p, HttpMethod m, Operation op) {
         if (p == null) return;
         switch (m) {
@@ -228,14 +315,31 @@ public final class RequestDiffHelper {
         }
     }
 
-    // ==================== null-safe helpers ====================
+    /**
+     * Provide a non-null map, substituting an empty map when the input is null.
+     *
+     * @return the original map if non-null, otherwise an empty immutable map
+     */
 
     public static <K,V> Map<K,V> safe(Map<K,V> m) {
         return (m == null) ? Collections.emptyMap() : m;
     }
+    /**
+     * Return an empty list when the input is null; otherwise return the original list.
+     *
+     * @param <T> the element type of the list
+     * @param l   the list that may be null
+     * @return    the original list if non-null, otherwise an immutable empty list
+     */
     public static <T> List<T> safeList(List<T> l) {
         return (l == null) ? Collections.emptyList() : l;
     }
+    /**
+     * Normalize a string to a non-null value.
+     *
+     * @param s the input string that may be null
+     * @return an empty string if {@code s} is null, otherwise {@code s}
+     */
     public static String nz(String s) {
         return (s == null) ? "" : s;
     }
