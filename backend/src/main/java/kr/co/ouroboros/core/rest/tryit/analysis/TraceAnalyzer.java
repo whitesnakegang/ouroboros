@@ -97,7 +97,32 @@ public class TraceAnalyzer {
                     info.startTimeNanos = span.getStartTimeUnixNano();
                     info.endTimeNanos = span.getEndTimeUnixNano();
                     info.durationNanos = span.getDurationNanos();
-                    info.durationMs = span.getDurationNanos() != null ? span.getDurationNanos() / 1_000_000 : 0L;
+                    // Compute duration if not provided
+                    if (info.durationNanos == null && info.startTimeNanos != null && info.endTimeNanos != null) {
+                        info.durationNanos = Math.max(0L, info.endTimeNanos - info.startTimeNanos);
+                    }
+                    info.durationMs = info.durationNanos != null ? info.durationNanos / 1_000_000 : 0L;
+                    // Extract attributes into a map for easier access
+                    info.attributes = new HashMap<>();
+                    if (span.getAttributes() != null) {
+                        for (TraceDTO.AttributeDTO attr : span.getAttributes()) {
+                            if (attr.getKey() != null && attr.getValue() != null) {
+                                String v = attr.getValue().getStringValue();
+                                if (v == null && attr.getValue().getIntValue() != null) {
+                                    v = String.valueOf(attr.getValue().getIntValue());
+                                }
+                                if (v == null && attr.getValue().getDoubleValue() != null) {
+                                    v = String.valueOf(attr.getValue().getDoubleValue());
+                                }
+                                if (v == null && attr.getValue().getBoolValue() != null) {
+                                    v = String.valueOf(attr.getValue().getBoolValue());
+                                }
+                                if (v != null) {
+                                    info.attributes.put(attr.getKey(), v);
+                                }
+                            }
+                        }
+                    }
                     
                     spans.add(info);
                 }
@@ -182,8 +207,8 @@ public class TraceAnalyzer {
         long durationMs = span.durationMs != null ? span.durationMs : 0;
         double percentage = totalDurationMs > 0 ? (durationMs * 100.0 / totalDurationMs) : 0;
         
-        // Parse class name and method signature
-        MethodInfo methodInfo = parseMethodSignature(span.name);
+        // Parse class name and method signature (prefer attributes from interceptor)
+        MethodInfo methodInfo = parseMethodInfo(span);
         
         // Get children
         List<TryResultResponse.SpanNode> children = new ArrayList<>();
@@ -204,18 +229,78 @@ public class TraceAnalyzer {
         // Calculate self percentage
         double selfPercentage = totalDurationMs > 0 ? (selfDurationMs * 100.0 / totalDurationMs) : 0;
         
+        String displayName;
+        if ("HTTP".equals(methodInfo.className)) {
+            displayName = formatHttpDisplayName(span, methodInfo);
+        } else if (methodInfo.className != null && !methodInfo.className.isEmpty()
+                && methodInfo.methodName != null && !methodInfo.methodName.isEmpty()) {
+            displayName = methodInfo.className + "." + methodInfo.methodName;
+        } else {
+            displayName = span.name;
+        }
+
         return TryResultResponse.SpanNode.builder()
-                .name(span.name)
+                .name(displayName)
                 .className(methodInfo.className)
                 .methodName(methodInfo.methodName)
                 .parameters(methodInfo.parameters)
                 .durationMs(durationMs)
                 .selfDurationMs(selfDurationMs)
-                .percentage(percentage)
-                .selfPercentage(selfPercentage)
+                .percentage(round2(percentage))
+                .selfPercentage(round2(selfPercentage))
                 .kind(span.kind)
                 .children(children)
                 .build();
+    }
+
+    private double round2(double value) {
+        return Math.round(value * 100.0) / 100.0;
+    }
+
+    /**
+     * Build human-friendly HTTP span display name using real URL if available.
+     * Example: "http get /api/users/123" while methodName keeps template route.
+     */
+    private String formatHttpDisplayName(SpanInfo span, MethodInfo methodInfo) {
+        String verb = null;
+        if (span.attributes != null) {
+            // Common keys used by our spans
+            verb = span.attributes.get("method");
+            if (verb == null) {
+                verb = span.attributes.get("http.method");
+            }
+        }
+        if (verb == null) {
+            // fallback: try to get from original span name: "http get ..."
+            if (span.name != null && span.name.startsWith("http ")) {
+                String[] parts = span.name.split(" ", 3);
+                if (parts.length >= 2) verb = parts[1];
+            }
+        }
+
+        String path = null;
+        if (span.attributes != null) {
+            String httpUrl = span.attributes.get("http.url");
+            if (httpUrl != null) {
+                try {
+                    java.net.URI u = java.net.URI.create(httpUrl);
+                    path = u.getPath();
+                    if (path == null || path.isEmpty()) path = httpUrl; // as-is fallback
+                } catch (Exception ignored) {
+                    path = httpUrl;
+                }
+            }
+            if (path == null) {
+                // Sometimes servers set "uri" with concrete value
+                path = span.attributes.get("uri");
+            }
+        }
+
+        if (verb != null && path != null) {
+            return "http " + verb.toLowerCase() + " " + path;
+        }
+        // fallback to original
+        return span.name != null ? span.name : (methodInfo.methodName != null ? methodInfo.methodName : "HTTP");
     }
     
     /**
@@ -392,6 +477,41 @@ public class TraceAnalyzer {
         
         return info;
     }
+
+    /**
+     * Parses method info preferring OpenTelemetry attributes set by our interceptor.
+     */
+    private MethodInfo parseMethodInfo(SpanInfo span) {
+        MethodInfo info = new MethodInfo();
+        if (span == null) return info;
+        // Attributes preferred
+        String namespace = span.attributes != null ? span.attributes.get("code.namespace") : null;
+        String function = span.attributes != null ? span.attributes.get("code.function") : null;
+        if (namespace != null || function != null) {
+            if (namespace != null) {
+                int lastDot = namespace.lastIndexOf('.');
+                info.className = lastDot >= 0 ? namespace.substring(lastDot + 1) : namespace;
+            }
+            if (function != null) {
+                info.methodName = function;
+            }
+            // Parameters
+            int idx = 0;
+            while (true) {
+                String type = span.attributes.get("code.parameter." + idx + ".type");
+                String name = span.attributes.get("code.parameter." + idx + ".name");
+                if (type == null && name == null) break;
+                info.parameters.add(TryResultResponse.SpanNode.Parameter.builder()
+                        .type(type != null ? type : "")
+                        .name(name != null ? name : "")
+                        .build());
+                idx++;
+            }
+            return info;
+        }
+        // Fallback to span name parsing
+        return parseMethodSignature(span.name);
+    }
     
     /**
      * Parses a parameter string into Parameter object.
@@ -457,6 +577,7 @@ public class TraceAnalyzer {
         Long endTimeNanos;
         Long durationNanos;
         Long durationMs;
+        Map<String, String> attributes;
     }
 }
 

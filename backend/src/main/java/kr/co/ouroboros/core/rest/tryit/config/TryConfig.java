@@ -18,7 +18,8 @@ import io.opentelemetry.sdk.trace.SpanProcessor;
  */
 @AutoConfiguration
 @EnableConfigurationProperties({
-        TempoProperties.class
+        TempoProperties.class,
+        MethodTracingProperties.class
 })
 @ComponentScan(basePackages = "kr.co.ouroboros")
 @EnableScheduling

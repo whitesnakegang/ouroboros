@@ -107,7 +107,8 @@ public class TryController {
             response.setTraceId(traceId);
             response.setCreatedAt(Instant.now());
             response.setAnalyzedAt(Instant.now());
-            response.setStatusCode(200); // TODO: Extract from trace
+            Integer statusCode = extractHttpStatusCode(traceData);
+            response.setStatusCode(statusCode != null ? statusCode : 200);
             
             return response;
             
@@ -164,5 +165,40 @@ public class TryController {
         }
         
         return (maxEnd - minStart) / 1_000_000; // Convert nanoseconds to milliseconds
+    }
+
+    /**
+     * Extracts HTTP status code from server span attributes.
+     */
+    private Integer extractHttpStatusCode(TraceDTO traceData) {
+        if (traceData == null || traceData.getBatches() == null) return null;
+        for (TraceDTO.BatchDTO batch : traceData.getBatches()) {
+            if (batch.getScopeSpans() == null) continue;
+            for (TraceDTO.ScopeSpanDTO scopeSpan : batch.getScopeSpans()) {
+                if (scopeSpan.getSpans() == null) continue;
+                for (TraceDTO.SpanDTO span : scopeSpan.getSpans()) {
+                    // Prefer server span or http-named span
+                    boolean maybeHttp = (span.getKind() != null && span.getKind().equals("SPAN_KIND_SERVER"))
+                            || (span.getName() != null && span.getName().toLowerCase().startsWith("http"));
+                    if (!maybeHttp || span.getAttributes() == null) continue;
+                    Integer code = null;
+                    for (TraceDTO.AttributeDTO attr : span.getAttributes()) {
+                        if (attr.getKey() == null || attr.getValue() == null) continue;
+                        String key = attr.getKey();
+                        if ("http.status_code".equalsIgnoreCase(key) || "status".equalsIgnoreCase(key)) {
+                            if (attr.getValue().getIntValue() != null) {
+                                code = attr.getValue().getIntValue().intValue();
+                            } else if (attr.getValue().getStringValue() != null) {
+                                try {
+                                    code = Integer.parseInt(attr.getValue().getStringValue());
+                                } catch (NumberFormatException ignored) { }
+                            }
+                        }
+                    }
+                    if (code != null) return code;
+                }
+            }
+        }
+        return null;
     }
 }
