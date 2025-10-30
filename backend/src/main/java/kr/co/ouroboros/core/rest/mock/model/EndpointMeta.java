@@ -35,7 +35,6 @@ import java.util.Map;
  *      ))
  *      .build();
  * }</pre>
- * </p>
  *
  * @since 0.1.0
  */
