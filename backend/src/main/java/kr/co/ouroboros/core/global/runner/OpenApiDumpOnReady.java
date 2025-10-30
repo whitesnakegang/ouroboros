@@ -1,10 +1,9 @@
 package kr.co.ouroboros.core.global.runner;
 
 import java.util.List;
-import java.util.Map;
-
 import kr.co.ouroboros.core.global.handler.OuroProtocolHandler;
 import kr.co.ouroboros.core.global.manager.OuroApiSpecManager;
+import kr.co.ouroboros.core.rest.spec.validator.OurorestYamlValidator;
 import kr.co.ouroboros.core.rest.mock.model.EndpointMeta;
 import kr.co.ouroboros.core.rest.mock.registry.RestMockRegistry;
 import kr.co.ouroboros.core.rest.mock.service.RestMockLoaderService;
@@ -23,16 +22,31 @@ public class OpenApiDumpOnReady {
     private final List<OuroProtocolHandler> handlers;
     private final RestMockLoaderService mockLoaderService;
     private final RestMockRegistry mockRegistry;
+    private final OurorestYamlValidator validator;
 
     /**
      * Initializes API specifications and protocol handlers once the application is ready.
-     *
-     * <p>Fetches the local OpenAPI JSON from /v3/api-docs and logs its size, then invokes
-     * {@code specManager.initializeProtocolOnStartup} for each registered {@code OuroProtocolHandler},
-     * logging any per-handler initialization failures without aborting the overall process.</p>
+     * <p>
+     * Execution order:
+     * <ol>
+     *   <li>Validate and enrich ourorest.yml (non-blocking)</li>
+     *   <li>Fetch OpenAPI JSON from /v3/api-docs</li>
+     *   <li>Initialize each protocol handler</li>
+     * </ol>
+     * <p>
+     * All errors are logged but do not prevent application startup.
      */
     @EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
     public void onReady() {
+        // Step 1: Validate and enrich ourorest.yml
+        try {
+            validator.validateAndEnrich();
+        } catch (Exception e) {
+            log.error("❌ ourorest.yml validation failed: {}", e.getMessage(), e);
+            log.error("⚠️  Continuing with application startup...");
+        }
+
+        // Step 2: Fetch OpenAPI docs
         int port = webCtx.getWebServer().getPort();
         String ctx = webCtx.getServletContext().getContextPath();
         String base = "http://localhost:" + port + (ctx != null ? ctx : "");
@@ -42,8 +56,7 @@ public class OpenApiDumpOnReady {
         String json = rt.getForObject(url, String.class);
         log.info("Fetched /v3/api-docs: {} bytes", json != null ? json.length() : 0);
 
-        // 여기서 JSON -> OuroRestApiSpec 역직렬화 후, 저장/검증 로직 실행
-        // specManager.initializeProtocolOnStartup(...); 등
+        // Step 3: Initialize protocol handlers
         for (OuroProtocolHandler h : handlers) {
             try {
                 specManager.initializeProtocolOnStartup(h.getProtocol());

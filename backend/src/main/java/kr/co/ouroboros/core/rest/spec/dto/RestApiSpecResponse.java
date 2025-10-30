@@ -91,7 +91,7 @@ public class RestApiSpecResponse {
     private String tag;
 
     /**
-     * Validation flag
+     * Diff status (none, added, modified, deleted)
      */
-    private Boolean isValid;
+    private String diff;
 }

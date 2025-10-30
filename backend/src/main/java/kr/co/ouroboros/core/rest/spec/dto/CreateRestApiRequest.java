@@ -39,5 +39,5 @@ public class CreateRestApiRequest {
     // Ouroboros custom fields
     private String progress;  // mock or completed (default: mock)
     private String tag;       // bugfix, implementing, or none (default: none)
-    private Boolean isValid;  // default: true
+    private String diff;      // none, request, response, endpoint, or both (default: none)
 }

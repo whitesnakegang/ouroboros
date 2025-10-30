@@ -2,7 +2,7 @@ package kr.co.ouroboros.core.rest.handler;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.swagger.v3.core.util.Json;
+import io.swagger.v3.core.util.Json31;
 import io.swagger.v3.oas.models.OpenAPI;
 import java.util.Locale;
 import java.util.Map;
@@ -22,6 +22,7 @@ import org.yaml.snakeyaml.Yaml;
 public class OuroRestHandler implements OuroProtocolHandler {
 
     private final OpenAPIService openAPIService;
+    private final RestSpecSyncPipeline pipeline;
 
     private static final ObjectMapper mapper = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true); // DTO에 @JsonIgnoreProperties로 안전
@@ -48,22 +49,21 @@ public class OuroRestHandler implements OuroProtocolHandler {
     }
 
     /**
-     * Scans the running application's OpenAPI model and returns it as an OuroRestApiSpec.
+     * Scans the running application's OpenAPI model and produces an API specification.
      *
-     * <p>Fetches the cached OpenAPI model for Locale.KOREA, converts it into an OuroRestApiSpec,
-     * and ensures the spec's info.version is set to "v1" when info exists but version is missing.</p>
+     * <p>Fetches the cached OpenAPI model for Locale.KOREA and converts it into an OuroRestApiSpec.
+     * If the model contains an info object with a missing version, sets that version to "v1".</p>
      *
-     * @return the scanned REST API specification as an OuroRestApiSpec
+     * @return the scanned REST API specification
      * @throws IllegalStateException if the OpenAPI model cannot be retrieved or converted
      */
     @Override
     public OuroApiSpec scanCurrentState() {
         try {
             OpenAPI model = openAPIService.getCachedOpenAPI(Locale.KOREA);
-
             log.info("OpenAPI model : {}", model);
 
-            String json = Json.mapper().writeValueAsString(model);
+            String json = Json31.mapper().writeValueAsString(model);
             OuroRestApiSpec spec = mapper.readValue(json, OuroRestApiSpec.class);
 
             if (spec.getInfo() != null && spec.getInfo().getVersion() == null) {
@@ -99,6 +99,7 @@ public class OuroRestHandler implements OuroProtocolHandler {
      */
     @Override
     public OuroApiSpec synchronize(OuroApiSpec fileSpec, OuroApiSpec scannedSpec) {
+        OuroApiSpec validate = pipeline.validate(fileSpec, scannedSpec);
         return null;
     }
 
