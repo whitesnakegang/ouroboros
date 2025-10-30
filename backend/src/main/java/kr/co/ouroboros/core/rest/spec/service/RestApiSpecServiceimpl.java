@@ -945,33 +945,63 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
 
     /**
      * Enriches a schema with missing Ouroboros custom fields.
+     * Recursively processes nested object properties and array items.
      *
      * @param schema the schema map to enrich
      */
     @SuppressWarnings("unchecked")
     private void enrichSchemaWithOuroborosFields(Map<String, Object> schema) {
-        if (schema == null || !schema.containsKey("properties")) {
+        if (schema == null) {
             return;
         }
 
-        Map<String, Object> properties = (Map<String, Object>) schema.get("properties");
-        if (properties == null) {
+        // Skip $ref schemas (they reference another schema)
+        if (schema.containsKey("$ref")) {
             return;
         }
 
-        // Add x-ouroboros-mock to each property
-        for (Map.Entry<String, Object> entry : properties.entrySet()) {
-            if (entry.getValue() instanceof Map) {
-                Map<String, Object> property = (Map<String, Object>) entry.getValue();
-                if (!property.containsKey("$ref") && !property.containsKey("x-ouroboros-mock")) {
-                    property.put("x-ouroboros-mock", "");
+        // Process properties if present
+        if (schema.containsKey("properties")) {
+            Map<String, Object> properties = (Map<String, Object>) schema.get("properties");
+            if (properties != null) {
+                // Add x-ouroboros-mock to each property
+                for (Map.Entry<String, Object> entry : properties.entrySet()) {
+                    if (entry.getValue() instanceof Map) {
+                        Map<String, Object> property = (Map<String, Object>) entry.getValue();
+
+                        // Add mock expression if not a reference and doesn't have it
+                        if (!property.containsKey("$ref") && !property.containsKey("x-ouroboros-mock")) {
+                            property.put("x-ouroboros-mock", "");
+                        }
+
+                        // Recursively process nested object properties
+                        if ("object".equals(property.get("type")) && property.containsKey("properties")) {
+                            enrichSchemaWithOuroborosFields(property);
+                        }
+
+                        // Recursively process array items
+                        if ("array".equals(property.get("type")) && property.containsKey("items")) {
+                            Object items = property.get("items");
+                            if (items instanceof Map) {
+                                enrichSchemaWithOuroborosFields((Map<String, Object>) items);
+                            }
+                        }
+                    }
+                }
+
+                // Add x-ouroboros-orders for property ordering
+                if (!schema.containsKey("x-ouroboros-orders")) {
+                    schema.put("x-ouroboros-orders", new ArrayList<>(properties.keySet()));
                 }
             }
         }
 
-        // Add x-ouroboros-orders
-        if (!schema.containsKey("x-ouroboros-orders")) {
-            schema.put("x-ouroboros-orders", new ArrayList<>(properties.keySet()));
+        // Process array items at schema level (for top-level array schemas)
+        if ("array".equals(schema.get("type")) && schema.containsKey("items")) {
+            Object items = schema.get("items");
+            if (items instanceof Map) {
+                enrichSchemaWithOuroborosFields((Map<String, Object>) items);
+            }
         }
     }
 

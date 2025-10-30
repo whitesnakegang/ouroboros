@@ -3,7 +3,9 @@ package kr.co.ouroboros.core.rest.spec.validator;
 import kr.co.ouroboros.core.rest.spec.dto.ValidationError;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 import java.util.*;
 
@@ -88,10 +90,11 @@ public class ImportYamlValidator {
     public List<ValidationError> validate(String yamlContent) {
         List<ValidationError> errors = new ArrayList<>();
 
-        // Step 1: Parse YAML
+        // Step 1: Parse YAML (using SafeConstructor to prevent arbitrary object deserialization)
         Map<String, Object> document;
         try {
-            Yaml yaml = new Yaml();
+            LoaderOptions loaderOptions = new LoaderOptions();
+            Yaml yaml = new Yaml(new SafeConstructor(loaderOptions));
             Object parsed = yaml.load(yamlContent);
             if (!(parsed instanceof Map)) {
                 errors.add(ValidationError.builder()
