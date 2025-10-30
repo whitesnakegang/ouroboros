@@ -35,12 +35,19 @@ public class RestMockRegistry implements MockRegistryBase<EndpointMeta> {
 
         // Path parameter 패턴 매칭
         String methodPrefix = method.toUpperCase() + ":";
+        String normalizedPath = normalizePath(path);
+
         return registry.entrySet().stream()
                 .filter(entry -> entry.getKey().startsWith(methodPrefix))
                 .filter(entry -> {
-                    Pattern pattern = patternCache.computeIfAbsent(entry.getKey(),
-                            p -> Pattern.compile(p.replaceAll("\\{[^/]+\\}", "[^/]+")));
-                    return pattern.matcher(normalizePath(path)).matches();
+                    String cacheKey = entry.getKey();  // "GET:/users/{id}" - 캐시 키 (메서드 포함)
+                    String registeredPath = cacheKey.substring(methodPrefix.length()); // "/users/{id}"
+
+                    // 캐시 키는 메서드 포함, 패턴은 path만 사용
+                    Pattern pattern = patternCache.computeIfAbsent(cacheKey,
+                            k -> Pattern.compile(registeredPath.replaceAll("\\{[^/]+\\}", "[^/]+")));
+
+                    return pattern.matcher(normalizedPath).matches();
                 })
                 .map(Map.Entry::getValue)
                 .findFirst();
