@@ -51,10 +51,13 @@ export function Sidebar({ onAddNew }: SidebarProps) {
           if (!matchesSearch) return false;
         }
 
+        const ep = endpoint as {
+          progress?: string;
+        };
         if (activeFilter === "mock") {
-          return "implementationStatus" in endpoint;
+          return ep.progress !== "completed";
         } else {
-          return !("implementationStatus" in endpoint);
+          return ep.progress === "completed";
         }
       });
 

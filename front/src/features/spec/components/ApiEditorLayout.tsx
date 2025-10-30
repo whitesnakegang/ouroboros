@@ -49,6 +49,7 @@ export function ApiEditorLayout() {
     setTriggerNewForm,
     loadEndpoints,
     updateEndpoint,
+    endpoints,
   } = useSidebarStore();
   const [activeTab, setActiveTab] = useState<"form" | "test">("form");
   const [isCodeSnippetOpen, setIsCodeSnippetOpen] = useState(false);
@@ -102,12 +103,15 @@ export function ApiEditorLayout() {
 
   const methods = ["GET", "POST", "PUT", "PATCH", "DELETE"];
 
-  // Mock API endpoints data for progress calculation
-  const totalEndpoints = 6;
-  const completedEndpoints = 3;
-  const progressPercentage = Math.round(
-    (completedEndpoints / totalEndpoints) * 100
-  );
+  // 진행률: 전체 엔드포인트 대비 completed 비율
+  const allEndpoints = Object.values(endpoints || {}).flat();
+  const totalEndpoints = allEndpoints.length || 0;
+  const completedEndpoints = allEndpoints.filter(
+    (ep) => ep.progress === "completed"
+  ).length;
+  const progressPercentage = totalEndpoints
+    ? Math.round((completedEndpoints / totalEndpoints) * 100)
+    : 0;
 
   const handleSave = async () => {
     if (!method || !url) {

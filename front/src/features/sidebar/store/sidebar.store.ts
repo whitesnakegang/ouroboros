@@ -12,6 +12,8 @@ interface Endpoint {
   hasSpecError?: boolean;
   tags?: string[];
   progress?: string;
+  tag?: string;
+  diff?: string;
 }
 
 export interface EndpointData {
@@ -38,16 +40,34 @@ interface SidebarState {
 
 // 백엔드 스펙을 프론트엔드 엔드포인트 형태로 변환
 function convertSpecToEndpoint(spec: RestApiSpecResponse): Endpoint {
+  // tag 매핑: none=미구현, implementing=구현중, bugfix=수정중
+  const mapTagToStatus = (
+    tag?: string,
+    progress?: string
+  ): Endpoint["implementationStatus"] => {
+    if (progress === "completed") return undefined;
+    switch (tag) {
+      case "implementing":
+        return "in-progress";
+      case "bugfix":
+        return "modifying";
+      case "none":
+      default:
+        return "not-implemented";
+    }
+  };
+
   return {
     id: spec.id,
     method: spec.method,
     path: spec.path,
     description: spec.description || spec.summary || "",
-    implementationStatus:
-      spec.progress === "mock" ? "not-implemented" : undefined,
+    implementationStatus: mapTagToStatus(spec.tag, spec.progress),
     hasSpecError: spec.isValid === false ? true : undefined,
     tags: spec.tags,
     progress: spec.progress,
+    tag: spec.tag,
+    diff: spec.diff,
   };
 }
 

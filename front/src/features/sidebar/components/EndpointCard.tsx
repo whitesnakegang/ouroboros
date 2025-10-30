@@ -7,6 +7,9 @@ interface Endpoint {
   description: string;
   implementationStatus?: "not-implemented" | "in-progress" | "modifying";
   hasSpecError?: boolean;
+  progress?: string;
+  tag?: string;
+  diff?: string;
 }
 
 interface EndpointCardProps {
