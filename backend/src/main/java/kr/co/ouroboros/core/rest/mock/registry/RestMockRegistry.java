@@ -44,8 +44,12 @@ public class RestMockRegistry implements MockRegistryBase<EndpointMeta> {
                     String registeredPath = cacheKey.substring(methodPrefix.length()); // "/users/{id}"
 
                     // 캐시 키는 메서드 포함, 패턴은 path만 사용
-                    Pattern pattern = patternCache.computeIfAbsent(cacheKey,
-                            k -> Pattern.compile(registeredPath.replaceAll("\\{[^/]+\\}", "[^/]+")));
+                    Pattern pattern = patternCache.computeIfAbsent(cacheKey, k -> {
+                        String regex = registeredPath
+                                .replaceAll("([.()\\[\\]\\-+*?^$|\\\\])", "\\\\$1")  // 특수문자 이스케이프
+                                .replaceAll("\\{[^/]+\\}", "[^/]+");  // 경로 파라미터 처리
+                        return Pattern.compile("^" + regex + "$");  // 전체 매칭 고정
+                    });
 
                     return pattern.matcher(normalizedPath).matches();
                 })

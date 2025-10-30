@@ -28,14 +28,17 @@ public class DummyDataGenerator {
             return "[FAKER_ERROR] " + str;
         }
 
-        // faker 형식이 아니고 값이 존재하면 그대로 반환
-        if (mockValue != null && !mockValue.toString().isBlank()) {
-            return mockValue.toString();
+        // faker 형식이 아니고 값이 존재하면 원본 타입 그대로 반환
+        if (mockValue instanceof String str) {
+            if (!str.isBlank()) {
+                return str;
+            }
+            // 빈 문자열이면 빈 값
+            return "";
         }
 
-        // 빈 문자열이면 빈 값
-        if (mockValue != null && mockValue.toString().isBlank()) {
-            return "";
+        if (mockValue != null) {
+            return mockValue;
         }
 
         // type 기반 기본 랜덤값
