@@ -2,7 +2,7 @@ package kr.co.ouroboros.core.rest.handler;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.swagger.v3.core.util.Json;
+import io.swagger.v3.core.util.Json31;
 import io.swagger.v3.oas.models.OpenAPI;
 import java.util.Locale;
 import java.util.Map;
@@ -48,10 +48,10 @@ public class OuroRestHandler implements OuroProtocolHandler {
     }
 
     /**
-     * Scans the running application's OpenAPI model and returns it as an OuroRestApiSpec.
+     * Scan the running application's OpenAPI model and produce a normalized REST API specification.
      *
      * <p>Fetches the cached OpenAPI model for Locale.KOREA, converts it into an OuroRestApiSpec,
-     * and ensures the spec's info.version is set to "v1" when info exists but version is missing.</p>
+     * and if the spec contains an info object with a missing version, sets that version to "v1".</p>
      *
      * @return the scanned REST API specification as an OuroRestApiSpec
      * @throws IllegalStateException if the OpenAPI model cannot be retrieved or converted
@@ -63,7 +63,7 @@ public class OuroRestHandler implements OuroProtocolHandler {
 
             log.info("OpenAPI model : {}", model);
 
-            String json = Json.mapper().writeValueAsString(model);
+            String json = Json31.mapper().writeValueAsString(model);
             OuroRestApiSpec spec = mapper.readValue(json, OuroRestApiSpec.class);
 
             if (spec.getInfo() != null && spec.getInfo().getVersion() == null) {
