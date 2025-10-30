@@ -47,6 +47,7 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
         for (String url : pathsScanned.keySet()) {
 
             // url이 다른가 먼저 봄
+            if(isDiffUrl(url, pathsFile, pathsScanned)) continue;
 
             PathItem fileItem = pathsFile.get(url);
             PathItem scanItem = pathsScanned.get(url);
@@ -63,6 +64,7 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
                 if (fileOp == null) {
                     // method 복사 후 diff enpoint로 상태 변경
                     // req res 검사 필요 없음
+                    markDiffEndpoint(url, scanOp, pathsFile, httpMethod);
                     continue;
                 }
 
