@@ -106,13 +106,29 @@ public class OuroborosMockFilter implements Filter{
             }
         }
 
-        // Generate mock body
+        // 요청 body 읽기 (POST, PUT 등)
+        Map<String, Object> requestJson = null;
+        if ("POST".equalsIgnoreCase(request.getMethod()) || "PUT".equalsIgnoreCase(request.getMethod())) {
+            try {
+                requestJson = objectMapper.readValue(request.getInputStream(), Map.class);
+                log.debug("Request body parsed for merge: {}", requestJson);
+            } catch (Exception e) {
+                log.debug("No readable request body found (ignored): {}", e.getMessage());
+            }
+        }
+
+        // Faker 기반 Mock body 생성
         Object body = null;
         if (responseMeta.getBody() != null && !responseMeta.getBody().isEmpty()) {
             body = schemaMockBuilder.build(responseMeta.getBody());
         }
 
-        // Determine content type
+        // 요청 body와 merge (요청 필드가 있으면 덮어씀)
+        if (body instanceof Map && requestJson != null) {
+            ((Map<String, Object>) body).putAll(requestJson);
+        }
+
+        // Content type 결정
         String contentType = responseMeta.getContentType();
         String accept = request.getHeader("Accept");
 
@@ -125,7 +141,7 @@ public class OuroborosMockFilter implements Filter{
         response.setContentType(contentType + ";charset=UTF-8");
         response.setStatus(responseMeta.getStatusCode() > 0 ? responseMeta.getStatusCode() : statusCode);
 
-        // Serialize and send response
+        // 직렬화 및 전송
         String bodyText = "";
         if (body != null) {
             if (contentType.contains("xml")) {
@@ -136,7 +152,7 @@ public class OuroborosMockFilter implements Filter{
         }
 
         response.getWriter().write(bodyText);
-        log.debug("Mock response sent: {} {} -> {}", meta.getMethod(), meta.getPath(), statusCode);
+        log.debug("Mock response sent with merged request: {} {} -> {}", meta.getMethod(), meta.getPath(), statusCode);
     }
 
     /**
