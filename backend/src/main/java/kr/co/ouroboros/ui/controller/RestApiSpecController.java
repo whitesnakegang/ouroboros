@@ -35,119 +35,65 @@ public class RestApiSpecController {
      * <p>
      * Validates uniqueness of path+method combination and automatically generates
      * a UUID if not provided. Supports both schema references and inline schemas.
+     * <p>
+     * Exceptions are handled by {@link kr.co.ouroboros.core.rest.spec.exception.RestSpecExceptionHandler}.
      *
      * @param request API specification details
      * @return created specification with generated ID
+     * @throws Exception if creation fails
      */
     @PostMapping
     public ResponseEntity<GlobalApiResponse<RestApiSpecResponse>> createRestApiSpec(
-            @RequestBody CreateRestApiRequest request) {
-        try {
-            RestApiSpecResponse data = restApiSpecService.createRestApiSpec(request);
-            GlobalApiResponse<RestApiSpecResponse> response = GlobalApiResponse.success(
-                    data,
-                    "REST API specification created successfully"
-            );
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            log.warn("Invalid REST API spec request: {}", e.getMessage(), e);
-            GlobalApiResponse<RestApiSpecResponse> response = GlobalApiResponse.error(
-                    HttpStatus.BAD_REQUEST.value(),
-                    "Failed to create REST API specification",
-                    "INVALID_REQUEST",
-                    "The API specification for this path and method already exists"
-            );
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        } catch (Exception e) {
-            log.error("Failed to create REST API specification", e);
-            GlobalApiResponse<RestApiSpecResponse> response = GlobalApiResponse.error(
-                    HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                    "Failed to create REST API specification",
-                    "INTERNAL_ERROR",
-                    "An internal error occurred while creating the specification"
-            );
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-        }
+            @RequestBody CreateRestApiRequest request) throws Exception {
+        RestApiSpecResponse data = restApiSpecService.createRestApiSpec(request);
+        GlobalApiResponse<RestApiSpecResponse> response = GlobalApiResponse.success(
+                data,
+                "REST API specification created successfully"
+        );
+        return ResponseEntity.ok(response);
     }
 
     /**
      * Retrieves all REST API specifications.
      * <p>
      * Returns a list of all API specifications from the OpenAPI YAML file.
-     * Returns 404 if no specifications exist.
+     * Returns an empty list if no specifications exist.
+     * <p>
+     * Exceptions are handled by {@link kr.co.ouroboros.core.rest.spec.exception.RestSpecExceptionHandler}.
      *
      * @return list of all specifications
+     * @throws Exception if retrieval fails
      */
     @GetMapping
-    public ResponseEntity<GlobalApiResponse<List<RestApiSpecResponse>>> getAllRestApiSpecs() {
-        try {
-            List<RestApiSpecResponse> data = restApiSpecService.getAllRestApiSpecs();
-
-            if (data.isEmpty()) {
-                log.info("No REST API specifications found");
-                GlobalApiResponse<List<RestApiSpecResponse>> response = GlobalApiResponse.error(
-                        HttpStatus.NOT_FOUND.value(),
-                        "No REST API specifications found",
-                        "SPEC_NOT_FOUND",
-                        "No API specifications exist yet. Create your first specification to get started."
-                );
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-            }
-
-            GlobalApiResponse<List<RestApiSpecResponse>> response = GlobalApiResponse.success(
-                    data,
-                    "REST API specifications retrieved successfully"
-            );
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            log.error("Failed to retrieve REST API specifications", e);
-            GlobalApiResponse<List<RestApiSpecResponse>> response = GlobalApiResponse.error(
-                    HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                    "Failed to retrieve REST API specifications",
-                    "INTERNAL_ERROR",
-                    "An internal error occurred while retrieving specifications"
-            );
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-        }
+    public ResponseEntity<GlobalApiResponse<List<RestApiSpecResponse>>> getAllRestApiSpecs() throws Exception {
+        List<RestApiSpecResponse> data = restApiSpecService.getAllRestApiSpecs();
+        GlobalApiResponse<List<RestApiSpecResponse>> response = GlobalApiResponse.success(
+                data,
+                "REST API specifications retrieved successfully"
+        );
+        return ResponseEntity.ok(response);
     }
 
     /**
      * Retrieves a specific REST API specification by ID.
      * <p>
      * Searches through all paths and methods to find the specification with the given UUID.
+     * <p>
+     * Exceptions are handled by {@link kr.co.ouroboros.core.rest.spec.exception.RestSpecExceptionHandler}.
      *
      * @param id specification UUID
      * @return specification details
+     * @throws Exception if retrieval fails
      */
     @GetMapping("/{id}")
     public ResponseEntity<GlobalApiResponse<RestApiSpecResponse>> getRestApiSpec(
-            @PathVariable("id") String id) {
-        try {
-            RestApiSpecResponse data = restApiSpecService.getRestApiSpec(id);
-            GlobalApiResponse<RestApiSpecResponse> response = GlobalApiResponse.success(
-                    data,
-                    "REST API specification retrieved successfully"
-            );
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            log.warn("REST API specification not found: {}", id, e);
-            GlobalApiResponse<RestApiSpecResponse> response = GlobalApiResponse.error(
-                    HttpStatus.NOT_FOUND.value(),
-                    "REST API specification not found",
-                    "SPEC_NOT_FOUND",
-                    e.getMessage()
-            );
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-        } catch (Exception e) {
-            log.error("Failed to retrieve REST API specification: {}", id, e);
-            GlobalApiResponse<RestApiSpecResponse> response = GlobalApiResponse.error(
-                    HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                    "Failed to retrieve REST API specification",
-                    "INTERNAL_ERROR",
-                    "An internal error occurred while retrieving the specification"
-            );
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-        }
+            @PathVariable("id") String id) throws Exception {
+        RestApiSpecResponse data = restApiSpecService.getRestApiSpec(id);
+        GlobalApiResponse<RestApiSpecResponse> response = GlobalApiResponse.success(
+                data,
+                "REST API specification retrieved successfully"
+        );
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -155,41 +101,24 @@ public class RestApiSpecController {
      * <p>
      * Only provided fields will be updated. Path and method cannot be changed
      * (use delete + create instead to change these).
+     * <p>
+     * Exceptions are handled by {@link kr.co.ouroboros.core.rest.spec.exception.RestSpecExceptionHandler}.
      *
      * @param id specification UUID
      * @param request updated specification details
      * @return updated specification
+     * @throws Exception if update fails
      */
     @PutMapping("/{id}")
     public ResponseEntity<GlobalApiResponse<RestApiSpecResponse>> updateRestApiSpec(
             @PathVariable("id") String id,
-            @RequestBody UpdateRestApiRequest request) {
-        try {
-            RestApiSpecResponse data = restApiSpecService.updateRestApiSpec(id, request);
-            GlobalApiResponse<RestApiSpecResponse> response = GlobalApiResponse.success(
-                    data,
-                    "REST API specification updated successfully"
-            );
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            log.warn("REST API specification not found: {}", id, e);
-            GlobalApiResponse<RestApiSpecResponse> response = GlobalApiResponse.error(
-                    HttpStatus.NOT_FOUND.value(),
-                    "REST API specification not found",
-                    "SPEC_NOT_FOUND",
-                    e.getMessage()
-            );
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-        } catch (Exception e) {
-            log.error("Failed to update REST API specification: {}", id, e);
-            GlobalApiResponse<RestApiSpecResponse> response = GlobalApiResponse.error(
-                    HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                    "Failed to update REST API specification",
-                    "INTERNAL_ERROR",
-                    "An internal error occurred while updating the specification"
-            );
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-        }
+            @RequestBody UpdateRestApiRequest request) throws Exception {
+        RestApiSpecResponse data = restApiSpecService.updateRestApiSpec(id, request);
+        GlobalApiResponse<RestApiSpecResponse> response = GlobalApiResponse.success(
+                data,
+                "REST API specification updated successfully"
+        );
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -197,38 +126,24 @@ public class RestApiSpecController {
      * <p>
      * Removes the specification from the OpenAPI YAML file.
      * If the path has no remaining methods, the entire path is removed.
+     * Exceptions are handled by {@link kr.co.ouroboros.core.rest.spec.exception.RestSpecExceptionHandler}.
      *
+     * @throws Exception if retrieval fails
      * @param id specification UUID
      * @return success response
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<GlobalApiResponse<Void>> deleteRestApiSpec(
-            @PathVariable("id") String id) {
-        try {
+            @PathVariable("id") String id) throws Exception {
+
             restApiSpecService.deleteRestApiSpec(id);
             GlobalApiResponse<Void> response = GlobalApiResponse.success(
                     null,
                     "REST API specification deleted successfully"
             );
             return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            log.warn("REST API specification not found: {}", id, e);
-            GlobalApiResponse<Void> response = GlobalApiResponse.error(
-                    HttpStatus.NOT_FOUND.value(),
-                    "REST API specification not found",
-                    "SPEC_NOT_FOUND",
-                    e.getMessage()
-            );
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-        } catch (Exception e) {
-            log.error("Failed to delete REST API specification: {}", id, e);
-            GlobalApiResponse<Void> response = GlobalApiResponse.error(
-                    HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                    "Failed to delete REST API specification",
-                    "INTERNAL_ERROR",
-                    "An internal error occurred while deleting the specification"
-            );
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-        }
+
+
+
     }
 }

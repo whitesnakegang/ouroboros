@@ -29,9 +29,12 @@ public class Schema {
     private Integer minItems;
     private Integer maxItems;
 
-    // For text/plain
-    // (type: string으로 이미 처리됨)
+    @JsonProperty("$ref")
+    private String ref;
+    private String format;
 
+    @JsonProperty("additionalProperties")
+    private Map<String, Object> additionalProperties;
     // (★핵심★) Ouroboros custom fields
     @JsonProperty("x-ouroboros-mock")
     private String xOuroborosMock;
