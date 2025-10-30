@@ -3,7 +3,7 @@ package kr.co.ouroboros.core.global.runner;
 import java.util.List;
 import kr.co.ouroboros.core.global.handler.OuroProtocolHandler;
 import kr.co.ouroboros.core.global.manager.OuroApiSpecManager;
-import kr.co.ouroboros.core.rest.validator.OurorestYamlValidator;
+import kr.co.ouroboros.core.rest.spec.validator.OurorestYamlValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
