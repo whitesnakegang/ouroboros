@@ -84,7 +84,7 @@ public class RestMockLoaderService {
 
     /**
      * Parse a single operation to create EndpointMeta.
-     * Endpoint 팡싱
+     * Endpoint 파싱
      */
     @SuppressWarnings("unchecked")
     private EndpointMeta parseOperation(String path, String method, Map<String, Object> operation, Map<String, Object> schemas) {
