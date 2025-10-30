@@ -9,6 +9,27 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 
+/**
+ * Service responsible for loading and parsing OpenAPI YAML definitions
+ * into {@link EndpointMeta} objects used by the mock registry.
+ *
+ * <p>This service acts as the bridge between the raw OpenAPI spec
+ * and the runtime mock system. It extracts paths, methods, parameters,
+ * security requirements, and responses, resolving any schema references
+ * ({@code $ref}) recursively into concrete mockable definitions.</p>
+ *
+ * <h3>Main responsibilities</h3>
+ * <ul>
+ *     <li>Reads the OpenAPI YAML document via {@link RestApiYamlParser}.</li>
+ *     <li>Resolves <b>$ref</b> schemas inside components/schemas.</li>
+ *     <li>Extracts mock-only endpoints (with <b>x-ouroboros-progress: mock</b>).</li>
+ *     <li>Builds {@link EndpointMeta} objects with all metadata required for mock generation.</li>
+ * </ul>
+ *
+ * <p>Endpoints are keyed as {@code "METHOD:/path"} (e.g. {@code GET:/api/users/{id}}).</p>
+ *
+ * @since 0.1.0
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -86,8 +107,34 @@ public class RestMockLoaderService {
     }
 
     /**
-     * Parse a single operation to create EndpointMeta.
-     * Endpoint 파싱
+     * Parses a single OpenAPI operation into EndpointMeta with security scheme resolution.
+     * <p>
+     * Only operations with {@code x-ouroboros-progress: mock} are parsed and registered.
+     * <p>
+     * Security scheme resolution:
+     * <ul>
+     *   <li><b>HTTP auth</b> (Bearer, Basic): Uses {@code Authorization} header</li>
+     *   <li><b>API Key</b>: Uses custom header name from scheme definition (e.g., {@code X-API-Key})</li>
+     *   <li><b>OAuth2/OpenID</b>: Uses {@code Authorization} header</li>
+     * </ul>
+     * <p>
+     * Example security resolution:
+     * <pre>
+     * security: [{ ApiKeyAuth: [] }]
+     * securitySchemes:
+     *   ApiKeyAuth:
+     *     type: apiKey
+     *     in: header
+     *     name: X-API-Key  ← Actual header name resolved
+     * Result: authHeaders = ["X-API-Key"]
+     * </pre>
+     *
+     * @param path the endpoint path
+     * @param method the HTTP method
+     * @param operation the OpenAPI operation object
+     * @param schemas the components/schemas map for $ref resolution
+     * @param securitySchemes the components/securitySchemes map for auth header resolution
+     * @return parsed EndpointMeta, or null if not a mock endpoint
      */
     @SuppressWarnings("unchecked")
     private EndpointMeta parseOperation(String path, String method, Map<String, Object> operation,

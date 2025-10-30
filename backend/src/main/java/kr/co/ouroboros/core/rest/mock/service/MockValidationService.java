@@ -7,6 +7,27 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+/**
+ * Service responsible for validating incoming HTTP requests
+ * against mock endpoint requirements defined in {@link EndpointMeta}.
+ *
+ * <p>This validation ensures that requests meet header,
+ * authentication, and query parameter conditions before a
+ * mock response is generated.</p>
+ *
+ * <h3>Validation Priority</h3>
+ * <ol>
+ *     <li><b>X-Ouroboros-Error</b> header — Forces an error response if present.</li>
+ *     <li><b>Authentication headers</b> — 401 Unauthorized if required headers are missing.</li>
+ *     <li><b>Required headers</b> — 400 Bad Request if missing.</li>
+ *     <li><b>Required query parameters</b> — 400 Bad Request if missing.</li>
+ * </ol>
+ *
+ * <p>If all validations pass, the request is considered valid and
+ * mock generation continues normally.</p>
+
+ * @since 0.1.0
+ */
 @Slf4j
 @Service
 public class MockValidationService {
