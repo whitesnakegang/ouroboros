@@ -9,7 +9,9 @@ import kr.co.ouroboros.core.rest.common.dto.PathItem;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import static kr.co.ouroboros.core.rest.handler.MockApiHelper.checkMockApi;
 import static kr.co.ouroboros.core.rest.handler.RequestDiffHelper.*;
+import static kr.co.ouroboros.core.rest.handler.EndpointDiffHelper.*;
 
 @Component
 public class RestSpecSyncPipeline implements SpecSyncPipeline {
@@ -39,18 +41,54 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
         Map<String, Boolean> schemaMatchResults = compareSchemas(restFileSpec, restScannedSpec);
 
         Map<String, PathItem> pathsScanned = safe(restScannedSpec.getPaths());
+        Map<String, PathItem> pathsFile = safe(restFileSpec.getPaths());
 
 
-        for (String key : pathsScanned.keySet()) {
-            if (restFileSpec.getPaths()
-                    .get(key) == null) {
-                System.out.println(String.format("[ENDPOINT MISSING] '%s': 파일 스펙에 해당 엔드포인트가 없습니다.", key));
+        for (String url : pathsScanned.keySet()) {
+
+            // url이 다른가 먼저 봄
+
+            PathItem fileItem = pathsFile.get(url);
+            PathItem scanItem = pathsScanned.get(url);
+
+            for(HttpMethod httpMethod : HttpMethod.values()) {
+                // method 별로 봄
+                Operation fileOp = getOperationByMethod(fileItem, httpMethod);
+                Operation scanOp = getOperationByMethod(scanItem, httpMethod);
+
+                // scan이 없으면 볼 필요 없음 (미구현 상태)
+                if(scanOp == null) continue;
+
+                // 명세에 없는 endpoint를 만듦
+                if (fileOp == null) {
+                    // method 복사 후 diff enpoint로 상태 변경
+                    // req res 검사 필요 없음
+                    continue;
+                }
+
+                // rest API 똑같은 경우
+
+                // scan의 x-ouroboros-progress가 MOCK이면 file에 그대로 마킹만 해주고 넘어감
+                if(checkMockApi(url, restFileSpec, restScannedSpec)) continue;
+
+                // 3. endpoint diff가 있으면 reqCompare, resCompare는 스킵
+                reqCompare(url, fileOp, scanOp, schemaMatchResults);
+                resCompare(url, fileOp, scanOp, schemaMatchResults);
+
             }
-            reqCompare(key, restFileSpec, restScannedSpec, schemaMatchResults);
-            resCompare(key, restFileSpec, restScannedSpec, schemaMatchResults);
         }
 
         return restFileSpec;
+    }
+
+    private Operation getOperationByMethod(PathItem item, HttpMethod httpMethod) {
+        return switch (httpMethod) {
+            case GET -> item.getGet();
+            case POST -> item.getPost();
+            case PUT -> item.getPut();
+            case PATCH -> item.getPatch();
+            case DELETE -> item.getDelete();
+        };
     }
 
     /**
@@ -86,26 +124,13 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
         PathItem fp = filePaths.get(path);
         PathItem sp = scanPaths.get(path);
 
-        if (fp == null) {
-            // 파일에 path 자체가 없으면: 스캔에 있는 메서드만 endpoint로 마킹하며 덮어쓰기
-            comparePair(null, sp.getGet(),    file, scan, path, HttpMethod.GET);
-            comparePair(null, sp.getPost(),   file, scan, path, HttpMethod.POST);
-            comparePair(null, sp.getPut(),    file, scan, path, HttpMethod.PUT);
-            comparePair(null, sp.getPatch(),  file, scan, path, HttpMethod.PATCH);
-            comparePair(null, sp.getDelete(), file, scan, path, HttpMethod.DELETE);
-            return;
-        }
-
         // 메서드별 요청 비교
-        // 1. 스캔에 있는 메서드: 파일과 비교하여 request diff 마킹 또는 endpoint로 마킹
+        // 1. 스캔에 있는 메서드: 파일과 비교하여 request diff 마킹
         comparePair(fp.getGet(),    sp.getGet(),   file, scan, path, HttpMethod.GET);
         comparePair(fp.getPost(),   sp.getPost(),  file, scan, path, HttpMethod.POST);
         comparePair(fp.getPut(),    sp.getPut(),   file, scan, path, HttpMethod.PUT);
         comparePair(fp.getPatch(),  sp.getPatch(), file, scan, path, HttpMethod.PATCH);
         comparePair(fp.getDelete(), sp.getDelete(),file, scan, path, HttpMethod.DELETE);
-
-        // 2. 파일에만 있는 메서드: 스캔에는 없으므로 endpoint로 마킹
-        markFileOnlyMethods(fp, sp);
     }
 
     /**
@@ -130,36 +155,6 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
             return;
         }
         compareAndMarkRequest(fileOp, scanOp);
-    }
-
-    /**
-     * Marks HTTP methods that exist in the file path but are absent in the scanned path as endpoint differences.
-     *
-     * For each of GET, POST, PUT, PATCH, and DELETE: if the file's operation exists and the scanned operation is null,
-     * merges the `DIFF_ENDPOINT` marker into the operation's `XOuroborosDiff`.
-     *
-     * @param fp the PathItem from the file-based spec to update
-     * @param sp the PathItem from the scanned runtime spec to compare against; if null no changes are made
-     */
-    private void markFileOnlyMethods(PathItem fp, PathItem sp) {
-        if (fp == null || sp == null) return;
-
-        // 각 메서드가 파일에만 있는지 확인하여 endpoint로 마킹
-        if (fp.getGet() != null && sp.getGet() == null) {
-            fp.getGet().setXOuroborosDiff(mergeDiff(fp.getGet().getXOuroborosDiff(), DIFF_ENDPOINT));
-        }
-        if (fp.getPost() != null && sp.getPost() == null) {
-            fp.getPost().setXOuroborosDiff(mergeDiff(fp.getPost().getXOuroborosDiff(), DIFF_ENDPOINT));
-        }
-        if (fp.getPut() != null && sp.getPut() == null) {
-            fp.getPut().setXOuroborosDiff(mergeDiff(fp.getPut().getXOuroborosDiff(), DIFF_ENDPOINT));
-        }
-        if (fp.getPatch() != null && sp.getPatch() == null) {
-            fp.getPatch().setXOuroborosDiff(mergeDiff(fp.getPatch().getXOuroborosDiff(), DIFF_ENDPOINT));
-        }
-        if (fp.getDelete() != null && sp.getDelete() == null) {
-            fp.getDelete().setXOuroborosDiff(mergeDiff(fp.getDelete().getXOuroborosDiff(), DIFF_ENDPOINT));
-        }
     }
 
 

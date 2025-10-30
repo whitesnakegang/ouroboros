@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.*;
  * 테스트용 REST API 컨트롤러 예시.
  * <p>ourorest.yml의 /api/users GET과 다른 요청 파라미터를 가진 API를 정의합니다.</p>
  */
-@RestController
+//@RestController
 @RequestMapping("/api")
 public class BangTestController {
 

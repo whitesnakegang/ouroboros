@@ -29,10 +29,6 @@ public class Schema {
     private Integer minItems;
     private Integer maxItems;
 
-    @JsonProperty("$ref")
-    private String ref;
-    private String format;
-
     @JsonProperty("additionalProperties")
     private Map<String, Object> additionalProperties;
     // (★핵심★) Ouroboros custom fields
