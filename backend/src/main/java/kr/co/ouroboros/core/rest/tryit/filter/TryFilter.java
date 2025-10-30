@@ -31,31 +31,48 @@ public class TryFilter extends OncePerRequestFilter {
 
     private static final String HEADER_NAME = "X-Ouroboros-Try";
     private static final String TRY_VALUE = "on";
+    private static final String RESPONSE_TRY_ID_HEADER = "X-Ouroboros-Try-Id";
+    private static final String REQUEST_TRY_ID_ATTR = "kr.co.ouroboros.tryId";
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, 
                                    FilterChain filterChain) throws ServletException, IOException {
         
         String tryHeader = request.getHeader(HEADER_NAME);
-        
-        // Check if this is a Try request
-        if (TRY_VALUE.equalsIgnoreCase(tryHeader)) {
+        boolean isTryRequest = TRY_VALUE.equalsIgnoreCase(tryHeader);
+        boolean generatedHere = false;
+
+        if (isTryRequest && request.getDispatcherType() == jakarta.servlet.DispatcherType.REQUEST) {
             UUID tryId = UUID.randomUUID();
             log.debug("Try request detected, generating tryId: {}", tryId);
-            
-            // Set tryId in OpenTelemetry Baggage (before span creation)
             TryContext.setTryId(tryId);
-            
-            try {
-                // Continue request processing - Spring will create spans automatically
-                filterChain.doFilter(request, response);
-            } finally {
-                // Clean up Baggage to prevent memory leaks
+            request.setAttribute(REQUEST_TRY_ID_ATTR, tryId.toString());
+            generatedHere = true;
+        }
+
+        try {
+            // Continue request processing - Spring will create spans automatically
+            filterChain.doFilter(request, response);
+        } finally {
+            // At the end (also for ERROR dispatch), ensure header is set if possible
+            String tryIdStr = TryContext.getTryIdFromBaggage();
+            if (tryIdStr == null) {
+                Object v = request.getAttribute(REQUEST_TRY_ID_ATTR);
+                if (v != null) tryIdStr = String.valueOf(v);
+            }
+            if (tryIdStr != null && !tryIdStr.isEmpty() && !response.isCommitted()) {
+                response.setHeader(RESPONSE_TRY_ID_HEADER, tryIdStr);
+            }
+            // Clean up only if we created it here on the initial REQUEST dispatch
+            if (generatedHere) {
                 TryContext.clear();
             }
-        } else {
-            // Normal request processing
-            filterChain.doFilter(request, response);
         }
+    }
+
+    @Override
+    protected boolean shouldNotFilterErrorDispatch() {
+        // We want to run on ERROR dispatch too, to enforce header at the end
+        return false;
     }
 }
