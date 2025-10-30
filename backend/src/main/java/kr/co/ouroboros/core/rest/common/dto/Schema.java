@@ -14,10 +14,7 @@ public class Schema {
 
     // Standard fields
     private String type;
-    private String format;
     private String description;
-    @JsonProperty("$ref")
-    private String ref;
 
     // For object type
     private Map<String, Schema> properties; // (재귀 구조)
