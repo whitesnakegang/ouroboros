@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.validator;
+package kr.co.ouroboros.core.rest.spec.validator;
 
 import kr.co.ouroboros.core.rest.common.yaml.RestApiYamlParser;
 import lombok.RequiredArgsConstructor;
