@@ -21,14 +21,19 @@ import java.util.Optional;
 /**
  * Unified mock filter that handles routing, validation, and response generation.
  * <p>
- * This filter runs before Spring Security (order = -101) to intercept mock endpoints before
- * authentication/authorization checks. Mock endpoints have no real Controller implementation,
- * so they must be handled before Handler Mapping to avoid 404 errors.
+ * This filter runs at {@link org.springframework.core.Ordered#HIGHEST_PRECEDENCE} to intercept
+ * mock endpoints before Spring Security and all other filters. Mock endpoints have no real
+ * Controller implementation, so they must be handled before Handler Mapping to avoid 404 errors.
  * <p>
  * Execution flow:
- * 1. Routing: Check if endpoint is registered as mock (direct registry lookup)
- * 2. Validation: Validate request via MockValidationService (delegated to service)
- * 3. Response: Generate and return mock response (direct processing)
+ * <ol>
+ *   <li><b>Routing</b>: Check if endpoint is registered as mock (registry lookup)</li>
+ *   <li><b>Validation</b>: Validate request via {@link MockValidationService}</li>
+ *   <li><b>Response</b>: Generate and return mock response via {@link SchemaMockBuilder}</li>
+ * </ol>
+ * <p>
+ * If endpoint is not mock or validation passes, generates mock response and stops filter chain.
+ * Otherwise, passes request to next filter.
  *
  * @since 0.0.1
  */

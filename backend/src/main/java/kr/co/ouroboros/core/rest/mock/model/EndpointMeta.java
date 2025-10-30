@@ -7,6 +7,38 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Represents metadata information for a single mock endpoint
+ * managed by the {@code RestMockRegistry}.
+ *
+ * <p>This class contains the essential information required to
+ * identify, validate, and generate mock responses for a specific
+ * API endpoint defined in the OpenAPI specification (YAML or JSON).</p>
+ *
+ * <p>Each {@link EndpointMeta} instance corresponds to a unique
+ * combination of HTTP method and request path, and may include
+ * required headers, authentication requirements, and multiple
+ * possible response definitions by status code.</p>
+ *
+ * <p>Example:
+ * <pre>{@code
+ * EndpointMeta meta = EndpointMeta.builder()
+ *      .id("user-get-001")
+ *      .path("/api/users/{id}")
+ *      .method("GET")
+ *      .status("mock")
+ *      .requiredHeaders(List.of("X-Client-Id"))
+ *      .authHeaders(List.of("Authorization"))
+ *      .responses(Map.of(
+ *          200, new ResponseMeta(200, "OK", Map.of("id", 1, "name", "Alice")),
+ *          401, new ResponseMeta(401, "Unauthorized", Map.of("error", "Unauthorized"))
+ *      ))
+ *      .build();
+ * }</pre>
+ * </p>
+ *
+ * @since 0.1.0
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

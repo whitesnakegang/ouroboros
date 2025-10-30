@@ -7,6 +7,29 @@ import java.lang.reflect.Method;
 import java.util.*;
 import java.util.regex.*;
 
+/**
+ * Parser for custom Faker DSL expressions in OpenAPI schemas.
+ * <p>
+ * Supports expression format: {@code {{$category.method(param=value)}}}<br>
+ * Uses Java reflection to dynamically invoke DataFaker methods at runtime.
+ * <p>
+ * Supported expression examples:
+ * <ul>
+ *   <li>{@code {{$name.firstName}}} - Korean name (configured locale)</li>
+ *   <li>{@code {{$number.int(min=1,max=100)}}} - Integer between 1-100</li>
+ *   <li>{@code {{$number.decimal(min=1000,max=100000)}}} - Decimal with 2 decimal places</li>
+ *   <li>{@code {{$internet.emailAddress}}} - Random email</li>
+ *   <li>{@code {{$address.city}}} - Random city name</li>
+ * </ul>
+ * <p>
+ * Method name aliasing:
+ * <ul>
+ *   <li>{@code int} → {@code numberBetween(min, max)}</li>
+ *   <li>{@code decimal} → {@code randomDouble(scale=2, min, max)}</li>
+ * </ul>
+ *
+ * @since 0.0.1
+ */
 @Component
 @RequiredArgsConstructor
 public class FakerExpressionParser {
@@ -17,6 +40,21 @@ public class FakerExpressionParser {
 
     private final Faker faker;
 
+    /**
+     * Parses and executes a Faker DSL expression.
+     * <p>
+     * Parsing steps:
+     * <ol>
+     *   <li>Validate expression format with regex pattern</li>
+     *   <li>Extract category (e.g., "name", "number")</li>
+     *   <li>Extract method name (e.g., "firstName", "int")</li>
+     *   <li>Parse parameters (e.g., "min=1,max=100")</li>
+     *   <li>Invoke Faker method via reflection</li>
+     * </ol>
+     *
+     * @param expression the Faker DSL expression (e.g., "{{$name.firstName}}")
+     * @return generated value from DataFaker, or null if parsing fails
+     */
     public Object parse(String expression) {
         if (expression == null || expression.isBlank()) return null;
         Matcher matcher = FAKER_PATTERN.matcher(expression.trim());
