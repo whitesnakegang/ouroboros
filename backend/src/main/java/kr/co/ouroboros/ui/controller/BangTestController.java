@@ -23,6 +23,13 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api")
 public class BangTestController {
 
+    /**
+     * Finds users filtered by the optional name and email query parameters.
+     *
+     * @param name  the optional name to filter users by
+     * @param email the optional email to filter users by
+     * @return a ResponseEntity whose body is a list of matching User objects; the list may be empty
+     */
     @GetMapping("/users")
     @Operation(summary = "Find users (request param)", description = "Query parameters로 사용자를 필터링합니다. (파라미터 2개)")
     @ApiState(state = State.BUG_FIXING)
@@ -40,6 +47,12 @@ public class BangTestController {
         return ResponseEntity.ok(users);
     }
 
+    /**
+     * Retrieve a single user by its ID.
+     *
+     * @param userId the numeric identifier of the user to retrieve
+     * @return a ResponseEntity containing the found User and HTTP 200 OK
+     */
     @GetMapping("/users/{userId}")
     @Operation(summary = "Get user by ID (path param)", description = "Path parameter로 단일 사용자를 조회합니다. (다른 이름과 타입)")
     @ApiState(state = State.COMPLETED)
@@ -54,6 +67,13 @@ public class BangTestController {
         return ResponseEntity.ok(user);
     }
 
+    /**
+     * Create a user using the path parameter id and the provided request body.
+     *
+     * @param id   path parameter identifying the user to create
+     * @param user request body containing the user's attributes
+     * @return the created User object
+     */
     @PostMapping("/users/{id}")
     @Operation(summary = "Create user by ID (path param)", description = "Path parameter로 사용자를 생성합니다. (ourorest.yml에는 없음)")
     @ApiState(state = State.COMPLETED)
