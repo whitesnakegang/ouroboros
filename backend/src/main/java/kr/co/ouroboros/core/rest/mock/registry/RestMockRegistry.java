@@ -38,8 +38,7 @@ public class RestMockRegistry implements MockRegistryBase<EndpointMeta> {
         return registry.entrySet().stream()
                 .filter(entry -> entry.getKey().startsWith(methodPrefix))
                 .filter(entry -> {
-                    String registeredPath = entry.getKey().substring(methodPrefix.length());
-                    Pattern pattern = patternCache.computeIfAbsent(registeredPath,
+                    Pattern pattern = patternCache.computeIfAbsent(entry.getKey(),
                             p -> Pattern.compile(p.replaceAll("\\{[^/]+\\}", "[^/]+")));
                     return pattern.matcher(normalizePath(path)).matches();
                 })
