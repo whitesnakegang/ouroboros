@@ -7,73 +7,65 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.UUID;
 
 /**
- * Thread-local utility for managing Try context.
- * Stores the current tryId in ThreadLocal and propagates it via OpenTelemetry Baggage.
+ * Utility for managing Try context using OpenTelemetry Baggage.
  * 
  * OpenTelemetry Baggage Integration:
- * - TryFilter sets the tryId in ThreadLocal
- * - Propagates tryId to OpenTelemetry Baggage for distributed tracing
+ * - TryFilter sets the tryId in OpenTelemetry Baggage
+ * - Baggage provides automatic context propagation across threads and async boundaries
  * - OpenTelemetry Sampler/Instrumentation can read it via Baggage
  * - Cleaned up after request processing
+ * 
+ * Baggage is used instead of ThreadLocal because:
+ * - Works across thread boundaries (async operations, CompletableFuture, etc.)
+ * - Standard OpenTelemetry mechanism for context propagation
+ * - Automatically propagated through OpenTelemetry Context
  */
 @Slf4j
 public class TryContext {
     
     private static final String BAGGAGE_KEY = "ouro.try_id";
-    private static final ThreadLocal<UUID> CURRENT_TRY_ID = new ThreadLocal<>();
     
     /**
-     * Sets the current tryId for this thread and propagates it via OpenTelemetry Baggage.
+     * Sets the current tryId in OpenTelemetry Baggage.
      * If null is provided, clears the current tryId.
      * 
      * @param tryId the try session ID
      */
     public static void setTryId(UUID tryId) {
         if (tryId != null) {
-            CURRENT_TRY_ID.set(tryId);
-            
-            // Propagate to OpenTelemetry Baggage
             try {
                 Baggage currentBaggage = Baggage.current();
                 BaggageBuilder builder = currentBaggage.toBuilder();
                 builder.put(BAGGAGE_KEY, tryId.toString());
                 Baggage updatedBaggage = builder.build();
                 updatedBaggage.makeCurrent();
-                log.debug("Set tryId in context and baggage: {}", tryId);
+                log.debug("Set tryId in baggage: {}", tryId);
             } catch (Exception e) {
                 // OpenTelemetry not available, just log
                 log.trace("OpenTelemetry Baggage not available: {}", e.getMessage());
-                log.debug("Set tryId in context: {}", tryId);
+                log.debug("Failed to set tryId in baggage: {}", tryId);
             }
         } else {
-            // Clear the tryId if null is provided
-            UUID removed = CURRENT_TRY_ID.get();
-            CURRENT_TRY_ID.remove();
-            
-            if (removed != null) {
-                // Clear from Baggage
-                try {
-                    Baggage currentBaggage = Baggage.current();
-                    BaggageBuilder builder = currentBaggage.toBuilder();
-                    builder.remove(BAGGAGE_KEY);
-                    Baggage updatedBaggage = builder.build();
-                    updatedBaggage.makeCurrent();
-                    log.debug("Cleared tryId from context and baggage: {}", removed);
-                } catch (Exception e) {
-                    log.trace("OpenTelemetry Baggage not available: {}", e.getMessage());
-                    log.debug("Cleared tryId from context: {}", removed);
-                }
-            }
+            clear();
         }
     }
     
     /**
-     * Gets the current tryId for this thread.
+     * Gets the current tryId from OpenTelemetry Baggage.
      * 
      * @return the try session ID, or null if not set
      */
     public static UUID getTryId() {
-        return CURRENT_TRY_ID.get();
+        String id = getTryIdFromBaggage();
+        if (id != null) {
+            try {
+                return UUID.fromString(id);
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid tryId format in baggage: {}", id);
+                return null;
+            }
+        }
+        return null;
     }
     
     /**
@@ -82,30 +74,27 @@ public class TryContext {
      * @return true if tryId is set, false otherwise
      */
     public static boolean hasTryId() {
-        return CURRENT_TRY_ID.get() != null;
+        return getTryIdFromBaggage() != null;
     }
     
     /**
-     * Clears the current tryId from this thread and Baggage.
+     * Clears the current tryId from OpenTelemetry Baggage.
      * Should be called after request processing to prevent memory leaks.
      */
     public static void clear() {
-        UUID removed = CURRENT_TRY_ID.get();
-        CURRENT_TRY_ID.remove();
-        
-        if (removed != null) {
-            // Clear from Baggage
-            try {
-                Baggage currentBaggage = Baggage.current();
+        try {
+            Baggage currentBaggage = Baggage.current();
+            String existingId = currentBaggage.getEntryValue(BAGGAGE_KEY);
+            
+            if (existingId != null) {
                 BaggageBuilder builder = currentBaggage.toBuilder();
                 builder.remove(BAGGAGE_KEY);
                 Baggage updatedBaggage = builder.build();
                 updatedBaggage.makeCurrent();
-                log.debug("Cleared tryId from context and baggage: {}", removed);
-            } catch (Exception e) {
-                log.trace("OpenTelemetry Baggage not available: {}", e.getMessage());
-                log.debug("Cleared tryId from context: {}", removed);
+                log.debug("Cleared tryId from baggage: {}", existingId);
             }
+        } catch (Exception e) {
+            log.trace("OpenTelemetry Baggage not available: {}", e.getMessage());
         }
     }
     

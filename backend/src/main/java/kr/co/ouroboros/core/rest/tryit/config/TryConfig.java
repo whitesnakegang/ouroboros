@@ -7,10 +7,6 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.scheduling.annotation.EnableScheduling;
-import io.opentelemetry.api.OpenTelemetry;
-import io.opentelemetry.api.trace.Tracer;
-import io.opentelemetry.sdk.trace.SdkTracerProviderBuilder;
-import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.trace.SpanProcessor;
 
 /**
@@ -27,18 +23,6 @@ import io.opentelemetry.sdk.trace.SpanProcessor;
 @ComponentScan(basePackages = "kr.co.ouroboros")
 @EnableScheduling
 public class TryConfig {
-    
-    /**
-     * Provides Tracer bean for TryFilter.
-     * 
-     * @param openTelemetry OpenTelemetry instance
-     * @return Tracer instance
-     */
-    @Bean
-    @ConditionalOnMissingBean
-    public Tracer tracer(OpenTelemetry openTelemetry) {
-        return openTelemetry.getTracer("ouroboros-try-filter");
-    }
     
     /**
      * Registers the TrySpanProcessor to automatically add tryId attributes to spans.
