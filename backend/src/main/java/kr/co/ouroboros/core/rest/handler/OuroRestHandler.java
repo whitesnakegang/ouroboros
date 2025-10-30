@@ -22,6 +22,7 @@ import org.yaml.snakeyaml.Yaml;
 public class OuroRestHandler implements OuroProtocolHandler {
 
     private final OpenAPIService openAPIService;
+    private final RestSpecSyncPipeline pipeline;
 
     private static final ObjectMapper mapper = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true); // DTO에 @JsonIgnoreProperties로 안전
@@ -48,19 +49,18 @@ public class OuroRestHandler implements OuroProtocolHandler {
     }
 
     /**
-     * Scan the running application's OpenAPI model and produce a normalized REST API specification.
+     * Scans the running application's OpenAPI model and produces an API specification.
      *
-     * <p>Fetches the cached OpenAPI model for Locale.KOREA, converts it into an OuroRestApiSpec,
-     * and if the spec contains an info object with a missing version, sets that version to "v1".</p>
+     * <p>Fetches the cached OpenAPI model for Locale.KOREA and converts it into an OuroRestApiSpec.
+     * If the model contains an info object with a missing version, sets that version to "v1".</p>
      *
-     * @return the scanned REST API specification as an OuroRestApiSpec
+     * @return the scanned REST API specification
      * @throws IllegalStateException if the OpenAPI model cannot be retrieved or converted
      */
     @Override
     public OuroApiSpec scanCurrentState() {
         try {
             OpenAPI model = openAPIService.getCachedOpenAPI(Locale.KOREA);
-
             log.info("OpenAPI model : {}", model);
 
             String json = Json31.mapper().writeValueAsString(model);
@@ -99,6 +99,7 @@ public class OuroRestHandler implements OuroProtocolHandler {
      */
     @Override
     public OuroApiSpec synchronize(OuroApiSpec fileSpec, OuroApiSpec scannedSpec) {
+        OuroApiSpec validate = pipeline.validate(fileSpec, scannedSpec);
         return null;
     }
 
