@@ -45,7 +45,21 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
     }
 
 
-    // 파일 스펙(file)과 스캔 스펙(scan)의 "요청" 차이만 반영
+    /**
+     * Synchronizes and marks differences in request definitions for a single API path
+     * between the file-based and scanned REST specifications.
+     *
+     * If the path is missing in the file spec, scanned methods for the path are marked
+     * as endpoints and prepared for overwrite. If the path exists in the file spec,
+     * each HTTP method (GET, POST, PUT, PATCH, DELETE) is compared: scanned methods
+     * are either merged into the file spec with request diffs marked or marked as
+     * endpoints when the file operation is absent. Methods present only in the file
+     * spec are marked as file-only endpoints.
+     *
+     * @param path the API path to compare (e.g., "/users/{id}")
+     * @param file the file-based REST API specification to update/mark
+     * @param scan the scanned runtime REST API specification to compare against
+     */
     private void reqCompare(String path, OuroRestApiSpec file, OuroRestApiSpec scan) {
         Map<String, PathItem> filePaths = safe(file.getPaths());
         Map<String, PathItem> scanPaths = safe(scan.getPaths());
@@ -75,6 +89,20 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
         markFileOnlyMethods(fp, sp);
     }
 
+    /**
+     * Compare a single HTTP method's operation between the file-based spec and the scanned spec and mark differences.
+     *
+     * If the scanned operation is absent, no action is taken. If the scanned operation exists but the file operation
+     * is missing, the method on the file spec is marked as a differing endpoint and overwritten from the scanned spec.
+     * If both operations exist, the request definitions are compared and differences are marked.
+     *
+     * @param fileOp the operation from the file-based specification, or {@code null} if absent
+     * @param scanOp the operation from the scanned runtime specification, or {@code null} if absent
+     * @param file the file-based REST API specification to update/mark
+     * @param scan the scanned REST API specification used as the source of truth for comparisons
+     * @param path the API path being compared (e.g., "/users/{id}")
+     * @param m the HTTP method being compared (GET, POST, PUT, PATCH, DELETE)
+     */
     private void comparePair(Operation fileOp, Operation scanOp,
             OuroRestApiSpec file, OuroRestApiSpec scan, String path, HttpMethod m) {
         if (scanOp == null) return;
@@ -85,7 +113,15 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
         compareAndMarkRequest(fileOp, scanOp);
     }
 
-    /** 파일에만 있는 메서드를 endpoint로 마킹 */
+    /**
+     * Marks HTTP methods that exist in the file path but are absent in the scanned path as endpoint differences.
+     *
+     * For each of GET, POST, PUT, PATCH, and DELETE: if the file's operation exists and the scanned operation is null,
+     * merges the `DIFF_ENDPOINT` marker into the operation's `XOuroborosDiff`.
+     *
+     * @param fp the PathItem from the file-based spec to update
+     * @param sp the PathItem from the scanned runtime spec to compare against; if null no changes are made
+     */
     private void markFileOnlyMethods(PathItem fp, PathItem sp) {
         if (fp == null || sp == null) return;
         
