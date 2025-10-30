@@ -41,7 +41,7 @@ public class MockValidationService {
             for (String header : meta.getAuthHeaders()) {
                 if (request.getHeader(header) == null) {
                     return ValidationResult.error(401,
-                            "Authentication required. Missing header: " + header);
+                            "Authentication required.");
                 }
             }
         }
@@ -51,7 +51,7 @@ public class MockValidationService {
             for (String header : meta.getRequiredHeaders()) {
                 if (request.getHeader(header) == null) {
                     return ValidationResult.error(400,
-                            "Missing required header: " + header);
+                            "Missing required header");
                 }
             }
         }
@@ -61,7 +61,7 @@ public class MockValidationService {
             for (String param : meta.getRequiredParams()) {
                 if (request.getParameter(param) == null) {
                     return ValidationResult.error(400,
-                            "Missing required parameter: " + param);
+                            "Missing required parameter");
                 }
             }
         }
