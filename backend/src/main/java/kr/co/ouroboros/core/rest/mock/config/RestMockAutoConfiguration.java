@@ -5,6 +5,7 @@ import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import kr.co.ouroboros.core.global.mock.service.SchemaMockBuilder;
 import kr.co.ouroboros.core.rest.mock.filter.*;
 import kr.co.ouroboros.core.rest.mock.registry.RestMockRegistry;
+import kr.co.ouroboros.core.rest.mock.service.MockValidationService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -12,39 +13,37 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.core.Ordered;
 
 
-@Configuration
 @Slf4j
+@Configuration
 @ConditionalOnClass(name = "jakarta.servlet.Filter")
 @ConditionalOnProperty(prefix = "ouroboros", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class RestMockAutoConfiguration {
-    @Bean
-    public FilterRegistrationBean<MockRoutingFilter> routing(RestMockRegistry registry) {
-        FilterRegistrationBean<MockRoutingFilter> reg = new FilterRegistrationBean<>();
-        reg.setFilter(new MockRoutingFilter(registry));
-        reg.setOrder(1);
-        return reg;
-    }
+    private static final int MOCK_FILTER_ORDER = Ordered.HIGHEST_PRECEDENCE;
 
     @Bean
-    public FilterRegistrationBean<MockValidationFilter> validation() {
-        FilterRegistrationBean<MockValidationFilter> reg = new FilterRegistrationBean<>();
-        reg.setFilter(new MockValidationFilter());
-        reg.setOrder(2);
-        return reg;
-    }
-
-    @Bean
-    @ConditionalOnMissingBean(MockResponseFilter.class)
-    public FilterRegistrationBean<MockResponseFilter> response(
+    public FilterRegistrationBean<OuroborosMockFilter> ouroborosMockFilter(
+            RestMockRegistry registry,
+            MockValidationService validationService,
             SchemaMockBuilder schemaMockBuilder,
             ObjectMapper objectMapper,
-            XmlMapper xmlMapper
-    ) {
-        FilterRegistrationBean<MockResponseFilter> reg = new FilterRegistrationBean<>();
-        reg.setFilter(new MockResponseFilter(schemaMockBuilder, objectMapper, xmlMapper));
-        reg.setOrder(3);
+            XmlMapper xmlMapper) {
+
+        FilterRegistrationBean<OuroborosMockFilter> reg = new FilterRegistrationBean<>();
+
+        OuroborosMockFilter filter = new OuroborosMockFilter(
+                registry,
+                validationService,
+                schemaMockBuilder,
+                objectMapper,
+                xmlMapper
+        );
+
+        reg.setFilter(filter);
+        reg.setOrder(MOCK_FILTER_ORDER);
+
         return reg;
     }
 
