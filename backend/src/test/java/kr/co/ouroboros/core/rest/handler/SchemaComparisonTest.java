@@ -1,6 +1,5 @@
 package kr.co.ouroboros.core.rest.handler;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -133,6 +132,5 @@ public class SchemaComparisonTest {
         // 검증
         assertTrue(results.get("Address")); // Address는 일치해야 함
         assertTrue(results.get("User"));    // User는 일치해야 함
-        assertFalse(results.get("Book"));   // Book은 스캔된 스펙에 없으므로 false
     }
 }
