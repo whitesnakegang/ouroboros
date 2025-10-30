@@ -16,19 +16,37 @@ public class SchemaMockBuilder {
 
         switch (type) {
             case "object" -> {
-                Map<String, Object> props = (Map<String, Object>) schema.get("properties");
+                Object propsObj = schema.get("properties");
+                if (!(propsObj instanceof Map)) {
+                    return Collections.emptyMap();
+                }
+                Map<String, Object> props = (Map<String, Object>) propsObj;
                 Map<String, Object> result = new LinkedHashMap<>();
-                if (props != null) {
-                    for (var entry : props.entrySet()) {
-                        result.put(entry.getKey(), build((Map<String, Object>) entry.getValue()));
+                for (var entry : props.entrySet()) {
+                    Object propValue = entry.getValue();
+                    if (propValue instanceof Map) {
+                        result.put(entry.getKey(), build((Map<String, Object>) propValue));
                     }
                 }
                 return result;
             }
             case "array" -> {
-                Map<String, Object> items = (Map<String, Object>) schema.get("items");
-                int minItems = ((Number) schema.getOrDefault("minItems", 1)).intValue();
-                int maxItems = ((Number) schema.getOrDefault("maxItems", 3)).intValue();
+                Object itemsObj = schema.get("items");
+                if (!(itemsObj instanceof Map)) {
+                    return Collections.emptyList();
+                }
+                Map<String, Object> items = (Map<String, Object>) itemsObj;
+
+                int minItems = 1;
+                int maxItems = 3;
+                Object minObj = schema.get("minItems");
+                Object maxObj = schema.get("maxItems");
+                if (minObj instanceof Number) {
+                    minItems = ((Number) minObj).intValue();
+                }
+                if (maxObj instanceof Number) {
+                    maxItems = ((Number) maxObj).intValue();
+                }
 
                 int size = ThreadLocalRandom.current().nextInt(minItems, maxItems + 1);
                 List<Object> arr = new ArrayList<>(size);
