@@ -10,8 +10,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import static kr.co.ouroboros.core.rest.handler.MockApiHelper.checkMockApi;
+import static kr.co.ouroboros.core.rest.handler.MockApiHelper.isMockApi;
 import static kr.co.ouroboros.core.rest.handler.RequestDiffHelper.*;
+import static kr.co.ouroboros.core.rest.handler.EndpointDiffHelper.*;
 
 @Slf4j
 @Component
@@ -72,10 +73,10 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
                 // rest API 똑같은 경우
 
                 // scan의 x-ouroboros-progress가 MOCK이면 file에 그대로 마킹만 해주고 넘어감
-                if(checkMockApi(url, restFileSpec, restScannedSpec)) continue;
+                if(isMockApi(url, fileOp, scanOp)) continue;
 
                 // 3. endpoint diff가 있으면 reqCompare, resCompare는 스킵
-                reqCompare(url, fileOp, scanOp, schemaMatchResults);
+                reqCompare(url, fileOp, scanOp, schemaMatchResults, httpMethod);
                 resCompare(url, httpMethod, fileOp, scanOp, schemaMatchResults);
 
             }
@@ -106,58 +107,16 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
     }
 
     /**
-     * Synchronizes and marks differences in request definitions for a single API path
-     * between the file-based and scanned REST specifications.
+     * Compare request parameters between file and scan operations.
      *
-     * If the path is missing in the file spec, scanned methods for the path are marked
-     * as endpoints and prepared for overwrite. If the path exists in the file spec,
-     * each HTTP method (GET, POST, PUT, PATCH, DELETE) is compared: scanned methods
-     * are either merged into the file spec with request diffs marked or marked as
-     * endpoints when the file operation is absent. Methods present only in the file
-     * spec are marked as file-only endpoints.
+     * This method is called only when both fileOp and scanOp exist for the same URL and HTTP method.
+     * It compares parameters (path and query) and marks differences.
      *
-     * @param path the API path to compare (e.g., "/users/{id}")
-     * @param file the file-based REST API specification to update/mark
-     * @param scan the scanned runtime REST API specification to compare against
+     * @param fileOp the operation from the file specification
+     * @param scanOp the operation from the scanned specification
      */
-    private void reqCompare(String path, OuroRestApiSpec file, OuroRestApiSpec scan, Map<String, Boolean> schemaMatchResults) {
-        Map<String, PathItem> filePaths = safe(file.getPaths());
-        Map<String, PathItem> scanPaths = safe(scan.getPaths());
-
-        PathItem fp = filePaths.get(path);
-        PathItem sp = scanPaths.get(path);
-
-        // 메서드별 요청 비교
-        // 1. 스캔에 있는 메서드: 파일과 비교하여 request diff 마킹
-        comparePair(fp.getGet(),    sp.getGet(),   file, scan, path, HttpMethod.GET);
-        comparePair(fp.getPost(),   sp.getPost(),  file, scan, path, HttpMethod.POST);
-        comparePair(fp.getPut(),    sp.getPut(),   file, scan, path, HttpMethod.PUT);
-        comparePair(fp.getPatch(),  sp.getPatch(), file, scan, path, HttpMethod.PATCH);
-        comparePair(fp.getDelete(), sp.getDelete(),file, scan, path, HttpMethod.DELETE);
-    }
-
-    /**
-     * Compare a single HTTP method's operation between the file-based spec and the scanned spec and mark differences.
-     *
-     * If the scanned operation is absent, no action is taken. If the scanned operation exists but the file operation
-     * is missing, the method on the file spec is marked as a differing endpoint and overwritten from the scanned spec.
-     * If both operations exist, the request definitions are compared and differences are marked.
-     *
-     * @param fileOp the operation from the file-based specification, or {@code null} if absent
-     * @param scanOp the operation from the scanned runtime specification, or {@code null} if absent
-     * @param file the file-based REST API specification to update/mark
-     * @param scan the scanned REST API specification used as the source of truth for comparisons
-     * @param path the API path being compared (e.g., "/users/{id}")
-     * @param m the HTTP method being compared (GET, POST, PUT, PATCH, DELETE)
-     */
-    private void comparePair(Operation fileOp, Operation scanOp,
-            OuroRestApiSpec file, OuroRestApiSpec scan, String path, HttpMethod m) {
-        if (scanOp == null) return;
-        if (fileOp == null) {
-            markEndpointAndOverwrite(file, scan, path, m);
-            return;
-        }
-        compareAndMarkRequest(fileOp, scanOp);
+    private void reqCompare(String url, Operation fileOp, Operation scanOp, Map<String, Boolean> schemaMatchResults, HttpMethod method) {
+        compareAndMarkRequest(url, fileOp, scanOp, method, schemaMatchResults);
     }
 
     private void resCompare(String url, HttpMethod method, Operation fileOp, Operation scanOp, Map<String, Boolean> schemaMatchResults) {
