@@ -47,6 +47,7 @@ public class TestController {
         private Integer age;
         private Double height;
         private Address address;
+        private int[] nums = new int[5];
     }
 
     @AllArgsConstructor
@@ -83,7 +84,7 @@ public class TestController {
     @PostMapping("/users")
     @ApiState(state = State.COMPLETED)
     public ResponseEntity<User> createUser(@RequestBody User user) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(new User("name", 13, 180.2, new Address("road", "Adong", "Bgu")));
+        return ResponseEntity.status(HttpStatus.CREATED).body(new User("name", 13, 180.2, new Address("road", "Adong", "Bgu"), new int[]{1, 2, 3, 4, 5}));
     }
 
     /**
