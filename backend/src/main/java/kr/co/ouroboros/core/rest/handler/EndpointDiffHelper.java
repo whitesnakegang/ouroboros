@@ -3,6 +3,7 @@ package kr.co.ouroboros.core.rest.handler;
 import java.util.Map;
 import kr.co.ouroboros.core.rest.common.dto.Operation;
 import kr.co.ouroboros.core.rest.common.dto.PathItem;
+import lombok.extern.slf4j.Slf4j;
 
 import static kr.co.ouroboros.core.rest.handler.RequestDiffHelper.*;
 
@@ -10,6 +11,7 @@ import static kr.co.ouroboros.core.rest.handler.RequestDiffHelper.*;
  * Helper class for comparing and synchronizing endpoint differences between file and scanned API
  * specifications.
  */
+@Slf4j
 public final class EndpointDiffHelper {
 
     /**
@@ -20,14 +22,15 @@ public final class EndpointDiffHelper {
 
 
     public static boolean isDiffUrl(String url, Map<String, PathItem> pathsFile, Map<String, PathItem> pathsScanned) {
-
         // url에 해당하는 ENDPOINT가 명세에 있는 경우
         if (pathsFile.get(url) != null) {
+            log.info("URL : {} 존재", url);
             return false;
         }
 
         pathsFile.put(url, pathsScanned.get(url));
         PathItem addedPath = pathsFile.get(url);
+        log.info("URL : {} 존재하지 않는 경우", url);
         for (RequestDiffHelper.HttpMethod method : RequestDiffHelper.HttpMethod.values()) {
             Operation op = getOperationByMethod(addedPath, method);
             if (op != null) {
@@ -40,6 +43,7 @@ public final class EndpointDiffHelper {
 
 
     public static void markDiffEndpoint(String url, Operation scanOp, Map<String, PathItem> restFileSpec, HttpMethod method) {
+        log.info("METHOD: [{}], URL: [{}]은 같지만 METHOD는 다름", method, url);
         PathItem pathItem = restFileSpec.get(url);
         setOperationByMethod(pathItem, method, scanOp);
         Operation operationByMethod = getOperationByMethod(pathItem, method);
