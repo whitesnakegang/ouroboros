@@ -61,7 +61,6 @@ public class OuroRestHandler implements OuroProtocolHandler {
     public OuroApiSpec scanCurrentState() {
         try {
             OpenAPI model = openAPIService.getCachedOpenAPI(Locale.KOREA);
-            log.info("OpenAPI model : {}", model);
 
             String json = Json31.mapper().writeValueAsString(model);
             OuroRestApiSpec spec = mapper.readValue(json, OuroRestApiSpec.class);
