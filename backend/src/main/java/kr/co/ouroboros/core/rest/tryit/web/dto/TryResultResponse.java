@@ -8,7 +8,7 @@ import java.util.List;
 
 /**
  * Response DTO for try result retrieval API.
- * GET /ouroboros/tries/{tryId}
+ * GET /ouro/tries/{tryId}
  */
 @Data
 @Builder

@@ -68,7 +68,7 @@ kr.co.ouroboros.core.qa/
 ## 8️⃣ 동작 흐름 요약
 
 ```
-UI → POST /ouroboros/tries (tryId 발급)
+UI → POST /ouro/tries (tryId 발급)
      ↓
 실제 API 호출 (/api/orders/123, X-Ouroboros-Try 헤더 포함)
      ↓
@@ -76,7 +76,7 @@ OpenTelemetry Sampler (Try 요청만 record)
      ↓
 Grafana Tempo 저장
      ↓
-GET /ouroboros/tries/{tryId} → 분석 및 결과 JSON 응답
+GET /ouro/tries/{tryId} → 분석 및 결과 JSON 응답
 ```
 
 ---

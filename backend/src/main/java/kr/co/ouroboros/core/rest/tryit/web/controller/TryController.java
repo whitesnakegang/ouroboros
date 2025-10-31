@@ -27,7 +27,7 @@ import java.util.UUID;
  */
 @Slf4j
 @RestController
-@RequestMapping("/ouroboros/tries")
+@RequestMapping("/ouro/tries")
 @RequiredArgsConstructor
 public class TryController {
     
@@ -38,7 +38,7 @@ public class TryController {
     /**
      * Retrieves Try result.
      * 
-     * GET /ouroboros/tries/{tryId}
+     * GET /ouro/tries/{tryId}
      * 
      * @param tryIdStr Try session ID
      * @return analysis result
