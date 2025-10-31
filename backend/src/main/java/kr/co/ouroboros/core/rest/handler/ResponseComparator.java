@@ -6,68 +6,81 @@ import kr.co.ouroboros.core.rest.common.dto.MediaType;
 import kr.co.ouroboros.core.rest.common.dto.Operation;
 import kr.co.ouroboros.core.rest.common.dto.Response;
 import kr.co.ouroboros.core.rest.common.dto.Schema;
+import kr.co.ouroboros.core.rest.handler.RequestDiffHelper.HttpMethod;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
  * REST API 응답 스펙을 비교하는 컴포넌트.
- * 
- * 스캔된 문서를 기준으로 파일 기반 스펙과 응답 형식을 비교하여
- * 일치 여부를 검사하고 상세한 불일치 사항을 로깅합니다.
- * 
+ * <p>
+ * 스캔된 문서를 기준으로 파일 기반 스펙과 응답 형식을 비교하여 일치 여부를 검사하고 상세한 불일치 사항을 로깅합니다.
+ *
  * @since 0.0.1
  */
 @Slf4j
 @Component
 public class ResponseComparator {
 
-    /**
-     * Compares responses for a given HTTP method between a scanned operation and a file-based operation, logging matches and recording differences.
-     *
-     * @param method the HTTP method name (e.g., "GET", "POST")
-     * @param scannedOperation the operation from the scanned (baseline) document
-     * @param fileOperation the operation from the file (reference) document; may be annotated when differences are found
-     * @param endpoint the endpoint path being compared
-     * @param schemaMatchResults map from schema name to a boolean indicating whether that schema was determined to match
-     */
-    public void compareResponsesForMethod(String method, Operation scannedOperation, Operation fileOperation, String endpoint, Map<String, Boolean> schemaMatchResults) {
+    public void compareResponsesForMethod(String url, HttpMethod method, Operation scannedOperation, Operation fileOperation, Map<String, Boolean> schemaMatchResults) {
         if (scannedOperation == null || fileOperation == null) {
+            log.debug("Scan과 FIle 모두 없는 엔드포인트입니다.");
             return;
         }
 
         Map<String, Response> scannedResponses = scannedOperation.getResponses();
         Map<String, Response> fileResponses = fileOperation.getResponses();
 
+        // response 필드가 아예 없는 경우
         if (scannedResponses == null || fileResponses == null) {
             log.debug("Responses가 null입니다.");
             return;
         }
 
-        // 스캔된 문서의 각 응답에 대해 파일 문서와 비교
+        boolean hasMismatch = false;
+        // 스캔된 스펙의 특정 엔드포인트의 응답을 순회하여 동일 엔드포인트의 파일 스펙의 응답과 비교
         for (Map.Entry<String, Response> scannedEntry : scannedResponses.entrySet()) {
             String statusCode = scannedEntry.getKey();
             Response scannedResponse = scannedEntry.getValue();
             Response fileResponse = fileResponses.get(statusCode);
 
+            // 스캔 스펙에는 있는데 파일 스펙에는 없는 경우
             if (fileResponse == null) {
-                System.out.println(String.format("[RESPONSE MISSING] %s %s - Status %s: File spec에 해당 상태코드 응답이 없습니다. 스캔된 응답을 추가합니다.", 
-                    method, endpoint, statusCode));
-                // 파일 스펙에 스캔된 응답 추가
+                log.info("[RESPONSE MISSING] {} {} - Response-Status {}: File spec에 해당 상태코드 응답이 없습니다. 스캔된 응답을 추가합니다.",
+                        url, method, statusCode);
                 fileResponses.put(statusCode, scannedResponse);
                 continue;
             }
 
-            // 응답 스키마 비교
-            boolean isMatch = compareResponseSchemas(scannedResponse, fileResponse, method, endpoint, statusCode, schemaMatchResults);
-            
+            // 둘 다 같은 상태코드에 대한 Response가 있는 경우, 응답 스키마 비교
+            boolean isMatch = compareResponseSchemas(scannedResponse, fileResponse, method, url, statusCode, schemaMatchResults);
+
             if (isMatch) {
-                System.out.println(String.format("[RESPONSE MATCH] %s %s - Status %s: 응답 형식이 일치합니다.", 
-                    method, endpoint, statusCode));
+                log.debug("[RESPONSE MATCH] {} {} - Status {}: 응답 형식이 일치합니다.", url, method, statusCode);
             } else {
-                System.out.println(String.format("[RESPONSE MISMATCH] %s %s - Status %s: 응답 형식이 일치하지 않습니다.", 
-                    method, endpoint, statusCode));
-                // 불일치 => 파일 Operation에 표기
+                log.debug("[RESPONSE MISMATCH] {} {} - Status {}: 응답 형식이 일치하지 않습니다.", url, method, statusCode);
+                hasMismatch = true;
+            }
+        }
+
+        // 파일에만 있는 상태코드(O/X) 확인 → 불일치로 간주
+        for (String fileStatus : fileResponses.keySet()) {
+            if (!scannedResponses.containsKey(fileStatus)) {
+                log.debug("[RESPONSE EXTRA] {} {} - Response-Status {}: 스캔 스펙에 없는 상태코드 응답입니다.", url, method, fileStatus);
+                hasMismatch = true;
+            }
+        }
+
+        // 엔드포인트 단위로 최종 결과 설정
+        if (hasMismatch) {
+            fileOperation.setXOuroborosProgress("mock");
+            if ("none".equals(fileOperation.getXOuroborosDiff())) {
                 fileOperation.setXOuroborosDiff("response");
+            } else if ("request".equals(fileOperation.getXOuroborosDiff())) {
+                fileOperation.setXOuroborosDiff("both");
+            }
+        } else {
+            if ("none".equals(fileOperation.getXOuroborosDiff())) {
+                fileOperation.setXOuroborosProgress("completed");
             }
         }
     }
@@ -78,7 +91,7 @@ public class ResponseComparator {
      * @param schemaMatchResults map of schema name to a boolean indicating whether that named schema matched; used to consider referenced schemas during comparison
      * @return `true` if the responses' content (content types and their schemas) are considered matching, `false` otherwise
      */
-    private boolean compareResponseSchemas(Response scannedResponse, Response fileResponse, String method, String endpoint, String statusCode, Map<String, Boolean> schemaMatchResults) {
+    private boolean compareResponseSchemas(Response scannedResponse, Response fileResponse, HttpMethod method, String endpoint, String statusCode, Map<String, Boolean> schemaMatchResults) {
         if (scannedResponse == null && fileResponse == null) {
             return true;
         }
@@ -95,7 +108,8 @@ public class ResponseComparator {
     }
 
 
-    private boolean compareContent(Map<String, MediaType> scannedContent, Map<String, MediaType> fileContent, String method, String endpoint, String statusCode, Map<String, Boolean> schemaMatchResults) {
+    private boolean compareContent(Map<String, MediaType> scannedContent, Map<String, MediaType> fileContent, HttpMethod method, String endpoint, String statusCode,
+            Map<String, Boolean> schemaMatchResults) {
         if (scannedContent == null && fileContent == null) {
             return true;
         }
@@ -112,12 +126,12 @@ public class ResponseComparator {
             if (fileMediaType == null) {
                 // */*는 모든 content-type과 일치한다고 간주
                 if ("*/*".equals(contentType)) {
-                    System.out.println(String.format("[CONTENT TYPE WILDCARD] %s %s - Status %s: Content-Type '*/*'는 모든 타입과 일치합니다.", 
-                        method, endpoint, statusCode));
+                    log.debug("[CONTENT TYPE WILDCARD] {} {} - Status {}: Content-Type '*/*'는 모든 타입과 일치합니다.",
+                            endpoint, method, statusCode);
                     continue;
                 }
-                System.out.println(String.format("[CONTENT TYPE MISSING] %s %s - Status %s: Content-Type '%s'가 파일 스펙에 없습니다.", 
-                    method, endpoint, statusCode, contentType));
+                log.debug("[CONTENT TYPE MISSING] {} {} - Status {}: Content-Type '%s'가 파일 스펙에 없습니다.",
+                        endpoint, method, statusCode, contentType);
                 return false;
             }
 
@@ -139,9 +153,10 @@ public class ResponseComparator {
      * @param statusCode         the HTTP status code of the response
      * @param contentType        the Content-Type being compared
      * @param schemaMatchResults a map of schema name to match result used to short-circuit referenced-schema comparisons
-     * @return                   `true` if the MediaType schemas match, `false` otherwise
+     * @return `true` if the MediaType schemas match, `false` otherwise
      */
-    private boolean compareMediaTypes(MediaType scannedMediaType, MediaType fileMediaType, String method, String endpoint, String statusCode, String contentType, Map<String, Boolean> schemaMatchResults) {
+    private boolean compareMediaTypes(MediaType scannedMediaType, MediaType fileMediaType, HttpMethod method, String endpoint, String statusCode, String contentType,
+            Map<String, Boolean> schemaMatchResults) {
         if (scannedMediaType == null && fileMediaType == null) {
             return true;
         }
@@ -154,46 +169,45 @@ public class ResponseComparator {
 
     /**
      * Compare two response schemas by their `$ref` reference or primitive `type`.
+     * <p>
+     * Compares the scanned (baseline) schema and the file-based (reference) schema: if either schema uses a `$ref` the `$ref` values must match and referenced schema match status is consulted via
+     * `schemaMatchResults`; otherwise the schemas' `type` values must be equal.
      *
-     * Compares the scanned (baseline) schema and the file-based (reference) schema: if either schema uses a `$ref`
-     * the `$ref` values must match and referenced schema match status is consulted via `schemaMatchResults`; otherwise
-     * the schemas' `type` values must be equal.
-     *
-     * @param scannedSchema the scanned (baseline) Schema to compare
-     * @param fileSchema the file-based (reference) Schema to compare against
-     * @param method the HTTP method associated with the response being compared
-     * @param endpoint the endpoint path associated with the response being compared
-     * @param statusCode the HTTP status code associated with the response being compared
-     * @param contentType the response Content-Type associated with the schema being compared
+     * @param scannedSchema      the scanned (baseline) Schema to compare
+     * @param fileSchema         the file-based (reference) Schema to compare against
+     * @param method             the HTTP method associated with the response being compared
+     * @param endpoint           the endpoint path associated with the response being compared
+     * @param statusCode         the HTTP status code associated with the response being compared
+     * @param contentType        the response Content-Type associated with the schema being compared
      * @param schemaMatchResults map from schema name (extracted from `$ref`) to a boolean indicating whether that referenced schema matched previously
      * @return `true` if the schemas are considered matching, `false` otherwise
      */
-    private boolean compareSchemas(Schema scannedSchema, Schema fileSchema, String method, String endpoint, String statusCode, String contentType, Map<String, Boolean> schemaMatchResults) {
+    private boolean compareSchemas(Schema scannedSchema, Schema fileSchema, HttpMethod method, String endpoint, String statusCode, String contentType, Map<String, Boolean> schemaMatchResults) {
         if (scannedSchema == null && fileSchema == null) {
             return true;
         }
         if (scannedSchema == null || fileSchema == null) {
-            System.out.println(String.format("[SCHEMA NULL MISMATCH] %s %s - Status %s, Content-Type '%s': 한쪽 스키마가 null입니다.", 
-                method, endpoint, statusCode, contentType));
+            log.debug("[SCHEMA NULL MISMATCH] {} {} - Status {}, Content-Type '{}': 한쪽 스키마가 null입니다.",
+                    endpoint, method, statusCode, contentType);
             return false;
         }
 
         // $ref 비교 (객체 참조인 경우)
         if (scannedSchema.getRef() != null || fileSchema.getRef() != null) {
             if (!Objects.equals(scannedSchema.getRef(), fileSchema.getRef())) {
-                System.out.println(String.format("[SCHEMA REF MISMATCH] %s %s - Status %s, Content-Type '%s': $ref가 다릅니다. (스캔: %s, 파일: %s)", 
-                    method, endpoint, statusCode, contentType, scannedSchema.getRef(), fileSchema.getRef()));
+                log.debug("[SCHEMA REF MISMATCH] {} {} - Status {}, Content-Type '{}': $ref가 다릅니다. (스캔: {}, 파일: {})",
+                        endpoint, method, statusCode, contentType, scannedSchema.getRef(), fileSchema.getRef());
                 return false;
             }
-            
+
             // $ref가 같으면 schemaMatchResults에서 확인
             if (scannedSchema.getRef() != null) {
                 String schemaName = extractSchemaNameFromRef(scannedSchema.getRef());
                 if (schemaName != null && schemaMatchResults.containsKey(schemaName)) {
                     boolean schemaMatch = schemaMatchResults.get(schemaName);
                     if (!schemaMatch) {
-                        System.out.println(String.format("[SCHEMA REF MISMATCH] %s %s - Status %s, Content-Type '%s': 참조하는 스키마 '%s'가 일치하지 않습니다.", 
-                            method, endpoint, statusCode, contentType, schemaName));
+                        log.debug("[SCHEMA REF MISMATCH] {} {} - Status {}, Content-Type '{}': 참조하는 스키마 '{}'가 일치하지 않습니다.",
+                                endpoint, method, statusCode, contentType, schemaName);
                         return false;
                     }
                 }
@@ -202,15 +216,15 @@ public class ResponseComparator {
         // type 비교 (기본 타입인 경우)
         else {
             if (!Objects.equals(scannedSchema.getType(), fileSchema.getType())) {
-                System.out.println(String.format("[SCHEMA TYPE MISMATCH] %s %s - Status %s, Content-Type '%s': 타입이 다릅니다. (스캔: %s, 파일: %s)", 
-                    method, endpoint, statusCode, contentType, scannedSchema.getType(), fileSchema.getType()));
+                log.debug("[SCHEMA TYPE MISMATCH] {} {} - Status {}, Content-Type '{}': 타입이 다릅니다. (스캔: {}, 파일: {})",
+                        endpoint, method, statusCode, contentType, scannedSchema.getType(), fileSchema.getType());
                 return false;
             }
         }
 
         return true;
     }
-    
+
     /**
      * Extracts the schema name from a JSON Reference ($ref) string.
      *

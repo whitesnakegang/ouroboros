@@ -28,7 +28,6 @@ paths:
       x-ouroboros-progress: mock
       x-ouroboros-tag: none
       x-ouroboros-diff: none
-
     get:
       summary: Find users (request param)
       description: Query parameters로 사용자 목록을 필터링합니다.
@@ -81,7 +80,6 @@ paths:
       x-ouroboros-progress: mock
       x-ouroboros-tag: none
       x-ouroboros-diff: none
-
   /api/users/{id}:
     get:
       summary: Get user by ID (path param)
@@ -109,7 +107,6 @@ paths:
       x-ouroboros-progress: mock
       x-ouroboros-tag: none
       x-ouroboros-diff: none
-
 components:
   schemas:
     Address:
@@ -132,6 +129,10 @@ components:
       required:
         - street
         - city
+      x-ouroboros-orders:
+        - street
+        - city
+        - zipCode
     User:
       type: object
       title: User Schema
@@ -152,6 +153,10 @@ components:
       required:
         - id
         - name
+      x-ouroboros-orders:
+        - id
+        - name
+        - email
     UserWithAddress:
       type: object
       title: User with Address
@@ -174,6 +179,12 @@ components:
             $ref: '#/components/schemas/Address'
           minItems: 0
           maxItems: 5
+          x-ouroboros-mock: ''
       required:
         - id
         - name
+      x-ouroboros-orders:
+        - id
+        - name
+        - address
+        - previousAddresses

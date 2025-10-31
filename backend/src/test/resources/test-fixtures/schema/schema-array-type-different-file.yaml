@@ -1,0 +1,17 @@
+openapi: "3.1.0"
+info:
+  title: "OpenAPI definition"
+  version: "v0"
+components:
+  schemas:
+    User:
+      type: "object"
+      properties:
+        name:
+          type: "string"
+        hobbies:
+          type: "array"
+          items:
+            type: "integer"
+            format: "int32"
+

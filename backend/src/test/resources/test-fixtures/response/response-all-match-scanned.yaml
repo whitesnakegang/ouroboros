@@ -1,0 +1,36 @@
+openapi: "3.1.0"
+info:
+  title: "OpenAPI definition"
+  version: "v0"
+paths:
+  "/api/test/users/{id}":
+    put:
+      x-ouroboros-id: "a886a792-b09c-40f2-b4ae-62f74c3c2009"
+      x-ouroboros-progress: "completed"
+      x-ouroboros-tag: "none"
+      x-ouroboros-diff: "none"
+      responses:
+        "200":
+          description: "정상적으로 조회됨"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          description: "잘못된 요청 파라미터"
+          content:
+            "*/*":
+              schema:
+                type: "string"
+                additionalProperties: {}
+components:
+  schemas:
+    User:
+      type: "object"
+      properties:
+        name:
+          type: "string"
+        age:
+          type: "integer"
+          format: "int32"
+

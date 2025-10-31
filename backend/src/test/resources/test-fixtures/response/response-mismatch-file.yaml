@@ -1,0 +1,26 @@
+openapi: "3.1.0"
+info:
+  title: "OpenAPI definition"
+  version: "v0"
+paths:
+  "/api/test/users":
+    get:
+      x-ouroboros-id: "11111111-1111-1111-1111-111111111111"
+      x-ouroboros-progress: "mock"
+      x-ouroboros-tag: "none"
+      x-ouroboros-diff: "none"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Book"
+components:
+  schemas:
+    Book:
+      type: "object"
+      properties:
+        title:
+          type: "string"
+

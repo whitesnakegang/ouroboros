@@ -6,6 +6,7 @@ import kr.co.ouroboros.core.global.spec.OuroApiSpec;
 import kr.co.ouroboros.core.rest.common.dto.Operation;
 import kr.co.ouroboros.core.rest.common.dto.OuroRestApiSpec;
 import kr.co.ouroboros.core.rest.common.dto.PathItem;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -13,6 +14,7 @@ import static kr.co.ouroboros.core.rest.handler.MockApiHelper.isMockApi;
 import static kr.co.ouroboros.core.rest.handler.RequestDiffHelper.*;
 import static kr.co.ouroboros.core.rest.handler.EndpointDiffHelper.*;
 
+@Slf4j
 @Component
 public class RestSpecSyncPipeline implements SpecSyncPipeline {
 
@@ -68,14 +70,14 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
                     continue;
                 }
 
-                // rest API 똑같은 경우q
+                // rest API 똑같은 경우
 
                 // scan의 x-ouroboros-progress가 MOCK이면 file에 그대로 마킹만 해주고 넘어감
                 if(isMockApi(url, fileOp, scanOp)) continue;
 
                 // 3. endpoint diff가 있으면 reqCompare, resCompare는 스킵
                 reqCompare(url, fileOp, scanOp, schemaMatchResults, httpMethod);
-//                resCompare(url, fileOp, scanOp, schemaMatchResults);
+                resCompare(url, httpMethod, fileOp, scanOp, schemaMatchResults);
 
             }
         }
@@ -106,7 +108,7 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
 
     /**
      * Compare request parameters between file and scan operations.
-     * 
+     *
      * This method is called only when both fileOp and scanOp exist for the same URL and HTTP method.
      * It compares parameters (path and query) and marks differences.
      *
@@ -117,50 +119,9 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
         compareAndMarkRequest(url, fileOp, scanOp, method, schemaMatchResults);
     }
 
-
-    /**
-     * Synchronizes response definitions for a specific API path by comparing the scanned spec against the file-backed spec.
-     *
-     * For each HTTP method present in the scanned path, compares responses and updates the file-based definition as needed,
-     * using schemaMatchResults to determine per-schema compatibility.
-     *
-     * @param key                the path key identifying the endpoint (for example "/users/{id}")
-     * @param restFileSpec       the file-based REST API specification to be updated
-     * @param restScannedSpec    the scanned REST API specification used as the source of truth
-     * @param schemaMatchResults a map of schema name to boolean indicating whether each schema matches between scanned and file specs
-     */
-    private void resCompare(String key, OuroRestApiSpec restFileSpec, OuroRestApiSpec restScannedSpec, Map<String, Boolean> schemaMatchResults) {
-        Map<String, PathItem> pathsScanned = restScannedSpec.getPaths();
-        Map<String, PathItem> pathsFile = restFileSpec.getPaths();
-
-        PathItem pathItemScanned = pathsScanned.get(key);
-        PathItem pathItemFile = pathsFile.get(key);
-
-        if (pathItemScanned == null || pathItemFile == null) {
-            return;
-        }
-
-        System.out.println(String.format("[RESPONSE COMPARE] '%s' - 스키마 매칭 결과: %s", key, schemaMatchResults));
-
-        // pathItemScanned를 기준으로 응답 비교 (스캔된 것만 확인)
-        if (pathItemScanned.getGet() != null) {
-            responseComparator.compareResponsesForMethod("GET", pathItemScanned.getGet(), pathItemFile.getGet(), key, schemaMatchResults);
-        }
-
-        if (pathItemScanned.getPost() != null) {
-            responseComparator.compareResponsesForMethod("POST", pathItemScanned.getPost(), pathItemFile.getPost(), key, schemaMatchResults);
-        }
-
-        if (pathItemScanned.getPut() != null) {
-            responseComparator.compareResponsesForMethod("PUT", pathItemScanned.getPut(), pathItemFile.getPut(), key, schemaMatchResults);
-        }
-
-        if (pathItemScanned.getPatch() != null) {
-            responseComparator.compareResponsesForMethod("PATCH", pathItemScanned.getPatch(), pathItemFile.getPatch(), key, schemaMatchResults);
-        }
-
-        if (pathItemScanned.getDelete() != null) {
-            responseComparator.compareResponsesForMethod("DELETE", pathItemScanned.getDelete(), pathItemFile.getDelete(), key, schemaMatchResults);
-        }
+    private void resCompare(String url, HttpMethod method, Operation fileOp, Operation scanOp, Map<String, Boolean> schemaMatchResults) {
+        // 이전 로직에 의해 fileOp과 scanOp은 endpoint랑 http-method가 똑같은 삳태가 보장됨.
+        // scan은 무조건 null이 아님
+        responseComparator.compareResponsesForMethod(url, method, scanOp, fileOp, schemaMatchResults);
     }
 }
