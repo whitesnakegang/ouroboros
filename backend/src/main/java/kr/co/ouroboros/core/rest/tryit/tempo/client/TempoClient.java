@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.tryit.tempo;
+package kr.co.ouroboros.core.rest.tryit.tempo.client;
 
 import java.util.List;
 
@@ -43,3 +43,4 @@ public interface TempoClient {
      */
     boolean isEnabled();
 }
+

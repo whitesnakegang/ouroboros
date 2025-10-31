@@ -1,6 +1,7 @@
-package kr.co.ouroboros.core.rest.tryit.config;
+package kr.co.ouroboros.core.rest.tryit.tracing.config;
 
-import kr.co.ouroboros.core.rest.tryit.aspect.MethodTracingMethodInterceptor;
+import kr.co.ouroboros.core.rest.tryit.tracing.aspect.MethodTracingMethodInterceptor;
+
 import org.aopalliance.aop.Advice;
 import org.springframework.aop.Advisor;
 import org.springframework.aop.ClassFilter;
@@ -22,7 +23,7 @@ import java.util.Set;
 @AutoConfiguration
 @EnableConfigurationProperties(MethodTracingProperties.class)
 @ConditionalOnClass(Advisor.class)
-public class MethodTracingAdvisorConfig {
+public class MethodTracingConfig {
 
     @Bean
     @ConditionalOnMissingBean(name = "ouroborosMethodTracingAdvisor")
@@ -90,5 +91,4 @@ public class MethodTracingAdvisorConfig {
         return new DefaultPointcutAdvisor(pointcut, advice);
     }
 }
-
 

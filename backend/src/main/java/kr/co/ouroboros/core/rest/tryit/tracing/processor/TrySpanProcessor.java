@@ -1,11 +1,11 @@
-package kr.co.ouroboros.core.rest.tryit.span;
+package kr.co.ouroboros.core.rest.tryit.tracing.processor;
 
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.sdk.trace.ReadWriteSpan;
 import io.opentelemetry.sdk.trace.ReadableSpan;
 import io.opentelemetry.sdk.trace.SpanProcessor;
-import kr.co.ouroboros.core.rest.tryit.util.TryContext;
+import kr.co.ouroboros.core.rest.tryit.context.TryContext;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -45,3 +45,4 @@ public class TrySpanProcessor implements SpanProcessor {
         return false;
     }
 }
+

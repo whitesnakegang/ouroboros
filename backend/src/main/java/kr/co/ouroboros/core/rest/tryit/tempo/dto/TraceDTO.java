@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.tryit.tempo;
+package kr.co.ouroboros.core.rest.tryit.tempo.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
@@ -106,3 +106,4 @@ public class TraceDTO {
         private Boolean boolValue;
     }
 }
+

@@ -1,7 +1,7 @@
 package kr.co.ouroboros.core.rest.tryit.analysis;
 
-import kr.co.ouroboros.core.rest.tryit.dto.TryResultResponse;
-import kr.co.ouroboros.core.rest.tryit.tempo.TraceDTO;
+import kr.co.ouroboros.core.rest.tryit.web.dto.TryResultResponse;
+import kr.co.ouroboros.core.rest.tryit.tempo.dto.TraceDTO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -322,7 +322,7 @@ public class TraceAnalyzer {
                 issues.add(TryResultResponse.Issue.builder()
                         .type(TryResultResponse.Issue.Type.DB_QUERY_SLOW)
                         .severity(determineSeverity(percentage))
-                        .summary(String.format("DB query takes %.1f%% of total time (%.0fms)", percentage, durationMs))
+                        .summary(String.format("DB query takes %.1f%% of total time (%dms)", percentage, durationMs))
                         .spanName(span.name)
                         .durationMs(durationMs)
                         .evidence(buildEvidence(span))
@@ -335,7 +335,7 @@ public class TraceAnalyzer {
                 issues.add(TryResultResponse.Issue.builder()
                         .type(TryResultResponse.Issue.Type.SLOW_HTTP)
                         .severity(determineSeverity(percentage))
-                        .summary(String.format("HTTP call takes %.1f%% of total time (%.0fms)", percentage, durationMs))
+                        .summary(String.format("HTTP call takes %.1f%% of total time (%dms)", percentage, durationMs))
                         .spanName(span.name)
                         .durationMs(durationMs)
                         .evidence(buildEvidence(span))
@@ -348,7 +348,7 @@ public class TraceAnalyzer {
                 issues.add(TryResultResponse.Issue.builder()
                         .type(TryResultResponse.Issue.Type.SLOW_SPAN)
                         .severity(determineSeverity(percentage))
-                        .summary(String.format("Span takes %.1f%% of total time (%.0fms)", percentage, durationMs))
+                        .summary(String.format("Span takes %.1f%% of total time (%dms)", percentage, durationMs))
                         .spanName(span.name)
                         .durationMs(durationMs)
                         .evidence(buildEvidence(span))

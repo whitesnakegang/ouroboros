@@ -1,8 +1,8 @@
-package kr.co.ouroboros.core.rest.tryit.aspect;
+package kr.co.ouroboros.core.rest.tryit.tracing.aspect;
 
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
-import kr.co.ouroboros.core.rest.tryit.config.MethodTracingProperties;
+import kr.co.ouroboros.core.rest.tryit.tracing.config.MethodTracingProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aopalliance.intercept.MethodInterceptor;
@@ -103,5 +103,4 @@ public class MethodTracingMethodInterceptor implements MethodInterceptor {
         return idx >= 0 ? fqcn.substring(idx + 1) : (fqcn != null ? fqcn : "");
     }
 }
-
 

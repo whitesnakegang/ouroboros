@@ -1,6 +1,8 @@
 package kr.co.ouroboros.core.rest.tryit.config;
 
-import kr.co.ouroboros.core.rest.tryit.span.TrySpanProcessor;
+import kr.co.ouroboros.core.rest.tryit.tracing.config.MethodTracingProperties;
+import kr.co.ouroboros.core.rest.tryit.tempo.config.TempoProperties;
+import kr.co.ouroboros.core.rest.tryit.tracing.processor.TrySpanProcessor;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;

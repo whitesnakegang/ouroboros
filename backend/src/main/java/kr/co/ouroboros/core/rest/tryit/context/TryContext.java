@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.tryit.util;
+package kr.co.ouroboros.core.rest.tryit.context;
 
 import io.opentelemetry.api.baggage.Baggage;
 import io.opentelemetry.api.baggage.BaggageBuilder;
@@ -112,3 +112,4 @@ public class TryContext {
         }
     }
 }
+

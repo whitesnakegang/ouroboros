@@ -1,6 +1,6 @@
-package kr.co.ouroboros.core.rest.tryit.filter;
+package kr.co.ouroboros.core.rest.tryit.identification;
 
-import kr.co.ouroboros.core.rest.tryit.util.TryContext;
+import kr.co.ouroboros.core.rest.tryit.context.TryContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.Ordered;

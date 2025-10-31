@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.tryit.config;
+package kr.co.ouroboros.core.rest.tryit.tempo.config;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -43,3 +43,4 @@ public class TempoProperties {
      */
     private int maxPollAttempts = 10;
 }
+

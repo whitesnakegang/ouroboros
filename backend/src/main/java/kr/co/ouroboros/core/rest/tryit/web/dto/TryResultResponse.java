@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.tryit.dto;
+package kr.co.ouroboros.core.rest.tryit.web.dto;
 
 import lombok.Builder;
 import lombok.Data;
@@ -219,3 +219,4 @@ public class TryResultResponse {
         }
     }
 }
+

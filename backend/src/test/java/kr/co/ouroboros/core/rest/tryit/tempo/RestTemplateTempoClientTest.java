@@ -1,6 +1,5 @@
-package kr.co.ouroboros.core.rest.tryit.tempo;
+package kr.co.ouroboros.core.rest.tryit.tempo.client;
 
-import kr.co.ouroboros.core.rest.tryit.config.TempoProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.autoconfigure.web.client.RestClientTest;
@@ -8,6 +7,8 @@ import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestTemplate;
+
+import kr.co.ouroboros.core.rest.tryit.tempo.config.TempoProperties;
 
 import java.util.List;
 

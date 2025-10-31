@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.tryit.util;
+package kr.co.ouroboros.core.rest.tryit.context;
 
 import org.junit.jupiter.api.*;
 import org.springframework.mock.web.MockHttpServletRequest;

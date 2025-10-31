@@ -1,16 +1,15 @@
-package kr.co.ouroboros.core.rest.tryit.tempo;
+package kr.co.ouroboros.core.rest.tryit.tempo.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import kr.co.ouroboros.core.rest.tryit.config.TempoProperties;
-import lombok.RequiredArgsConstructor;
+import kr.co.ouroboros.core.rest.tryit.tempo.config.TempoProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
-
 import org.springframework.web.util.UriUtils;
+
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -174,3 +173,4 @@ public class RestTemplateTempoClient implements TempoClient {
         }
     }
 }
+

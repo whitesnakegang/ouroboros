@@ -1,10 +1,10 @@
-package kr.co.ouroboros.core.rest.tryit.filter;
+package kr.co.ouroboros.core.rest.tryit.identification;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import kr.co.ouroboros.core.rest.tryit.util.TryContext;
+import kr.co.ouroboros.core.rest.tryit.context.TryContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -79,3 +79,4 @@ public class TryFilter extends OncePerRequestFilter {
         return false;
     }
 }
+

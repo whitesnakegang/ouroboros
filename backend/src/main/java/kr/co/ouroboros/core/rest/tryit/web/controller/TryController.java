@@ -1,10 +1,10 @@
-package kr.co.ouroboros.core.rest.tryit.controller;
+package kr.co.ouroboros.core.rest.tryit.web.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.co.ouroboros.core.rest.tryit.analysis.TraceAnalyzer;
-import kr.co.ouroboros.core.rest.tryit.dto.TryResultResponse;
-import kr.co.ouroboros.core.rest.tryit.tempo.TempoClient;
-import kr.co.ouroboros.core.rest.tryit.tempo.TraceDTO;
+import kr.co.ouroboros.core.rest.tryit.web.dto.TryResultResponse;
+import kr.co.ouroboros.core.rest.tryit.tempo.client.TempoClient;
+import kr.co.ouroboros.core.rest.tryit.tempo.dto.TraceDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -202,3 +202,4 @@ public class TryController {
         return null;
     }
 }
+
