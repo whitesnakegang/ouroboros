@@ -16,13 +16,14 @@ import java.util.UUID;
 
 /**
  * Filter that identifies Try requests and sets tryId in OpenTelemetry Baggage.
- * Response modification is handled by TryResponseBodyAdvice for better safety.
+ * Response modification (header and body) is handled by TryResponseAdvice for better safety.
  * 
  * Behavior:
  * 1. If X-Ouroboros-Try header equals "on", generate tryId
  * 2. Set tryId in OpenTelemetry Baggage (for context propagation)
- * 3. Response modification is handled by TryResponseBodyAdvice
- * 4. If missing or not "on", process as normal request
+ * 3. Set tryId in response header early (as safety net)
+ * 4. Response modification is handled by TryResponseAdvice
+ * 5. If missing or not "on", process as normal request
  */
 @Slf4j
 @Component
@@ -46,6 +47,8 @@ public class TryFilter extends OncePerRequestFilter {
             UUID tryId = UUID.randomUUID();
             log.debug("Try request detected, generating tryId: {}", tryId);
             TryContext.setTryId(tryId);
+            // Set header early to cover cases where response may be committed within the chain (e.g., 404 basic error)
+            response.setHeader(RESPONSE_TRY_ID_HEADER, tryId.toString());
             request.setAttribute(REQUEST_TRY_ID_ATTR, tryId.toString());
             generatedHere = true;
         }
