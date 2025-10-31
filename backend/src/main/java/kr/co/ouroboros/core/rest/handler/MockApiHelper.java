@@ -13,27 +13,15 @@ public final class MockApiHelper {
 
     }
 
-    public static boolean checkMockApi(String path, OuroRestApiSpec file, OuroRestApiSpec scan) {
-
-        PathItem filePathItem = file.getPaths().get(path);
-        PathItem scanPathItem = scan.getPaths().get(path);
-
-        boolean isMock = false;
-
-        for(HttpMethod httpMethod : HttpMethod.values()) {
-            Operation fileOp = getOperationByMethod(filePathItem, httpMethod);
-            Operation scanOp = getOperationByMethod(scanPathItem, httpMethod);
-
-            if(fileOp == null || scanOp == null) continue;
-
-            if(scanOp.getXOuroborosProgress().equals("MOCK")) {
-                fileOp.setXOuroborosProgress("MOCK");
-                fileOp.setXOuroborosTag(scanOp.getXOuroborosTag());
-                isMock = true;
-            }
+    public static boolean isMockApi(String path, Operation fileOp, Operation scanOp) {
+        String xOuroborosProgress = scanOp.getXOuroborosProgress();
+        if (xOuroborosProgress.equals("MOCK")) {
+            fileOp.setXOuroborosProgress("MOCK");
+            fileOp.setXOuroborosTag(scanOp.getXOuroborosTag());
+            return true;
         }
 
-        return isMock;
+        return false;
     }
 
 
