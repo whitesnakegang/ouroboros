@@ -2,9 +2,11 @@ package kr.co.ouroboros.core.rest.tryit.web.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.co.ouroboros.core.rest.tryit.analysis.TraceAnalyzer;
+import kr.co.ouroboros.core.rest.tryit.web.dto.TryIssuesResponse;
 import kr.co.ouroboros.core.rest.tryit.web.dto.TryMethodListResponse;
 import kr.co.ouroboros.core.rest.tryit.web.dto.TryResultResponse;
 import kr.co.ouroboros.core.rest.tryit.web.dto.TryTraceResponse;
+import kr.co.ouroboros.core.rest.tryit.service.TryIssuesService;
 import kr.co.ouroboros.core.rest.tryit.service.TryMethodListService;
 import kr.co.ouroboros.core.rest.tryit.service.TryTraceService;
 import kr.co.ouroboros.core.rest.tryit.tempo.client.TempoClient;
@@ -45,28 +47,7 @@ public class TryController {
     private final TraceSpanConverter traceSpanConverter;
     private final TryMethodListService tryMethodListService;
     private final TryTraceService tryTraceService;
-
-    /**
-     * Retrieves detected issues for a try without trace spans.
-     * Optimized for issues analysis and recommendations.
-     * 
-     * GET /ouro/tries/{tryId}/issues
-     * 
-     * @param tryIdStr Try session ID
-     * @return issues response
-     */
-    @GetMapping("/{tryId}/issues")
-    public TryIssuesResponse getIssues(@PathVariable("tryId") String tryIdStr) {
-        // Validate tryId format
-        try {
-            UUID.fromString(tryIdStr);
-        } catch (IllegalArgumentException e) {
-            log.warn("Invalid tryId format: {}", tryIdStr);
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid tryId format");
-        }
-        
-        return tryIssuesService.getIssues(tryIdStr);
-    }
+    private final TryIssuesService tryIssuesService;
     
     /**
      * Retrieves paginated list of methods for a try, sorted by selfDurationMs (descending).
@@ -75,7 +56,7 @@ public class TryController {
      * 
      * @param tryIdStr Try session ID
      * @param page Page number (default: 0)
-     * @param size Page size (default: 20)
+     * @param size Page size (default: 5)
      * @return paginated method list
      */
     @GetMapping("/{tryId}/methods")
@@ -115,6 +96,28 @@ public class TryController {
         }
 
         return tryTraceService.getTrace(tryIdStr);
+    }
+
+    /**
+     * Retrieves detected issues for a try without trace spans.
+     * Optimized for issues analysis and recommendations.
+     *
+     * GET /ouro/tries/{tryId}/issues
+     *
+     * @param tryIdStr Try session ID
+     * @return issues response
+     */
+    @GetMapping("/{tryId}/issues")
+    public TryIssuesResponse getIssues(@PathVariable("tryId") String tryIdStr) {
+        // Validate tryId format
+        try {
+            UUID.fromString(tryIdStr);
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid tryId format: {}", tryIdStr);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid tryId format");
+        }
+
+        return tryIssuesService.getIssues(tryIdStr);
     }
     
     /**
