@@ -1,7 +1,7 @@
 package kr.co.ouroboros.core.rest.tryit.trace.analyzer;
 
+import kr.co.ouroboros.core.rest.tryit.trace.dto.Issue;
 import kr.co.ouroboros.core.rest.tryit.trace.dto.TraceSpanInfo;
-import kr.co.ouroboros.core.rest.tryit.web.dto.TryResultResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -22,13 +22,13 @@ public class IssueAnalyzer {
      * @param totalDurationMs Total duration
      * @return List of detected issues
      */
-    public List<TryResultResponse.Issue> analyze(List<TraceSpanInfo> spans, long totalDurationMs) {
+    public List<Issue> analyze(List<TraceSpanInfo> spans, long totalDurationMs) {
         if (spans == null || spans.isEmpty()) {
             log.debug("Empty spans list, no issues detected");
             return new ArrayList<>();
         }
         
-        List<TryResultResponse.Issue> issues = new ArrayList<>();
+        List<Issue> issues = new ArrayList<>();
         
         for (TraceSpanInfo span : spans) {
             long durationMs = span.getDurationNanos() != null ? span.getDurationNanos() / 1_000_000 : 0;
@@ -36,8 +36,8 @@ public class IssueAnalyzer {
             
             // Detect slow DB queries
             if (isDatabaseSpan(span) && percentage > 50 && durationMs > 500) {
-                issues.add(TryResultResponse.Issue.builder()
-                        .type(TryResultResponse.Issue.Type.DB_QUERY_SLOW)
+                issues.add(Issue.builder()
+                        .type(Issue.Type.DB_QUERY_SLOW)
                         .severity(determineSeverity(percentage))
                         .summary(String.format("DB query takes %.1f%% of total time (%dms)", percentage, durationMs))
                         .spanName(span.getName())
@@ -49,8 +49,8 @@ public class IssueAnalyzer {
             
             // Detect slow HTTP calls
             if (isHttpSpan(span) && percentage > 30 && durationMs > 300) {
-                issues.add(TryResultResponse.Issue.builder()
-                        .type(TryResultResponse.Issue.Type.SLOW_HTTP)
+                issues.add(Issue.builder()
+                        .type(Issue.Type.SLOW_HTTP)
                         .severity(determineSeverity(percentage))
                         .summary(String.format("HTTP call takes %.1f%% of total time (%dms)", percentage, durationMs))
                         .spanName(span.getName())
@@ -62,8 +62,8 @@ public class IssueAnalyzer {
             
             // Detect generally slow spans
             if (percentage > 20 && durationMs > 100) {
-                issues.add(TryResultResponse.Issue.builder()
-                        .type(TryResultResponse.Issue.Type.SLOW_SPAN)
+                issues.add(Issue.builder()
+                        .type(Issue.Type.SLOW_SPAN)
                         .severity(determineSeverity(percentage))
                         .summary(String.format("Span takes %.1f%% of total time (%dms)", percentage, durationMs))
                         .spanName(span.getName())
@@ -113,15 +113,15 @@ public class IssueAnalyzer {
      * @param percentage Percentage of total time
      * @return Severity level
      */
-    private TryResultResponse.Issue.Severity determineSeverity(double percentage) {
+    private Issue.Severity determineSeverity(double percentage) {
         if (percentage >= 75) {
-            return TryResultResponse.Issue.Severity.CRITICAL;
+            return Issue.Severity.CRITICAL;
         } else if (percentage >= 50) {
-            return TryResultResponse.Issue.Severity.HIGH;
+            return Issue.Severity.HIGH;
         } else if (percentage >= 25) {
-            return TryResultResponse.Issue.Severity.MEDIUM;
+            return Issue.Severity.MEDIUM;
         } else {
-            return TryResultResponse.Issue.Severity.LOW;
+            return Issue.Severity.LOW;
         }
     }
     

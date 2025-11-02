@@ -5,10 +5,10 @@ import kr.co.ouroboros.core.rest.tryit.tempo.client.TempoClient;
 import kr.co.ouroboros.core.rest.tryit.tempo.dto.TraceDTO;
 import kr.co.ouroboros.core.rest.tryit.trace.builder.TraceTreeBuilder;
 import kr.co.ouroboros.core.rest.tryit.trace.converter.TraceSpanConverter;
+import kr.co.ouroboros.core.rest.tryit.trace.dto.SpanNode;
 import kr.co.ouroboros.core.rest.tryit.trace.dto.TraceSpanInfo;
 import kr.co.ouroboros.core.rest.tryit.util.SpanFlattener;
 import kr.co.ouroboros.core.rest.tryit.web.dto.TryMethodListResponse;
-import kr.co.ouroboros.core.rest.tryit.web.dto.TryResultResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -76,15 +76,15 @@ public class TryMethodListService {
             long totalDurationMs = calculateTotalDuration(spans);
             
             // Build tree
-            List<TryResultResponse.SpanNode> spanTree = traceTreeBuilder.buildTree(spans, totalDurationMs);
+            List<SpanNode> spanTree = traceTreeBuilder.buildTree(spans, totalDurationMs);
             
             // Flatten the tree
-            List<TryResultResponse.SpanNode> flatSpans = spanFlattener.flatten(spanTree);
+            List<SpanNode> flatSpans = spanFlattener.flatten(spanTree);
             
             // Sort by selfDurationMs descending
-            List<TryResultResponse.SpanNode> sortedSpans = flatSpans.stream()
+            List<SpanNode> sortedSpans = flatSpans.stream()
                     .sorted(Comparator
-                            .comparing((TryResultResponse.SpanNode node) -> 
+                            .comparing((SpanNode node) -> 
                                     node.getSelfDurationMs() != null ? node.getSelfDurationMs() : 0L)
                             .reversed())
                     .collect(Collectors.toList());
@@ -95,7 +95,7 @@ public class TryMethodListService {
             int end = Math.min(start + size, totalCount);
             boolean hasMore = end < totalCount;
             
-            List<TryResultResponse.SpanNode> paginatedSpans = start < totalCount 
+            List<SpanNode> paginatedSpans = start < totalCount 
                     ? sortedSpans.subList(start, end)
                     : List.of();
             
@@ -165,7 +165,7 @@ public class TryMethodListService {
     /**
      * Converts SpanNode to MethodInfo.
      */
-    private TryMethodListResponse.MethodInfo convertToMethodInfo(TryResultResponse.SpanNode spanNode) {
+    private TryMethodListResponse.MethodInfo convertToMethodInfo(SpanNode spanNode) {
         // Convert parameters
         List<TryMethodListResponse.MethodInfo.Parameter> parameters = null;
         if (spanNode.getParameters() != null) {

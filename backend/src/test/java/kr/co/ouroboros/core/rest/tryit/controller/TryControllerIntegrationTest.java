@@ -29,21 +29,26 @@ class TryControllerIntegrationTest {
     private MockMvc mockMvc;
 
     @Test
-    @DisplayName("유효하지 않은 tryId 형식")
-    void testGetResult_InvalidTryId() throws Exception {
+    @DisplayName("유효하지 않은 tryId 형식으로 요약 조회")
+    void testGetSummary_InvalidTryId() throws Exception {
         mockMvc.perform(get("/ouro/tries/invalid-uuid"))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
-    @DisplayName("유효한 tryId로 결과 조회 - PENDING 상태")
-    void testGetResult_ValidTryId() throws Exception {
+    @DisplayName("유효한 tryId로 요약 조회 - PENDING 상태")
+    void testGetSummary_ValidTryId() throws Exception {
         String validUuid = UUID.randomUUID().toString();
         
         mockMvc.perform(get("/ouro/tries/{tryId}", validUuid))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tryId").value(validUuid))
-                .andExpect(jsonPath("$.status").value("PENDING"));
+                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.totalDurationMs").value(0))
+                .andExpect(jsonPath("$.spanCount").value(0))
+                .andExpect(jsonPath("$.issueCount").value(0))
+                .andExpect(jsonPath("$.spans").doesNotExist())  // spans 필드 없음 확인
+                .andExpect(jsonPath("$.issues").doesNotExist()); // issues 필드 없음 확인
     }
 
     @Test

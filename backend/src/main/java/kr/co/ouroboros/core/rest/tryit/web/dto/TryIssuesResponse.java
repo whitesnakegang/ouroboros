@@ -1,5 +1,6 @@
 package kr.co.ouroboros.core.rest.tryit.web.dto;
 
+import kr.co.ouroboros.core.rest.tryit.trace.dto.Issue;
 import lombok.Builder;
 import lombok.Data;
 
@@ -23,6 +24,6 @@ public class TryIssuesResponse {
     /**
      * Detected issues (bottlenecks).
      */
-    private List<TryResultResponse.Issue> issues;
+    private List<Issue> issues;
 }
 

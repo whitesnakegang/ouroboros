@@ -1,9 +1,9 @@
 package kr.co.ouroboros.core.rest.tryit.trace.builder;
 
 import kr.co.ouroboros.core.rest.tryit.trace.dto.SpanMethodInfo;
+import kr.co.ouroboros.core.rest.tryit.trace.dto.SpanNode;
 import kr.co.ouroboros.core.rest.tryit.trace.dto.TraceSpanInfo;
 import kr.co.ouroboros.core.rest.tryit.trace.parser.SpanMethodParser;
-import kr.co.ouroboros.core.rest.tryit.web.dto.TryResultResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -32,7 +32,7 @@ public class TraceTreeBuilder {
      * @param totalDurationMs Total duration
      * @return Root spans (with children)
      */
-    public List<TryResultResponse.SpanNode> buildTree(List<TraceSpanInfo> spans, long totalDurationMs) {
+    public List<SpanNode> buildTree(List<TraceSpanInfo> spans, long totalDurationMs) {
         if (spans == null || spans.isEmpty()) {
             log.debug("Empty spans list, returning empty tree");
             return new ArrayList<>();
@@ -59,7 +59,7 @@ public class TraceTreeBuilder {
                 .collect(Collectors.toList());
         
         // Build tree recursively
-        List<TryResultResponse.SpanNode> tree = rootSpans.stream()
+        List<SpanNode> tree = rootSpans.stream()
                 .map(span -> buildSpanNode(span, spanMap, childrenMap, totalDurationMs))
                 .collect(Collectors.toList());
         
@@ -76,7 +76,7 @@ public class TraceTreeBuilder {
      * @param totalDurationMs Total duration
      * @return Span node
      */
-    private TryResultResponse.SpanNode buildSpanNode(
+    private SpanNode buildSpanNode(
             TraceSpanInfo span,
             Map<String, TraceSpanInfo> spanMap,
             Map<String, List<TraceSpanInfo>> childrenMap,
@@ -89,7 +89,7 @@ public class TraceTreeBuilder {
         SpanMethodInfo methodInfo = spanMethodParser.parse(span);
         
         // Get children
-        List<TryResultResponse.SpanNode> children = new ArrayList<>();
+        List<SpanNode> children = new ArrayList<>();
         if (childrenMap.containsKey(span.getSpanId())) {
             children = childrenMap.get(span.getSpanId()).stream()
                     .map(child -> buildSpanNode(child, spanMap, childrenMap, totalDurationMs))
@@ -111,17 +111,17 @@ public class TraceTreeBuilder {
         String displayName = buildDisplayName(span, methodInfo);
         
         // Convert parameters
-        List<TryResultResponse.SpanNode.Parameter> parameters = null;
+        List<SpanNode.Parameter> parameters = null;
         if (methodInfo.getParameters() != null) {
             parameters = methodInfo.getParameters().stream()
-                    .map(param -> TryResultResponse.SpanNode.Parameter.builder()
+                    .map(param -> SpanNode.Parameter.builder()
                             .type(param.getType())
                             .name(param.getName())
                             .build())
                     .collect(Collectors.toList());
         }
         
-        return TryResultResponse.SpanNode.builder()
+        return SpanNode.builder()
                 .name(displayName)
                 .className(methodInfo.getClassName())
                 .methodName(methodInfo.getMethodName())

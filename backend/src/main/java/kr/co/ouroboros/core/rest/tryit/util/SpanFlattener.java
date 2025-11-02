@@ -1,6 +1,6 @@
 package kr.co.ouroboros.core.rest.tryit.util;
 
-import kr.co.ouroboros.core.rest.tryit.web.dto.TryResultResponse;
+import kr.co.ouroboros.core.rest.tryit.trace.dto.SpanNode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -20,14 +20,14 @@ public class SpanFlattener {
      * @param spanTree Root spans
      * @return Flat list of all spans
      */
-    public List<TryResultResponse.SpanNode> flatten(List<TryResultResponse.SpanNode> spanTree) {
+    public List<SpanNode> flatten(List<SpanNode> spanTree) {
         if (spanTree == null || spanTree.isEmpty()) {
             return new ArrayList<>();
         }
         
-        List<TryResultResponse.SpanNode> flatList = new ArrayList<>();
+        List<SpanNode> flatList = new ArrayList<>();
         
-        for (TryResultResponse.SpanNode root : spanTree) {
+        for (SpanNode root : spanTree) {
             flattenRecursive(root, flatList);
         }
         
@@ -41,7 +41,7 @@ public class SpanFlattener {
      * @param node Current span node
      * @param flatList Accumulated flat list
      */
-    private void flattenRecursive(TryResultResponse.SpanNode node, List<TryResultResponse.SpanNode> flatList) {
+    private void flattenRecursive(SpanNode node, List<SpanNode> flatList) {
         if (node == null) {
             return;
         }
@@ -51,7 +51,7 @@ public class SpanFlattener {
         
         // Process children recursively
         if (node.getChildren() != null) {
-            for (TryResultResponse.SpanNode child : node.getChildren()) {
+            for (SpanNode child : node.getChildren()) {
                 flattenRecursive(child, flatList);
             }
         }

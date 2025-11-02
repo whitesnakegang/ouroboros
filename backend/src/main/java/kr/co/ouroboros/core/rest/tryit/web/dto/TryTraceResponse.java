@@ -1,5 +1,6 @@
 package kr.co.ouroboros.core.rest.tryit.web.dto;
 
+import kr.co.ouroboros.core.rest.tryit.trace.dto.SpanNode;
 import lombok.Builder;
 import lombok.Data;
 
@@ -33,6 +34,6 @@ public class TryTraceResponse {
     /**
      * Hierarchical span tree showing all method calls.
      */
-    private List<TryResultResponse.SpanNode> spans;
+    private List<SpanNode> spans;
 }
 
