@@ -110,7 +110,7 @@ class TryControllerIntegrationTest {
                 .andExpect(jsonPath("$.tryId").value(validUuid))
                 .andExpect(jsonPath("$.totalCount").value(0))
                 .andExpect(jsonPath("$.page").value(0))
-                .andExpect(jsonPath("$.size").value(20))
+                .andExpect(jsonPath("$.size").value(5))
                 .andExpect(jsonPath("$.hasMore").value(false))
                 .andExpect(jsonPath("$.methods").isArray())
                 .andExpect(jsonPath("$.methods").isEmpty());
@@ -127,6 +127,47 @@ class TryControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.page").value(2))
                 .andExpect(jsonPath("$.size").value(10));
+    }
+
+    @Test
+    @DisplayName("유효하지 않은 tryId 형식으로 trace 조회")
+    void testGetTrace_InvalidTryId() throws Exception {
+        mockMvc.perform(get("/ouro/tries/invalid-uuid/trace"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("유효한 tryId로 trace 조회 - 빈 결과")
+    void testGetTrace_ValidTryId_EmptyResult() throws Exception {
+        String validUuid = UUID.randomUUID().toString();
+        
+        mockMvc.perform(get("/ouro/tries/{tryId}/trace", validUuid))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tryId").value(validUuid))
+                .andExpect(jsonPath("$.totalDurationMs").value(0))
+                .andExpect(jsonPath("$.spans").isArray())
+                .andExpect(jsonPath("$.spans").isEmpty())
+                .andExpect(jsonPath("$.issues").doesNotExist());  // issues 필드 없음 확인
+    }
+
+    @Test
+    @DisplayName("유효하지 않은 tryId 형식으로 issues 조회")
+    void testGetIssues_InvalidTryId() throws Exception {
+        mockMvc.perform(get("/ouro/tries/invalid-uuid/issues"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("유효한 tryId로 issues 조회 - 빈 결과")
+    void testGetIssues_ValidTryId_EmptyResult() throws Exception {
+        String validUuid = UUID.randomUUID().toString();
+        
+        mockMvc.perform(get("/ouro/tries/{tryId}/issues", validUuid))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tryId").value(validUuid))
+                .andExpect(jsonPath("$.issues").isArray())
+                .andExpect(jsonPath("$.issues").isEmpty())
+                .andExpect(jsonPath("$.spans").doesNotExist());  // spans 필드 없음 확인
     }
 
 }

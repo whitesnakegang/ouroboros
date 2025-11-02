@@ -4,7 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.co.ouroboros.core.rest.tryit.analysis.TraceAnalyzer;
 import kr.co.ouroboros.core.rest.tryit.web.dto.TryMethodListResponse;
 import kr.co.ouroboros.core.rest.tryit.web.dto.TryResultResponse;
+import kr.co.ouroboros.core.rest.tryit.web.dto.TryTraceResponse;
 import kr.co.ouroboros.core.rest.tryit.service.TryMethodListService;
+import kr.co.ouroboros.core.rest.tryit.service.TryTraceService;
 import kr.co.ouroboros.core.rest.tryit.tempo.client.TempoClient;
 import kr.co.ouroboros.core.rest.tryit.tempo.dto.TraceDTO;
 import kr.co.ouroboros.core.rest.tryit.trace.converter.TraceSpanConverter;
@@ -42,7 +44,30 @@ public class TryController {
     private final ObjectMapper objectMapper;
     private final TraceSpanConverter traceSpanConverter;
     private final TryMethodListService tryMethodListService;
+    private final TryTraceService tryTraceService;
 
+    /**
+     * Retrieves detected issues for a try without trace spans.
+     * Optimized for issues analysis and recommendations.
+     * 
+     * GET /ouro/tries/{tryId}/issues
+     * 
+     * @param tryIdStr Try session ID
+     * @return issues response
+     */
+    @GetMapping("/{tryId}/issues")
+    public TryIssuesResponse getIssues(@PathVariable("tryId") String tryIdStr) {
+        // Validate tryId format
+        try {
+            UUID.fromString(tryIdStr);
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid tryId format: {}", tryIdStr);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid tryId format");
+        }
+        
+        return tryIssuesService.getIssues(tryIdStr);
+    }
+    
     /**
      * Retrieves paginated list of methods for a try, sorted by selfDurationMs (descending).
      * 
@@ -68,6 +93,28 @@ public class TryController {
         }
         
         return tryMethodListService.getMethodList(tryIdStr, page, size);
+    }
+
+    /**
+     * Retrieves full call trace for a try without analysis issues.
+     * Optimized for call trace visualization (toggle tree view).
+     *
+     * GET /ouro/tries/{tryId}/trace
+     *
+     * @param tryIdStr Try session ID
+     * @return trace response with hierarchical spans
+     */
+    @GetMapping("/{tryId}/trace")
+    public TryTraceResponse getTrace(@PathVariable("tryId") String tryIdStr) {
+        // Validate tryId format
+        try {
+            UUID.fromString(tryIdStr);
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid tryId format: {}", tryIdStr);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid tryId format");
+        }
+
+        return tryTraceService.getTrace(tryIdStr);
     }
     
     /**
