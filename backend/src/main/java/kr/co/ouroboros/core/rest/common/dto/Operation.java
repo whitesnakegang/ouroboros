@@ -31,6 +31,6 @@ public class Operation {
     @JsonProperty("x-ouroboros-tag")
     private String xOuroborosTag;
 
-    @JsonProperty("x-ouroboros-isvalid")
-    private boolean xOuroborosIsValid;
+    @JsonProperty("x-ouroboros-diff")
+    private String xOuroborosDiff;
 }

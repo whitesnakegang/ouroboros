@@ -1,13 +1,12 @@
 package kr.co.ouroboros.core.rest.spec.service;
 
 import kr.co.ouroboros.core.rest.common.yaml.RestApiYamlParser;
-import kr.co.ouroboros.core.rest.spec.dto.CreateRestApiRequest;
-import kr.co.ouroboros.core.rest.spec.dto.RestApiSpecResponse;
-import kr.co.ouroboros.core.rest.spec.dto.UpdateRestApiRequest;
+import kr.co.ouroboros.core.rest.spec.dto.*;
 import kr.co.ouroboros.core.rest.spec.model.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.yaml.snakeyaml.Yaml;
 
 import java.util.*;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -29,6 +28,10 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
 
     private final RestApiYamlParser yamlParser;
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
+
+    private static final List<String> HTTP_METHODS = Arrays.asList(
+            "get", "post", "put", "delete", "patch", "options", "head", "trace"
+    );
 
     @Override
     public RestApiSpecResponse createRestApiSpec(CreateRestApiRequest request) throws Exception {
@@ -716,5 +719,330 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
             result.put(entry.getKey(), header);
         }
         return result;
+    }
+
+    @Override
+    public ImportYamlResponse importYaml(String yamlContent) throws Exception {
+        lock.writeLock().lock();
+        try {
+            log.info("========================================");
+            log.info("📥 Starting YAML import...");
+
+            // Step 1: Parse imported YAML (validation already done in controller)
+            Yaml yaml = new Yaml();
+            @SuppressWarnings("unchecked")
+            Map<String, Object> importedDoc = (Map<String, Object>) yaml.load(yamlContent);
+
+            // Step 2: Read existing document or create new one
+            Map<String, Object> existingDoc = yamlParser.readOrCreateDocument();
+
+            // Step 3: Prepare renamed tracking
+            List<RenamedItem> renamedList = new ArrayList<>();
+            Map<String, String> schemaRenameMap = new HashMap<>(); // old name -> new name
+
+            // Step 4: Process schemas first (to build rename map)
+            int importedSchemas = importSchemas(importedDoc, existingDoc, renamedList, schemaRenameMap);
+
+            // Step 5: Process APIs with schema reference updates
+            int importedApis = importApis(importedDoc, existingDoc, renamedList, schemaRenameMap);
+
+            // Step 6: Write merged document back to file
+            yamlParser.writeDocument(existingDoc);
+
+            // Step 7: Build response
+            String summary = String.format("Successfully imported %d APIs and %d schemas%s",
+                    importedApis, importedSchemas,
+                    !renamedList.isEmpty() ? ", renamed " + renamedList.size() + " items due to duplicates" : "");
+
+            log.info("========================================");
+            log.info("✅ YAML Import Completed");
+            log.info("   📊 APIs imported: {}", importedApis);
+            log.info("   📊 Schemas imported: {}", importedSchemas);
+            log.info("   📊 Items renamed: {}", renamedList.size());
+            log.info("========================================");
+
+            return ImportYamlResponse.builder()
+                    .imported(importedApis)
+                    .renamed(renamedList.size())
+                    .summary(summary)
+                    .renamedList(renamedList)
+                    .build();
+
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    /**
+     * Imports schemas from imported document into existing document.
+     * Handles duplicate schema names by auto-renaming with "-import" suffix.
+     *
+     * @param importedDoc the imported OpenAPI document
+     * @param existingDoc the existing ourorest.yml document
+     * @param renamedList list to track renamed items
+     * @param schemaRenameMap map to track schema renames (old -> new)
+     * @return number of schemas imported
+     */
+    @SuppressWarnings("unchecked")
+    private int importSchemas(Map<String, Object> importedDoc, Map<String, Object> existingDoc,
+                              List<RenamedItem> renamedList, Map<String, String> schemaRenameMap) {
+        int count = 0;
+
+        // Get or create components
+        Map<String, Object> existingComponents = (Map<String, Object>) existingDoc.get("components");
+        if (existingComponents == null) {
+            existingComponents = new LinkedHashMap<>();
+            existingDoc.put("components", existingComponents);
+        }
+
+        Map<String, Object> existingSchemas = (Map<String, Object>) existingComponents.get("schemas");
+        if (existingSchemas == null) {
+            existingSchemas = new LinkedHashMap<>();
+            existingComponents.put("schemas", existingSchemas);
+        }
+
+        // Get imported schemas
+        Map<String, Object> importedComponents = (Map<String, Object>) importedDoc.get("components");
+        if (importedComponents == null) {
+            return 0;
+        }
+
+        Map<String, Object> importedSchemas = (Map<String, Object>) importedComponents.get("schemas");
+        if (importedSchemas == null || importedSchemas.isEmpty()) {
+            return 0;
+        }
+
+        // Import each schema
+        for (Map.Entry<String, Object> entry : importedSchemas.entrySet()) {
+            String originalName = entry.getKey();
+            String finalName = originalName;
+
+            // Check for duplicate and rename if necessary
+            if (existingSchemas.containsKey(originalName)) {
+                finalName = originalName + "-import";
+                int counter = 1;
+                while (existingSchemas.containsKey(finalName)) {
+                    finalName = originalName + "-import" + counter;
+                    counter++;
+                }
+
+                renamedList.add(RenamedItem.builder()
+                        .type("schema")
+                        .original(originalName)
+                        .renamed(finalName)
+                        .build());
+
+                schemaRenameMap.put(originalName, finalName);
+                log.info("🔄 Schema '{}' renamed to '{}' due to duplicate", originalName, finalName);
+            }
+
+            // Add schema to existing document
+            Map<String, Object> schema = (Map<String, Object>) entry.getValue();
+            enrichSchemaWithOuroborosFields(schema);
+            existingSchemas.put(finalName, schema);
+            count++;
+        }
+
+        return count;
+    }
+
+    /**
+     * Imports API operations from imported document into existing document.
+     * Handles duplicate path+method by auto-renaming paths with "-import" suffix.
+     * Updates $ref references according to schema rename map.
+     *
+     * @param importedDoc the imported OpenAPI document
+     * @param existingDoc the existing ourorest.yml document
+     * @param renamedList list to track renamed items
+     * @param schemaRenameMap map of schema renames to update $ref
+     * @return number of APIs imported
+     */
+    @SuppressWarnings("unchecked")
+    private int importApis(Map<String, Object> importedDoc, Map<String, Object> existingDoc,
+                           List<RenamedItem> renamedList, Map<String, String> schemaRenameMap) {
+        int count = 0;
+
+        // Get or create paths
+        Map<String, Object> existingPaths = yamlParser.getOrCreatePaths(existingDoc);
+
+        // Get imported paths
+        Map<String, Object> importedPaths = (Map<String, Object>) importedDoc.get("paths");
+        if (importedPaths == null || importedPaths.isEmpty()) {
+            return 0;
+        }
+
+        // Import each path
+        for (Map.Entry<String, Object> pathEntry : importedPaths.entrySet()) {
+            String originalPath = pathEntry.getKey();
+            Map<String, Object> pathItem = (Map<String, Object>) pathEntry.getValue();
+
+            // Process each HTTP method
+            for (Map.Entry<String, Object> methodEntry : pathItem.entrySet()) {
+                String method = methodEntry.getKey().toLowerCase();
+
+                // Skip non-method keys
+                if (!HTTP_METHODS.contains(method)) {
+                    continue;
+                }
+
+                Map<String, Object> operation = (Map<String, Object>) methodEntry.getValue();
+                String finalPath = originalPath;
+
+                // Check for duplicate path+method and rename if necessary
+                if (yamlParser.operationExists(existingDoc, originalPath, method)) {
+                    finalPath = originalPath + "-import";
+                    int counter = 1;
+                    while (yamlParser.operationExists(existingDoc, finalPath, method)) {
+                        finalPath = originalPath + "-import" + counter;
+                        counter++;
+                    }
+
+                    renamedList.add(RenamedItem.builder()
+                            .type("api")
+                            .original(originalPath)
+                            .renamed(finalPath)
+                            .method(method.toUpperCase())
+                            .build());
+
+                    log.info("🔄 API '{} {}' renamed to '{} {}' due to duplicate",
+                            method.toUpperCase(), originalPath, method.toUpperCase(), finalPath);
+                }
+
+                // Update $ref references in the operation
+                updateSchemaReferences(operation, schemaRenameMap);
+
+                // Enrich operation with Ouroboros fields
+                enrichOperationWithOuroborosFields(operation);
+
+                // Add operation to existing document
+                yamlParser.putOperation(existingDoc, finalPath, method, operation);
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    /**
+     * Enriches an operation with missing Ouroboros custom fields.
+     *
+     * @param operation the operation map to enrich
+     */
+    private void enrichOperationWithOuroborosFields(Map<String, Object> operation) {
+        if (!operation.containsKey("x-ouroboros-id")) {
+            operation.put("x-ouroboros-id", UUID.randomUUID().toString());
+        }
+        if (!operation.containsKey("x-ouroboros-progress")) {
+            operation.put("x-ouroboros-progress", "mock");
+        }
+        if (!operation.containsKey("x-ouroboros-tag")) {
+            operation.put("x-ouroboros-tag", "none");
+        }
+        if (!operation.containsKey("x-ouroboros-diff")) {
+            operation.put("x-ouroboros-diff", "none");
+        }
+    }
+
+    /**
+     * Enriches a schema with missing Ouroboros custom fields.
+     * Recursively processes nested object properties and array items.
+     *
+     * @param schema the schema map to enrich
+     */
+    @SuppressWarnings("unchecked")
+    private void enrichSchemaWithOuroborosFields(Map<String, Object> schema) {
+        if (schema == null) {
+            return;
+        }
+
+        // Skip $ref schemas (they reference another schema)
+        if (schema.containsKey("$ref")) {
+            return;
+        }
+
+        // Process properties if present
+        if (schema.containsKey("properties")) {
+            Map<String, Object> properties = (Map<String, Object>) schema.get("properties");
+            if (properties != null) {
+                // Add x-ouroboros-mock to each property
+                for (Map.Entry<String, Object> entry : properties.entrySet()) {
+                    if (entry.getValue() instanceof Map) {
+                        Map<String, Object> property = (Map<String, Object>) entry.getValue();
+
+                        // Add mock expression if not a reference and doesn't have it
+                        if (!property.containsKey("$ref") && !property.containsKey("x-ouroboros-mock")) {
+                            property.put("x-ouroboros-mock", "");
+                        }
+
+                        // Recursively process nested object properties
+                        if ("object".equals(property.get("type")) && property.containsKey("properties")) {
+                            enrichSchemaWithOuroborosFields(property);
+                        }
+
+                        // Recursively process array items
+                        if ("array".equals(property.get("type")) && property.containsKey("items")) {
+                            Object items = property.get("items");
+                            if (items instanceof Map) {
+                                enrichSchemaWithOuroborosFields((Map<String, Object>) items);
+                            }
+                        }
+                    }
+                }
+
+                // Add x-ouroboros-orders for property ordering
+                if (!schema.containsKey("x-ouroboros-orders")) {
+                    schema.put("x-ouroboros-orders", new ArrayList<>(properties.keySet()));
+                }
+            }
+        }
+
+        // Process array items at schema level (for top-level array schemas)
+        if ("array".equals(schema.get("type")) && schema.containsKey("items")) {
+            Object items = schema.get("items");
+            if (items instanceof Map) {
+                enrichSchemaWithOuroborosFields((Map<String, Object>) items);
+            }
+        }
+    }
+
+    /**
+     * Recursively updates all $ref references in an operation according to schema rename map.
+     *
+     * @param obj the object to scan for $ref (can be Map, List, or primitive)
+     * @param schemaRenameMap map of old schema names to new names
+     */
+    @SuppressWarnings("unchecked")
+    private void updateSchemaReferences(Object obj, Map<String, String> schemaRenameMap) {
+        if (schemaRenameMap.isEmpty()) {
+            return; // No renames needed
+        }
+
+        if (obj instanceof Map) {
+            Map<String, Object> map = (Map<String, Object>) obj;
+
+            // Check if this map has a $ref field
+            if (map.containsKey("$ref")) {
+                String ref = (String) map.get("$ref");
+                if (ref != null && ref.startsWith("#/components/schemas/")) {
+                    String schemaName = ref.substring("#/components/schemas/".length());
+                    if (schemaRenameMap.containsKey(schemaName)) {
+                        String newSchemaName = schemaRenameMap.get(schemaName);
+                        map.put("$ref", "#/components/schemas/" + newSchemaName);
+                        log.debug("🔗 Updated $ref: {} -> {}", schemaName, newSchemaName);
+                    }
+                }
+            }
+
+            // Recursively scan all values
+            for (Object value : map.values()) {
+                updateSchemaReferences(value, schemaRenameMap);
+            }
+
+        } else if (obj instanceof List) {
+            List<Object> list = (List<Object>) obj;
+            for (Object item : list) {
+                updateSchemaReferences(item, schemaRenameMap);
+            }
+        }
     }
 }
