@@ -70,7 +70,10 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
                     continue;
                 }
 
-                // rest API 똑같은 경우
+                // 각 method가 endpoint인지 확인
+                if(isDiffStatusEndpoint(fileOp)) continue;
+
+
 
                 // scan의 x-ouroboros-progress가 MOCK이면 file에 그대로 마킹만 해주고 넘어감
                 if(isMockApi(url, fileOp, scanOp)) continue;

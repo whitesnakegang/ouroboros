@@ -41,6 +41,11 @@ public final class EndpointDiffHelper {
         return true;
     }
 
+    public static boolean isDiffStatusEndpoint(Operation fileOp) {
+        return fileOp.getXOuroborosDiff()
+                .equals("endpoint");
+    }
+
 
     public static void markDiffEndpoint(String url, Operation scanOp, Map<String, PathItem> restFileSpec, HttpMethod method) {
         log.info("METHOD: [{}], URL: [{}]은 같지만 METHOD는 다름", method, url);
