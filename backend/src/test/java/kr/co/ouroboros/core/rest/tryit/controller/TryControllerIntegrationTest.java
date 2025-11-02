@@ -93,4 +93,40 @@ class TryControllerIntegrationTest {
                 .andExpect(jsonPath("$._ouroborosTryId").doesNotExist());
     }
 
+    @Test
+    @DisplayName("유효하지 않은 tryId 형식으로 메서드 목록 조회")
+    void testGetMethods_InvalidTryId() throws Exception {
+        mockMvc.perform(get("/ouro/tries/invalid-uuid/methods"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("유효한 tryId로 메서드 목록 조회 - 빈 결과")
+    void testGetMethods_ValidTryId_EmptyResult() throws Exception {
+        String validUuid = UUID.randomUUID().toString();
+        
+        mockMvc.perform(get("/ouro/tries/{tryId}/methods", validUuid))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tryId").value(validUuid))
+                .andExpect(jsonPath("$.totalCount").value(0))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(20))
+                .andExpect(jsonPath("$.hasMore").value(false))
+                .andExpect(jsonPath("$.methods").isArray())
+                .andExpect(jsonPath("$.methods").isEmpty());
+    }
+
+    @Test
+    @DisplayName("페이지네이션 파라미터 테스트")
+    void testGetMethods_PaginationParams() throws Exception {
+        String validUuid = UUID.randomUUID().toString();
+        
+        mockMvc.perform(get("/ouro/tries/{tryId}/methods", validUuid)
+                .param("page", "2")
+                .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page").value(2))
+                .andExpect(jsonPath("$.size").value(10));
+    }
+
 }

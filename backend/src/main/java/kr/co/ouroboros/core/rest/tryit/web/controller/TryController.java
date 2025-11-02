@@ -2,7 +2,9 @@ package kr.co.ouroboros.core.rest.tryit.web.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.co.ouroboros.core.rest.tryit.analysis.TraceAnalyzer;
+import kr.co.ouroboros.core.rest.tryit.web.dto.TryMethodListResponse;
 import kr.co.ouroboros.core.rest.tryit.web.dto.TryResultResponse;
+import kr.co.ouroboros.core.rest.tryit.service.TryMethodListService;
 import kr.co.ouroboros.core.rest.tryit.tempo.client.TempoClient;
 import kr.co.ouroboros.core.rest.tryit.tempo.dto.TraceDTO;
 import kr.co.ouroboros.core.rest.tryit.trace.converter.TraceSpanConverter;
@@ -13,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -33,11 +36,12 @@ import java.util.UUID;
 @RequestMapping("/ouro/tries")
 @RequiredArgsConstructor
 public class TryController {
-    
+
     private final TempoClient tempoClient;
     private final TraceAnalyzer traceAnalyzer;
     private final ObjectMapper objectMapper;
     private final TraceSpanConverter traceSpanConverter;
+    private final TryMethodListService tryMethodListService;
 
     /**
      * Retrieves paginated list of methods for a try, sorted by selfDurationMs (descending).
@@ -53,7 +57,7 @@ public class TryController {
     public TryMethodListResponse getMethods(
             @PathVariable("tryId") String tryIdStr,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size
+            @RequestParam(defaultValue = "5") int size
     ) {
         // Validate tryId format
         try {
