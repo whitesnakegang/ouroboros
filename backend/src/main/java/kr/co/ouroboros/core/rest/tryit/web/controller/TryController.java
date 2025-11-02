@@ -5,6 +5,8 @@ import kr.co.ouroboros.core.rest.tryit.analysis.TraceAnalyzer;
 import kr.co.ouroboros.core.rest.tryit.web.dto.TryResultResponse;
 import kr.co.ouroboros.core.rest.tryit.tempo.client.TempoClient;
 import kr.co.ouroboros.core.rest.tryit.tempo.dto.TraceDTO;
+import kr.co.ouroboros.core.rest.tryit.trace.converter.TraceSpanConverter;
+import kr.co.ouroboros.core.rest.tryit.trace.dto.TraceSpanInfo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -16,6 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -34,7 +37,35 @@ public class TryController {
     private final TempoClient tempoClient;
     private final TraceAnalyzer traceAnalyzer;
     private final ObjectMapper objectMapper;
+    private final TraceSpanConverter traceSpanConverter;
 
+    /**
+     * Retrieves paginated list of methods for a try, sorted by selfDurationMs (descending).
+     * 
+     * GET /ouro/tries/{tryId}/methods
+     * 
+     * @param tryIdStr Try session ID
+     * @param page Page number (default: 0)
+     * @param size Page size (default: 20)
+     * @return paginated method list
+     */
+    @GetMapping("/{tryId}/methods")
+    public TryMethodListResponse getMethods(
+            @PathVariable("tryId") String tryIdStr,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        // Validate tryId format
+        try {
+            UUID.fromString(tryIdStr);
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid tryId format: {}", tryIdStr);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid tryId format");
+        }
+        
+        return tryMethodListService.getMethodList(tryIdStr, page, size);
+    }
+    
     /**
      * Retrieves Try result.
      * 
@@ -96,8 +127,11 @@ public class TryController {
             // Parse trace data
             TraceDTO traceData = objectMapper.readValue(traceDataJson, TraceDTO.class);
             
+            // Convert to TraceSpanInfo
+            List<TraceSpanInfo> spans = traceSpanConverter.convert(traceData);
+            
             // Calculate total duration
-            long totalDurationMs = calculateTotalDuration(traceData);
+            long totalDurationMs = calculateTotalDuration(spans);
             
             // Analyze trace and build response
             TryResultResponse response = traceAnalyzer.analyze(traceData, totalDurationMs);
@@ -107,7 +141,7 @@ public class TryController {
             response.setTraceId(traceId);
             response.setCreatedAt(Instant.now());
             response.setAnalyzedAt(Instant.now());
-            Integer statusCode = extractHttpStatusCode(traceData);
+            Integer statusCode = extractHttpStatusCode(spans);
             response.setStatusCode(statusCode != null ? statusCode : 200);
             
             return response;
@@ -130,33 +164,21 @@ public class TryController {
     /**
      * Calculates total duration of the trace.
      * 
-     * @param traceData Trace data
+     * @param spans List of spans
      * @return Total duration in milliseconds
      */
-    private long calculateTotalDuration(TraceDTO traceData) {
-        if (traceData == null || traceData.getBatches() == null) {
+    private long calculateTotalDuration(List<TraceSpanInfo> spans) {
+        if (spans == null || spans.isEmpty()) {
             return 0;
         }
         
         long minStart = Long.MAX_VALUE;
         long maxEnd = Long.MIN_VALUE;
         
-        for (TraceDTO.BatchDTO batch : traceData.getBatches()) {
-            if (batch.getScopeSpans() == null) {
-                continue;
-            }
-            
-            for (TraceDTO.ScopeSpanDTO scopeSpan : batch.getScopeSpans()) {
-                if (scopeSpan.getSpans() == null) {
-                    continue;
-                }
-                
-                for (TraceDTO.SpanDTO span : scopeSpan.getSpans()) {
-                    if (span.getStartTimeUnixNano() != null && span.getEndTimeUnixNano() != null) {
-                        minStart = Math.min(minStart, span.getStartTimeUnixNano());
-                        maxEnd = Math.max(maxEnd, span.getEndTimeUnixNano());
-                    }
-                }
+        for (TraceSpanInfo span : spans) {
+            if (span.getStartTimeNanos() != null && span.getEndTimeNanos() != null) {
+                minStart = Math.min(minStart, span.getStartTimeNanos());
+                maxEnd = Math.max(maxEnd, span.getEndTimeNanos());
             }
         }
         
@@ -170,35 +192,35 @@ public class TryController {
     /**
      * Extracts HTTP status code from server span attributes.
      */
-    private Integer extractHttpStatusCode(TraceDTO traceData) {
-        if (traceData == null || traceData.getBatches() == null) return null;
-        for (TraceDTO.BatchDTO batch : traceData.getBatches()) {
-            if (batch.getScopeSpans() == null) continue;
-            for (TraceDTO.ScopeSpanDTO scopeSpan : batch.getScopeSpans()) {
-                if (scopeSpan.getSpans() == null) continue;
-                for (TraceDTO.SpanDTO span : scopeSpan.getSpans()) {
-                    // Prefer server span or http-named span
-                    boolean maybeHttp = (span.getKind() != null && span.getKind().equals("SPAN_KIND_SERVER"))
-                            || (span.getName() != null && span.getName().toLowerCase().startsWith("http"));
-                    if (!maybeHttp || span.getAttributes() == null) continue;
-                    Integer code = null;
-                    for (TraceDTO.AttributeDTO attr : span.getAttributes()) {
-                        if (attr.getKey() == null || attr.getValue() == null) continue;
-                        String key = attr.getKey();
-                        if ("http.status_code".equalsIgnoreCase(key) || "status".equalsIgnoreCase(key)) {
-                            if (attr.getValue().getIntValue() != null) {
-                                code = attr.getValue().getIntValue().intValue();
-                            } else if (attr.getValue().getStringValue() != null) {
-                                try {
-                                    code = Integer.parseInt(attr.getValue().getStringValue());
-                                } catch (NumberFormatException ignored) { }
-                            }
-                        }
-                    }
-                    if (code != null) return code;
+    private Integer extractHttpStatusCode(List<TraceSpanInfo> spans) {
+        if (spans == null || spans.isEmpty()) {
+            return null;
+        }
+        
+        for (TraceSpanInfo span : spans) {
+            // Prefer server span or http-named span
+            boolean maybeHttp = ("SERVER".equals(span.getKind()))
+                    || (span.getName() != null && span.getName().toLowerCase().startsWith("http"));
+            
+            if (!maybeHttp || span.getAttributes() == null) {
+                continue;
+            }
+            
+            // Check common status code attribute keys
+            String statusCodeStr = span.getAttributes().get("http.status_code");
+            if (statusCodeStr == null) {
+                statusCodeStr = span.getAttributes().get("status");
+            }
+            
+            if (statusCodeStr != null) {
+                try {
+                    return Integer.parseInt(statusCodeStr);
+                } catch (NumberFormatException ignored) {
+                    // Continue to next span
                 }
             }
         }
+        
         return null;
     }
 }
