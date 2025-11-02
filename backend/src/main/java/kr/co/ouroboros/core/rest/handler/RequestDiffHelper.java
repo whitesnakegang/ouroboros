@@ -20,42 +20,9 @@ public final class RequestDiffHelper {
     // diff states
     public static final String DIFF_NONE = "none";
     public static final String DIFF_REQUEST = "request";
-    public static final String DIFF_RESPONSE = "response";
-    public static final String DIFF_ENDPOINT = "endpoint";
-    public static final String DIFF_BOTH = "both";
 
     // 메서드 타입
     public enum HttpMethod {GET, POST, PUT, PATCH, DELETE}
-
-    // ==================== 공통 유틸 메서드 ====================
-
-    /**
-     * Get Operation by HTTP method from PathItem
-     */
-    public static Operation getOp(PathItem p, HttpMethod m) {
-        if (p == null) return null;
-        return switch (m) {
-            case GET -> p.getGet();
-            case POST -> p.getPost();
-            case PUT -> p.getPut();
-            case PATCH -> p.getPatch();
-            case DELETE -> p.getDelete();
-        };
-    }
-
-    /**
-     * Set Operation by HTTP method on PathItem
-     */
-    public static void setOp(PathItem p, HttpMethod m, Operation op) {
-        if (p == null) return;
-        switch (m) {
-            case GET -> p.setGet(op);
-            case POST -> p.setPost(op);
-            case PUT -> p.setPut(op);
-            case PATCH -> p.setPatch(op);
-            case DELETE -> p.setDelete(op);
-        }
-    }
 
     public static <K, V> Map<K, V> safe(Map<K, V> m) {
         return (m == null) ? Collections.emptyMap() : m;
