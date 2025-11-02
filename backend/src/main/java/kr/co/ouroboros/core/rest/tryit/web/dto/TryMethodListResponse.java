@@ -59,6 +59,12 @@ public class TryMethodListResponse {
     @Data
     @Builder
     public static class MethodInfo {
+
+        /**
+         * Span ID (unique identifier for the span).
+         * Used to match spans between /methods and /trace API responses.
+         */
+        private String spanId;
         
         /**
          * Method name.

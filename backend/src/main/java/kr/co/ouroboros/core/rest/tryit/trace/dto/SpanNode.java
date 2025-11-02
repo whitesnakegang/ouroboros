@@ -12,6 +12,12 @@ import java.util.List;
 @Data
 @Builder
 public class SpanNode {
+        
+    /**
+     * Span ID (unique identifier for the span).
+     * Used to match spans between different API responses.
+     */
+    private String spanId;
     
     /**
      * Span name (e.g., "OrderController.getOrder").

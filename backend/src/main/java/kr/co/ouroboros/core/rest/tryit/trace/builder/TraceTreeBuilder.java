@@ -122,6 +122,7 @@ public class TraceTreeBuilder {
         }
         
         return SpanNode.builder()
+                .spanId(span.getSpanId())
                 .name(displayName)
                 .className(methodInfo.getClassName())
                 .methodName(methodInfo.getMethodName())
