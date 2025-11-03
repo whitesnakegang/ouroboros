@@ -1,58 +1,8 @@
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { StatusFilter } from "./StatusFilter";
 import { EndpointGroup } from "./EndpointGroup";
 import { EndpointCard } from "./EndpointCard";
 import { useSidebarStore } from "../store/sidebar.store";
-
-// 예시 데이터
-const mockEndpoints = {
-  AUTH: [
-    {
-      id: 1,
-      method: "POST",
-      path: "/api/auth/login",
-      description: "사용자 로그인",
-      implementationStatus: "not-implemented" as const,
-    },
-    {
-      id: 2,
-      method: "POST",
-      path: "/api/auth/register",
-      description: "신규 사용자 등록",
-      implementationStatus: "in-progress" as const,
-    },
-    {
-      id: 3,
-      method: "POST",
-      path: "/api/auth/logout",
-      description: "사용자 로그아웃",
-      implementationStatus: "modifying" as const,
-    },
-  ],
-  USERS: [
-    {
-      id: 4,
-      method: "GET",
-      path: "/api/users/:id",
-      description: "ID로 사용자 조회",
-      hasSpecError: false,
-    },
-    {
-      id: 5,
-      method: "GET",
-      path: "/api/users",
-      description: "전체 사용자 목록",
-      hasSpecError: true,
-    },
-    {
-      id: 6,
-      method: "PUT",
-      path: "/api/users/:id",
-      description: "사용자 정보 수정",
-      hasSpecError: false,
-    },
-  ],
-};
 
 interface SidebarProps {
   onAddNew?: () => void;
@@ -63,25 +13,35 @@ export function Sidebar({ onAddNew }: SidebarProps) {
   const [activeFilter, setActiveFilter] = useState<"mock" | "completed">(
     "mock"
   );
+
   const {
     isDarkMode,
     toggleDarkMode,
-    isOpen,
     toggle,
-    selectedEndpoint,
     endpoints,
+    loadEndpoints,
+    isLoading,
   } = useSidebarStore();
 
-  // 필터링된 엔드포인트
+  React.useEffect(() => {
+    loadEndpoints();
+  }, [loadEndpoints]);
+
   const filteredEndpoints = useMemo(() => {
     const filtered: Record<
       string,
-      Array<(typeof mockEndpoints.AUTH)[0] | (typeof mockEndpoints.USERS)[0]>
+      Array<{
+        id: string;
+        method: string;
+        path: string;
+        description: string;
+        implementationStatus?: "not-implemented" | "in-progress" | "modifying";
+        hasSpecError?: boolean;
+      }>
     > = {};
 
     Object.entries(endpoints).forEach(([group, groupEndpoints]) => {
       const filteredGroupEndpoints = groupEndpoints.filter((endpoint) => {
-        // 검색어 필터
         if (searchQuery) {
           const query = searchQuery.toLowerCase();
           const matchesSearch =
@@ -91,11 +51,13 @@ export function Sidebar({ onAddNew }: SidebarProps) {
           if (!matchesSearch) return false;
         }
 
-        // Mock/Completed 필터
+        const ep = endpoint as {
+          progress?: string;
+        };
         if (activeFilter === "mock") {
-          return "implementationStatus" in endpoint;
+          return ep.progress !== "completed";
         } else {
-          return !("implementationStatus" in endpoint);
+          return ep.progress === "completed";
         }
       });
 
@@ -109,7 +71,6 @@ export function Sidebar({ onAddNew }: SidebarProps) {
 
   return (
     <div className="h-full flex flex-col bg-white dark:bg-gray-800 transition-colors">
-      {/* 헤더 */}
       <div className="p-4 border-b dark:border-gray-700">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
@@ -118,7 +79,6 @@ export function Sidebar({ onAddNew }: SidebarProps) {
             </h2>
           </div>
           <div className="flex items-center gap-2">
-            {/* 모바일 닫기 버튼 */}
             <button
               onClick={toggle}
               className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
@@ -168,7 +128,6 @@ export function Sidebar({ onAddNew }: SidebarProps) {
           </div>
         </div>
 
-        {/* 검색창 */}
         <div className="relative mb-3">
           <svg
             className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400"
@@ -212,16 +171,18 @@ export function Sidebar({ onAddNew }: SidebarProps) {
           )}
         </div>
 
-        {/* 필터 탭 */}
         <StatusFilter
           activeFilter={activeFilter}
           onFilterChange={setActiveFilter}
         />
       </div>
 
-      {/* 엔드포인트 목록 */}
       <div className="flex-1 overflow-y-auto">
-        {Object.keys(filteredEndpoints).length > 0 ? (
+        {isLoading ? (
+          <div className="p-4 text-center text-gray-500 dark:text-gray-400 text-sm">
+            로딩 중...
+          </div>
+        ) : Object.keys(filteredEndpoints).length > 0 ? (
           Object.entries(filteredEndpoints).map(([groupName, endpoints]) => (
             <EndpointGroup key={groupName} groupName={groupName} defaultOpen>
               {endpoints.map((endpoint) => (
@@ -240,7 +201,6 @@ export function Sidebar({ onAddNew }: SidebarProps) {
         )}
       </div>
 
-      {/* 추가 버튼 */}
       <div className="p-4 border-t dark:border-gray-700">
         <button
           onClick={onAddNew}
