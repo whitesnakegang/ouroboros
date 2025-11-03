@@ -43,6 +43,7 @@ import java.util.*;
 public class OurorestYamlValidator {
 
     private final RestApiYamlParser yamlParser;
+    private final SchemaValidator schemaValidator;
 
     // HTTP methods to check for operations
     private static final List<String> HTTP_METHODS = Arrays.asList(
@@ -489,9 +490,10 @@ public class OurorestYamlValidator {
      * </ul>
      * <p>
      * Only processes schemas that have a 'properties' field. Skips $ref schemas.
+     * Also validates and corrects minItems/maxItems constraints.
      *
      * @param schema the schema map to enrich
-     * @return true if any field was added, false if all fields already existed
+     * @return true if any field was added or corrected, false if all fields already existed
      */
     @SuppressWarnings("unchecked")
     private boolean enrichSchemaFields(Map<String, Object> schema) {
@@ -500,9 +502,15 @@ public class OurorestYamlValidator {
         }
 
         boolean modified = false;
+
+        // Validate schema constraints (minItems/maxItems, etc.)
+        if (schemaValidator.validateAndCorrectSchemaMap(schema)) {
+            modified = true;
+        }
+
         Object propertiesObj = schema.get("properties");
         if (!(propertiesObj instanceof Map)) {
-            return false;
+            return modified;
         }
         Map<String, Object> properties = (Map<String, Object>) propertiesObj;
 
