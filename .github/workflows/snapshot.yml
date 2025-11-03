@@ -24,12 +24,10 @@ jobs:
           java-version: "17"
           cache: gradle
 
-      # gradlew 실행 권한
       - name: Make gradlew executable
         working-directory: backend
         run: chmod +x gradlew
 
-      # SNAPSHOT 버전인지 확인
       - name: "Guard: version must be *-SNAPSHOT"
         shell: bash
         working-directory: backend
@@ -41,14 +39,35 @@ jobs:
             *) echo "⏭️ Not a SNAPSHOT version. Skipping."; exit 78;;
           esac
 
-      # 스냅샷 업로드(포털 Publish 불필요)
+      # 🧩 GPG 키를 안전하게 주입
+      - name: Prepare signing key (robust)
+        shell: bash
+        run: |
+          set -euo pipefail
+          RAW="${{ secrets.GPG_PRIVATE_KEY_ARMOR }}"
+
+          if echo "$RAW" | grep -q 'BEGIN PGP PRIVATE KEY BLOCK'; then
+            KEY="$RAW"
+          elif echo "$RAW" | grep -q '\\n'; then
+            KEY="$(printf '%b' "$RAW")"
+          else
+            KEY="$(echo "$RAW" | base64 -d)"
+          fi
+
+          echo "Signing key length: $(echo "$KEY" | wc -c)"
+
+          {
+            echo 'ORG_GRADLE_PROJECT_signingInMemoryKey<<EOF'
+            echo "$KEY"
+            echo 'EOF'
+            echo "ORG_GRADLE_PROJECT_signingInMemoryKeyPassword=${{ secrets.GPG_PASSPHRASE }}"
+          } >> "$GITHUB_ENV"
+
       - name: Publish SNAPSHOT (no manual portal publish needed)
         shell: bash
-        working-directory: backend           # 👈 추가!
+        working-directory: backend
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.CENTRAL_TOKEN_USER }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.CENTRAL_TOKEN_PASS }}
-          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_PRIVATE_KEY_ARMOR }}
-          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_PASSPHRASE }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.GPG_KEY_ID }}
-        run: ./gradlew publishToMavenCentral --no-daemon
+        run: ./gradlew publishToMavenCentral --no-daemon --info

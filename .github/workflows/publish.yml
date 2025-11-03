@@ -19,7 +19,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      # 태그가 main 히스토리 위인지 확인 (아니면 중립 스킵)
       - name: Ensure tag commit is on main history
         if: ${{ github.event_name == 'push' }}
         shell: bash
@@ -44,16 +43,35 @@ jobs:
         working-directory: backend
         run: chmod +x gradlew
 
-      # (선택) Gradle Wrapper 검증
-      # - uses: gradle/actions/wrapper-validation@v3
+      # 🧩 GPG 키 주입 (개행 안전)
+      - name: Prepare signing key (robust)
+        shell: bash
+        run: |
+          set -euo pipefail
+          RAW="${{ secrets.GPG_PRIVATE_KEY_ARMOR }}"
 
-      - name: Publish (upload + validate only; portal Publish is manual)
+          if echo "$RAW" | grep -q 'BEGIN PGP PRIVATE KEY BLOCK'; then
+            KEY="$RAW"
+          elif echo "$RAW" | grep -q '\\n'; then
+            KEY="$(printf '%b' "$RAW")"
+          else
+            KEY="$(echo "$RAW" | base64 -d)"
+          fi
+
+          echo "Signing key length: $(echo "$KEY" | wc -c)"
+
+          {
+            echo 'ORG_GRADLE_PROJECT_signingInMemoryKey<<EOF'
+            echo "$KEY"
+            echo 'EOF'
+            echo "ORG_GRADLE_PROJECT_signingInMemoryKeyPassword=${{ secrets.GPG_PASSPHRASE }}"
+          } >> "$GITHUB_ENV"
+
+      - name: Publish (upload + validate; portal publish manual)
         shell: bash
         working-directory: backend
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.CENTRAL_TOKEN_USER }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.CENTRAL_TOKEN_PASS }}
-          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_PRIVATE_KEY_ARMOR }}
-          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_PASSPHRASE }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.GPG_KEY_ID }}
-        run: ./gradlew publishToMavenCentral --no-daemon
+        run: ./gradlew publishToMavenCentral --no-daemon --info
