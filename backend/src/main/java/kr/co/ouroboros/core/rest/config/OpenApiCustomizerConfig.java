@@ -1,5 +1,7 @@
 package kr.co.ouroboros.core.rest.config;
 
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import java.util.LinkedHashMap;
 import kr.co.ouroboros.core.global.annotation.ApiState;
 import kr.co.ouroboros.core.global.annotation.ApiState.State;
@@ -28,6 +30,8 @@ public class OpenApiCustomizerConfig {
     public OperationCustomizer apiOperationCustomizer() {
         return (operation, handlerMethod) -> {
             ApiState apiState = handlerMethod.getMethodAnnotation(ApiState.class);
+            ApiResponse apiResponse = handlerMethod.getMethodAnnotation(ApiResponse.class);
+            ApiResponses apiResponses = handlerMethod.getMethodAnnotation(ApiResponses.class);
 
             if (apiState == null) {
                 return operation;
@@ -43,6 +47,10 @@ public class OpenApiCustomizerConfig {
             } else {
                 operation.getExtensions().put("x-ouroboros-progress", "MOCK");
                 operation.getExtensions().put("x-ouroboros-tag", apiState.state().name());
+            }
+
+            if(apiResponses != null || apiResponse != null){
+                operation.getExtensions().put("x-ouroboros-response", "use");
             }
 
             return operation;

@@ -5,12 +5,13 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import kr.co.ouroboros.core.global.annotation.ApiState;
 import kr.co.ouroboros.core.global.annotation.ApiState.State;
 import kr.co.ouroboros.core.rest.handler.OuroRestHandler;
 import lombok.AllArgsConstructor;
-import lombok.Data;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +24,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -37,28 +37,6 @@ public class TestController {
 
     private final OuroRestHandler ouroRestHandler;
 
-
-    @AllArgsConstructor
-    @NoArgsConstructor
-    @Getter
-    @Setter
-    static class User {
-        private String name;
-        private Integer age;
-        private Double height;
-        private Address address;
-        private int[] nums = new int[5];
-    }
-
-    @AllArgsConstructor
-    @NoArgsConstructor
-    @Data
-    static class Address {
-        String roadname;
-        String dong;
-        String gu;
-    }
-
     /**
      * Retrieve a list of users.
      *
@@ -68,11 +46,8 @@ public class TestController {
      */
     @GetMapping("/users")
     @ApiState(state = State.COMPLETED)
-    public ResponseEntity<Map<String, Object>> getUsers() {
-        return ResponseEntity.ok(Map.of(
-                "message", "사용자 목록 조회 성공",
-                "data", new String[]{"방준엽", "홍길동", "이몽룡"}
-        ));
+    public ResponseEntity<List<User>> getUsers() {
+        return ResponseEntity.ok(List.of(new User("id1", "name1", "email1"), new User("id2", "name2", "email2")));
     }
 
     /**
@@ -83,9 +58,11 @@ public class TestController {
      */
     @PostMapping("/users")
     @ApiState(state = State.COMPLETED)
-    @ResponseStatus(HttpStatus.CREATED)
+    @ApiResponse(responseCode = "201", description = "정상적으로 조회됨",
+            content = @Content(mediaType = "application/json",
+                    schema = @Schema(implementation = User.class)))
     public ResponseEntity<User> createUser(@RequestBody User user) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(new User("name", 13, 180.2, new Address("road", "Adong", "Bgu"), new int[]{1, 2, 3, 4, 5}));
+        return ResponseEntity.status(HttpStatus.CREATED).body(new User("id3", "name3", "email3"));
     }
 
     /**
@@ -127,26 +104,6 @@ public class TestController {
      *         - "filter": the provided filter values,
      *         - "data": an array of matching user names
      */
-    @GetMapping("/users/search")
-    @ApiState(state = State.COMPLETED)
-    @Operation(summary = "사용자 검색", description = "이름(name)과 나이(age)로 사용자를 검색합니다.")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "검색 성공",
-                    content = @Content(mediaType = "application/json",
-                            schema = @Schema(implementation = User.class))),
-            @ApiResponse(responseCode = "400", description = "잘못된 요청 파라미터"),
-            @ApiResponse(responseCode = "500", description = "서버 내부 오류")
-    })
-    public ResponseEntity<Map<String, Object>> searchUsers(
-            @RequestParam(required = false) String name,
-            @RequestParam(required = false) Integer age
-    ) {
-        return ResponseEntity.ok(Map.of(
-                "message", "검색 결과",
-                "filter", Map.of("name", name, "age", age),
-                "data", new String[]{"방준엽", "홍길동"} // 예시 데이터
-        ));
-    }
 
     /**
      * Provide a plain "성공" response for the /response endpoint.
@@ -161,10 +118,37 @@ public class TestController {
             @RequestParam(required = false) String name,
             @RequestParam(required = false) Integer age
     ) {
-        int a = 0;
-        if(a==1){
-            return ResponseEntity.ok(new User("name", 13, 180.2, new Address("road", "Adong", "Bgu"), new int[]{1, 2, 3, 4, 5}));
-        }
         return ResponseEntity.ok("성공");
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class User {
+        private String id;
+        private String name;
+        private String email;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Address {
+        private String street;
+        private String city;
+        private String zipCode;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class UserWithAddress {
+        private String id;
+        private String name;
+        private Address address;
+        private List<Address> previousAddresses = new ArrayList<>();
     }
 }

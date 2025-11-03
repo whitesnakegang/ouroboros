@@ -71,14 +71,16 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
                 }
 
                 // rest API 똑같은 경우
-
                 // scan의 x-ouroboros-progress가 MOCK이면 file에 그대로 마킹만 해주고 넘어감
                 if(isMockApi(url, fileOp, scanOp)) continue;
 
                 // 3. endpoint diff가 있으면 reqCompare, resCompare는 스킵
                 reqCompare(url, fileOp, scanOp, schemaMatchResults, httpMethod);
-                resCompare(url, httpMethod, fileOp, scanOp, schemaMatchResults);
 
+                // 시영지기 @ApiResponse를 사용해서 명세를 정확히 작성했을 때만 response 검증
+                if(scanOp.getXOuroborosResponse() != null && scanOp.getXOuroborosResponse().equals("use")) {
+                    resCompare(url, httpMethod, fileOp, scanOp, schemaMatchResults);
+                }
             }
         }
 
