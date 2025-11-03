@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 import kr.co.ouroboros.core.global.Protocol;
 import kr.co.ouroboros.core.global.handler.OuroProtocolHandler;
 import kr.co.ouroboros.core.global.spec.OuroApiSpec;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
@@ -24,7 +25,7 @@ public class OuroApiSpecManager {
 
     // 'classpath:' 경로에서 리소스를 읽기 위해 주입
     private final ResourceLoader resourceLoader;
-
+    
     /**
      * Constructs an OuroApiSpecManager, registering protocol handlers and storing the
      * ResourceLoader.
@@ -42,13 +43,15 @@ public class OuroApiSpecManager {
     }
 
     /**
-     * Processes an API spec for the given protocol by reconciling the provided YAML with the
-     * current runtime state, persisting any validated updates back to the protocol's spec resource,
-     * and updating the in-memory cache.
+     * Reconciles a protocol's API spec YAML with the current runtime state, persists the validated spec,
+     * and updates the in-memory cache for that protocol.
      *
-     * @param protocol        the protocol identifier whose spec is being processed
-     * @param yamlFileContent the YAML content of the spec file to be validated and reconciled with
-     *                        the current state
+     * Performs parsing of the provided YAML, scans the live runtime state, synchronizes differences
+     * to produce the validated spec that will be persisted via the protocol handler, and caches the
+     * scanned specification for subsequent reads.
+     *
+     * @param protocol        the protocol whose API specification is being processed
+     * @param yamlFileContent the YAML content of the protocol's spec file to reconcile with the runtime state
      */
     public void processAndCacheSpec(Protocol protocol, String yamlFileContent) {
         OuroProtocolHandler handler = getHandler(protocol);
@@ -62,14 +65,11 @@ public class OuroApiSpecManager {
         // 3. 불일치 검증
         // 비교 후, 최종적으로 저장할 ApiSpec 반환
         OuroApiSpec validationResult = handler.synchronize(fileSpec, scannedSpec);
+        
+        // 4. 스캔한 최신 스펙을 YAML로 직렬화하고 파일에 저장
+        handler.saveYaml(validationResult);
 
-        // 4. 스캔한 최신 스펙을 YAML 문자열로 변환
-        String updatedYaml = handler.serializeToYaml(validationResult);
-
-        // 5. .yml 파일 갱신
-        saveYamlToResources(handler.getSpecFilePath(), updatedYaml);
-
-        // 6. 캐시 최신화
+        // 5. 캐시 최신화
         apiCache.put(protocol, scannedSpec);
     }
 
@@ -157,20 +157,5 @@ public class OuroApiSpecManager {
         } catch (Exception e) {
             return ""; // 오류 발생 시 빈 문자열
         }
-    }
-
-    /**
-     * Persist the given YAML content to the specified classpath resource path.
-     * <p>
-     * Writes the provided YAML string to the resource location identified by filePath
-     * (classpath-relative), creating parent directories if necessary and overwriting any existing
-     * file using UTF-8 encoding.
-     *
-     * @param filePath the classpath-relative path to the YAML resource to write (e.g.,
-     *                 "specs/protocol.yml")
-     * @param content  the YAML content to be written to the resource
-     */
-    private void saveYamlToResources(String filePath, String content) {
-        // (TODO) 파일 저장 로직 구현
     }
 }

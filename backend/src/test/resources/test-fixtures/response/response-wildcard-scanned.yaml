@@ -1,0 +1,19 @@
+openapi: "3.1.0"
+info:
+  title: "OpenAPI definition"
+  version: "v0"
+paths:
+  "/api/test/wildcard":
+    get:
+      x-ouroboros-id: "22222222-2222-2222-2222-222222222222"
+      x-ouroboros-progress: "mock"
+      x-ouroboros-tag: "none"
+      x-ouroboros-diff: "none"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            "*/*":
+              schema:
+                type: "string"
+
