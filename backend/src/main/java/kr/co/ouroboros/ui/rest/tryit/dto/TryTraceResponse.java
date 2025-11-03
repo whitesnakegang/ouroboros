@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.tryit.api.dto;
+package kr.co.ouroboros.ui.rest.tryit.dto;
 
 import kr.co.ouroboros.core.rest.tryit.trace.dto.SpanNode;
 import lombok.Builder;

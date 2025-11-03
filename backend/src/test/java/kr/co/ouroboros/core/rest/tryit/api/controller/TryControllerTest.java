@@ -1,13 +1,14 @@
 package kr.co.ouroboros.core.rest.tryit.api.controller;
 
-import kr.co.ouroboros.core.rest.tryit.api.dto.TryIssuesResponse;
-import kr.co.ouroboros.core.rest.tryit.api.dto.TryMethodListResponse;
-import kr.co.ouroboros.core.rest.tryit.api.dto.TrySummaryResponse;
-import kr.co.ouroboros.core.rest.tryit.api.dto.TryTraceResponse;
+import kr.co.ouroboros.ui.rest.tryit.dto.TryIssuesResponse;
+import kr.co.ouroboros.ui.rest.tryit.dto.TryMethodListResponse;
+import kr.co.ouroboros.ui.rest.tryit.dto.TrySummaryResponse;
+import kr.co.ouroboros.ui.rest.tryit.dto.TryTraceResponse;
 import kr.co.ouroboros.core.rest.tryit.service.TryIssuesService;
 import kr.co.ouroboros.core.rest.tryit.service.TryMethodListService;
 import kr.co.ouroboros.core.rest.tryit.service.TrySummaryService;
 import kr.co.ouroboros.core.rest.tryit.service.TryTraceService;
+import kr.co.ouroboros.ui.rest.tryit.controller.TryController;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

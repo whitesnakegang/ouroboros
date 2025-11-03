@@ -7,7 +7,7 @@ import kr.co.ouroboros.core.rest.tryit.trace.analyzer.IssueAnalyzer;
 import kr.co.ouroboros.core.rest.tryit.trace.converter.TraceSpanConverter;
 import kr.co.ouroboros.core.rest.tryit.trace.dto.AnalysisStatus;
 import kr.co.ouroboros.core.rest.tryit.trace.dto.TraceSpanInfo;
-import kr.co.ouroboros.core.rest.tryit.api.dto.TrySummaryResponse;
+import kr.co.ouroboros.ui.rest.tryit.dto.TrySummaryResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

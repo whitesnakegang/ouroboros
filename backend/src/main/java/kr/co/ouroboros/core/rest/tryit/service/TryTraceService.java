@@ -7,7 +7,7 @@ import kr.co.ouroboros.core.rest.tryit.trace.builder.TraceTreeBuilder;
 import kr.co.ouroboros.core.rest.tryit.trace.converter.TraceSpanConverter;
 import kr.co.ouroboros.core.rest.tryit.trace.dto.SpanNode;
 import kr.co.ouroboros.core.rest.tryit.trace.dto.TraceSpanInfo;
-import kr.co.ouroboros.core.rest.tryit.api.dto.TryTraceResponse;
+import kr.co.ouroboros.ui.rest.tryit.dto.TryTraceResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

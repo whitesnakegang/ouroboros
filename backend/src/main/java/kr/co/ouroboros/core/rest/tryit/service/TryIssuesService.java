@@ -5,7 +5,7 @@ import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.tempo.client.Tempo
 import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.tempo.model.TraceDTO;
 import kr.co.ouroboros.core.rest.tryit.trace.analyzer.IssueAnalyzer;
 import kr.co.ouroboros.core.rest.tryit.trace.converter.TraceSpanConverter;
-import kr.co.ouroboros.core.rest.tryit.api.dto.TryIssuesResponse;
+import kr.co.ouroboros.ui.rest.tryit.dto.TryIssuesResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

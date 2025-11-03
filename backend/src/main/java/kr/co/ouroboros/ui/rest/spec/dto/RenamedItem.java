@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.spec.dto;
+package kr.co.ouroboros.ui.rest.spec.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;

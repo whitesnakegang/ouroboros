@@ -1,12 +1,11 @@
 package kr.co.ouroboros.core.rest.spec.service;
 
-import kr.co.ouroboros.core.rest.spec.dto.CreateRestApiRequest;
-import kr.co.ouroboros.core.rest.spec.dto.ImportYamlResponse;
-import kr.co.ouroboros.core.rest.spec.dto.RestApiSpecResponse;
-import kr.co.ouroboros.core.rest.spec.dto.UpdateRestApiRequest;
+import kr.co.ouroboros.ui.rest.spec.dto.CreateRestApiRequest;
+import kr.co.ouroboros.ui.rest.spec.dto.ImportYamlResponse;
+import kr.co.ouroboros.ui.rest.spec.dto.RestApiSpecResponse;
+import kr.co.ouroboros.ui.rest.spec.dto.UpdateRestApiRequest;
 
 import java.util.List;
-import org.springframework.stereotype.Service;
 
 /**
  * Service interface for REST API specification management.

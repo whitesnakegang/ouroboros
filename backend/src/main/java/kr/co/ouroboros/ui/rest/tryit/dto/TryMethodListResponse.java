@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.tryit.api.dto;
+package kr.co.ouroboros.ui.rest.tryit.dto;
 
 import lombok.Builder;
 import lombok.Data;
