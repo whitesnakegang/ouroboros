@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  * Converts them into standardized {@link GlobalApiResponse} format with appropriate HTTP status codes.
  * <p>
  * This handler has higher priority than {@link kr.co.ouroboros.core.global.exception.GlobalExceptionHandler}
- * and only applies to controllers in the {@code kr.co.ouroboros.ui.controller} package
+ * and only applies to controllers in the {@code kr.co.ouroboros.ui.rest.spec} package
  * (REST API spec and schema controllers).
  * <p>
  * <b>Handled Exceptions:</b>
@@ -29,7 +29,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  *
  * @since 0.0.1
  */
-@RestControllerAdvice(basePackages = "kr.co.ouroboros.ui.controller")
+@RestControllerAdvice(basePackages = "kr.co.ouroboros.ui.rest.spec")
 @Order(10) // Higher priority than GlobalExceptionHandler
 @Slf4j
 public class RestSpecExceptionHandler {
