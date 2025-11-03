@@ -1,0 +1,119 @@
+import { create } from "zustand";
+
+export type Protocol = "REST" | "WebSocket" | "GraphQL";
+
+export interface TestRequest {
+  method: string;
+  url: string;
+  description: string;
+  headers: Array<{ key: string; value: string }>;
+  queryParams: Array<{ key: string; value: string }>;
+  body: string;
+}
+
+export interface TestResponse {
+  status: number;
+  statusText: string;
+  headers: Record<string, string>;
+  body: string;
+  responseTime: number; // 응답 시간 (ms)
+}
+
+interface TestingState {
+  protocol: Protocol;
+  setProtocol: (protocol: Protocol) => void;
+
+  // Request State
+  request: TestRequest;
+  setRequest: (request: Partial<TestRequest>) => void;
+  updateRequestHeader: (index: number, key: string, value: string) => void;
+  addRequestHeader: () => void;
+  removeRequestHeader: (index: number) => void;
+  updateQueryParam: (index: number, key: string, value: string) => void;
+  addQueryParam: () => void;
+  removeQueryParam: (index: number) => void;
+
+  // Response State
+  response: TestResponse | null;
+  setResponse: (response: TestResponse | null) => void;
+
+  // Test Execution State
+  isLoading: boolean;
+  setIsLoading: (isLoading: boolean) => void;
+  useDummyResponse: boolean;
+  setUseDummyResponse: (useDummy: boolean) => void;
+}
+
+export const useTestingStore = create<TestingState>((set) => ({
+  protocol: "REST",
+  setProtocol: (protocol) => set({ protocol }),
+
+  request: {
+    method: "POST",
+    url: "/api/auth/login",
+    description: "사용자 로그인",
+    headers: [{ key: "Content-Type", value: "application/json" }],
+    queryParams: [],
+    body: JSON.stringify({ email: "string", password: "string" }, null, 2),
+  },
+  setRequest: (partialRequest) =>
+    set((state) => ({
+      request: { ...state.request, ...partialRequest },
+    })),
+  updateRequestHeader: (index, key, value) =>
+    set((state) => ({
+      request: {
+        ...state.request,
+        headers: state.request.headers.map((h, i) =>
+          i === index ? { key, value } : h
+        ),
+      },
+    })),
+  addRequestHeader: () =>
+    set((state) => ({
+      request: {
+        ...state.request,
+        headers: [...state.request.headers, { key: "", value: "" }],
+      },
+    })),
+  removeRequestHeader: (index) =>
+    set((state) => ({
+      request: {
+        ...state.request,
+        headers: state.request.headers.filter((_, i) => i !== index),
+      },
+    })),
+  updateQueryParam: (index, key, value) =>
+    set((state) => ({
+      request: {
+        ...state.request,
+        queryParams: state.request.queryParams.map((p, i) =>
+          i === index ? { key, value } : p
+        ),
+      },
+    })),
+  addQueryParam: () =>
+    set((state) => ({
+      request: {
+        ...state.request,
+        queryParams: [...state.request.queryParams, { key: "", value: "" }],
+      },
+    })),
+  removeQueryParam: (index) =>
+    set((state) => ({
+      request: {
+        ...state.request,
+        queryParams: state.request.queryParams.filter((_, i) => i !== index),
+      },
+    })),
+
+  response: null,
+  setResponse: (response) => set({ response }),
+
+  isLoading: false,
+  setIsLoading: (isLoading) => set({ isLoading }),
+
+  useDummyResponse: false,
+  setUseDummyResponse: (useDummy) => set({ useDummyResponse: useDummy }),
+}));
+
