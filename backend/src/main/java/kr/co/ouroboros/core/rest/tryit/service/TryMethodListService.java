@@ -18,7 +18,21 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Service for retrieving try method list with pagination.
+ * Service for retrieving Try method list with pagination.
+ * <p>
+ * This service provides paginated method lists sorted by self-duration
+ * (descending), optimized for method-level performance analysis.
+ * <p>
+ * <b>Features:</b>
+ * <ul>
+ *   <li>Paginated method list (page, size)</li>
+ *   <li>Sorted by selfDurationMs (descending)</li>
+ *   <li>Includes method information (name, class, parameters, duration)</li>
+ *   <li>Calculates self-duration percentage</li>
+ * </ul>
+ *
+ * @author Ouroboros Team
+ * @since 0.0.1
  */
 @Slf4j
 @Service
@@ -32,12 +46,23 @@ public class TryMethodListService {
     private final SpanFlattener spanFlattener;
     
     /**
-     * Retrieves paginated list of methods for a try, sorted by selfDurationMs (descending).
-     * 
-     * @param tryIdStr Try session ID
-     * @param page Page number (0-based)
-     * @param size Page size
-     * @return Paginated method list response
+     * Retrieves paginated list of methods for a Try, sorted by selfDurationMs (descending).
+     * <p>
+     * This method:
+     * <ol>
+     *   <li>Retrieves trace data from Tempo using tryId</li>
+     *   <li>Builds hierarchical trace tree</li>
+     *   <li>Flattens tree into list of spans</li>
+     *   <li>Sorts by selfDurationMs (descending)</li>
+     *   <li>Applies pagination</li>
+     *   <li>Converts spans to method information</li>
+     * </ol>
+     *
+     * @param tryIdStr Try session ID (must be a valid UUID)
+     * @param page Page number (0-based, must be non-negative)
+     * @param size Page size (must be between 1 and 100)
+     * @return Paginated method list response with sorted methods
+     * @throws Exception if retrieval fails
      */
     public TryMethodListResponse getMethodList(String tryIdStr, int page, int size) {
         log.info("Retrieving method list for tryId: {}, page: {}, size: {}", tryIdStr, page, size);
@@ -122,7 +147,12 @@ public class TryMethodListService {
     }
     
     /**
-     * Builds an empty response when no data is available.
+     * Builds an empty response when no trace data is available.
+     *
+     * @param tryId Try session ID
+     * @param page Page number
+     * @param size Page size
+     * @return Empty method list response with zero counts
      */
     private TryMethodListResponse buildEmptyResponse(String tryId, int page, int size) {
         return TryMethodListResponse.builder()
@@ -138,7 +168,13 @@ public class TryMethodListService {
     }
     
     /**
-     * Calculates total duration of the trace.
+     * Calculates total duration of the trace from span timestamps.
+     * <p>
+     * Finds the earliest start time and latest end time across all spans,
+     * then calculates the difference in milliseconds.
+     *
+     * @param spans List of trace span information
+     * @return Total duration in milliseconds, or 0 if spans are empty or invalid
      */
     private long calculateTotalDuration(List<TraceSpanInfo> spans) {
         if (spans == null || spans.isEmpty()) {
@@ -163,7 +199,13 @@ public class TryMethodListService {
     }
     
     /**
-     * Converts SpanNode to MethodInfo.
+     * Converts SpanNode to MethodInfo for response.
+     * <p>
+     * Extracts method information including span ID, name, class name,
+     * method name, parameters, duration, and percentage.
+     *
+     * @param spanNode Span node to convert
+     * @return Method information DTO
      */
     private TryMethodListResponse.MethodInfo convertToMethodInfo(SpanNode spanNode) {
         // Convert parameters

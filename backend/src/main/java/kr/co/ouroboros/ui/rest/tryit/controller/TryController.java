@@ -26,13 +26,25 @@ import java.util.UUID;
 
 /**
  * REST API controller for Try result retrieval.
- * Retrieves Try analysis results for QA analysis.
  * <p>
+ * Provides endpoints for retrieving Try analysis results for QA analysis.
  * All endpoints return standardized {@link GlobalApiResponse} format.
+ * <p>
+ * <b>Endpoints:</b>
+ * <ul>
+ *   <li>GET /ouro/tries/{tryId} - Retrieves Try summary</li>
+ *   <li>GET /ouro/tries/{tryId}/methods - Retrieves paginated method list</li>
+ *   <li>GET /ouro/tries/{tryId}/trace - Retrieves full call trace</li>
+ *   <li>GET /ouro/tries/{tryId}/issues - Retrieves detected issues</li>
+ * </ul>
+ * <p>
  * Exceptions are handled by {@link kr.co.ouroboros.core.rest.tryit.exception.TryExceptionHandler}.
  * <p>
- * Note: Session creation is no longer needed. Try requests are identified
- * by X-Ouroboros-Try: on header and tryId is returned in response header.
+ * <b>Note:</b> Session creation is no longer needed. Try requests are identified
+ * by X-Ouroboros-Try header and tryId is returned in response header.
+ *
+ * @author Ouroboros Team
+ * @since 0.0.1
  */
 @Slf4j
 @RestController
@@ -48,14 +60,20 @@ public class TryController {
     
     /**
      * Retrieves Try summary without detailed trace or issues.
-     * Contains only metadata, counts, and status information.
+     * <p>
+     * Contains only metadata, counts, and status information:
+     * <ul>
+     *   <li>tryId and traceId</li>
+     *   <li>Analysis status (PENDING, COMPLETED, FAILED)</li>
+     *   <li>HTTP status code</li>
+     *   <li>Total duration in milliseconds</li>
+     *   <li>Span count and issue count</li>
+     * </ul>
      * <p>
      * Exceptions are handled by {@link kr.co.ouroboros.core.rest.tryit.exception.TryExceptionHandler}.
      * 
-     * GET /ouro/tries/{tryId}
-     * 
-     * @param tryIdStr Try session ID
-     * @return summary response wrapped in GlobalApiResponse
+     * @param tryIdStr Try session ID (must be a valid UUID)
+     * @return Summary response wrapped in GlobalApiResponse
      * @throws InvalidTryIdException if tryId format is invalid
      * @throws Exception if retrieval fails
      */
@@ -74,16 +92,21 @@ public class TryController {
     }
     
     /**
-     * Retrieves paginated list of methods for a try, sorted by selfDurationMs (descending).
+     * Retrieves paginated list of methods for a Try, sorted by selfDurationMs (descending).
+     * <p>
+     * Returns a paginated list of methods with:
+     * <ul>
+     *   <li>Method information (name, class, parameters)</li>
+     *   <li>Self-duration and percentage</li>
+     *   <li>Pagination metadata (page, size, totalCount, hasMore)</li>
+     * </ul>
      * <p>
      * Exceptions are handled by {@link kr.co.ouroboros.core.rest.tryit.exception.TryExceptionHandler}.
      * 
-     * GET /ouro/tries/{tryId}/methods
-     * 
-     * @param tryIdStr Try session ID
-     * @param page Page number (default: 0)
-     * @param size Page size (default: 5)
-     * @return paginated method list wrapped in GlobalApiResponse
+     * @param tryIdStr Try session ID (must be a valid UUID)
+     * @param page Page number (default: 0, must be non-negative)
+     * @param size Page size (default: 5, must be between 1 and 100)
+     * @return Paginated method list wrapped in GlobalApiResponse
      * @throws InvalidTryIdException if tryId format is invalid
      * @throws Exception if retrieval fails
      */
@@ -105,15 +128,20 @@ public class TryController {
     }
 
     /**
-     * Retrieves full call trace for a try without analysis issues.
-     * Optimized for call trace visualization (toggle tree view).
+     * Retrieves full call trace for a Try without analysis issues.
+     * <p>
+     * Optimized for call trace visualization (toggle tree view):
+     * <ul>
+     *   <li>Hierarchical span structure</li>
+     *   <li>Parent-child relationships</li>
+     *   <li>Total duration</li>
+     *   <li>Skips issue detection for performance</li>
+     * </ul>
      * <p>
      * Exceptions are handled by {@link kr.co.ouroboros.core.rest.tryit.exception.TryExceptionHandler}.
      *
-     * GET /ouro/tries/{tryId}/trace
-     *
-     * @param tryIdStr Try session ID
-     * @return trace response with hierarchical spans wrapped in GlobalApiResponse
+     * @param tryIdStr Try session ID (must be a valid UUID)
+     * @return Trace response with hierarchical spans wrapped in GlobalApiResponse
      * @throws InvalidTryIdException if tryId format is invalid
      * @throws Exception if retrieval fails
      */
@@ -132,15 +160,20 @@ public class TryController {
     }
 
     /**
-     * Retrieves detected issues for a try without trace spans.
-     * Optimized for issues analysis and recommendations.
+     * Retrieves detected issues for a Try without trace spans.
+     * <p>
+     * Optimized for issues analysis and recommendations:
+     * <ul>
+     *   <li>Performance bottlenecks</li>
+     *   <li>N+1 query problems</li>
+     *   <li>Slow HTTP calls and database queries</li>
+     *   <li>Issue severity and recommendations</li>
+     * </ul>
      * <p>
      * Exceptions are handled by {@link kr.co.ouroboros.core.rest.tryit.exception.TryExceptionHandler}.
      *
-     * GET /ouro/tries/{tryId}/issues
-     *
-     * @param tryIdStr Try session ID
-     * @return issues response wrapped in GlobalApiResponse
+     * @param tryIdStr Try session ID (must be a valid UUID)
+     * @return Issues response wrapped in GlobalApiResponse
      * @throws InvalidTryIdException if tryId format is invalid
      * @throws Exception if retrieval fails
      */
@@ -160,9 +193,12 @@ public class TryController {
     
     /**
      * Validates tryId format (must be a valid UUID).
-     * 
+     * <p>
+     * Checks if the tryId string is a valid UUID format.
+     * Throws {@link InvalidTryIdException} if validation fails.
+     *
      * @param tryIdStr tryId string to validate
-     * @throws InvalidTryIdException if tryId format is invalid
+     * @throws InvalidTryIdException if tryId format is invalid (not a valid UUID)
      */
     private void validateTryId(String tryIdStr) {
         try {

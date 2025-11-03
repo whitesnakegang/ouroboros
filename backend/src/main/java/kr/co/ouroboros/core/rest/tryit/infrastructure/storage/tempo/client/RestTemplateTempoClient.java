@@ -19,10 +19,28 @@ import java.util.List;
 
 /**
  * RestTemplate-based implementation of TempoClient.
- * 
- * Tempo API Endpoints:
- * - GET /api/search?q={traceql} - Search traces
- * - GET /api/traces/{traceId} - Get trace data
+ * <p>
+ * This component provides HTTP client implementation for interacting with Tempo
+ * (distributed tracing backend) using Spring's RestTemplate.
+ * <p>
+ * <b>Tempo API Endpoints:</b>
+ * <ul>
+ *   <li>GET /api/search?q={traceql} - Search traces using TraceQL</li>
+ *   <li>GET /api/traces/{traceId} - Get trace data by trace ID</li>
+ * </ul>
+ * <p>
+ * <b>Features:</b>
+ * <ul>
+ *   <li>Configurable timeout from TempoProperties</li>
+ *   <li>Automatic query parameter encoding</li>
+ *   <li>Polling support with configurable interval and max attempts</li>
+ *   <li>JSON response parsing</li>
+ * </ul>
+ * <p>
+ * Configuration is provided via {@link kr.co.ouroboros.core.rest.tryit.infrastructure.storage.tempo.config.TempoProperties}.
+ *
+ * @author Ouroboros Team
+ * @since 0.0.1
  */
 @Slf4j
 @Component
@@ -31,6 +49,18 @@ public class RestTemplateTempoClient implements TempoClient {
     private final TempoProperties properties;
     private final RestTemplate restTemplate;
     
+    /**
+     * Constructs RestTemplateTempoClient with configuration properties and RestTemplate builder.
+     * <p>
+     * Configures RestTemplate with:
+     * <ul>
+     *   <li>Connect timeout: 5 seconds</li>
+     *   <li>Read timeout: from TempoProperties.queryTimeoutSeconds</li>
+     * </ul>
+     *
+     * @param properties Tempo configuration properties
+     * @param builder RestTemplate builder for creating configured RestTemplate
+     */
     public RestTemplateTempoClient(TempoProperties properties, RestTemplateBuilder builder) {
         this.properties = properties;
         this.restTemplate = builder
@@ -39,6 +69,22 @@ public class RestTemplateTempoClient implements TempoClient {
                 .build();
     }
     
+    /**
+     * Searches for traces using TraceQL query.
+     * <p>
+     * Executes a TraceQL query against Tempo search API and parses
+     * the response to extract trace IDs.
+     * <p>
+     * Returns empty list if:
+     * <ul>
+     *   <li>Tempo is disabled</li>
+     *   <li>Request fails</li>
+     *   <li>No traces match the query</li>
+     * </ul>
+     *
+     * @param query TraceQL query string (e.g., "{ span.ouro.try_id = \"tryId\" }")
+     * @return List of trace IDs matching the query, empty list if none found or error occurs
+     */
     @Override
     public List<String> searchTraces(String query) {
         if (!isEnabled()) {
@@ -74,6 +120,22 @@ public class RestTemplateTempoClient implements TempoClient {
         }
     }
     
+    /**
+     * Fetches trace data by trace ID.
+     * <p>
+     * Retrieves full trace data from Tempo for the specified trace ID.
+     * The returned data is in JSON format as returned by Tempo API.
+     * <p>
+     * Returns null if:
+     * <ul>
+     *   <li>Tempo is disabled</li>
+     *   <li>Request fails</li>
+     *   <li>Trace not found</li>
+     * </ul>
+     *
+     * @param traceId the trace ID to fetch
+     * @return Trace data in JSON format, or null if not found or error occurs
+     */
     @Override
     public String getTrace(String traceId) {
         if (!isEnabled()) {
@@ -107,6 +169,24 @@ public class RestTemplateTempoClient implements TempoClient {
         }
     }
     
+    /**
+     * Polls for traces matching the query until found or timeout.
+     * <p>
+     * Repeatedly searches for traces matching the query with configurable
+     * polling interval until a trace is found or maximum attempts are reached.
+     * <p>
+     * <b>Polling Configuration:</b>
+     * <ul>
+     *   <li>Poll interval: from {@link TempoProperties#pollIntervalMillis}</li>
+     *   <li>Max attempts: from {@link TempoProperties#maxPollAttempts}</li>
+     * </ul>
+     * <p>
+     * Useful for waiting for traces that may not be immediately available in Tempo.
+     * Thread sleep is used between attempts, with interrupt handling.
+     *
+     * @param query TraceQL query string (e.g., "{ span.ouro.try_id = \"tryId\" }")
+     * @return Trace ID if found within max attempts, null if timeout or error occurs
+     */
     @Override
     public String pollForTrace(String query) {
         if (!isEnabled()) {
@@ -136,6 +216,13 @@ public class RestTemplateTempoClient implements TempoClient {
         return null;
     }
     
+    /**
+     * Checks if Tempo is enabled and available.
+     * <p>
+     * Delegates to {@link TempoProperties#enabled} field.
+     *
+     * @return true if Tempo is enabled, false otherwise
+     */
     @Override
     public boolean isEnabled() {
         return properties.isEnabled();
@@ -143,10 +230,19 @@ public class RestTemplateTempoClient implements TempoClient {
     
     /**
      * Parses trace IDs from Tempo search response.
-     * Expected format: {"traces": [{"id": "...", ...}, ...]}
-     * 
-     * @param jsonResponse JSON response from Tempo
-     * @return list of trace IDs
+     * <p>
+     * Parses JSON response from Tempo search API and extracts trace IDs.
+     * Expected format: {@code {"traces": [{"traceID": "...", ...}, ...]}}
+     * <p>
+     * Returns empty list if:
+     * <ul>
+     *   <li>Response format is invalid</li>
+     *   <li>Parsing fails</li>
+     *   <li>No traces found in response</li>
+     * </ul>
+     *
+     * @param jsonResponse JSON response string from Tempo search API
+     * @return List of trace IDs extracted from response, empty list if parsing fails
      */
     private List<String> parseTraceIds(String jsonResponse) {
         try {

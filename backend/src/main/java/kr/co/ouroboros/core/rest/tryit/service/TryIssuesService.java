@@ -13,8 +13,23 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 
 /**
- * Service for retrieving try issues without trace spans.
- * Optimized for issues analysis and recommendations.
+ * Service for retrieving Try issues without trace spans.
+ * <p>
+ * This service is optimized for issues analysis and recommendations,
+ * providing detected performance issues without full trace tree structure
+ * for better performance.
+ * <p>
+ * <b>Features:</b>
+ * <ul>
+ *   <li>Detects performance bottlenecks</li>
+ *   <li>Identifies N+1 query problems</li>
+ *   <li>Detects slow HTTP calls and database queries</li>
+ *   <li>Provides recommendations for fixing issues</li>
+ *   <li>Skips tree building for performance</li>
+ * </ul>
+ *
+ * @author Ouroboros Team
+ * @since 0.0.1
  */
 @Slf4j
 @Service
@@ -27,11 +42,19 @@ public class TryIssuesService {
     private final IssueAnalyzer issueAnalyzer;
     
     /**
-     * Retrieves detected issues for a try without trace spans.
-     * This is optimized for performance by skipping tree building.
-     * 
-     * @param tryIdStr Try session ID
-     * @return Issues response
+     * Retrieves detected issues for a Try without trace spans.
+     * <p>
+     * This method is optimized for performance by skipping tree building:
+     * <ol>
+     *   <li>Retrieves trace data from Tempo using tryId</li>
+     *   <li>Analyzes spans for performance issues</li>
+     *   <li>Detects bottlenecks, N+1 queries, slow calls</li>
+     *   <li>Returns issue list with recommendations</li>
+     * </ol>
+     *
+     * @param tryIdStr Try session ID (must be a valid UUID)
+     * @return Issues response with detected issues and recommendations
+     * @throws Exception if retrieval fails
      */
     public TryIssuesResponse getIssues(String tryIdStr) {
         log.info("Retrieving issues for tryId: {}", tryIdStr);
@@ -84,7 +107,10 @@ public class TryIssuesService {
     }
     
     /**
-     * Builds an empty response when no issues data is available.
+     * Builds an empty issues response when no issues are detected or trace data is unavailable.
+     *
+     * @param tryId Try session ID
+     * @return Empty issues response with empty issue list
      */
     private TryIssuesResponse buildEmptyResponse(String tryId) {
         return TryIssuesResponse.builder()
@@ -94,7 +120,13 @@ public class TryIssuesService {
     }
     
     /**
-     * Calculates total duration of the trace.
+     * Calculates total duration of the trace from span timestamps.
+     * <p>
+     * Finds the earliest start time and latest end time across all spans,
+     * then calculates the difference in milliseconds.
+     *
+     * @param spans List of trace span information
+     * @return Total duration in milliseconds, or 0 if spans are empty or invalid
      */
     private long calculateTotalDuration(List<kr.co.ouroboros.core.rest.tryit.trace.dto.TraceSpanInfo> spans) {
         if (spans == null || spans.isEmpty()) {

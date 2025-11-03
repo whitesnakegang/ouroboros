@@ -9,6 +9,12 @@ import java.util.List;
 
 /**
  * DTO representing method information parsed from a span.
+ * <p>
+ * Contains parsed method information extracted from span names,
+ * including class name, method name, and parameters.
+ *
+ * @author Ouroboros Team
+ * @since 0.0.1
  */
 @Data
 @Builder
@@ -32,7 +38,12 @@ public class SpanMethodInfo {
     private List<Parameter> parameters;
     
     /**
-     * Parameter information.
+     * Method parameter information.
+     * <p>
+     * Contains parameter type and name extracted from method signature.
+     *
+     * @author Ouroboros Team
+     * @since 0.0.1
      */
     @Data
     @Builder

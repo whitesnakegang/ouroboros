@@ -9,7 +9,12 @@ import java.util.Map;
 
 /**
  * Internal DTO representing span information extracted from TraceDTO.
+ * <p>
  * Used as an intermediate representation for trace processing.
+ * Contains span metadata including IDs, timestamps, duration, and attributes.
+ *
+ * @author Ouroboros Team
+ * @since 0.0.1
  */
 @Data
 @Builder

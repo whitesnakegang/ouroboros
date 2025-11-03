@@ -5,10 +5,15 @@ import lombok.Builder;
 import lombok.Data;
 
 /**
- * Response DTO for try summary retrieval API.
- * GET /ouro/tries/{tryId}
- * 
+ * Response DTO for Try summary retrieval API.
+ * <p>
+ * Response for GET /ouro/tries/{tryId}
+ * <p>
  * Contains only summary metadata without trace spans or analysis issues.
+ * Optimized for dashboard and list views with minimal data.
+ *
+ * @author Ouroboros Team
+ * @since 0.0.1
  */
 @Data
 @Builder

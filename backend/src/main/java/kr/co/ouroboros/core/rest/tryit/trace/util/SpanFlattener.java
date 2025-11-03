@@ -9,6 +9,15 @@ import java.util.List;
 
 /**
  * Utility class for flattening hierarchical span tree into a flat list.
+ * <p>
+ * This component converts hierarchical span trees (parent-child relationships)
+ * into a flat list for processing and sorting operations.
+ * <p>
+ * Uses depth-first search (DFS) to traverse the tree and collect all spans
+ * in a single flat list while preserving order.
+ *
+ * @author Ouroboros Team
+ * @since 0.0.1
  */
 @Slf4j
 @Component
@@ -16,9 +25,15 @@ public class SpanFlattener {
     
     /**
      * Flattens a hierarchical span tree into a flat list using DFS.
-     * 
-     * @param spanTree Root spans
-     * @return Flat list of all spans
+     * <p>
+     * Traverses the hierarchical tree structure starting from root spans,
+     * collecting all spans (including nested children) into a single flat list.
+     * <p>
+     * Order: Root spans are processed first, followed by their children
+     * recursively in depth-first order.
+     *
+     * @param spanTree List of root span nodes with hierarchical children
+     * @return Flat list containing all spans from the tree
      */
     public List<SpanNode> flatten(List<SpanNode> spanTree) {
         if (spanTree == null || spanTree.isEmpty()) {
@@ -37,9 +52,12 @@ public class SpanFlattener {
     
     /**
      * Recursively flattens a span node and its children using DFS.
-     * 
-     * @param node Current span node
-     * @param flatList Accumulated flat list
+     * <p>
+     * Adds the current node to the flat list, then recursively processes
+     * all children nodes in depth-first order.
+     *
+     * @param node Current span node to process
+     * @param flatList Accumulated flat list to add spans to
      */
     private void flattenRecursive(SpanNode node, List<SpanNode> flatList) {
         if (node == null) {

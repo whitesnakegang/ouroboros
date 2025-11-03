@@ -6,8 +6,15 @@ import lombok.Data;
 import java.util.List;
 
 /**
- * Response DTO for try method list API.
- * GET /ouro/tries/{tryId}/methods
+ * Response DTO for Try method list API.
+ * <p>
+ * Response for GET /ouro/tries/{tryId}/methods
+ * <p>
+ * Contains paginated list of methods sorted by selfDurationMs (descending),
+ * optimized for method-level performance analysis.
+ *
+ * @author Ouroboros Team
+ * @since 0.0.1
  */
 @Data
 @Builder
@@ -55,6 +62,12 @@ public class TryMethodListResponse {
     
     /**
      * Individual method information.
+     * <p>
+     * Contains method execution details including name, class, parameters,
+     * duration, and percentage of total trace time.
+     *
+     * @author Ouroboros Team
+     * @since 0.0.1
      */
     @Data
     @Builder
@@ -97,7 +110,12 @@ public class TryMethodListResponse {
         private Double selfPercentage;
         
         /**
-         * Parameter information.
+         * Method parameter information.
+         * <p>
+         * Contains parameter type and name extracted from method signature.
+         *
+         * @author Ouroboros Team
+         * @since 0.0.1
          */
         @Data
         @Builder

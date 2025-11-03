@@ -15,8 +15,22 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 
 /**
- * Service for retrieving try summary information without trace spans or issues.
- * Optimized for dashboard and list views.
+ * Service for retrieving Try summary information without trace spans or issues.
+ * <p>
+ * This service is optimized for dashboard and list views, providing only
+ * metadata, counts, and status information without detailed trace data or
+ * issue analysis.
+ * <p>
+ * <b>Features:</b>
+ * <ul>
+ *   <li>Retrieves summary metadata (traceId, status, duration, counts)</li>
+ *   <li>Calculates total duration and span count</li>
+ *   <li>Detects issues without full trace tree building</li>
+ *   <li>Extracts HTTP status code from trace spans</li>
+ * </ul>
+ *
+ * @author Ouroboros Team
+ * @since 0.0.1
  */
 @Slf4j
 @Service
@@ -29,11 +43,20 @@ public class TrySummaryService {
     private final IssueAnalyzer issueAnalyzer;
     
     /**
-     * Retrieves summary information for a try without trace spans or issues.
-     * Includes metadata, counts, and status information only.
-     * 
-     * @param tryIdStr Try session ID
-     * @return Summary response
+     * Retrieves summary information for a Try without trace spans or issues.
+     * <p>
+     * Includes only metadata, counts, and status information:
+     * <ul>
+     *   <li>tryId and traceId</li>
+     *   <li>Analysis status (PENDING, COMPLETED, FAILED)</li>
+     *   <li>HTTP status code</li>
+     *   <li>Total duration in milliseconds</li>
+     *   <li>Span count and issue count</li>
+     * </ul>
+     *
+     * @param tryIdStr Try session ID (must be a valid UUID)
+     * @return Summary response with metadata and counts
+     * @throws Exception if retrieval fails
      */
     public TrySummaryResponse getSummary(String tryIdStr) {
         log.info("Retrieving summary for tryId: {}", tryIdStr);
@@ -103,7 +126,12 @@ public class TrySummaryService {
     }
     
     /**
-     * Builds an empty summary when no trace data is available.
+     * Builds an empty summary response when no trace data is available.
+     * <p>
+     * Returns a summary with PENDING status and zero counts.
+     *
+     * @param tryId Try session ID
+     * @return Empty summary response with PENDING status
      */
     private TrySummaryResponse buildEmptySummary(String tryId) {
         return TrySummaryResponse.builder()
@@ -117,7 +145,13 @@ public class TrySummaryService {
     }
     
     /**
-     * Calculates total duration of the trace.
+     * Calculates total duration of the trace from span timestamps.
+     * <p>
+     * Finds the earliest start time and latest end time across all spans,
+     * then calculates the difference in milliseconds.
+     *
+     * @param spans List of trace span information
+     * @return Total duration in milliseconds, or 0 if spans are empty or invalid
      */
     private long calculateTotalDuration(List<TraceSpanInfo> spans) {
         if (spans == null || spans.isEmpty()) {
@@ -143,6 +177,16 @@ public class TrySummaryService {
     
     /**
      * Extracts HTTP status code from server span attributes.
+     * <p>
+     * Searches for spans with kind "SERVER" or names starting with "http",
+     * then extracts the status code from attributes using common keys:
+     * <ul>
+     *   <li>http.status_code</li>
+     *   <li>status</li>
+     * </ul>
+     *
+     * @param spans List of trace span information
+     * @return HTTP status code if found, null otherwise
      */
     private Integer extractHttpStatusCode(List<TraceSpanInfo> spans) {
         if (spans == null || spans.isEmpty()) {

@@ -15,8 +15,22 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 
 /**
- * Service for retrieving try trace information without analysis issues.
- * Optimized for call trace visualization (toggle tree view).
+ * Service for retrieving Try trace information without analysis issues.
+ * <p>
+ * This service is optimized for call trace visualization (toggle tree view),
+ * providing hierarchical span structure without issue analysis for better
+ * performance.
+ * <p>
+ * <b>Features:</b>
+ * <ul>
+ *   <li>Retrieves full call trace with hierarchical spans</li>
+ *   <li>Builds trace tree structure</li>
+ *   <li>Calculates total duration</li>
+ *   <li>Skips issue detection for performance</li>
+ * </ul>
+ *
+ * @author Ouroboros Team
+ * @since 0.0.1
  */
 @Slf4j
 @Service
@@ -29,11 +43,19 @@ public class TryTraceService {
     private final TraceTreeBuilder traceTreeBuilder;
     
     /**
-     * Retrieves full call trace for a try without issue analysis.
-     * This is optimized for performance by skipping issue detection.
-     * 
-     * @param tryIdStr Try session ID
+     * Retrieves full call trace for a Try without issue analysis.
+     * <p>
+     * This method is optimized for performance by skipping issue detection:
+     * <ol>
+     *   <li>Retrieves trace data from Tempo using tryId</li>
+     *   <li>Builds hierarchical trace tree</li>
+     *   <li>Calculates total duration</li>
+     *   <li>Returns tree structure with spans</li>
+     * </ol>
+     *
+     * @param tryIdStr Try session ID (must be a valid UUID)
      * @return Trace response with hierarchical spans
+     * @throws Exception if retrieval fails
      */
     public TryTraceResponse getTrace(String tryIdStr) {
         log.info("Retrieving trace for tryId: {}", tryIdStr);
@@ -88,7 +110,10 @@ public class TryTraceService {
     }
     
     /**
-     * Builds an empty response when no trace data is available.
+     * Builds an empty trace response when no trace data is available.
+     *
+     * @param tryId Try session ID
+     * @return Empty trace response with zero duration and empty spans
      */
     private TryTraceResponse buildEmptyResponse(String tryId) {
         return TryTraceResponse.builder()
@@ -100,7 +125,13 @@ public class TryTraceService {
     }
     
     /**
-     * Calculates total duration of the trace.
+     * Calculates total duration of the trace from span timestamps.
+     * <p>
+     * Finds the earliest start time and latest end time across all spans,
+     * then calculates the difference in milliseconds.
+     *
+     * @param spans List of trace span information
+     * @return Total duration in milliseconds, or 0 if spans are empty or invalid
      */
     private long calculateTotalDuration(List<TraceSpanInfo> spans) {
         if (spans == null || spans.isEmpty()) {

@@ -7,10 +7,15 @@ import lombok.Data;
 import java.util.List;
 
 /**
- * Response DTO for try trace retrieval API.
- * GET /ouro/tries/{tryId}/trace
- * 
- * Contains only trace information (spans) without analysis issues.
+ * Response DTO for Try trace retrieval API.
+ * <p>
+ * Response for GET /ouro/tries/{tryId}/trace
+ * <p>
+ * Contains hierarchical trace information (spans) without analysis issues.
+ * Optimized for call trace visualization (toggle tree view).
+ *
+ * @author Ouroboros Team
+ * @since 0.0.1
  */
 @Data
 @Builder

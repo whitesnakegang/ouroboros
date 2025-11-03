@@ -15,28 +15,64 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
 import java.util.UUID;
 
 /**
- * ResponseBodyAdvice를 사용하여 Try 요청에 대해 응답 헤더에 tryId를 설정합니다.
- * 이 방법은 사용자 필터와 완전히 독립적으로 동작합니다.
- * 
- * 역할:
- * - 응답 커밋 직전에 헤더에 tryId 설정 (Filter에서 누락된 경우 대비)
- * 
- * 장점:
- * - 사용자 필터 순서에 영향받지 않음
- * - 응답 커밋 직전에 실행되므로 헤더 설정이 안전함
- * - 모든 컨트롤러 메서드에 자동 적용
+ * ResponseBodyAdvice for setting tryId in response headers for Try requests.
+ * <p>
+ * This component uses Spring's ResponseBodyAdvice mechanism to set tryId
+ * in response headers just before response body is written. This approach
+ * works completely independently of user filters.
+ * <p>
+ * <b>Responsibilities:</b>
+ * <ul>
+ *   <li>Sets tryId in response header just before response commit (safety net for Filter)</li>
+ *   <li>Works independently of filter execution order</li>
+ *   <li>Automatically applies to all controller methods</li>
+ * </ul>
+ * <p>
+ * <b>Advantages:</b>
+ * <ul>
+ *   <li>Not affected by user filter execution order</li>
+ *   <li>Executes just before response commit, ensuring safe header setting</li>
+ *   <li>Automatically applies to all controller methods</li>
+ * </ul>
+ *
+ * @author Ouroboros Team
+ * @since 0.0.1
  */
 @Slf4j
 @ControllerAdvice
 @Order(Ordered.LOWEST_PRECEDENCE)
 public class TryResponseAdvice implements ResponseBodyAdvice<Object> {
 
+    /**
+     * Determines whether this advice supports the given return type and converter.
+     * <p>
+     * Returns true if TryContext has a tryId, indicating this is a Try request.
+     *
+     * @param returnType Return type of the controller method
+     * @param converterType Selected HTTP message converter type
+     * @return true if TryContext has tryId, false otherwise
+     */
     @Override
     public boolean supports(MethodParameter returnType, Class<? extends HttpMessageConverter<?>> converterType) {
-        // TryContext에 tryId가 있거나 Try 헤더가 있을 때 동작
+        // Act only when TryContext has tryId (indicating Try request)
         return TryContext.hasTryId();
     }
 
+    /**
+     * Sets tryId in response header before body is written.
+     * <p>
+     * This method executes just before the response body is written,
+     * allowing safe header modification. Checks if header is already
+     * set by Filter; if not, sets it as a safety net.
+     *
+     * @param body Response body (not modified)
+     * @param returnType Return type of the controller method
+     * @param selectedContentType Selected media type
+     * @param selectedConverterType Selected HTTP message converter type
+     * @param request HTTP request
+     * @param response HTTP response (header is modified here)
+     * @return Original response body (not modified)
+     */
     @Override
     public Object beforeBodyWrite(Object body, MethodParameter returnType, MediaType selectedContentType,
                                 Class<? extends HttpMessageConverter<?>> selectedConverterType,

@@ -11,6 +11,20 @@ import java.util.List;
 
 /**
  * Converts TraceDTO from Tempo to TraceSpanInfo intermediate representation.
+ * <p>
+ * This component converts trace data from Tempo's TraceDTO format to
+ * internal TraceSpanInfo representation for processing.
+ * <p>
+ * <b>Conversion Process:</b>
+ * <ul>
+ *   <li>Extracts spans from TraceDTO batches</li>
+ *   <li>Converts span timestamps and durations</li>
+ *   <li>Maps span kinds to internal format</li>
+ *   <li>Extracts span attributes into map</li>
+ * </ul>
+ *
+ * @author Ouroboros Team
+ * @since 0.0.1
  */
 @Slf4j
 @Component
@@ -18,9 +32,18 @@ public class TraceSpanConverter {
     
     /**
      * Converts TraceDTO to list of TraceSpanInfo.
-     * 
-     * @param traceData Trace data from Tempo
-     * @return List of span information
+     * <p>
+     * Extracts all spans from TraceDTO batches and converts them to
+     * TraceSpanInfo format, including:
+     * <ul>
+     *   <li>Span IDs and parent relationships</li>
+     *   <li>Timestamps (start, end, duration)</li>
+     *   <li>Span kind and name</li>
+     *   <li>Attributes as key-value map</li>
+     * </ul>
+     *
+     * @param traceData Trace data from Tempo in TraceDTO format
+     * @return List of span information in TraceSpanInfo format
      */
     public List<TraceSpanInfo> convert(TraceDTO traceData) {
         if (traceData == null || traceData.getBatches() == null) {
@@ -75,6 +98,12 @@ public class TraceSpanConverter {
     
     /**
      * Extracts attributes from span into a map.
+     * <p>
+     * Converts span attributes from TraceDTO format to a simple key-value map.
+     * Handles various attribute value types (string, int, double, bool).
+     *
+     * @param span Span DTO from Tempo containing attributes
+     * @return Map of attribute keys to string values
      */
     private java.util.Map<String, String> extractAttributes(TraceDTO.SpanDTO span) {
         java.util.Map<String, String> attributes = new HashMap<>();
@@ -108,10 +137,21 @@ public class TraceSpanConverter {
     }
     
     /**
-     * Maps span kind from Tempo format to our internal format.
-     * 
-     * @param kind Span kind from Tempo
-     * @return Internal span kind representation
+     * Maps span kind from Tempo format to internal format.
+     * <p>
+     * Converts OpenTelemetry span kind strings to simplified internal format:
+     * <ul>
+     *   <li>SPAN_KIND_UNSPECIFIED → UNSPECIFIED</li>
+     *   <li>SPAN_KIND_INTERNAL → INTERNAL</li>
+     *   <li>SPAN_KIND_SERVER → SERVER</li>
+     *   <li>SPAN_KIND_CLIENT → CLIENT</li>
+     *   <li>SPAN_KIND_PRODUCER → PRODUCER</li>
+     *   <li>SPAN_KIND_CONSUMER → CONSUMER</li>
+     *   <li>Default → INTERNAL</li>
+     * </ul>
+     *
+     * @param kind Span kind string from Tempo (OpenTelemetry format)
+     * @return Internal span kind representation (simplified format)
      */
     private String mapSpanKind(String kind) {
         if (kind == null) {

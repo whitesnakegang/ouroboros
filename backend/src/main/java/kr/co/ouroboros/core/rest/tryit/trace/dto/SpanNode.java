@@ -7,7 +7,13 @@ import java.util.List;
 
 /**
  * Span node in the hierarchical trace tree.
+ * <p>
  * Represents a method call with its metadata and nested calls.
+ * Forms a tree structure where parent spans contain child spans,
+ * enabling hierarchical trace visualization.
+ *
+ * @author Ouroboros Team
+ * @since 0.0.1
  */
 @Data
 @Builder
@@ -40,7 +46,12 @@ public class SpanNode {
     private List<Parameter> parameters;
     
     /**
-     * Parameter information.
+     * Method parameter information.
+     * <p>
+     * Contains parameter type and name extracted from method signature.
+     *
+     * @author Ouroboros Team
+     * @since 0.0.1
      */
     @Data
     @Builder

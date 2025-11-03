@@ -15,19 +15,31 @@ import java.io.IOException;
 import java.util.UUID;
 
 /**
- * Filter that identifies Try requests and sets tryId in OpenTelemetry Baggage.
- * Response modification (header and body) is handled by TryResponseAdvice for better safety.
- * 
- * Behavior:
- * 1. If X-Ouroboros-Try header equals "on", generate tryId
- * 2. Set tryId in OpenTelemetry Baggage (for context propagation)
- * 3. Set tryId in response header early (as safety net)
- * 4. Response modification is handled by TryResponseAdvice
- * 5. If missing or not "on", process as normal request
+ * Filter that identifies Try requests and sets tryId in OpenTelemetry context.
+ * <p>
+ * This filter intercepts HTTP requests to identify Try requests and sets tryId
+ * in the OpenTelemetry context for distributed tracing.
+ * Response modification (header and body) is handled by {@link TryResponseAdvice}
+ * for better safety.
+ * <p>
+ * <b>Behavior:</b>
+ * <ol>
+ *   <li>If X-Ouroboros-Try header equals "on", generate tryId (UUID)</li>
+ *   <li>Set tryId in TryContext for context propagation</li>
+ *   <li>Set tryId in response header early (as safety net)</li>
+ *   <li>Response modification is handled by TryResponseAdvice</li>
+ *   <li>If missing or not "on", process as normal request</li>
+ * </ol>
+ * <p>
+ * This filter runs with highest precedence to ensure it processes all requests,
+ * including error dispatches.
+ *
+ * @author Ouroboros Team
+ * @since 0.0.1
  */
 @Slf4j
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE) // 최고 우선순위로 설정
+@Order(Ordered.HIGHEST_PRECEDENCE) // Highest priority to process all requests
 public class TryFilter extends OncePerRequestFilter {
 
     private static final String HEADER_NAME = "X-Ouroboros-Try";
@@ -76,6 +88,14 @@ public class TryFilter extends OncePerRequestFilter {
         }
     }
 
+    /**
+     * Determines whether this filter should not filter error dispatches.
+     * <p>
+     * Returns false to ensure the filter runs on ERROR dispatch too,
+     * allowing tryId header to be set even in error scenarios.
+     *
+     * @return false to process error dispatches as well
+     */
     @Override
     protected boolean shouldNotFilterErrorDispatch() {
         // We want to run on ERROR dispatch too, to enforce header at the end

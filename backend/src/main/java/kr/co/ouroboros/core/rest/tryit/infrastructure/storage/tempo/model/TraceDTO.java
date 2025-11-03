@@ -6,8 +6,25 @@ import lombok.Data;
 import java.util.List;
 
 /**
- * Trace data from Tempo.
- * Represents the parsed trace structure.
+ * Trace data transfer object (DTO) for Tempo trace data.
+ * <p>
+ * This class represents the parsed trace structure returned from Tempo API.
+ * It follows the OpenTelemetry trace data model structure with batches,
+ * resource spans, and individual spans.
+ * <p>
+ * <b>Structure:</b>
+ * <ul>
+ *   <li>{@link BatchDTO} - Contains resource information and scope spans</li>
+ *   <li>{@link ScopeSpanDTO} - Contains scope and list of spans</li>
+ *   <li>{@link SpanDTO} - Individual span with IDs, timestamps, attributes</li>
+ *   <li>{@link AttributeDTO} - Key-value attributes for spans/resource</li>
+ * </ul>
+ * <p>
+ * This DTO is used by {@link kr.co.ouroboros.core.rest.tryit.trace.converter.TraceSpanConverter}
+ * to convert Tempo trace data to internal {@link kr.co.ouroboros.core.rest.tryit.trace.dto.TraceSpanInfo} format.
+ *
+ * @author Ouroboros Team
+ * @since 0.0.1
  */
 @Data
 public class TraceDTO {
@@ -15,6 +32,15 @@ public class TraceDTO {
     @JsonProperty("batches")
     private List<BatchDTO> batches;
     
+    /**
+     * Batch of trace data from Tempo.
+     * <p>
+     * Represents a batch of spans with resource information.
+     * Contains resource attributes and list of scope spans.
+     *
+     * @author Ouroboros Team
+     * @since 0.0.1
+     */
     @Data
     public static class BatchDTO {
         
@@ -25,6 +51,14 @@ public class TraceDTO {
         private List<ScopeSpanDTO> scopeSpans;
     }
     
+    /**
+     * Resource information for trace batch.
+     * <p>
+     * Contains resource-level attributes that apply to all spans in the batch.
+     *
+     * @author Ouroboros Team
+     * @since 0.0.1
+     */
     @Data
     public static class ResourceDTO {
         
@@ -32,6 +66,15 @@ public class TraceDTO {
         private List<AttributeDTO> attributes;
     }
     
+    /**
+     * Scope spans containing instrumentation scope and list of spans.
+     * <p>
+     * Groups spans by their instrumentation scope (library/component name).
+     * Contains scope metadata and list of actual spans.
+     *
+     * @author Ouroboros Team
+     * @since 0.0.1
+     */
     @Data
     public static class ScopeSpanDTO {
         
@@ -42,6 +85,15 @@ public class TraceDTO {
         private List<SpanDTO> spans;
     }
     
+    /**
+     * Instrumentation scope information.
+     * <p>
+     * Contains metadata about the instrumentation library/component
+     * that created the spans.
+     *
+     * @author Ouroboros Team
+     * @since 0.0.1
+     */
     @Data
     public static class ScopeDTO {
         
@@ -49,6 +101,23 @@ public class TraceDTO {
         private String name;
     }
     
+    /**
+     * Individual span data from Tempo.
+     * <p>
+     * Represents a single span in the trace with:
+     * <ul>
+     *   <li>Span IDs (traceId, spanId, parentSpanId)</li>
+     *   <li>Span name and kind</li>
+     *   <li>Timestamps (start, end, duration in nanoseconds)</li>
+     *   <li>Attributes (key-value pairs)</li>
+     * </ul>
+     * <p>
+     * This is the core span data structure used to represent
+     * method calls and operations in a distributed trace.
+     *
+     * @author Ouroboros Team
+     * @since 0.0.1
+     */
     @Data
     public static class SpanDTO {
         
@@ -80,6 +149,15 @@ public class TraceDTO {
         private List<AttributeDTO> attributes;
     }
     
+    /**
+     * Attribute key-value pair for spans or resource.
+     * <p>
+     * Represents metadata attributes attached to spans or resource.
+     * Contains a key and a value (which can be string, int, double, or bool).
+     *
+     * @author Ouroboros Team
+     * @since 0.0.1
+     */
     @Data
     public static class AttributeDTO {
         
@@ -90,6 +168,22 @@ public class TraceDTO {
         private ValueDTO value;
     }
     
+    /**
+     * Attribute value container supporting multiple types.
+     * <p>
+     * Represents attribute values that can be one of:
+     * <ul>
+     *   <li>String value (stringValue)</li>
+     *   <li>Integer value (intValue)</li>
+     *   <li>Double value (doubleValue)</li>
+     *   <li>Boolean value (boolValue)</li>
+     * </ul>
+     * <p>
+     * Only one value type should be set per attribute.
+     *
+     * @author Ouroboros Team
+     * @since 0.0.1
+     */
     @Data
     public static class ValueDTO {
         

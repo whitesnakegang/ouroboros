@@ -17,20 +17,47 @@ import java.util.stream.Collectors;
 
 /**
  * Builds hierarchical span tree from TraceSpanInfo list.
+ * <p>
+ * This component builds a hierarchical tree structure from flat span lists,
+ * organizing spans by parent-child relationships for trace visualization.
+ * <p>
+ * <b>Features:</b>
+ * <ul>
+ *   <li>Builds parent-child relationships between spans</li>
+ *   <li>Calculates total and self duration for each span</li>
+ *   <li>Calculates percentage of total trace time</li>
+ *   <li>Parses method information from span names</li>
+ *   <li>Formats display names for HTTP spans</li>
+ * </ul>
+ *
+ * @author Ouroboros Team
+ * @since 0.0.1
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class TraceTreeBuilder {
     
+    /**
+     * Parser for extracting method information from span names.
+     */
     private final SpanMethodParser spanMethodParser;
     
     /**
      * Builds hierarchical span tree from flat span list.
-     * 
-     * @param spans List of spans
-     * @param totalDurationMs Total duration
-     * @return Root spans (with children)
+     * <p>
+     * This method:
+     * <ol>
+     *   <li>Groups spans by parentSpanId</li>
+     *   <li>Identifies root spans (spans with no parent or parent not in trace)</li>
+     *   <li>Recursively builds tree structure with parent-child relationships</li>
+     *   <li>Calculates durations and percentages for each node</li>
+     *   <li>Parses method information and formats display names</li>
+     * </ol>
+     *
+     * @param spans Flat list of trace spans
+     * @param totalDurationMs Total duration of the trace in milliseconds
+     * @return List of root span nodes with hierarchical children structure
      */
     public List<SpanNode> buildTree(List<TraceSpanInfo> spans, long totalDurationMs) {
         if (spans == null || spans.isEmpty()) {
@@ -69,12 +96,25 @@ public class TraceTreeBuilder {
     
     /**
      * Recursively builds a span node with its children.
-     * 
-     * @param span Span info
-     * @param spanMap Map of span ID to span info
-     * @param childrenMap Map of parent ID to children
-     * @param totalDurationMs Total duration
-     * @return Span node
+     * <p>
+     * Creates a SpanNode with:
+     * <ul>
+     *   <li>Method information parsed from span name</li>
+     *   <li>Duration calculations (total and self)</li>
+     *   <li>Percentage calculations (total and self)</li>
+     *   <li>Child nodes recursively built</li>
+     *   <li>Formatted display name</li>
+     * </ul>
+     * <p>
+     * Note: Self duration is calculated as (total duration - sum of children durations).
+     * This is an approximation; if children execute in parallel, actual self duration
+     * might be less.
+     *
+     * @param span Span information to build node from
+     * @param spanMap Map of span ID to span information for lookup
+     * @param childrenMap Map of parent span ID to list of child spans
+     * @param totalDurationMs Total duration of the trace in milliseconds
+     * @return Span node with children recursively built
      */
     private SpanNode buildSpanNode(
             TraceSpanInfo span,
@@ -138,6 +178,17 @@ public class TraceTreeBuilder {
     
     /**
      * Builds display name for the span.
+     * <p>
+     * Constructs a human-readable display name based on span type:
+     * <ul>
+     *   <li>HTTP spans: Uses formatted HTTP display name (e.g., "http get /api/users")</li>
+     *   <li>Method spans: Uses class.method format (e.g., "OrderController.getOrder")</li>
+     *   <li>Others: Uses original span name</li>
+     * </ul>
+     *
+     * @param span Span information
+     * @param methodInfo Parsed method information
+     * @return Display name for the span
      */
     private String buildDisplayName(TraceSpanInfo span, SpanMethodInfo methodInfo) {
         if ("HTTP".equals(methodInfo.getClassName())) {
@@ -152,7 +203,15 @@ public class TraceTreeBuilder {
     
     /**
      * Builds human-friendly HTTP span display name using real URL if available.
-     * Example: "http get /api/users/123" while methodName keeps template route.
+     * <p>
+     * Formats HTTP spans as "http {method} {path}" using actual HTTP method and URL path
+     * from span attributes.
+     * <p>
+     * Example: "http get /api/users/123"
+     *
+     * @param span Span information containing HTTP attributes
+     * @param methodInfo Parsed method information (fallback)
+     * @return Formatted HTTP display name
      */
     private String formatHttpDisplayName(TraceSpanInfo span, SpanMethodInfo methodInfo) {
         String verb = null;

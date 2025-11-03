@@ -20,11 +20,64 @@ import java.lang.reflect.Method;
 import java.util.HashSet;
 import java.util.Set;
 
+/**
+ * Auto-configuration for method-level tracing using AOP.
+ * <p>
+ * This configuration sets up AOP-based method tracing for classes in allowed packages,
+ * creating OpenTelemetry spans for method invocations automatically.
+ * <p>
+ * <b>Configuration:</b>
+ * <ul>
+ *   <li>Uses {@link MethodTracingProperties} for configuration</li>
+ *   <li>Creates AOP advisor that intercepts methods in allowed packages</li>
+ *   <li>Excludes SDK classes (kr.co.ouroboros.*) from tracing</li>
+ *   <li>Checks class, interfaces, and superclass chain for allowed packages</li>
+ * </ul>
+ * <p>
+ * <b>Class Filtering:</b>
+ * <ul>
+ *   <li>Target class itself is in allowed package</li>
+ *   <li>Implements interface in allowed package (e.g., Spring Data JPA Repository)</li>
+ *   <li>Extends superclass in allowed package</li>
+ *   <li>Always excludes kr.co.ouroboros.* SDK classes</li>
+ * </ul>
+ * <p>
+ * If no allowed packages are configured, method tracing is disabled.
+ *
+ * @author Ouroboros Team
+ * @since 0.0.1
+ */
 @AutoConfiguration
 @EnableConfigurationProperties(MethodTracingProperties.class)
 @ConditionalOnClass(Advisor.class)
 public class MethodTracingConfig {
 
+    /**
+     * Creates AOP advisor for method-level tracing.
+     * <p>
+     * Configures Spring AOP advisor that:
+     * <ul>
+     *   <li>Intercepts all methods in classes matching ClassFilter criteria</li>
+     *   <li>Uses {@link MethodTracingMethodInterceptor} to create observation spans</li>
+     *   <li>Applies only to classes in allowed packages from properties</li>
+     *   <li>Excludes SDK classes (kr.co.ouroboros.*)</li>
+     * </ul>
+     * <p>
+     * ClassFilter checks:
+     * <ol>
+     *   <li>Target class itself is in allowed package</li>
+     *   <li>Implemented interfaces include class in allowed package</li>
+     *   <li>Superclass chain includes class in allowed package</li>
+     * </ol>
+     * <p>
+     * If allowedPackages is empty, returns an advisor that matches no classes
+     * (effectively disables method tracing).
+     *
+     * @param observationRegistryProvider Provider for ObservationRegistry (optional)
+     * @param props Method tracing properties containing allowed packages
+     * @param beanFactory Bean factory (currently unused, reserved for future use)
+     * @return AOP advisor for method tracing
+     */
     @Bean
     @ConditionalOnMissingBean(name = "ouroborosMethodTracingAdvisor")
     public Advisor ouroborosMethodTracingAdvisor(
