@@ -20,10 +20,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -31,7 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>Swagger에서 자동 스캔되어 /swagger-ui.html 또는 /v3/api-docs 에 표시됨.</p>
  */
 @RestController
-@RequestMapping("/api/test")
+@RequestMapping("/api")
 @RequiredArgsConstructor
 public class TestController {
 
@@ -83,6 +83,7 @@ public class TestController {
      */
     @PostMapping("/users")
     @ApiState(state = State.COMPLETED)
+    @ResponseStatus(HttpStatus.CREATED)
     public ResponseEntity<User> createUser(@RequestBody User user) {
         return ResponseEntity.status(HttpStatus.CREATED).body(new User("name", 13, 180.2, new Address("road", "Adong", "Bgu"), new int[]{1, 2, 3, 4, 5}));
     }
@@ -94,7 +95,7 @@ public class TestController {
      * @param request a map containing fields to update and their new values
      * @return a map containing "message" (operation result), "userId" (the user ID), and "updatedData" (the provided request)
      */
-    @PutMapping("/users/{id}")
+    @GetMapping("/users/{id}")
     @ApiState(state = State.BUG_FIXING)
     @Operation(summary = "사용자 조회", description = "ID로 사용자 정보를 조회합니다.")
     @ApiResponses(value = {
@@ -156,10 +157,14 @@ public class TestController {
      */
     @GetMapping("/response")
     @ApiState(state = State.COMPLETED)
-    public ResponseEntity<String> response(
+    public ResponseEntity<?> response(
             @RequestParam(required = false) String name,
             @RequestParam(required = false) Integer age
     ) {
+        int a = 0;
+        if(a==1){
+            return ResponseEntity.ok(new User("name", 13, 180.2, new Address("road", "Adong", "Bgu"), new int[]{1, 2, 3, 4, 5}));
+        }
         return ResponseEntity.ok("성공");
     }
 }
