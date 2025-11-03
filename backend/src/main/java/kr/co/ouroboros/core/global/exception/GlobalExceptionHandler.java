@@ -36,7 +36,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  *
  * @since 0.0.1
  */
-@RestControllerAdvice
+@RestControllerAdvice(basePackages = "kr.co.ouroboros")
 @Order(100) // Lower priority - package-specific handlers have higher priority (lower order number)
 @Slf4j
 public class GlobalExceptionHandler {
