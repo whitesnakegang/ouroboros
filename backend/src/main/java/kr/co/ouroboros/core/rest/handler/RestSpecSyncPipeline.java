@@ -1,5 +1,7 @@
 package kr.co.ouroboros.core.rest.handler;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import kr.co.ouroboros.core.global.handler.SpecSyncPipeline;
 import kr.co.ouroboros.core.global.spec.OuroApiSpec;
@@ -43,7 +45,12 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
         Map<String, Boolean> schemaMatchResults = compareSchemas(restFileSpec, restScannedSpec);
 
         Map<String, PathItem> pathsScanned = safe(restScannedSpec.getPaths());
-        Map<String, PathItem> pathsFile = safe(restFileSpec.getPaths());
+        Map<String, PathItem> pathsFile = restFileSpec.getPaths();
+
+        if (pathsFile == null) {
+            pathsFile = new LinkedHashMap<>();
+            restFileSpec.setPaths(pathsFile);
+        }
 
 
         for (String url : pathsScanned.keySet()) {
