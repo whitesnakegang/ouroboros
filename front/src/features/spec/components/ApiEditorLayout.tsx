@@ -267,12 +267,12 @@ export function ApiEditorLayout() {
 
     // completed 상태이거나 diff가 있으면 삭제 불가
     if (isCompleted) {
-      alert("⚠️ 이미 완료(completed)된 API는 삭제할 수 없습니다.");
+      alert("이미 완료(completed)된 API는 삭제할 수 없습니다.");
       return;
     }
     if (hasDiff) {
       alert(
-        "⚠️ 명세와 실제 구현이 불일치하는 API는 삭제할 수 없습니다.\n\n먼저 백엔드에서 실제 구현을 제거하거나, 불일치를 해결해주세요."
+        "명세와 실제 구현이 불일치하는 API는 삭제할 수 없습니다.\n\n먼저 백엔드에서 실제 구현을 제거하거나, 불일치를 해결해주세요."
       );
       return;
     }
@@ -304,12 +304,12 @@ export function ApiEditorLayout() {
   const handleEdit = () => {
     // completed 상태이거나 diff가 있으면 수정 불가
     if (isCompleted) {
-      alert("⚠️ 이미 완료(completed)된 API는 수정할 수 없습니다.");
+      alert("이미 완료(completed)된 API는 수정할 수 없습니다.");
       return;
     }
     if (hasDiff) {
       alert(
-        "⚠️ 명세와 실제 구현이 불일치하는 API는 수정할 수 없습니다.\n\n실제 구현에 맞춰 명세를 업데이트하려면 '실제 구현 → 명세에 자동 반영' 버튼을 사용하세요."
+        "명세와 실제 구현이 불일치하는 API는 수정할 수 없습니다.\n\n실제 구현에 맞춰 명세를 업데이트하려면 '실제 구현 → 명세에 자동 반영' 버튼을 사용하세요."
       );
       return;
     }
@@ -398,7 +398,7 @@ export function ApiEditorLayout() {
         console.error("YAML Import 오류:", error);
         const errorMsg =
           error instanceof Error ? error.message : "알 수 없는 오류";
-        alert(`❌ YAML Import 실패\n\n${errorMsg}`);
+        alert(`YAML Import 실패\n\n${errorMsg}`);
       }
     };
 
@@ -418,7 +418,7 @@ export function ApiEditorLayout() {
         // TODO: 백엔드 API 엔드포인트 구현 필요
         // 백엔드에서 실제 구현된 스펙을 가져와서 명세를 업데이트하는 API 호출
         alert(
-          "🚧 기능 개발 중입니다.\n\n백엔드에서 실제 구현 → 명세 동기화 API가 필요합니다."
+          "기능 개발 중입니다.\n\n백엔드에서 실제 구현 → 명세 동기화 API가 필요합니다."
         );
 
         // 예시: 향후 구현될 API 호출
@@ -430,7 +430,7 @@ export function ApiEditorLayout() {
         console.error("명세 동기화 실패:", error);
         const errorMessage =
           error instanceof Error ? error.message : "알 수 없는 오류";
-        alert(`❌ 명세 동기화에 실패했습니다: ${errorMessage}`);
+        alert(`명세 동기화에 실패했습니다: ${errorMessage}`);
       }
     }
   };
@@ -551,37 +551,31 @@ export function ApiEditorLayout() {
   };
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+    <div className="h-full flex flex-col bg-white dark:bg-[#0D1117]">
       {/* Header Tabs */}
-      <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-4 bg-white dark:bg-gray-800 shadow-sm">
+      <div className="border-b border-gray-200 dark:border-[#2D333B] px-6 py-4 bg-white dark:bg-[#0D1117]">
         <div className="flex items-center justify-between mb-4">
           {/* Left: Tabs */}
-          <div className="flex gap-1 bg-gray-100 dark:bg-gray-700 rounded-xl p-1">
+          <div className="flex gap-1 border-b border-gray-200 dark:border-[#2D333B]">
             <button
               onClick={() => setActiveTab("form")}
-              className={`px-6 py-3 text-sm font-semibold transition-all duration-200 rounded-lg ${
+              className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
                 activeTab === "form"
-                  ? "bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm"
-                  : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600"
+                  ? "text-gray-900 dark:text-[#E6EDF3] border-[#2563EB]"
+                  : "text-gray-500 dark:text-[#8B949E] border-transparent hover:text-gray-900 dark:hover:text-[#E6EDF3]"
               }`}
             >
-              <div className="flex items-center gap-2">
-                <span className="text-lg"></span>
-                API 생성 폼
-              </div>
+              API 생성 폼
             </button>
             <button
               onClick={() => setActiveTab("test")}
-              className={`px-6 py-3 text-sm font-semibold transition-all duration-200 rounded-lg ${
+              className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
                 activeTab === "test"
-                  ? "bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm"
-                  : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600"
+                  ? "text-gray-900 dark:text-[#E6EDF3] border-[#2563EB]"
+                  : "text-gray-500 dark:text-[#8B949E] border-transparent hover:text-gray-900 dark:hover:text-[#E6EDF3]"
               }`}
             >
-              <div className="flex items-center gap-2">
-                <span className="text-lg"></span>
-                테스트 폼
-              </div>
+              테스트 폼
             </button>
           </div>
 
@@ -591,20 +585,20 @@ export function ApiEditorLayout() {
               {/* Progress Bar */}
               <div className="flex items-center gap-3">
                 <div className="text-right hidden sm:block">
-                  <div className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  <div className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
                     진행률
                   </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                  <div className="text-xs text-gray-600 dark:text-[#8B949E]">
                     {completedEndpoints}/{totalEndpoints} 완료
                   </div>
                 </div>
-                <div className="w-24 sm:w-32 h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden shadow-inner">
+                <div className="w-24 sm:w-32 h-2 bg-gray-200 dark:bg-[#161B22] border border-gray-300 dark:border-[#2D333B] rounded-md overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-blue-500 to-purple-600 transition-all duration-500 ease-out"
+                    className="h-full bg-[#2563EB] transition-all duration-500 ease-out"
                     style={{ width: `${progressPercentage}%` }}
                   />
                 </div>
-                <span className="text-sm font-bold text-gray-700 dark:text-gray-300 min-w-[3rem]">
+                <span className="text-sm font-medium text-gray-900 dark:text-[#E6EDF3] min-w-[3rem]">
                   {progressPercentage}%
                 </span>
               </div>
@@ -614,7 +608,7 @@ export function ApiEditorLayout() {
                 {/* Utility Buttons */}
                 <button
                   onClick={handleImportYAML}
-                  className="px-2 sm:px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 font-medium shadow-sm hover:shadow-md flex items-center gap-2 text-sm sm:text-base"
+                  className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2"
                   title="YAML 파일 가져오기"
                 >
                   <svg
@@ -651,7 +645,7 @@ export function ApiEditorLayout() {
                       );
                     }
                   }}
-                  className="px-2 sm:px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 font-medium shadow-sm hover:shadow-md flex items-center gap-2 text-sm sm:text-base"
+                  className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2"
                   title="Markdown 파일 내보내기"
                 >
                   <svg
@@ -704,7 +698,7 @@ export function ApiEditorLayout() {
                       );
                     }
                   }}
-                  className="px-2 sm:px-3 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-xl transition-all duration-200 font-semibold shadow-sm hover:shadow-md flex items-center gap-2 text-sm sm:text-base"
+                  className="px-3 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-colors text-sm font-medium flex items-center gap-2"
                   title="API YAML 파일 생성"
                 >
                   <svg
@@ -730,7 +724,7 @@ export function ApiEditorLayout() {
                 </button>
                 <button
                   onClick={() => setIsCodeSnippetOpen(true)}
-                  className="px-2 sm:px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 font-medium shadow-sm hover:shadow-md flex items-center gap-2 text-sm sm:text-base"
+                  className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2"
                   title="Code Snippet 보기"
                 >
                   <svg
@@ -754,14 +748,14 @@ export function ApiEditorLayout() {
             // 테스트 폼일 때 버튼들
             <div className="flex flex-wrap items-center gap-2">
               {/* Use Dummy Response Checkbox */}
-              <label className="flex items-center gap-2 cursor-pointer px-2 sm:px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 shadow-sm hover:shadow-md">
+              <label className="flex items-center gap-2 cursor-pointer px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-transparent hover:bg-gray-50 dark:hover:bg-[#161B22] transition-colors">
                 <input
                   type="checkbox"
                   checked={useDummyResponse}
                   onChange={(e) => setUseDummyResponse(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                  className="w-4 h-4 text-[#2563EB] bg-white dark:bg-[#0D1117] border-gray-300 dark:border-[#2D333B] rounded focus:ring-[#2563EB] focus:ring-1"
                 />
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <span className="text-sm font-medium text-gray-900 dark:text-[#E6EDF3]">
                   Use Dummy Response
                 </span>
               </label>
@@ -770,7 +764,7 @@ export function ApiEditorLayout() {
               <button
                 onClick={handleRun}
                 disabled={isLoading}
-                className="px-2 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-xl transition-all duration-200 font-semibold shadow-md hover:shadow-lg flex items-center gap-2 disabled:cursor-not-allowed text-sm sm:text-base"
+                className="px-6 py-2 bg-[#2563EB] hover:bg-[#1E40AF] disabled:bg-gray-200 dark:disabled:bg-[#161B22] disabled:text-gray-400 dark:disabled:text-[#8B949E] text-white rounded-md transition-colors text-sm font-medium flex items-center gap-2 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
                   <>
@@ -819,7 +813,7 @@ export function ApiEditorLayout() {
       </div>
 
       {/* Protocol Tabs - 항상 표시 */}
-      <div className="border-b border-gray-200 dark:border-gray-700 px-6 bg-white dark:bg-gray-800">
+      <div className="border-b border-gray-200 dark:border-[#2D333B] px-6 bg-white dark:bg-[#0D1117]">
         {activeTab === "form" ? (
           <ProtocolTabs
             selectedProtocol={protocol}
@@ -841,22 +835,22 @@ export function ApiEditorLayout() {
           <>
             {/* Execution Status - 테스트 폼에서만 표시 */}
             {executionStatus !== "idle" && (
-              <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-3 bg-white dark:bg-gray-800">
+              <div className="border-b border-gray-200 dark:border-[#2D333B] px-6 py-3 bg-white dark:bg-[#0D1117]">
                 <div className="flex items-center gap-2">
                   <div
-                    className={`px-3 py-1 rounded-lg text-sm font-semibold ${
+                    className={`px-3 py-1 rounded-md text-sm font-medium ${
                       executionStatus === "running"
-                        ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                        ? "bg-[#2563EB] text-white"
                         : executionStatus === "completed"
-                        ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                        : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                        ? "bg-emerald-500 text-white"
+                        : "bg-red-500 text-white"
                     }`}
                   >
                     {executionStatus === "running"
-                      ? "⏳ 실행 중..."
+                      ? "실행 중..."
                       : executionStatus === "completed"
-                      ? "✅ 완료됨"
-                      : "❌ 에러 발생"}
+                      ? "완료됨"
+                      : "에러 발생"}
                   </div>
                 </div>
               </div>
@@ -869,16 +863,28 @@ export function ApiEditorLayout() {
             {protocol !== "REST" && (
               <div className="h-full flex items-center justify-center py-12">
                 <div className="text-center">
-                  <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
-                    <span className="text-4xl">🚧</span>
+                  <div className="w-16 h-16 mx-auto mb-6 rounded-md bg-gray-100 dark:bg-[#161B22] border border-gray-300 dark:border-[#2D333B] flex items-center justify-center">
+                    <svg
+                      className="w-8 h-8 text-gray-500 dark:text-[#8B949E]"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                      />
+                    </svg>
                   </div>
-                  <h3 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-[#E6EDF3] mb-2">
                     {protocol} 명세서 준비 중
                   </h3>
-                  <p className="text-gray-500 dark:text-gray-400 mb-4">
+                  <p className="text-gray-600 dark:text-[#8B949E] mb-4">
                     현재는 REST API만 지원합니다.
                   </p>
-                  <p className="text-sm text-gray-400 dark:text-gray-500">
+                  <p className="text-sm text-gray-500 dark:text-[#8B949E]">
                     프로토콜 탭을 클릭하여 REST로 전환할 수 있습니다.
                   </p>
                 </div>
@@ -895,31 +901,37 @@ export function ApiEditorLayout() {
 
             {/* Method + URL Card */}
             {protocol === "REST" && (
-              <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-8 shadow-lg mb-8 hover:shadow-xl transition-shadow duration-300">
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
-                    <span className="text-white text-xl">🌐</span>
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                      Method & URL
-                    </h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      HTTP 메서드와 엔드포인트 URL을 입력하세요
-                    </p>
-                  </div>
+              <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm mb-6">
+                <div className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3] mb-2 flex items-center gap-2">
+                  <svg
+                    className="h-4 w-4 text-gray-500 dark:text-[#8B949E]"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    />
+                  </svg>
+                  <span>Method & URL</span>
                 </div>
+                <p className="text-xs text-gray-600 dark:text-[#8B949E] mb-4">
+                  HTTP 메서드와 엔드포인트 URL을 입력하세요
+                </p>
 
-                <div className="space-y-6">
+                <div className="space-y-4">
                   <div className="flex flex-col sm:flex-row gap-4">
                     <div className="relative sm:w-auto w-full">
                       <select
                         value={method}
                         onChange={(e) => setMethod(e.target.value)}
                         disabled={!!(selectedEndpoint && !isEditMode)}
-                        className={`appearance-none w-full sm:w-auto px-4 py-3 pr-10 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 font-semibold min-w-[120px] ${
+                        className={`appearance-none w-full sm:w-auto px-3 py-2 pr-10 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm font-medium min-w-[120px] ${
                           selectedEndpoint && !isEditMode
-                            ? "bg-gray-100 dark:bg-gray-800 cursor-not-allowed opacity-60"
+                            ? "opacity-60 cursor-not-allowed"
                             : ""
                         }`}
                       >
@@ -931,7 +943,7 @@ export function ApiEditorLayout() {
                       </select>
                       <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                         <svg
-                          className="w-5 h-5 text-gray-400"
+                          className="w-4 h-4 text-gray-500 dark:text-[#8B949E]"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -951,9 +963,9 @@ export function ApiEditorLayout() {
                       onChange={(e) => setUrl(e.target.value)}
                       placeholder="예: /api/users, /api/auth/login"
                       disabled={!!(selectedEndpoint && !isEditMode)}
-                      className={`flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 font-mono ${
+                      className={`flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm font-mono ${
                         selectedEndpoint && !isEditMode
-                          ? "bg-gray-100 dark:bg-gray-800 cursor-not-allowed opacity-60"
+                          ? "opacity-60 cursor-not-allowed"
                           : ""
                       }`}
                     />
@@ -961,29 +973,29 @@ export function ApiEditorLayout() {
 
                   {/* Method Badge */}
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    <span className="text-xs text-gray-600 dark:text-[#8B949E]">
                       Method:
                     </span>
                     <span
-                      className={`px-3 py-1 rounded-lg text-sm font-semibold ${
+                      className={`inline-flex items-center rounded-[4px] border border-gray-300 dark:border-[#2D333B] bg-white dark:bg-[#0D1117] px-2 py-[2px] text-[10px] font-mono font-semibold ${
                         method === "GET"
-                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                          ? "text-[#10B981]"
                           : method === "POST"
-                          ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                          ? "text-[#2563EB]"
                           : method === "PUT"
-                          ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                          ? "text-[#F59E0B]"
                           : method === "PATCH"
-                          ? "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
-                          : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                          ? "text-[#F59E0B]"
+                          : "text-red-500"
                       }`}
                     >
                       {method}
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                      <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
                         Tags/Category
                       </label>
                       <input
@@ -992,15 +1004,15 @@ export function ApiEditorLayout() {
                         onChange={(e) => setTags(e.target.value)}
                         placeholder="예: AUTH, USER, PRODUCT, ORDER"
                         disabled={!!(selectedEndpoint && !isEditMode)}
-                        className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
+                        className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
                           selectedEndpoint && !isEditMode
-                            ? "bg-gray-100 dark:bg-gray-800 cursor-not-allowed opacity-60"
+                            ? "opacity-60 cursor-not-allowed"
                             : ""
                         }`}
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                      <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
                         Summary
                       </label>
                       <input
@@ -1009,15 +1021,15 @@ export function ApiEditorLayout() {
                         onChange={(e) => setSummary(e.target.value)}
                         placeholder="예: 사용자 로그인 생성"
                         disabled={!!(selectedEndpoint && !isEditMode)}
-                        className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
+                        className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
                           selectedEndpoint && !isEditMode
-                            ? "bg-gray-100 dark:bg-gray-800 cursor-not-allowed opacity-60"
+                            ? "opacity-60 cursor-not-allowed"
                             : ""
                         }`}
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                      <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
                         Owner
                       </label>
                       <input
@@ -1026,9 +1038,9 @@ export function ApiEditorLayout() {
                         onChange={(e) => setOwner(e.target.value)}
                         placeholder="예: SMART-TEAM, 김개발, 백엔드팀"
                         disabled={!!(selectedEndpoint && !isEditMode)}
-                        className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
+                        className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
                           selectedEndpoint && !isEditMode
-                            ? "bg-gray-100 dark:bg-gray-800 cursor-not-allowed opacity-60"
+                            ? "opacity-60 cursor-not-allowed"
                             : ""
                         }`}
                       />
@@ -1037,7 +1049,7 @@ export function ApiEditorLayout() {
 
                   {/* Description - place below Tags/Summary/Owner */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                    <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
                       Description
                     </label>
                     <input
@@ -1046,9 +1058,9 @@ export function ApiEditorLayout() {
                       onChange={(e) => setDescription(e.target.value)}
                       placeholder="예: 사용자 로그인, 상품 목록 조회, 주문 생성"
                       disabled={!!(selectedEndpoint && !isEditMode)}
-                      className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
+                      className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
                         selectedEndpoint && !isEditMode
-                          ? "bg-gray-100 dark:bg-gray-800 cursor-not-allowed opacity-60"
+                          ? "opacity-60 cursor-not-allowed"
                           : ""
                       }`}
                     />
@@ -1086,46 +1098,20 @@ export function ApiEditorLayout() {
 
       {/* 하단 수정/삭제 버튼 - 선택된 엔드포인트가 있을 때만 표시 (명세서 폼에서만) */}
       {activeTab === "form" && selectedEndpoint && (
-        <div className="border-t border-gray-200 dark:border-gray-700 px-6 py-4 bg-white dark:bg-gray-800 shadow-lg">
+        <div className="border-t border-gray-200 dark:border-[#2D333B] px-6 py-4 bg-white dark:bg-[#0D1117]">
           <div className="flex items-center justify-end gap-3">
             {isEditMode ? (
               <>
                 <button
                   onClick={handleCancelEdit}
-                  className="px-6 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 font-semibold shadow-sm hover:shadow-md flex items-center gap-2"
+                  className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2"
                 >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
                   취소
                 </button>
                 <button
                   onClick={handleSave}
-                  className="px-6 py-3 bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white rounded-xl transition-all duration-200 font-semibold shadow-sm hover:shadow-md flex items-center gap-2"
+                  className="px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md transition-colors text-sm font-medium flex items-center gap-2"
                 >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
                   저장
                 </button>
               </>
@@ -1134,10 +1120,10 @@ export function ApiEditorLayout() {
                 <button
                   onClick={handleEdit}
                   disabled={isReadOnly}
-                  className={`px-6 py-3 rounded-xl transition-all duration-200 font-semibold shadow-sm hover:shadow-md flex items-center gap-2 ${
+                  className={`px-3 py-2 rounded-md transition-colors text-sm font-medium flex items-center gap-2 ${
                     isReadOnly
-                      ? "bg-gray-400 dark:bg-gray-600 text-gray-200 dark:text-gray-400 cursor-not-allowed"
-                      : "bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white"
+                      ? "bg-gray-200 dark:bg-[#161B22] text-gray-400 dark:text-[#8B949E] cursor-not-allowed"
+                      : "bg-[#2563EB] hover:bg-[#1E40AF] text-white"
                   }`}
                   title={
                     isCompleted
@@ -1147,28 +1133,15 @@ export function ApiEditorLayout() {
                       : ""
                   }
                 >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                    />
-                  </svg>
                   수정
                 </button>
                 <button
                   onClick={handleDelete}
                   disabled={isReadOnly}
-                  className={`px-6 py-3 rounded-xl transition-all duration-200 font-semibold shadow-sm hover:shadow-md flex items-center gap-2 ${
+                  className={`px-3 py-2 rounded-md transition-colors text-sm font-medium flex items-center gap-2 ${
                     isReadOnly
-                      ? "bg-gray-400 dark:bg-gray-600 text-gray-200 dark:text-gray-400 cursor-not-allowed"
-                      : "bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 text-white"
+                      ? "bg-gray-200 dark:bg-[#161B22] text-gray-400 dark:text-[#8B949E] cursor-not-allowed"
+                      : "bg-red-500 hover:bg-red-600 text-white"
                   }`}
                   title={
                     isCompleted
@@ -1178,19 +1151,6 @@ export function ApiEditorLayout() {
                       : ""
                   }
                 >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                    />
-                  </svg>
                   삭제
                 </button>
               </>
@@ -1200,44 +1160,18 @@ export function ApiEditorLayout() {
       )}
       {/* 하단 생성/초기화 버튼 - 새 명세 작성 중일 때 표시 (명세서 폼에서만) */}
       {activeTab === "form" && !selectedEndpoint && (
-        <div className="border-t border-gray-200 dark:border-gray-700 px-6 py-4 bg-white dark:bg-gray-800 shadow-lg">
+        <div className="border-t border-gray-200 dark:border-[#2D333B] px-6 py-4 bg-white dark:bg-[#0D1117]">
           <div className="flex items-center justify-end gap-3">
             <button
               onClick={handleReset}
-              className="px-6 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 font-semibold shadow-sm hover:shadow-md flex items-center gap-2"
+              className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2"
             >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
               초기화
             </button>
             <button
               onClick={handleSave}
-              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white rounded-xl transition-all duration-200 font-semibold shadow-sm hover:shadow-md flex items-center gap-2"
+              className="px-3 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-colors text-sm font-medium flex items-center gap-2"
             >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                />
-              </svg>
               생성
             </button>
           </div>
