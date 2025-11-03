@@ -26,7 +26,7 @@ jobs:
           java-version: "17"
           cache: gradle
 
-      - name: Guard: version must be *-SNAPSHOT
+      - name: "Guard: version must be *-SNAPSHOT"
         shell: bash
         run: |
           VER=$(./gradlew -q properties | grep "^version:" | sed -E 's/^version:\s*//')
