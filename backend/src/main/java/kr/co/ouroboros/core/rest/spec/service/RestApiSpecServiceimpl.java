@@ -58,6 +58,12 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
             // Add operation to document
             yamlParser.putOperation(openApiDoc, request.getPath(), request.getMethod(), operation);
 
+            // Validate and auto-create missing schema references
+            int createdSchemas = schemaValidator.validateAndCreateMissingSchemas(openApiDoc);
+            if (createdSchemas > 0) {
+                log.info("Auto-created {} missing schema(s)", createdSchemas);
+            }
+
             // Write back to file
             yamlParser.writeDocument(openApiDoc);
 
@@ -214,6 +220,12 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
                 updateOperationFields(operation, request);
 
                 log.info("Updated REST API spec: {} {} (ID: {})", foundMethod.toUpperCase(), foundPath, id);
+            }
+
+            // Validate and auto-create missing schema references
+            int createdSchemas = schemaValidator.validateAndCreateMissingSchemas(openApiDoc);
+            if (createdSchemas > 0) {
+                log.info("Auto-created {} missing schema(s)", createdSchemas);
             }
 
             // Write back to file
@@ -751,10 +763,16 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
             // Step 5: Process APIs with schema reference updates
             int importedApis = importApis(importedDoc, existingDoc, renamedList, schemaRenameMap);
 
-            // Step 6: Write merged document back to file
+            // Step 6: Validate and auto-create missing schema references
+            int createdSchemas = schemaValidator.validateAndCreateMissingSchemas(existingDoc);
+            if (createdSchemas > 0) {
+                log.info("📦 Auto-created {} missing schema(s)", createdSchemas);
+            }
+
+            // Step 7: Write merged document back to file
             yamlParser.writeDocument(existingDoc);
 
-            // Step 7: Build response
+            // Step 8: Build response
             String summary = String.format("Successfully imported %d APIs and %d schemas%s",
                     importedApis, importedSchemas,
                     !renamedList.isEmpty() ? ", renamed " + renamedList.size() + " items due to duplicates" : "");

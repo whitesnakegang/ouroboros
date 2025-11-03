@@ -5,14 +5,15 @@ import kr.co.ouroboros.core.rest.spec.model.Schema;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.util.Map;
+import java.util.*;
 
 /**
- * Validates and auto-corrects schema constraints.
+ * Validates and auto-corrects schema constraints and references.
  * <p>
- * Ensures that min/max constraints are logically valid:
+ * Ensures that:
  * <ul>
- *   <li>If minItems &gt; maxItems, swaps the values automatically</li>
+ *   <li>Min/max constraints are logically valid (minItems &le; maxItems)</li>
+ *   <li>Schema references ($ref) point to existing schemas (auto-creates if missing)</li>
  * </ul>
  * <p>
  * This validator is applied during:
@@ -237,5 +238,114 @@ public class SchemaValidator {
         }
 
         return corrected;
+    }
+
+    /**
+     * Validates and auto-creates missing schema references in an OpenAPI document.
+     * <p>
+     * Scans all $ref fields in the document and creates placeholder schemas
+     * for any references that don't exist in components/schemas.
+     * <p>
+     * Created schemas have the following structure:
+     * <pre>
+     * {
+     *   "type": "object",
+     *   "properties": {},
+     *   "x-ouroboros-orders": []
+     * }
+     * </pre>
+     *
+     * @param document the OpenAPI document to validate
+     * @return number of schemas auto-created
+     */
+    @SuppressWarnings("unchecked")
+    public int validateAndCreateMissingSchemas(Map<String, Object> document) {
+        if (document == null) {
+            return 0;
+        }
+
+        // Get or create components/schemas
+        Map<String, Object> components = (Map<String, Object>) document.get("components");
+        if (components == null) {
+            components = new LinkedHashMap<>();
+            document.put("components", components);
+        }
+
+        Map<String, Object> schemas = (Map<String, Object>) components.get("schemas");
+        if (schemas == null) {
+            schemas = new LinkedHashMap<>();
+            components.put("schemas", schemas);
+        }
+
+        // Collect all referenced schema names
+        Set<String> referencedSchemas = new HashSet<>();
+        collectSchemaReferences(document, referencedSchemas);
+
+        // Create missing schemas
+        int created = 0;
+        for (String schemaName : referencedSchemas) {
+            if (!schemas.containsKey(schemaName)) {
+                log.warn("🔧 Auto-creating missing schema: {}", schemaName);
+                schemas.put(schemaName, createEmptySchema());
+                created++;
+            }
+        }
+
+        return created;
+    }
+
+    /**
+     * Recursively collects all schema names referenced via $ref in the document.
+     *
+     * @param obj the object to scan (Map, List, or primitive)
+     * @param referencedSchemas set to collect schema names
+     */
+    @SuppressWarnings("unchecked")
+    private void collectSchemaReferences(Object obj, Set<String> referencedSchemas) {
+        if (obj instanceof Map) {
+            Map<String, Object> map = (Map<String, Object>) obj;
+
+            // Check if this map has a $ref field
+            if (map.containsKey("$ref")) {
+                String ref = (String) map.get("$ref");
+                if (ref != null && ref.startsWith("#/components/schemas/")) {
+                    String schemaName = ref.substring("#/components/schemas/".length());
+                    referencedSchemas.add(schemaName);
+                }
+            }
+
+            // Recursively scan all values
+            for (Object value : map.values()) {
+                collectSchemaReferences(value, referencedSchemas);
+            }
+
+        } else if (obj instanceof List) {
+            List<Object> list = (List<Object>) obj;
+            for (Object item : list) {
+                collectSchemaReferences(item, referencedSchemas);
+            }
+        }
+    }
+
+    /**
+     * Creates an empty placeholder schema structure.
+     * <p>
+     * The schema is created with:
+     * <ul>
+     *   <li>type: "object" (default type)</li>
+     *   <li>properties: {} (empty properties map)</li>
+     *   <li>x-ouroboros-orders: [] (empty field ordering)</li>
+     * </ul>
+     * <p>
+     * All values are non-null to prevent issues during YAML serialization.
+     *
+     * @return a new empty schema map
+     */
+    private Map<String, Object> createEmptySchema() {
+        Map<String, Object> schema = new LinkedHashMap<>();
+        schema.put("type", "object");
+        schema.put("properties", new LinkedHashMap<>());
+        schema.put("x-ouroboros-orders", new ArrayList<>());
+        return schema;
     }
 }
