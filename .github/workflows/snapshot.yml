@@ -1,11 +1,9 @@
 name: Publish SNAPSHOT (develop)
 
 on:
-  # develop 브랜치 푸시 시 자동 실행
   push:
     branches:
       - develop
-  # ✅ 수동 실행도 허용
   workflow_dispatch: {}
 
 concurrency:
@@ -26,6 +24,12 @@ jobs:
           java-version: "17"
           cache: gradle
 
+      # gradlew 실행 권한
+      - name: Make gradlew executable
+        working-directory: backend
+        run: chmod +x gradlew
+
+      # SNAPSHOT 버전인지 확인
       - name: "Guard: version must be *-SNAPSHOT"
         shell: bash
         working-directory: backend
@@ -37,8 +41,10 @@ jobs:
             *) echo "⏭️ Not a SNAPSHOT version. Skipping."; exit 78;;
           esac
 
+      # 스냅샷 업로드(포털 Publish 불필요)
       - name: Publish SNAPSHOT (no manual portal publish needed)
         shell: bash
+        working-directory: backend           # 👈 추가!
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.CENTRAL_TOKEN_USER }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.CENTRAL_TOKEN_PASS }}
