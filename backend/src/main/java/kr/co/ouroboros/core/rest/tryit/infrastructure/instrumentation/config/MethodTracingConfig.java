@@ -1,6 +1,6 @@
-package kr.co.ouroboros.core.rest.tryit.tracing.config;
+package kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.config;
 
-import kr.co.ouroboros.core.rest.tryit.tracing.aspect.MethodTracingMethodInterceptor;
+import kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.aspect.MethodTracingMethodInterceptor;
 
 import org.aopalliance.aop.Advice;
 import org.springframework.aop.Advisor;

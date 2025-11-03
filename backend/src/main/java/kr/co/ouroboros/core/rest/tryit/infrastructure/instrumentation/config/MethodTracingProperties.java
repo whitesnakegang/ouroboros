@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.tryit.tracing.config;
+package kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

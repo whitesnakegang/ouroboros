@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.tryit.tracing.processor;
+package kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.processor;
 
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.context.Context;

@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.tryit.web.controller;
+package kr.co.ouroboros.core.rest.tryit.api.controller;
 
 import kr.co.ouroboros.OuroborosApplication;
 import org.junit.jupiter.api.DisplayName;

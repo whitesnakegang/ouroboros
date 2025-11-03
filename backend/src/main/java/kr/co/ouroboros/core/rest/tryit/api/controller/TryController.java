@@ -1,9 +1,9 @@
-package kr.co.ouroboros.core.rest.tryit.web.controller;
+package kr.co.ouroboros.core.rest.tryit.api.controller;
 
-import kr.co.ouroboros.core.rest.tryit.web.dto.TryIssuesResponse;
-import kr.co.ouroboros.core.rest.tryit.web.dto.TryMethodListResponse;
-import kr.co.ouroboros.core.rest.tryit.web.dto.TrySummaryResponse;
-import kr.co.ouroboros.core.rest.tryit.web.dto.TryTraceResponse;
+import kr.co.ouroboros.core.rest.tryit.api.dto.TryIssuesResponse;
+import kr.co.ouroboros.core.rest.tryit.api.dto.TryMethodListResponse;
+import kr.co.ouroboros.core.rest.tryit.api.dto.TrySummaryResponse;
+import kr.co.ouroboros.core.rest.tryit.api.dto.TryTraceResponse;
 import kr.co.ouroboros.core.rest.tryit.service.TryIssuesService;
 import kr.co.ouroboros.core.rest.tryit.service.TryMethodListService;
 import kr.co.ouroboros.core.rest.tryit.service.TrySummaryService;

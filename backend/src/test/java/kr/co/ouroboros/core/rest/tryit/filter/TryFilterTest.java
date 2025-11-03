@@ -74,6 +74,7 @@ class TryFilterTest {
         @Test
         void lowercase_on() throws Exception {
             when(request.getHeader("X-Ouroboros-Try")).thenReturn("on");
+            when(request.getDispatcherType()).thenReturn(jakarta.servlet.DispatcherType.REQUEST);
 
             try (MockedStatic<TryContext> ctx = mockStatic(TryContext.class)) {
                 filter.doFilterInternal(request, response, filterChain);
@@ -88,6 +89,7 @@ class TryFilterTest {
         @Test
         void uppercase_ON() throws Exception {
             when(request.getHeader("X-Ouroboros-Try")).thenReturn("ON");
+            when(request.getDispatcherType()).thenReturn(jakarta.servlet.DispatcherType.REQUEST);
 
             try (MockedStatic<TryContext> ctx = mockStatic(TryContext.class)) {
                 filter.doFilterInternal(request, response, filterChain);
@@ -101,6 +103,7 @@ class TryFilterTest {
         @Test
         void mixedCase_On() throws Exception {
             when(request.getHeader("X-Ouroboros-Try")).thenReturn("On");
+            when(request.getDispatcherType()).thenReturn(jakarta.servlet.DispatcherType.REQUEST);
 
             try (MockedStatic<TryContext> ctx = mockStatic(TryContext.class)) {
                 filter.doFilterInternal(request, response, filterChain);

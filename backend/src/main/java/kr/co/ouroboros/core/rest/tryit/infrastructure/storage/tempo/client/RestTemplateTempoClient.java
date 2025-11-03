@@ -1,8 +1,8 @@
-package kr.co.ouroboros.core.rest.tryit.tempo.client;
+package kr.co.ouroboros.core.rest.tryit.infrastructure.storage.tempo.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import kr.co.ouroboros.core.rest.tryit.tempo.config.TempoProperties;
+import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.tempo.config.TempoProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.*;

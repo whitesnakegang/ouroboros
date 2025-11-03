@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.tryit.util;
+package kr.co.ouroboros.core.rest.tryit.trace.util;
 
 import kr.co.ouroboros.core.rest.tryit.trace.dto.SpanNode;
 import lombok.extern.slf4j.Slf4j;

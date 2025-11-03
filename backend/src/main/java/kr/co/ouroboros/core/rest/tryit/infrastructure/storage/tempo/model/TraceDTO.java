@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.tryit.tempo.dto;
+package kr.co.ouroboros.core.rest.tryit.infrastructure.storage.tempo.model;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;

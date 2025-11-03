@@ -1,6 +1,6 @@
 package kr.co.ouroboros.core.rest.tryit.trace.converter;
 
-import kr.co.ouroboros.core.rest.tryit.tempo.dto.TraceDTO;
+import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.tempo.model.TraceDTO;
 import kr.co.ouroboros.core.rest.tryit.trace.dto.TraceSpanInfo;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

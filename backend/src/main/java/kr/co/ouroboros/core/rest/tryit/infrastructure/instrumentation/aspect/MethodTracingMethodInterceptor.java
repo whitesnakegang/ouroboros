@@ -1,8 +1,8 @@
-package kr.co.ouroboros.core.rest.tryit.tracing.aspect;
+package kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.aspect;
 
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
-import kr.co.ouroboros.core.rest.tryit.tracing.config.MethodTracingProperties;
+import kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.config.MethodTracingProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aopalliance.intercept.MethodInterceptor;

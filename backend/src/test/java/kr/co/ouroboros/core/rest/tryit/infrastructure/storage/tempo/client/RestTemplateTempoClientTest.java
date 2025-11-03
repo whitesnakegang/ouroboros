@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.tryit.tempo.client;
+package kr.co.ouroboros.core.rest.tryit.infrastructure.storage.tempo.client;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -8,7 +8,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestTemplate;
 
-import kr.co.ouroboros.core.rest.tryit.tempo.config.TempoProperties;
+import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.tempo.config.TempoProperties;
 
 import java.util.List;
 
@@ -218,3 +218,4 @@ class RestTemplateTempoClientTest {
         assertThat(client.isEnabled()).isFalse();
     }
 }
+

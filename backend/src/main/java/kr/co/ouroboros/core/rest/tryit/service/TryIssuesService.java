@@ -1,11 +1,11 @@
 package kr.co.ouroboros.core.rest.tryit.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import kr.co.ouroboros.core.rest.tryit.tempo.client.TempoClient;
-import kr.co.ouroboros.core.rest.tryit.tempo.dto.TraceDTO;
+import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.tempo.client.TempoClient;
+import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.tempo.model.TraceDTO;
 import kr.co.ouroboros.core.rest.tryit.trace.analyzer.IssueAnalyzer;
 import kr.co.ouroboros.core.rest.tryit.trace.converter.TraceSpanConverter;
-import kr.co.ouroboros.core.rest.tryit.web.dto.TryIssuesResponse;
+import kr.co.ouroboros.core.rest.tryit.api.dto.TryIssuesResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

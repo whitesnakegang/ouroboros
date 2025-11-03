@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.tryit.tempo.client;
+package kr.co.ouroboros.core.rest.tryit.infrastructure.storage.tempo.client;
 
 import java.util.List;
 
