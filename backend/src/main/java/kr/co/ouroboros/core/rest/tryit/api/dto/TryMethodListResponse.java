@@ -67,6 +67,11 @@ public class TryMethodListResponse {
         private String spanId;
         
         /**
+         * Span name (e.g., "OrderController.getOrder").
+         */
+        private String name;
+        
+        /**
          * Method name.
          */
         private String methodName;

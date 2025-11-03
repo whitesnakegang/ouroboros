@@ -179,6 +179,7 @@ public class TryMethodListService {
         
         return TryMethodListResponse.MethodInfo.builder()
                 .spanId(spanNode.getSpanId())
+                .name(spanNode.getName())
                 .className(spanNode.getClassName())
                 .methodName(spanNode.getMethodName())
                 .parameters(parameters)
