@@ -130,20 +130,6 @@ public class ResponseComparator {
         return true;
     }
 
-
-    /**
-     * Compares content definitions (media types and their schemas) between scanned and file responses for a specific endpoint response.
-     *
-     * Compares each content type from the scanned response against the file response; a scanned content type of "*/*" is treated as matching any file content type.
-     *
-     * @param scannedContent     map of content types to MediaType from the scanned operation
-     * @param fileContent        map of content types to MediaType from the file-based operation
-     * @param method             the HTTP method for the endpoint being compared
-     * @param endpoint           the URL/endpoint being compared
-     * @param statusCode         the response status code being compared
-     * @param schemaMatchResults map of schema names to previously computed match results; used to short-circuit schema comparisons when applicable
-     * @return                   `true` if the content definitions match (all scanned content types correspond to matching file content types and schemas), `false` otherwise
-     */
     private boolean compareContent(Map<String, MediaType> scannedContent, Map<String, MediaType> fileContent, HttpMethod method, String endpoint, String statusCode,
             Map<String, Boolean> schemaMatchResults) {
         if (scannedContent == null && fileContent == null) {
