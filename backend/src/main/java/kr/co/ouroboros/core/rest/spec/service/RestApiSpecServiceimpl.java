@@ -29,7 +29,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class RestApiSpecServiceImpl implements RestApiSpecService {
+public class RestApiSpecServiceimpl implements RestApiSpecService {
 
     private final RestApiYamlParser yamlParser;
     private final SchemaValidator schemaValidator;

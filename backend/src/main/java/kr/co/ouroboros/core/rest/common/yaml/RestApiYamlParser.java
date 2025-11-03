@@ -132,7 +132,7 @@ public class RestApiYamlParser {
                         : new LinkedHashMap<>();
 
                 // Update cache
-                cachedDocument = document;
+                cachedDocument = deepCopy(document);
                 cachedFileTimestamp = currentTimestamp;
 
                 log.debug("OpenAPI document cached (size: {} keys, timestamp: {})",
