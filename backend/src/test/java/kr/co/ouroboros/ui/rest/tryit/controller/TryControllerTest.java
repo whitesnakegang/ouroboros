@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.tryit.api.controller;
+package kr.co.ouroboros.ui.rest.tryit.controller;
 
 import kr.co.ouroboros.ui.rest.tryit.dto.TryIssuesResponse;
 import kr.co.ouroboros.ui.rest.tryit.dto.TryMethodListResponse;
@@ -8,7 +8,6 @@ import kr.co.ouroboros.core.rest.tryit.service.TryIssuesService;
 import kr.co.ouroboros.core.rest.tryit.service.TryMethodListService;
 import kr.co.ouroboros.core.rest.tryit.service.TrySummaryService;
 import kr.co.ouroboros.core.rest.tryit.service.TryTraceService;
-import kr.co.ouroboros.ui.rest.tryit.controller.TryController;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -50,6 +49,7 @@ class TryControllerTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.standaloneSetup(tryController)
+                .setControllerAdvice(new kr.co.ouroboros.core.rest.tryit.exception.TryExceptionHandler())
                 .setMessageConverters(new org.springframework.http.converter.json.MappingJackson2HttpMessageConverter())
                 .build();
         validTryId = UUID.randomUUID().toString();
@@ -74,13 +74,13 @@ class TryControllerTest {
         // when & then
         mockMvc.perform(get("/ouro/tries/{tryId}", validTryId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.tryId").value(validTryId))
-                .andExpect(jsonPath("$.traceId").value("trace123"))
-                .andExpect(jsonPath("$.status").value("COMPLETED"))
-                .andExpect(jsonPath("$.statusCode").value(200))
-                .andExpect(jsonPath("$.totalDurationMs").value(100))
-                .andExpect(jsonPath("$.spanCount").value(5))
-                .andExpect(jsonPath("$.issueCount").value(2));
+                .andExpect(jsonPath("$.data.tryId").value(validTryId))
+                .andExpect(jsonPath("$.data.traceId").value("trace123"))
+                .andExpect(jsonPath("$.data.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.data.statusCode").value(200))
+                .andExpect(jsonPath("$.data.totalDurationMs").value(100))
+                .andExpect(jsonPath("$.data.spanCount").value(5))
+                .andExpect(jsonPath("$.data.issueCount").value(2));
     }
 
     @Test
@@ -126,17 +126,17 @@ class TryControllerTest {
                         .param("page", "0")
                         .param("size", "5"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.tryId").value(validTryId))
-                .andExpect(jsonPath("$.traceId").value("trace123"))
-                .andExpect(jsonPath("$.totalDurationMs").value(100))
-                .andExpect(jsonPath("$.totalCount").value(1))
-                .andExpect(jsonPath("$.page").value(0))
-                .andExpect(jsonPath("$.size").value(5))
-                .andExpect(jsonPath("$.hasMore").value(false))
-                .andExpect(jsonPath("$.methods[0].spanId").value("span1"))
-                .andExpect(jsonPath("$.methods[0].name").value("OrderController.getOrder"))
-                .andExpect(jsonPath("$.methods[0].methodName").value("getOrder"))
-                .andExpect(jsonPath("$.methods[0].className").value("OrderController"));
+                .andExpect(jsonPath("$.data.tryId").value(validTryId))
+                .andExpect(jsonPath("$.data.traceId").value("trace123"))
+                .andExpect(jsonPath("$.data.totalDurationMs").value(100))
+                .andExpect(jsonPath("$.data.totalCount").value(1))
+                .andExpect(jsonPath("$.data.page").value(0))
+                .andExpect(jsonPath("$.data.size").value(5))
+                .andExpect(jsonPath("$.data.hasMore").value(false))
+                .andExpect(jsonPath("$.data.methods[0].spanId").value("span1"))
+                .andExpect(jsonPath("$.data.methods[0].name").value("OrderController.getOrder"))
+                .andExpect(jsonPath("$.data.methods[0].methodName").value("getOrder"))
+                .andExpect(jsonPath("$.data.methods[0].className").value("OrderController"));
     }
 
     @Test
@@ -177,9 +177,9 @@ class TryControllerTest {
         // when & then
         mockMvc.perform(get("/ouro/tries/{tryId}/trace", validTryId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.tryId").value(validTryId))
-                .andExpect(jsonPath("$.traceId").value("trace123"))
-                .andExpect(jsonPath("$.totalDurationMs").value(100));
+                .andExpect(jsonPath("$.data.tryId").value(validTryId))
+                .andExpect(jsonPath("$.data.traceId").value("trace123"))
+                .andExpect(jsonPath("$.data.totalDurationMs").value(100));
     }
 
     @Test
@@ -196,8 +196,8 @@ class TryControllerTest {
         // when & then
         mockMvc.perform(get("/ouro/tries/{tryId}/issues", validTryId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.tryId").value(validTryId))
-                .andExpect(jsonPath("$.issues").isArray());
+                .andExpect(jsonPath("$.data.tryId").value(validTryId))
+                .andExpect(jsonPath("$.data.issues").isArray());
     }
 
     @Test
@@ -233,3 +233,4 @@ class TryControllerTest {
                 .andExpect(status().isBadRequest());
     }
 }
+
