@@ -76,44 +76,38 @@ export function ApiRequestCard({
   const [activeTab, setActiveTab] = useState("headers");
 
   return (
-    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6 shadow-sm">
+    <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm mb-6">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-          <svg
-            className="w-6 h-6 text-blue-600 dark:text-blue-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 4v16m8-8H4"
-            />
-          </svg>
-        </div>
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Request
-          </h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            요청 파라미터 및 헤더 설정
-          </p>
-        </div>
+      <div className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3] mb-2 flex items-center gap-2">
+        <svg
+          className="h-4 w-4 text-gray-500 dark:text-[#8B949E]"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M12 4v16m8-8H4"
+          />
+        </svg>
+        <span>Request</span>
       </div>
+      <p className="text-xs text-gray-600 dark:text-[#8B949E] mb-4">
+        요청 파라미터 및 헤더 설정
+      </p>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-gray-200 dark:border-gray-700 mb-4">
+      <div className="flex gap-1 border-b border-gray-200 dark:border-[#2D333B] mb-4">
         {["params", "headers", "body", "auth"].map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 text-sm font-medium transition-colors capitalize ${
+            className={`px-4 py-2 text-sm font-medium transition-colors capitalize border-b-2 ${
               activeTab === tab
-                ? "text-blue-600 border-b-2 border-blue-600 dark:text-blue-400"
-                : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                ? "text-gray-900 dark:text-[#E6EDF3] border-[#2563EB]"
+                : "text-gray-500 dark:text-[#8B949E] border-transparent hover:text-gray-900 dark:hover:text-[#E6EDF3]"
             }`}
           >
             {tab === "params" && "Params"}
@@ -129,16 +123,16 @@ export function ApiRequestCard({
         {activeTab === "headers" && (
           <div>
             <div className="flex items-center justify-between mb-3">
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              <p className="text-xs text-gray-600 dark:text-[#8B949E]">
                 요청 헤더 설정
               </p>
               <button
                 onClick={addHeader}
                 disabled={isReadOnly}
-                className={`px-3 py-1 text-sm font-medium ${
+                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
                   isReadOnly
-                    ? "text-gray-400 cursor-not-allowed"
-                    : "text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                    ? "text-gray-400 dark:text-[#8B949E] cursor-not-allowed"
+                    : "text-[#2563EB] hover:text-[#1E40AF]"
                 }`}
               >
                 + Add
@@ -152,7 +146,8 @@ export function ApiRequestCard({
                     value={header.key}
                     onChange={(e) => updateHeader(index, "key", e.target.value)}
                     placeholder="Header Name (e.g., Content-Type)"
-                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={isReadOnly}
+                    className="flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm"
                   />
                   <input
                     type="text"
@@ -161,11 +156,13 @@ export function ApiRequestCard({
                       updateHeader(index, "value", e.target.value)
                     }
                     placeholder="Header Value (e.g., application/json)"
-                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={isReadOnly}
+                    className="flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm"
                   />
                   <button
                     onClick={() => removeHeader(index)}
-                    className="p-2 text-red-500 hover:text-red-600"
+                    disabled={isReadOnly}
+                    className="p-2 text-gray-500 dark:text-[#8B949E] hover:text-red-500 transition-colors disabled:opacity-50"
                   >
                     <svg
                       className="w-5 h-5"
@@ -189,7 +186,7 @@ export function ApiRequestCard({
 
         {activeTab === "body" && (
           <div>
-            <div className="flex gap-2 mb-3 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex gap-1 mb-3 border-b border-gray-200 dark:border-[#2D333B]">
               {bodyTypes.map((type) => (
                 <button
                   key={type}
@@ -209,11 +206,12 @@ export function ApiRequestCard({
                     };
                     setRequestBody(newBody);
                   }}
-                  className={`px-4 py-2 text-sm font-medium transition-colors ${
+                  disabled={isReadOnly}
+                  className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
                     requestBody.type === type
-                      ? "text-blue-600 border-b-2 border-blue-600 dark:text-blue-400"
-                      : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                  }`}
+                      ? "text-gray-900 dark:text-[#E6EDF3] border-[#2563EB]"
+                      : "text-gray-500 dark:text-[#8B949E] border-transparent hover:text-gray-900 dark:hover:text-[#E6EDF3]"
+                  } disabled:opacity-50`}
                 >
                   {type}
                 </button>
@@ -234,15 +232,15 @@ export function ApiRequestCard({
                         ],
                       });
                     }}
-                    className="px-3 py-1 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+                    className="px-3 py-1 text-sm text-[#2563EB] hover:text-[#1E40AF] font-medium"
                   >
                     + Add Field
                   </button>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg">
+                  <table className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-md">
                     <thead>
-                      <tr className="bg-gray-50 dark:bg-gray-750">
+                      <tr className="bg-gray-50 dark:bg-[#161B22]">
                         <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
                           Key
                         </th>
@@ -277,7 +275,7 @@ export function ApiRequestCard({
                                 });
                               }}
                               placeholder="예: username, password"
-                              className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="w-full px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
                             />
                           </td>
                           <td className="px-4 py-3">
@@ -312,7 +310,7 @@ export function ApiRequestCard({
                                   fields: updated,
                                 });
                               }}
-                              className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="w-full px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
                             >
                               {fieldTypes.map((type) => (
                                 <option key={type} value={type}>

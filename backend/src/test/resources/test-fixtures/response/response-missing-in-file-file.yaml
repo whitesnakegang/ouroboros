@@ -1,0 +1,17 @@
+openapi: "3.1.0"
+info:
+  title: "t"
+  version: "v0"
+paths:
+  "/p":
+    get:
+      x-ouroboros-diff: "none"
+      x-ouroboros-progress: "mock"
+      responses:
+        "200":
+          description: "ok"
+          content:
+            application/json:
+              schema:
+                type: "string"
+

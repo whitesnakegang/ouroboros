@@ -23,16 +23,16 @@ export function ProtocolTabs({
   };
 
   return (
-    <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
+    <div className="mb-6 border-b border-gray-200 dark:border-[#2D333B]">
       <div className="flex gap-8">
         {protocols.map((protocol) => (
           <button
             key={protocol}
             onClick={() => handleProtocolChange(protocol)}
-            className={`px-4 py-3 text-sm font-medium transition-colors ${
+            className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
               selectedProtocol === protocol
-                ? "text-gray-900 dark:text-white border-b-2 border-gray-900 dark:border-white"
-                : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                ? "text-gray-900 dark:text-[#E6EDF3] border-[#2563EB]"
+                : "text-gray-500 dark:text-[#8B949E] border-transparent hover:text-gray-900 dark:hover:text-[#E6EDF3]"
             }`}
           >
             {protocol}

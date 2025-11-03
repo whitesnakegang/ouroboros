@@ -1,5 +1,6 @@
 package kr.co.ouroboros.core.rest.common.dto;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
@@ -10,6 +11,11 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
+@JsonAutoDetect(
+        fieldVisibility = JsonAutoDetect.Visibility.ANY,
+        getterVisibility = JsonAutoDetect.Visibility.NONE,
+        isGetterVisibility = JsonAutoDetect.Visibility.NONE
+)
 public class Schema {
 
     // Standard fields
@@ -32,6 +38,7 @@ public class Schema {
 
     @JsonProperty("additionalProperties")
     private Map<String, Object> additionalProperties;
+    
     // (★핵심★) Ouroboros custom fields
     @JsonProperty("x-ouroboros-mock")
     private String xOuroborosMock;

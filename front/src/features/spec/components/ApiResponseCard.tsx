@@ -189,44 +189,38 @@ export function ApiResponseCard({
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6 shadow-sm">
+    <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900 flex items-center justify-center">
-          <svg
-            className="w-6 h-6 text-purple-600 dark:text-purple-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-            />
-          </svg>
-        </div>
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Response
-          </h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            응답 바디, 헤더 및 상태 코드 설정
-          </p>
-        </div>
+      <div className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3] mb-2 flex items-center gap-2">
+        <svg
+          className="h-4 w-4 text-gray-500 dark:text-[#8B949E]"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+          />
+        </svg>
+        <span>Response</span>
       </div>
+      <p className="text-xs text-gray-600 dark:text-[#8B949E] mb-4">
+        응답 바디, 헤더 및 상태 코드 설정
+      </p>
 
       {/* Tabs - Only Status Codes and Schema */}
-      <div className="flex gap-1 border-b border-gray-200 dark:border-gray-700 mb-4">
+      <div className="flex gap-1 border-b border-gray-200 dark:border-[#2D333B] mb-4">
         {["status", "schema"].map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 text-sm font-medium transition-colors capitalize ${
+            className={`px-4 py-2 text-sm font-medium transition-colors capitalize border-b-2 ${
               activeTab === tab
-                ? "text-purple-600 border-b-2 border-purple-600 dark:text-purple-400"
-                : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                ? "text-gray-900 dark:text-[#E6EDF3] border-[#2563EB]"
+                : "text-gray-500 dark:text-[#8B949E] border-transparent hover:text-gray-900 dark:hover:text-[#E6EDF3]"
             }`}
           >
             {tab === "status" && "Status Codes"}
@@ -257,7 +251,7 @@ export function ApiResponseCard({
                       }
                     }
                   }}
-                  className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="px-3 py-1 text-sm border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
                 >
                   <option value="">템플릿 선택...</option>
                   <optgroup label="Success">
@@ -281,7 +275,7 @@ export function ApiResponseCard({
                 </select>
                 <button
                   onClick={() => addStatusCode()}
-                  className="px-3 py-1 text-sm text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 font-medium border border-purple-600 dark:border-purple-400 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900"
+                  className="px-3 py-1 text-sm text-[#2563EB] hover:text-[#1E40AF] font-medium border border-[#2563EB] rounded-md hover:bg-[#2563EB] hover:text-white transition-colors"
                 >
                   + Add Custom
                 </button>
@@ -308,7 +302,7 @@ export function ApiResponseCard({
                   {statusCodes.map((statusCode, index) => (
                     <tr
                       key={index}
-                      className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750"
+                      className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-[#161B22]"
                     >
                       <td className="px-4 py-3">
                         <input
@@ -318,7 +312,7 @@ export function ApiResponseCard({
                             updateStatusCode(index, "code", e.target.value)
                           }
                           placeholder="200"
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
                         />
                       </td>
                       <td className="px-4 py-3">
@@ -327,7 +321,7 @@ export function ApiResponseCard({
                           onChange={(e) =>
                             updateStatusCode(index, "type", e.target.value)
                           }
-                          className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
                         >
                           <option value="Success">Success</option>
                           <option value="Error">Error</option>
@@ -341,7 +335,7 @@ export function ApiResponseCard({
                             updateStatusCode(index, "message", e.target.value)
                           }
                           placeholder="예: 요청이 성공적으로 처리됨"
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
                         />
                       </td>
                       <td className="px-4 py-3">
@@ -385,13 +379,13 @@ export function ApiResponseCard({
                 <button
                   onClick={loadSchemas}
                   disabled={isLoading}
-                  className="px-3 py-1 text-sm text-gray-600 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 font-medium border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+                  className="px-3 py-1 text-sm text-gray-600 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 font-medium border border-gray-300 dark:border-[#2D333B] rounded-md hover:bg-gray-50 dark:hover:bg-[#161B22] disabled:opacity-50"
                 >
                   {isLoading ? "로딩..." : "새로고침"}
                 </button>
                 <button
                   onClick={() => setIsSchemaModalOpen(true)}
-                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 dark:bg-purple-700 dark:hover:bg-purple-600 text-white rounded-lg text-sm font-medium transition-colors"
+                  className="px-4 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md text-sm font-medium transition-colors"
                 >
                   Schema 관리
                 </button>
@@ -409,7 +403,7 @@ export function ApiResponseCard({
                   value={currentSchemaName}
                   onChange={(e) => setCurrentSchemaName(e.target.value)}
                   placeholder="Schema 이름을 입력하세요 (예: UserInfo, ProductData)"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
                 />
               </div>
 
@@ -422,7 +416,7 @@ export function ApiResponseCard({
                   onChange={(e) => setCurrentSchemaDescription(e.target.value)}
                   placeholder="Schema에 대한 설명을 입력하세요 (선택사항)"
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] resize-none"
                 />
               </div>
 
@@ -439,7 +433,7 @@ export function ApiResponseCard({
                       },
                     ]);
                   }}
-                  className="px-3 py-1 text-sm text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 font-medium"
+                  className="px-3 py-1 text-sm text-[#2563EB] hover:text-[#1E40AF] font-medium"
                 >
                   + Add Field
                 </button>
@@ -447,9 +441,9 @@ export function ApiResponseCard({
                   <button
                     onClick={saveSchema}
                     disabled={isLoading}
-                    className="px-4 py-2 bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                    className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50"
                   >
-                    {isLoading ? "저장 중..." : "💾 Save Schema"}
+                    {isLoading ? "저장 중..." : "Save Schema"}
                   </button>
                 )}
               </div>
@@ -464,9 +458,9 @@ export function ApiResponseCard({
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg">
+                <table className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-md">
                   <thead>
-                    <tr className="bg-gray-50 dark:bg-gray-750">
+                    <tr className="bg-gray-50 dark:bg-[#161B22]">
                       <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 w-1/4">
                         Field Name <span className="text-red-500">*</span>
                       </th>
@@ -501,7 +495,7 @@ export function ApiResponseCard({
                               setSchemaFields(updated);
                             }}
                             placeholder="예: userId, userName, status"
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
                           />
                         </td>
                         <td className="px-4 py-3">
@@ -515,7 +509,7 @@ export function ApiResponseCard({
                               };
                               setSchemaFields(updated);
                             }}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
                           >
                             <option value="string">string</option>
                             <option value="integer">integer</option>
@@ -538,7 +532,7 @@ export function ApiResponseCard({
                               setSchemaFields(updated);
                             }}
                             placeholder="예: {{$random.uuid}}, {{$name.fullName}}"
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
                           />
                         </td>
                         <td className="px-4 py-3">
@@ -554,7 +548,7 @@ export function ApiResponseCard({
                               setSchemaFields(updated);
                             }}
                             placeholder="필드에 대한 설명을 입력하세요"
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
                           />
                         </td>
                         <td className="px-4 py-3 text-center">
