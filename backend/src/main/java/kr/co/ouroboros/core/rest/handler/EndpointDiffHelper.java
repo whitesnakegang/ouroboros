@@ -1,6 +1,7 @@
 package kr.co.ouroboros.core.rest.handler;
 
 import java.util.Map;
+import java.util.UUID;
 import kr.co.ouroboros.core.rest.common.dto.Operation;
 import kr.co.ouroboros.core.rest.common.dto.PathItem;
 import lombok.extern.slf4j.Slf4j;
@@ -42,6 +43,11 @@ public final class EndpointDiffHelper {
         for (RequestDiffHelper.HttpMethod method : RequestDiffHelper.HttpMethod.values()) {
             Operation op = getOperationByMethod(addedPath, method);
             if (op != null) {
+                // Generate x-ouroboros-id if not present
+                if (op.getXOuroborosId() == null) {
+                    op.setXOuroborosId(UUID.randomUUID().toString());
+                    log.debug("Generated x-ouroboros-id for {} {}: {}", method, url, op.getXOuroborosId());
+                }
                 op.setXOuroborosDiff("endpoint");
             }
         }
@@ -74,6 +80,13 @@ public final class EndpointDiffHelper {
     public static void markDiffEndpoint(String url, Operation scanOp, Map<String, PathItem> restFileSpec, HttpMethod method) {
         log.info("METHOD: [{}], URL: [{}]은 같지만 METHOD는 다름", method, url);
         PathItem pathItem = restFileSpec.get(url);
+
+        // Generate x-ouroboros-id if not present
+        if (scanOp.getXOuroborosId() == null) {
+            scanOp.setXOuroborosId(UUID.randomUUID().toString());
+            log.debug("Generated x-ouroboros-id for {} {}: {}", method, url, scanOp.getXOuroborosId());
+        }
+
         setOperationByMethod(pathItem, method, scanOp);
         Operation operationByMethod = getOperationByMethod(pathItem, method);
         operationByMethod.setXOuroborosDiff("endpoint");

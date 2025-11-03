@@ -298,7 +298,6 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         if (request.getDescription() != null) {
             operation.put("description", request.getDescription());
         }
-        operation.put("deprecated", request.isDeprecated());
 
         if (request.getTags() != null && !request.getTags().isEmpty()) {
             operation.put("tags", request.getTags());
@@ -322,11 +321,11 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
             operation.put("security", convertSecurity(request.getSecurity()));
         }
 
-        // Add Ouroboros custom fields
+        // Add Ouroboros custom fields (auto-generated)
         operation.put("x-ouroboros-id", id);
-        operation.put("x-ouroboros-progress", request.getProgress() != null ? request.getProgress() : "mock");
-        operation.put("x-ouroboros-tag", request.getTag() != null ? request.getTag() : "none");
-        operation.put("x-ouroboros-diff", request.getDiff() != null ? request.getDiff() : "none");
+        operation.put("x-ouroboros-progress", "mock");  // Always start as "mock"
+        operation.put("x-ouroboros-tag", "none");       // Always start as "none"
+        operation.put("x-ouroboros-diff", "none");      // Always start as "none"
 
         return operation;
     }
@@ -338,9 +337,7 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         if (request.getDescription() != null) {
             operation.put("description", request.getDescription());
         }
-        if (request.getDeprecated() != null) {
-            operation.put("deprecated", request.getDeprecated());
-        }
+
         if (request.getTags() != null) {
             operation.put("tags", request.getTags());
         }
@@ -356,15 +353,8 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         if (request.getSecurity() != null) {
             operation.put("security", convertSecurity(request.getSecurity()));
         }
-        if (request.getProgress() != null) {
-            operation.put("x-ouroboros-progress", request.getProgress());
-        }
-        if (request.getTag() != null) {
-            operation.put("x-ouroboros-tag", request.getTag());
-        }
-        if (request.getDiff() != null) {
-            operation.put("x-ouroboros-diff", request.getDiff());
-        }
+        // Note: progress and tag are NOT updated via API
+        // They are managed internally or by YAML parser
     }
 
     private List<Map<String, Object>> convertParameters(List<Parameter> parameters) {
@@ -549,7 +539,6 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
                 .method(method.toUpperCase())
                 .summary((String) operation.get("summary"))
                 .description((String) operation.get("description"))
-                .deprecated((Boolean) operation.get("deprecated"))
                 .tags((List<String>) operation.get("tags"))
                 .progress((String) operation.get("x-ouroboros-progress"))
                 .tag((String) operation.get("x-ouroboros-tag"))

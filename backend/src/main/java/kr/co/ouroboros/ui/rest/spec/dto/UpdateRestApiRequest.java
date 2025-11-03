@@ -48,11 +48,6 @@ public class UpdateRestApiRequest {
     private String description;
 
     /**
-     * Whether this endpoint is deprecated
-     */
-    private Boolean deprecated;
-
-    /**
      * Grouping tags
      */
     private List<String> tags;
@@ -76,19 +71,4 @@ public class UpdateRestApiRequest {
      * Security requirements
      */
     private List<SecurityRequirement> security;
-
-    /**
-     * Development progress (mock or completed)
-     */
-    private String progress;
-
-    /**
-     * Development tag (none, implementing, bugfix)
-     */
-    private String tag;
-
-    /**
-     * Diff status (none, request, response, endpoint, both)
-     */
-    private String diff;
 }
