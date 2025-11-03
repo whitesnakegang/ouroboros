@@ -37,31 +37,33 @@ public class RestMockLoaderService {
     private final RestApiYamlParser parser;
 
     /**
-     * Parse OpenAPI YAML file and convert to EndpointMeta map.
-     * Resolves all $ref references in response schemas.
+     * OpenAPI YAML 파일을 파싱하여 EndpointMeta 맵으로 변환
+     * 모든 $ref 참조를 실제 스키마로 치환함
      *
-     * @return map of "METHOD:path" to EndpointMeta
+     * @return "METHOD:path" → EndpointMeta 맵
      */
     public Map<String, EndpointMeta> loadFromYaml() {
         try {
-            // 1. YAML 파일 존재 확인
+            // ===== 1. YAML 파일 존재 확인 =====
             if (!parser.fileExists()) {
                 log.info("YAML file does not exist");
                 return Collections.emptyMap();
             }
-            // 2. YAML 문서 읽기
+            // ===== 2. YAML 문서 읽기 =====
             Map<String, Object> openApiDoc = parser.readDocument();
 
-            // 3. components/schemas 추출
+            // ===== 3. components/schemas 추출 =====
+            // $ref 참조를 해결하기 위해 필요
             Map<String, Object> schemas = parser.getSchemas(openApiDoc);
             if (schemas == null) {
                 schemas = Collections.emptyMap();
             }
 
-            // 3-1. components/securitySchemes 추출
+            // ===== 3-1. components/securitySchemes 추출 =====
+            // 인증 헤더 이름 확인용 (Authorization, X-API-Key 등)
             Map<String, Object> securitySchemes = extractSecuritySchemes(openApiDoc);
 
-            // 4. paths 추출
+            // ===== 4. paths 추출 =====
             @SuppressWarnings("unchecked")
             Map<String, Object> paths = (Map<String, Object>) openApiDoc.get("paths");
             if (paths == null || paths.isEmpty()) {
@@ -71,7 +73,7 @@ public class RestMockLoaderService {
 
             Map<String, EndpointMeta> endpoints = new LinkedHashMap<>();
 
-            // 5. 각 path와 method를 순회하며 EndpointMeta 생성
+            // ===== 5. 각 path와 method를 순회하며 EndpointMeta 생성 =====
             for (Map.Entry<String, Object> pathEntry : paths.entrySet()) {
                 String path = pathEntry.getKey();
                 @SuppressWarnings("unchecked")
@@ -80,17 +82,18 @@ public class RestMockLoaderService {
                 for (Map.Entry<String, Object> methodEntry : pathItem.entrySet()) {
                     String method = methodEntry.getKey().toLowerCase();
 
-                    // Skip non-HTTP method fields
+                    // HTTP 메서드가 아닌 필드는 스킵
                     if (!isHttpMethod(method)) {
                         continue;
                     }
 
                     @SuppressWarnings("unchecked")
                     Map<String, Object> operation = (Map<String, Object>) methodEntry.getValue();
+                    // operation을 파싱하여 EndpointMeta 생성
                     EndpointMeta meta = parseOperation(path, method, operation, schemas, securitySchemes);
 
                     if (meta != null) {
-                        String key = method.toUpperCase() + ":" + path;
+                        String key = method.toUpperCase() + ":" + path; // 예: "GET:/api/users"
                         endpoints.put(key, meta);
                         log.debug("Parsed endpoint: {} {}", method.toUpperCase(), path);
                     }
@@ -107,6 +110,7 @@ public class RestMockLoaderService {
     }
 
     /**
+     * 단일 OpenAPI operation을 파싱하여 EndpointMeta로 변환
      * Parses a single OpenAPI operation into EndpointMeta with security scheme resolution.
      * <p>
      * Only operations with {@code x-ouroboros-progress: mock} are parsed and registered.
@@ -139,18 +143,20 @@ public class RestMockLoaderService {
     @SuppressWarnings("unchecked")
     private EndpointMeta parseOperation(String path, String method, Map<String, Object> operation,
                                        Map<String, Object> schemas, Map<String, Object> securitySchemes) {
-        // Extract Ouroboros custom fields
+        // ===== Ouroboros 커스텀 필드 추출 =====
         String id = (String) operation.get("x-ouroboros-id");
         String progress = (String) operation.get("x-ouroboros-progress");
+        // mock이 아닌 endpoint는 registry에 등록하지 않음
         if (!"mock".equalsIgnoreCase(progress)) {
-            return null;  // mock이 아닌 endpoint는 registry에 등록하지 않음
+            return null;
         }
 
-        // Extract required parameters
-        List<String> requiredHeaders = new ArrayList<>();
-        List<String> requiredParams = new ArrayList<>();
-        List<String> authHeaders = new ArrayList<>();
+        // ===== 필수 파라미터 추출 =====
+        List<String> requiredHeaders = new ArrayList<>(); // 일반 필수 헤더 (400)
+        List<String> requiredParams = new ArrayList<>();  // 필수 쿼리 파라미터 (400)
+        List<String> authHeaders = new ArrayList<>();  // 인증 헤더 (401)
 
+        // parameters 필드에서 필수 헤더/파라미터 추출
         List<Map<String, Object>> parameters = (List<Map<String, Object>>) operation.get("parameters");
         if (parameters != null) {
             for (Map<String, Object> param : parameters) {
@@ -160,42 +166,69 @@ public class RestMockLoaderService {
                     String in = (String) param.get("in");
 
                     if ("header".equals(in)) {
+                        // 예: X-Request-ID, X-Tenant-ID
                         requiredHeaders.add(name);
                     } else if ("query".equals(in)) {
+                        // 예: userId, role
                         requiredParams.add(name);
                     }
                 }
             }
         }
 
-        // Parse security requirements and resolve actual header names from securitySchemes
+        // ===== 보안 요구사항 파싱 및 실제 헤더 이름 해결 =====
+        // security 필드에서 인증 헤더 추출
         List<Map<String, Object>> security = (List<Map<String, Object>>) operation.get("security");
         if (security != null && !security.isEmpty()) {
             for (Map<String, Object> requirement : security) {
                 for (String schemeName : requirement.keySet()) {
+                    // securitySchemes에서 실제 정의 가져오기
                     Map<String, Object> scheme = (Map<String, Object>) securitySchemes.getOrDefault(schemeName, Collections.emptyMap());
                     String type = (String) scheme.get("type");
 
                     if ("http".equals(type)) {
-                        // HTTP authentication (Bearer, Basic, etc.): always uses Authorization header
+                        // HTTP 인증 (Bearer, Basic 등) → Authorization 헤더
                         authHeaders.add("Authorization");
                     } else if ("apiKey".equals(type) && "header".equals(scheme.get("in"))) {
-                        // API Key authentication: use custom header name from scheme definition
+                        // API Key 인증 → 스키마에 정의된 헤더 이름 사용
+                        // 예: X-API-Key, X-Auth-Token 등
                         authHeaders.add((String) scheme.get("name"));
                     } else if ("oauth2".equals(type) || "openIdConnect".equals(type)) {
-                        // OAuth2 and OpenID Connect: use Authorization header
+                        // OAuth2, OpenID Connect → Authorization 헤더
                         authHeaders.add("Authorization");
                     }
                 }
             }
         }
 
-        // Parse responses
+        // ===== Request Body 파싱 =====
+        boolean requestBodyRequired = false;  // body가 필수인지
+        Map<String, Object> requestBodySchema = null;  // body의 스키마 (타입/필드 검증용)
+        Map<String, Object> requestBody = (Map<String, Object>) operation.get("requestBody");
+        if (requestBody != null) {
+            requestBodyRequired = Boolean.TRUE.equals(requestBody.get("required"));
+            // content.application/json.schema 추출
+            Map<String, Object> content = (Map<String, Object>) requestBody.get("content");
+            if (content != null) {
+                Map<String, Object> mediaType = (Map<String, Object>) content.get("application/json");
+                if (mediaType != null) {
+                    Map<String, Object> schema = (Map<String, Object>) mediaType.get("schema");
+                    if (schema != null) {
+                        // $ref가 있으면 실제 스키마로 치환
+                        // 예: {$ref: '#/components/schemas/User'} → {type: 'object', properties: {...}}
+                        requestBodySchema = resolveSchema(schema, schemas, new HashSet<>());
+                    }
+                }
+            }
+        }
+
+        // ===== Response 파싱 =====
         Map<Integer, ResponseMeta> responses = new HashMap<>();
         Map<String, Object> responsesMap = (Map<String, Object>) operation.get("responses");
         if (responsesMap != null) {
             for (Map.Entry<String, Object> responseEntry : responsesMap.entrySet()) {
                 try {
+                    // "200", "400" 등을 숫자로 변환
                     int statusCode = Integer.parseInt(responseEntry.getKey());
                     Map<String, Object> responseObj = (Map<String, Object>) responseEntry.getValue();
 
@@ -204,11 +237,12 @@ public class RestMockLoaderService {
                         responses.put(statusCode, responseMeta);
                     }
                 } catch (NumberFormatException e) {
-                    // Skip non-numeric status codes (like "default")
+                    // 비숫자 status code는 스킵
                 }
             }
         }
 
+        // ===== EndpointMeta 빌드 =====
         return EndpointMeta.builder()
                 .id(id)
                 .path(path)
@@ -217,13 +251,19 @@ public class RestMockLoaderService {
                 .requiredHeaders(requiredHeaders)
                 .authHeaders(authHeaders)
                 .requiredParams(requiredParams)
+                .requestBodyRequired(requestBodyRequired)
+                .requestBodySchema(requestBodySchema)
                 .responses(responses)
                 .build();
     }
 
     /**
-     * Parse a single response to create ResponseMeta.
-     * Response 스키마 파싱
+     * Response를 파싱하여 ResponseMeta 생성
+     *
+     * @param statusCode HTTP 상태 코드 (200, 400 등)
+     * @param response response 객체
+     * @param schemas components/schemas 맵 ($ref 해결용)
+     * @return 파싱된 ResponseMeta
      */
     @SuppressWarnings("unchecked")
     private ResponseMeta parseResponse(int statusCode, Map<String, Object> response, Map<String, Object> schemas) {
@@ -232,7 +272,7 @@ public class RestMockLoaderService {
             return null;
         }
 
-        // Try to get JSON or XML content
+        // JSON 또는 XML content 타입 확인
         String contentType = null;
         Map<String, Object> schema = null;
 
@@ -250,7 +290,7 @@ public class RestMockLoaderService {
             return null;
         }
 
-        // Resolve $ref if present
+        // $ref 있으면 실제 스키마로 치환
         Map<String, Object> resolvedSchema = resolveSchema(schema, schemas, new HashSet<>());
 
         return ResponseMeta.builder()
@@ -261,7 +301,7 @@ public class RestMockLoaderService {
     }
 
     /**
-     * Recursively resolve $ref in schema.
+     * 스키마의 $ref를 재귀적으로 해결
      *
      * @param schema the schema that may contain $ref
      * @param schemas the components/schemas map for lookup
@@ -274,39 +314,40 @@ public class RestMockLoaderService {
             return Collections.emptyMap();
         }
 
-        // Handle $ref
+        // ===== $ref 처리 =====
         if (schema.containsKey("$ref")) {
-            String ref = (String) schema.get("$ref");
+            String ref = (String) schema.get("$ref"); // 예: "#/components/schemas/User"
 
-            // Prevent circular references
+            // 순환 참조 방지 (A → B → A)
             if (visited.contains(ref)) {
                 log.warn("Circular reference detected: {}", ref);
                 return Collections.emptyMap();
             }
             visited.add(ref);
 
-            // Parse ref: "#/components/schemas/User" -> "User"
+            // ref에서 스키마 이름 추출: "#/components/schemas/User" → "User"
             String schemaName = extractSchemaName(ref);
             if (schemaName == null) {
                 log.warn("Invalid $ref format: {}", ref);
                 return Collections.emptyMap();
             }
 
-            // Get referenced schema
+            // schemas 맵에서 실제 스키마 가져오기
             Map<String, Object> referencedSchema = (Map<String, Object>) schemas.get(schemaName);
             if (referencedSchema == null) {
                 log.warn("Schema not found: {}", schemaName);
                 return Collections.emptyMap();
             }
 
-            // Recursively resolve the referenced schema
+            // 참조된 스키마를 재귀적으로 해결 (중첩 $ref 처리)
             return resolveSchema(referencedSchema, schemas, visited);
         }
 
-        // Create a new map to avoid modifying the original
+        // ===== 원본 스키마 복사 (수정 방지) =====
         Map<String, Object> resolved = new LinkedHashMap<>(schema);
 
-        // Recursively resolve properties
+        // ===== properties 재귀 해결 =====
+        // properties: {id: {type: 'string'}, address: {$ref: '#/components/schemas/Address'}}
         if (resolved.containsKey("properties")) {
             Map<String, Object> properties = (Map<String, Object>) resolved.get("properties");
             Map<String, Object> resolvedProperties = new LinkedHashMap<>();
@@ -319,7 +360,8 @@ public class RestMockLoaderService {
             resolved.put("properties", resolvedProperties);
         }
 
-        // Recursively resolve array items
+        // ===== array items 재귀 해결 =====
+        // items: {$ref: '#/components/schemas/Address'}
         if (resolved.containsKey("items")) {
             Map<String, Object> items = (Map<String, Object>) resolved.get("items");
             resolved.put("items", resolveSchema(items, schemas, new HashSet<>(visited)));
@@ -329,26 +371,30 @@ public class RestMockLoaderService {
     }
 
     /**
-     * Extract schema name from $ref string.
+     * $ref 문자열에서 스키마 이름 추출
      *
-     * @param ref the reference string (e.g., "#/components/schemas/User")
-     * @return the schema name (e.g., "User"), or null if invalid format
+     * @param ref $ref 문자열 (예: "#/components/schemas/User")
+     * @return 스키마 이름 (예: "User"), 잘못된 형식이면 null
      */
     private String extractSchemaName(String ref) {
         if (ref == null || !ref.startsWith("#/components/schemas/")) {
             return null;
         }
 
+        // "/" 기준으로 분리: ["#", "components", "schemas", "User"]
         String[] parts = ref.split("/");
         if (parts.length >= 4) {
-            return parts[3];
+            return parts[3]; // "User"
         }
 
         return null;
     }
 
     /**
-     * Check if the string is an HTTP method.
+     * HTTP 메서드인지 확인
+     *
+     * @param method 메서드 문자열
+     * @return HTTP 메서드이면 true
      */
     private boolean isHttpMethod(String method) {
         return method.matches("get|post|put|delete|patch|options|head|trace");
