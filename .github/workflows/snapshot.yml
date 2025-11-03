@@ -28,6 +28,7 @@ jobs:
 
       - name: "Guard: version must be *-SNAPSHOT"
         shell: bash
+        working-directory: backend
         run: |
           VER=$(./gradlew -q properties | grep "^version:" | sed -E 's/^version:\s*//')
           echo "Detected version: $VER"

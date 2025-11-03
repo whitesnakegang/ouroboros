@@ -26,6 +26,7 @@ jobs:
       - name: Ensure tag commit is on main history
         if: ${{ github.event_name == 'push' }}
         shell: bash
+        working-directory: backend
         run: |
           TAG_SHA="${GITHUB_SHA}"
           git fetch origin main --quiet
