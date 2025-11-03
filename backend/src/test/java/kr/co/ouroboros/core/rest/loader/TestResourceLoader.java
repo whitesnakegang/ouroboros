@@ -83,6 +83,9 @@ public class TestResourceLoader {
      */
     private String loadResourceAsString(String resourcePath) throws Exception {
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+        if( classLoader == null) {
+            classLoader = getClass().getClassLoader();
+        }
         InputStream inputStream = classLoader.getResourceAsStream(resourcePath);
         
         if (inputStream == null) {
