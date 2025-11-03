@@ -53,7 +53,7 @@ public final class RequestDiffHelper {
         if (paramsDiff) {
             log.info("[{}], [{}]: 파라미터 다름", url, method);
             fileOp.setXOuroborosDiff(DIFF_REQUEST);
-            fileOp.setXOuroborosProgress("MOCK");
+            fileOp.setXOuroborosProgress("mock");
             return;
         }
         log.info("[{}], [{}]: 파라미터 똑같음", url, method);
@@ -63,14 +63,14 @@ public final class RequestDiffHelper {
         if (bodyDiff) {
             log.info("[{}], [{}]: Request Body 다름", url, method);
             fileOp.setXOuroborosDiff(DIFF_REQUEST);
-            fileOp.setXOuroborosProgress("MOCK");
+            fileOp.setXOuroborosProgress("mock");
             return;
         }
         log.info("[{}], [{}]: Request Body 똑같음", url, method);
         
         // 3. 모든 검증 통과
         fileOp.setXOuroborosDiff(DIFF_NONE);
-        fileOp.setXOuroborosProgress("COMPLETED");
+        fileOp.setXOuroborosProgress("completed");
     }
 
     /**
