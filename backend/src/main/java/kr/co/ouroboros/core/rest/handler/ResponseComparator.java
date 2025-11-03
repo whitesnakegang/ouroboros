@@ -72,6 +72,8 @@ public class ResponseComparator {
 
         // 엔드포인트 단위로 최종 결과 설정
         if (hasMismatch) {
+            // 검사 실패했을 경우, progress: mock으로 설정
+            // diff는 상황에 따라 request, response, both로 설정
             fileOperation.setXOuroborosProgress("mock");
             if ("none".equals(fileOperation.getXOuroborosDiff())) {
                 fileOperation.setXOuroborosDiff("response");
@@ -79,7 +81,8 @@ public class ResponseComparator {
                 fileOperation.setXOuroborosDiff("both");
             }
         } else {
-            if ("none".equals(fileOperation.getXOuroborosDiff())) {
+            // 검사 통과했으면 diff: none으로 설정하고 progress: completed로 설정0
+            if("none".equals(fileOperation.getXOuroborosDiff())) {
                 fileOperation.setXOuroborosProgress("completed");
             }
         }

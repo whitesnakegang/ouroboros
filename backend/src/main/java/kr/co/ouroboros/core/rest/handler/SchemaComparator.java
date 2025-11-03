@@ -134,11 +134,11 @@ public class SchemaComparator {
         }
 
         // Required 필드 비교
-        if (!Objects.equals(scannedSchema.getRequired(), fileSchema.getRequired())) {
-            log.debug("[SCHEMA REQUIRED MISMATCH] '{}': required 필드가 다릅니다. (스캔: {}, 파일: {})",
-                    schemaName, scannedSchema.getRequired(), fileSchema.getRequired());
-            return false;
-        }
+//        if (!Objects.equals(scannedSchema.getRequired(), fileSchema.getRequired())) {
+//            log.debug("[SCHEMA REQUIRED MISMATCH] '{}': required 필드가 다릅니다. (스캔: {}, 파일: {})",
+//                    schemaName, scannedSchema.getRequired(), fileSchema.getRequired());
+//            return false;
+//        }
 
         // AdditionalProperties 비교
         if (!Objects.equals(scannedSchema.getAdditionalProperties(), fileSchema.getAdditionalProperties())) {

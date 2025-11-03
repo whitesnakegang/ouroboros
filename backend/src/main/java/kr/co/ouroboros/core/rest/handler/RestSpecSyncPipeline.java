@@ -80,8 +80,11 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
 
                 // 3. endpoint diff가 있으면 reqCompare, resCompare는 스킵
                 reqCompare(url, fileOp, scanOp, schemaMatchResults, httpMethod);
-                resCompare(url, httpMethod, fileOp, scanOp, schemaMatchResults);
 
+                // 시영지기 @ApiResponse를 사용해서 명세를 정확히 작성했을 때만 response 검증
+                if(scanOp.getXOuroborosResponse() != null && scanOp.getXOuroborosResponse().equals("use")) {
+                    resCompare(url, httpMethod, fileOp, scanOp, schemaMatchResults);
+                }
             }
         }
 

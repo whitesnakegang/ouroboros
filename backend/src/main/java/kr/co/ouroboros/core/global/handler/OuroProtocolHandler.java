@@ -55,5 +55,5 @@ public interface OuroProtocolHandler {
      * @param specToSave the API specification to serialize (typically a scanned or merged spec)
      * @return the YAML representation of the provided specification
      */
-    String serializeToYaml(OuroApiSpec specToSave);
+    void saveYaml(OuroApiSpec specToSave);
 }
