@@ -19,15 +19,14 @@ public final class MockApiHelper {
     /**
      * Determines whether the operation should be treated as a mock and, if so, marks and tags the file operation accordingly.
      *
-     * @param path    the API path being evaluated
      * @param fileOp  the operation from the file to update when mock status applies
      * @param scanOp  the scanned operation whose mock metadata is the source of truth
      * @return `true` if the scanned operation's XOuroborosProgress equals "MOCK", `false` otherwise.
      */
-    public static boolean isMockApi(String path, Operation fileOp, Operation scanOp) {
+    public static boolean isMockApi(Operation fileOp, Operation scanOp) {
         String xOuroborosProgress = scanOp.getXOuroborosProgress();
-        if (xOuroborosProgress.equals("MOCK")) {
-            fileOp.setXOuroborosProgress("MOCK");
+        if (xOuroborosProgress.equals("mock")) {
+            fileOp.setXOuroborosProgress("mock");
             fileOp.setXOuroborosTag(scanOp.getXOuroborosTag());
             return true;
         }
