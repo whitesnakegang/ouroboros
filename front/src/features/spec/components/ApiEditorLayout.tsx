@@ -44,6 +44,7 @@ type RequestBody = {
     type: string;
     description?: string;
     required?: boolean;
+    ref?: string;  // 스키마 참조 시 사용 (예: "User")
   }>;
 };
 
@@ -51,6 +52,10 @@ interface StatusCode {
   code: string;
   type: "Success" | "Error";
   message: string;
+  schema?: {
+    ref?: string;  // 스키마 참조 (예: "User")
+    properties?: Record<string, any>;  // 인라인 스키마
+  };
 }
 
 export function ApiEditorLayout() {
@@ -158,6 +163,153 @@ export function ApiEditorLayout() {
     ? Math.round((completedEndpoints / totalEndpoints) * 100)
     : 0;
 
+  /**
+   * 프론트엔드 RequestBody를 OpenAPI RequestBody 구조로 변환
+   */
+  const convertRequestBodyToOpenAPI = (
+    frontendBody: RequestBody | null
+  ): {
+    description: string;
+    required: boolean;
+    content: Record<string, any>;
+  } | null => {
+    // null이거나 type이 "none"이면 null 반환
+    if (!frontendBody || frontendBody.type === "none" || !frontendBody.fields || frontendBody.fields.length === 0) {
+      return null;
+    }
+
+    // Content-Type 결정
+    let contentType = "application/json";
+    if (frontendBody.type === "form-data") {
+      contentType = "multipart/form-data";
+    } else if (frontendBody.type === "x-www-form-urlencoded") {
+      contentType = "application/x-www-form-urlencoded";
+    } else if (frontendBody.type === "xml") {
+      contentType = "application/xml";
+    }
+
+    // fields를 OpenAPI properties로 변환
+    const properties: Record<string, any> = {};
+    const required: string[] = [];
+
+    frontendBody.fields.forEach((field) => {
+      if (field.key) {
+        // ref가 있으면 Reference 모드, 없으면 Inline 모드
+        if ((field as any).ref) {
+          // Reference 모드: ref만 전송 (다른 필드 무시)
+          properties[field.key] = {
+            ref: (field as any).ref,  // 예: "User"
+          };
+        } else {
+          // Inline 모드: 모든 필드 정보 포함
+          const property: any = {
+            type: field.type || "string",
+          };
+          
+          if (field.description) {
+            property.description = field.description;
+          }
+          
+          if (field.value) {
+            property.mockExpression = field.value;  // DataFaker 표현식
+          }
+
+          properties[field.key] = property;
+        }
+
+        if (field.required) {
+          required.push(field.key);
+        }
+      }
+    });
+
+    return {
+      description: "Request body",
+      required: required.length > 0,
+      content: {
+        [contentType]: {
+          schema: {
+            type: "object",
+            properties: properties,
+            required: required.length > 0 ? required : undefined,
+          },
+        },
+      },
+    };
+  };
+
+  /**
+   * requestHeaders를 OpenAPI parameters 구조로 변환
+   * (Content-Type 같은 일반 헤더는 제외하고, API 스펙에 필요한 헤더만 parameters로 변환)
+   */
+  const convertHeadersToParameters = (
+    headers: KeyValuePair[]
+  ): any[] => {
+    // Content-Type은 requestBody의 content에 포함되므로 parameters에서 제외
+    const standardHeaders = ["Content-Type", "Accept"];
+    
+    return headers
+      .filter((header) => header.key && !standardHeaders.includes(header.key))
+      .map((header) => ({
+        name: header.key,
+        in: "header",
+        description: `Header: ${header.key}`,
+        required: false, // 기본값은 optional
+        schema: {
+          type: "string",
+        },
+      }));
+  };
+
+  /**
+   * StatusCode 배열을 OpenAPI responses 구조로 변환
+   */
+  const convertResponsesToOpenAPI = (
+    statusCodes: StatusCode[]
+  ): Record<string, any> => {
+    return statusCodes.reduce((acc, code) => {
+      let schema: any;
+      
+      // StatusCode에 schema 정보가 있으면 사용
+      if (code.schema) {
+        if (code.schema.ref) {
+          // Reference 모드: ref만 전송
+          schema = {
+            ref: code.schema.ref,
+          };
+        } else if (code.schema.properties) {
+          // Inline 모드: properties 포함
+          schema = {
+            type: "object",
+            properties: code.schema.properties,
+          };
+        } else {
+          // 기본 schema
+          schema = {
+            type: "object",
+            properties: {},
+          };
+        }
+      } else {
+        // schema 정보가 없으면 기본 schema
+        schema = {
+          type: "object",
+          properties: {},
+        };
+      }
+
+      acc[code.code] = {
+        description: code.message,
+        content: {
+          "application/json": {
+            schema: schema,
+          },
+        },
+      };
+      return acc;
+    }, {} as Record<string, any>);
+  };
+
   const handleSave = async () => {
     if (!method || !url) {
       alert("Method와 URL을 입력해주세요.");
@@ -173,19 +325,9 @@ export function ApiEditorLayout() {
           summary,
           description,
           tags: tags ? tags.split(",").map((tag) => tag.trim()) : [],
-          progress: "mock",
-          tag: "none",
-          isValid: true,
-          // 추가 필드들도 포함
-          parameters: [], // 실제 데이터로 교체 필요
-          requestBody: requestBody, // 실제 requestBody 데이터
-          responses: statusCodes.reduce((acc, code) => {
-            acc[code.code] = {
-              description: code.message,
-              type: code.type.toLowerCase(),
-            };
-            return acc;
-          }, {} as Record<string, unknown>),
+          parameters: convertHeadersToParameters(requestHeaders),
+          requestBody: convertRequestBodyToOpenAPI(requestBody),
+          responses: convertResponsesToOpenAPI(statusCodes),
           security: [],
         };
 
@@ -218,9 +360,10 @@ export function ApiEditorLayout() {
           summary,
           description,
           tags: tags ? tags.split(",").map((tag) => tag.trim()) : [],
-          progress: "mock",
-          tag: "none",
-          isValid: true,
+          parameters: convertHeadersToParameters(requestHeaders),
+          requestBody: convertRequestBodyToOpenAPI(requestBody),
+          responses: convertResponsesToOpenAPI(statusCodes),
+          security: [],
         };
 
         const response = await createRestApiSpec(apiRequest);
@@ -551,7 +694,7 @@ export function ApiEditorLayout() {
   };
 
   return (
-    <div className="h-full flex flex-col bg-white dark:bg-[#0D1117]">
+    <div className="h-full flex flex-col bg-white dark:bg-[#0D1117] min-h-0">
       {/* Header Tabs */}
       <div className="border-b border-gray-200 dark:border-[#2D333B] px-6 py-4 bg-white dark:bg-[#0D1117]">
         <div className="flex items-center justify-between mb-4">
@@ -858,7 +1001,7 @@ export function ApiEditorLayout() {
             <TestLayout />
           </>
         ) : (
-          <div className="max-w-6xl mx-auto px-6 py-8">
+          <div className="w-full max-w-6xl mx-auto px-6 py-8">
             {/* Protocol not supported message */}
             {protocol !== "REST" && (
               <div className="h-full flex items-center justify-center py-12">

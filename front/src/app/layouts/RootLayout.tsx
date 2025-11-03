@@ -51,7 +51,7 @@ export function RootLayout() {
         </div>
       </header>
       <div className="flex flex-1 overflow-hidden relative">
-        {/* 오버레이 (모바일용) */}
+        {/* 오버레이 (모바일용만) */}
         {isOpen && (
           <div
             className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
@@ -61,15 +61,15 @@ export function RootLayout() {
 
         {/* 사이드바 */}
         <aside
-          className={`fixed lg:static inset-y-0 left-0 z-50 lg:z-auto w-80 border-r border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#0D1117] transition-transform duration-300 transform ${
-            isOpen ? "translate-x-0" : "-translate-x-full"
+          className={`fixed lg:static inset-y-0 left-0 z-50 lg:z-auto w-80 border-r border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#0D1117] transition-transform duration-300 transform lg:transform-none ${
+            isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
           }`}
         >
           <Sidebar onAddNew={handleNewApiForm} />
         </aside>
 
         {/* 메인 콘텐츠 */}
-        <main className="flex-1 overflow-auto bg-white dark:bg-[#0D1117]">
+        <main className="flex-1 overflow-auto bg-white dark:bg-[#0D1117] min-w-0 w-full">
           <Outlet />
         </main>
       </div>

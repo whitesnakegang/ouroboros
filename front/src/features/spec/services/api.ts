@@ -30,16 +30,14 @@ export interface RestApiSpecResponse {
   method: string;
   summary?: string;
   description?: string;
-  deprecated?: boolean;
   tags?: string[];
   parameters?: unknown[];
   requestBody?: unknown;
   responses?: Record<string, unknown>;
   security?: unknown[];
-  progress: string;
-  tag: string;
-  isValid?: boolean;
-  diff?: string;
+  progress: string;      // Response에만 유지 (읽기 전용)
+  tag: string;           // Response에만 유지 (읽기 전용)
+  diff?: string;         // Response에만 유지
 }
 
 export interface GetAllSpecsResponse {
@@ -53,16 +51,11 @@ export interface CreateApiRequest {
   method: string;
   summary?: string;
   description?: string;
-  deprecated?: boolean;
   tags?: string[];
   parameters?: unknown[];
   requestBody?: unknown;
   responses?: Record<string, unknown>;
   security?: unknown[];
-  progress?: string;
-  tag?: string;
-  isValid?: boolean;
-  diff?: string;
 }
 
 export interface CreateApiResponse {
@@ -76,16 +69,11 @@ export interface UpdateApiRequest {
   method?: string;
   summary?: string;
   description?: string;
-  deprecated?: boolean;
   tags?: string[];
   parameters?: unknown[];
   requestBody?: unknown;
   responses?: Record<string, unknown>;
   security?: unknown[];
-  progress?: string;
-  tag?: string;
-  isValid?: boolean;
-  diff?: string;
 }
 
 export interface UpdateApiResponse {
