@@ -15,8 +15,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.aop.framework.ProxyFactory;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
+import org.springframework.validation.beanvalidation.MethodValidationInterceptor;
 
 import java.util.List;
 import java.util.UUID;
@@ -48,8 +51,23 @@ class TryControllerTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(tryController)
-                .setControllerAdvice(new kr.co.ouroboros.core.rest.tryit.exception.TryExceptionHandler())
+        // Bean Validation을 위한 설정
+        LocalValidatorFactoryBean validatorFactory = new LocalValidatorFactoryBean();
+        validatorFactory.afterPropertiesSet();
+        
+        // MethodValidationInterceptor를 사용하여 AOP 프록시 생성
+        MethodValidationInterceptor interceptor = new MethodValidationInterceptor(validatorFactory.getValidator());
+        
+        // 컨트롤러를 AOP 프록시로 감싸기
+        ProxyFactory proxyFactory = new ProxyFactory(tryController);
+        proxyFactory.addAdvice(interceptor);
+        TryController proxiedController = (TryController) proxyFactory.getProxy();
+        
+        mockMvc = MockMvcBuilders.standaloneSetup(proxiedController)
+                .setControllerAdvice(
+                        new kr.co.ouroboros.core.rest.tryit.exception.TryExceptionHandler(),
+                        new kr.co.ouroboros.core.global.exception.GlobalExceptionHandler()
+                )
                 .setMessageConverters(new org.springframework.http.converter.json.MappingJackson2HttpMessageConverter())
                 .build();
         validTryId = UUID.randomUUID().toString();
@@ -231,6 +249,82 @@ class TryControllerTest {
         // when & then
         mockMvc.perform(get("/ouro/tries/{tryId}/issues", invalidTryId))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("음수 page 값으로 methods 조회 시 400 에러")
+    void getMethods_NegativePage_Returns400() throws Exception {
+        // given
+        int negativePage = -1;
+
+        // when & then
+        mockMvc.perform(get("/ouro/tries/{tryId}/methods", validTryId)
+                        .param("page", String.valueOf(negativePage))
+                        .param("size", "5"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("size가 0인 경우 methods 조회 시 400 에러")
+    void getMethods_ZeroSize_Returns400() throws Exception {
+        // given
+        int zeroSize = 0;
+
+        // when & then
+        mockMvc.perform(get("/ouro/tries/{tryId}/methods", validTryId)
+                        .param("page", "0")
+                        .param("size", String.valueOf(zeroSize)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("음수 size 값으로 methods 조회 시 400 에러")
+    void getMethods_NegativeSize_Returns400() throws Exception {
+        // given
+        int negativeSize = -1;
+
+        // when & then
+        mockMvc.perform(get("/ouro/tries/{tryId}/methods", validTryId)
+                        .param("page", "0")
+                        .param("size", String.valueOf(negativeSize)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("size가 100 초과인 경우 methods 조회 시 400 에러")
+    void getMethods_SizeExceedsMax_Returns400() throws Exception {
+        // given
+        int tooLargeSize = 101;
+
+        // when & then
+        mockMvc.perform(get("/ouro/tries/{tryId}/methods", validTryId)
+                        .param("page", "0")
+                        .param("size", String.valueOf(tooLargeSize)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("유효한 범위 내의 page와 size로 methods 조회 성공")
+    void getMethods_ValidPagination_Success() throws Exception {
+        // given
+        TryMethodListResponse response = TryMethodListResponse.builder()
+                .tryId(validTryId)
+                .traceId("trace123")
+                .totalDurationMs(100L)
+                .totalCount(0)
+                .page(10)
+                .size(50)
+                .hasMore(false)
+                .methods(List.of())
+                .build();
+
+        when(tryMethodListService.getMethodList(validTryId, 10, 50)).thenReturn(response);
+
+        // when & then
+        mockMvc.perform(get("/ouro/tries/{tryId}/methods", validTryId)
+                        .param("page", "10")
+                        .param("size", "50"))
+                .andExpect(status().isOk());
     }
 }
 

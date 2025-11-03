@@ -10,9 +10,12 @@ import kr.co.ouroboros.core.rest.tryit.service.TryIssuesService;
 import kr.co.ouroboros.core.rest.tryit.service.TryMethodListService;
 import kr.co.ouroboros.core.rest.tryit.service.TrySummaryService;
 import kr.co.ouroboros.core.rest.tryit.service.TryTraceService;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -35,6 +38,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/ouro/tries")
 @RequiredArgsConstructor
+@Validated
 public class TryController {
 
     private final TryMethodListService tryMethodListService;
@@ -86,8 +90,8 @@ public class TryController {
     @GetMapping("/{tryId}/methods")
     public ResponseEntity<GlobalApiResponse<TryMethodListResponse>> getMethods(
             @PathVariable("tryId") String tryIdStr,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "5") int size
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "5") @Min(1) @Max(100) int size
     ) throws Exception {
         // Validate tryId format
         validateTryId(tryIdStr);

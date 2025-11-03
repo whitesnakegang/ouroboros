@@ -1,5 +1,6 @@
 package kr.co.ouroboros.core.global.exception;
 
+import jakarta.validation.ConstraintViolationException;
 import kr.co.ouroboros.core.global.response.GlobalApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  * <p>
  * <b>Handled Exceptions:</b>
  * <ul>
+ *   <li>{@link ConstraintViolationException} - 400 Bad Request (validation errors)</li>
  *   <li>{@link IllegalArgumentException} - 400 Bad Request</li>
  *   <li>{@link ClassCastException} - 400 Bad Request (type mismatch error)</li>
  *   <li>{@link NullPointerException} - 400 Bad Request (null value error)</li>
@@ -40,6 +42,32 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @Order(100) // Lower priority - package-specific handlers have higher priority (lower order number)
 @Slf4j
 public class GlobalExceptionHandler {
+
+    /**
+     * Handles constraint violation exceptions (Bean Validation errors).
+     * <p>
+     * Returns 400 Bad Request when request parameters fail validation (e.g., @Min, @Max).
+     * <p>
+     * Note: Detailed exception message is logged but not exposed to client for security.
+     *
+     * @param ex the constraint violation exception
+     * @return response entity with 400 status and error details
+     */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<GlobalApiResponse<Void>> handleConstraintViolation(ConstraintViolationException ex) {
+        // Log detailed error for debugging
+        log.error("Validation constraint violation: {}", ex.getMessage());
+
+        // Return generic message to client
+        GlobalApiResponse<Void> response = GlobalApiResponse.error(
+                HttpStatus.BAD_REQUEST.value(),
+                "Invalid request data",
+                "VALIDATION_ERROR",
+                "The request parameters are invalid"
+        );
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
 
     /**
      * Handles illegal argument exceptions (validation errors).
