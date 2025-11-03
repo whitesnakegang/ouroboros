@@ -1,0 +1,190 @@
+openapi: 3.1.0
+info:
+  title: API Documentation
+  version: 1.0.0
+paths:
+  /api/users:
+    post:
+      summary: Create a new user
+      description: Simple ref test
+      deprecated: false
+      tags:
+        - Users
+      requestBody:
+        description: User object
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+      x-ouroboros-id: a886a792-b09c-40f2-b4ae-62f74c3c2009
+      x-ouroboros-progress: mock
+      x-ouroboros-tag: none
+      x-ouroboros-diff: none
+    get:
+      summary: Find users (request param)
+      description: Query parameters로 사용자 목록을 필터링합니다.
+      deprecated: false
+      tags:
+        - Users
+      parameters:
+        - name: name
+          in: query
+          required: false
+          description: 사용자 이름(부분 일치)
+          schema:
+            type: string
+        - name: email
+          in: query
+          required: false
+          description: 이메일(정확 일치)
+          schema:
+            type: string
+            format: email
+        - name: page
+          in: query
+          required: false
+          description: 페이지 번호(0-based)
+          schema:
+            type: integer
+            format: int32
+            minimum: 0
+            default: 0
+        - name: size
+          in: query
+          required: false
+          description: 페이지 크기
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 200
+            default: 20
+      responses:
+        '200':
+          description: Filtered user list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+      x-ouroboros-id: 6e3b3a0b-2c1c-41b7-9c2e-6f7a5f3a6f11
+      x-ouroboros-progress: mock
+      x-ouroboros-tag: none
+      x-ouroboros-diff: none
+  /api/users/{id}:
+    get:
+      summary: Get user by ID (path param)
+      description: Path parameter로 단일 사용자를 조회합니다.
+      deprecated: false
+      tags:
+        - Users
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: User ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Found user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          description: User not found
+      x-ouroboros-id: 9d5f8f27-3a7a-4b5a-9f1b-2a6e5c4d0b22
+      x-ouroboros-progress: mock
+      x-ouroboros-tag: none
+      x-ouroboros-diff: none
+components:
+  schemas:
+    Address:
+      type: object
+      title: Address Schema
+      description: A physical address
+      properties:
+        street:
+          type: string
+          description: Street address
+          x-ouroboros-mock: '{{$address.streetAddress}}'
+        city:
+          type: string
+          description: City name
+          x-ouroboros-mock: '{{$address.city}}'
+        zipCode:
+          type: string
+          description: Postal code
+          x-ouroboros-mock: '{{$address.zipCode}}'
+      required:
+        - street
+        - city
+      x-ouroboros-orders:
+        - street
+        - city
+        - zipCode
+    User:
+      type: object
+      title: User Schema
+      description: A user entity
+      properties:
+        id:
+          type: string
+          description: User ID
+          x-ouroboros-mock: '{{$random.uuid}}'
+        name:
+          type: string
+          description: User name
+          x-ouroboros-mock: '{{$name.fullName}}'
+        email:
+          type: string
+          description: User email
+          x-ouroboros-mock: '{{$internet.email}}'
+      required:
+        - id
+        - name
+      x-ouroboros-orders:
+        - id
+        - name
+        - email
+    UserWithAddress:
+      type: object
+      title: User with Address
+      description: User with nested address reference
+      properties:
+        id:
+          type: string
+          description: User ID
+          x-ouroboros-mock: '{{$random.uuid}}'
+        name:
+          type: string
+          description: User name
+          x-ouroboros-mock: '{{$name.fullName}}'
+        address:
+          $ref: '#/components/schemas/Address'
+        previousAddresses:
+          type: array
+          description: Previous addresses
+          items:
+            $ref: '#/components/schemas/Address'
+          minItems: 0
+          maxItems: 5
+          x-ouroboros-mock: ''
+      required:
+        - id
+        - name
+      x-ouroboros-orders:
+        - id
+        - name
+        - address
+        - previousAddresses

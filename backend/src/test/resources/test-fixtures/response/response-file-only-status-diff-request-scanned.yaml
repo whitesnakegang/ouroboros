@@ -1,0 +1,19 @@
+openapi: "3.1.0"
+info:
+  title: "t"
+  version: "v0"
+paths:
+  "/e2":
+    get:
+      x-ouroboros-id: "44444444-4444-4444-4444-444444444444"
+      x-ouroboros-progress: "completed"
+      x-ouroboros-tag: "none"
+      x-ouroboros-diff: "none"
+      responses:
+        "201":
+          description: "created"
+          content:
+            application/json:
+              schema:
+                type: "string"
+

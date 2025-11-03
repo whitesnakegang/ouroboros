@@ -1,0 +1,77 @@
+name: Publish to Maven Central (manual or v* tags on main)
+
+on:
+  workflow_dispatch: {}
+  push:
+    tags:
+      - 'v*'
+
+concurrency:
+  group: release-central
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure tag commit is on main history
+        if: ${{ github.event_name == 'push' }}
+        shell: bash
+        run: |
+          TAG_SHA="${GITHUB_SHA}"
+          git fetch origin main --quiet
+          if git merge-base --is-ancestor origin/main "$TAG_SHA"; then
+            echo "✅ Tag commit is on main history."
+          else
+            echo "⏭️ Tag commit is NOT on main. Skipping."
+            exit 78
+          fi
+
+      - name: Set up Temurin JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Make gradlew executable
+        working-directory: backend
+        run: chmod +x gradlew
+
+      # 🧩 GPG 키 주입 (개행 안전)
+      - name: Prepare signing key (robust)
+        shell: bash
+        run: |
+          set -euo pipefail
+          RAW="${{ secrets.GPG_PRIVATE_KEY_ARMOR }}"
+
+          if echo "$RAW" | grep -q 'BEGIN PGP PRIVATE KEY BLOCK'; then
+            KEY="$RAW"
+          elif echo "$RAW" | grep -q '\\n'; then
+            KEY="$(printf '%b' "$RAW")"
+          else
+            KEY="$(echo "$RAW" | base64 -d)"
+          fi
+
+          echo "Signing key length: $(echo "$KEY" | wc -c)"
+
+          {
+            echo 'ORG_GRADLE_PROJECT_signingInMemoryKey<<EOF'
+            echo "$KEY"
+            echo 'EOF'
+            echo "ORG_GRADLE_PROJECT_signingInMemoryKeyPassword=${{ secrets.GPG_PASSPHRASE }}"
+          } >> "$GITHUB_ENV"
+
+      - name: Publish (upload + validate; portal publish manual)
+        shell: bash
+        working-directory: backend
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.CENTRAL_TOKEN_USER }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.CENTRAL_TOKEN_PASS }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.GPG_KEY_ID }}
+        run: ./gradlew publishToMavenCentral --no-daemon --info

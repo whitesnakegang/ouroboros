@@ -1,0 +1,31 @@
+{
+  "schemaName": "Address",
+  "type": "object",
+  "title": "Address Schema",
+  "description": "A physical address",
+  "properties": {
+    "street": {
+      "type": "string",
+      "description": "Street address",
+      "mockExpression": "{{$address.streetAddress}}"
+    },
+    "city": {
+      "type": "string",
+      "description": "City name",
+      "mockExpression": "{{$address.city}}"
+    },
+    "country": {
+      "type": "string",
+      "description": "Country name",
+      "mockExpression": "{{$address.country}}"
+    },
+    "zipCode": {
+      "type": "string",
+      "description": "Postal code",
+      "mockExpression": "{{$address.zipCode}}"
+    }
+  },
+  "required": ["street", "city"],
+  "orders": ["street", "city", "zipCode", "country"]
+}
+
