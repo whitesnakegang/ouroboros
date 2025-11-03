@@ -4,10 +4,13 @@ import kr.co.ouroboros.core.global.properties.OuroborosProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
+import org.yaml.snakeyaml.representer.Representer;
 
-import java.io.FileInputStream;
 import java.io.FileWriter;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -32,16 +35,32 @@ public class RestApiYamlParser {
     private static final String RESOURCE_PATH = System.getProperty("user.dir") + "/src/main/resources";
     private static final String YAML_FILE_PATH = "ouroboros/rest/ourorest.yml";
 
-    private final Yaml yaml;
+    private final LoaderOptions loaderOptions;
+    private final DumperOptions dumperOptions;
     private final OuroborosProperties properties;
 
     public RestApiYamlParser(OuroborosProperties properties) {
-        DumperOptions options = new DumperOptions();
-        options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
-        options.setPrettyFlow(true);
-        options.setIndent(2);
-        this.yaml = new Yaml(options);
+        this.loaderOptions = new LoaderOptions();
+        this.loaderOptions.setCodePointLimit(50 * 1024 * 1024); // 50MB limit to prevent buffer overflow
+
+        this.dumperOptions = new DumperOptions();
+        this.dumperOptions.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+        this.dumperOptions.setPrettyFlow(true);
+        this.dumperOptions.setIndent(2);
+
         this.properties = properties;
+    }
+
+    /**
+     * Creates a new Yaml instance for thread-safe parsing.
+     * SnakeYAML Yaml instances are not thread-safe, so we create a new one for each operation.
+     *
+     * @return new Yaml instance
+     */
+    private Yaml createYaml() {
+        SafeConstructor constructor = new SafeConstructor(loaderOptions);
+        Representer representer = new Representer(dumperOptions);
+        return new Yaml(constructor, representer, dumperOptions);
     }
 
     /**
@@ -75,8 +94,9 @@ public class RestApiYamlParser {
             throw new IllegalStateException("YAML file does not exist: " + filePath);
         }
 
-        try (FileInputStream fis = new FileInputStream(filePath.toFile())) {
-            Object loaded = yaml.load(fis);
+        try (InputStream is = Files.newInputStream(filePath)) {
+            Yaml yaml = createYaml();
+            Object loaded = yaml.load(is);
             if (loaded instanceof Map) {
                 return (Map<String, Object>) loaded;
             }
@@ -139,6 +159,7 @@ public class RestApiYamlParser {
         Files.createDirectories(filePath.getParent());
 
         try (FileWriter writer = new FileWriter(filePath.toFile())) {
+            Yaml yaml = createYaml();
             yaml.dump(document, writer);
         }
 
