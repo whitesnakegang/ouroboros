@@ -1,20 +1,22 @@
 plugins {
 	id 'java-library'
-	id 'maven-publish'
+	// Maven Central (Central Portal) 배포용 플러그인 — 자동 퍼블리시는 안 켬
+	id 'com.vanniktech.maven.publish' version '0.34.0'
+
+	// (선택) 사용자 프로젝트에 Boot를 쓰더라도, 여긴 라이브러리 모듈로만 빌드됨
 	id 'org.springframework.boot' version '3.5.7' apply false
 	id 'io.spring.dependency-management' version '1.1.7'
 }
 
-group = 'kr.co'
-version = '0.0.1-SNAPSHOT'
+group = 'io.github.whitesnakegang'   // ← 실제 groupId 반영
+version = '0.1.0-SNAPSHOT'                    // ← 스냅샷이면 0.1.1-SNAPSHOT 등으로
+
 description = 'Open Source Project'
 
 java {
 	toolchain {
 		languageVersion = JavaLanguageVersion.of(17)
 	}
-	withSourcesJar()  // 소스 JAR 생성
-	withJavadocJar()  // Javadoc JAR 생성
 }
 
 configurations {
@@ -29,66 +31,104 @@ repositories {
 
 dependencyManagement {
 	imports {
+		// Boot BOM으로 starter, jackson 등 버전 자동 관리
 		mavenBom org.springframework.boot.gradle.plugin.SpringBootPlugin.BOM_COORDINATES
+		// 또는 명시하고 싶으면: mavenBom "org.springframework.boot:spring-boot-dependencies:3.5.7"
 	}
 }
 
 dependencies {
-	implementation("org.springdoc:springdoc-openapi-starter-webmvc-api:2.8.13")
-	// Spring Boot (사용자 프로젝트의 버전에 기생)
-	compileOnly 'org.springframework.boot:spring-boot-starter-web'
+	implementation "org.springdoc:springdoc-openapi-starter-webmvc-api:2.8.13"
 
-	// YAML processing
-	implementation 'org.yaml:snakeyaml:2.2'
+	// 사용자 앱 쪽 Boot 버전에 '기생'하고 싶다면 compileOnly 유지 (라이브러리 자체는 Boot에 종속 X)
+	compileOnly "org.springframework.boot:spring-boot-starter-web"
 
-	// DataFaker for mock data generation
-	implementation 'net.datafaker:datafaker:2.1.0'
+	// YAML
+	implementation "org.yaml:snakeyaml:2.2"
 
-	// Lombok
-	compileOnly 'org.projectlombok:lombok'
-	annotationProcessor 'org.projectlombok:lombok'
+	// DataFaker (중복 제거: 최신 것만 남김)
+	implementation "net.datafaker:datafaker:2.5.2"
 
-	// Testing
-	testImplementation 'org.springframework.boot:spring-boot-starter-test'
-	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+	// XML
+	implementation "com.fasterxml.jackson.dataformat:jackson-dataformat-xml"
 
-	// Data Generator
-	implementation 'net.datafaker:datafaker:2.5.2'
-	// xml formatting
-	implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-xml'
+	// Lombok (버전 명시)
+	compileOnly "org.projectlombok:lombok:1.18.34"
+	annotationProcessor "org.projectlombok:lombok:1.18.34"
+	testCompileOnly "org.projectlombok:lombok:1.18.34"
+	testAnnotationProcessor "org.projectlombok:lombok:1.18.34"
+
+	// Test
+	testImplementation "org.springframework.boot:spring-boot-starter-test"
+	testRuntimeOnly "org.junit.platform:junit-platform-launcher"
 }
 
 tasks.named('test') {
 	useJUnitPlatform()
 }
 
-tasks.withType(JavaCompile) {
-	options.encoding = 'UTF-8'
-}
-
-tasks.withType(Javadoc) {
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+tasks.withType(Javadoc).configureEach {
 	options.encoding = 'UTF-8'
 	options.charSet = 'UTF-8'
 	options.docEncoding = 'UTF-8'
 }
 
-publishing {
-	publications {
-		mavenJava(MavenPublication) {
-			from components.java
+/**
+ * Maven Central(포털) 업로드: 자동 퍼블리시는 사용하지 않음.
+ * - User Token은 gradle.properties 또는 환경변수(ORG_GRADLE_PROJECT_*)로 주입
+ * - 모든 아티팩트는 GPG 서명(플러그인이 처리)
+ */
+mavenPublishing {
+	// Central Portal 사용 (인자 없이 호출하면 Central 경로로 처리됨)
+	publishToMavenCentral()
+	// GPG 서명 (중앙 필수)
+	signAllPublications()
 
-			pom {
-				name = 'Ouroboros'
-				description = 'Open Source Project'
-				url = 'https://github.com/whitesnakegang/ouroboros'
+	// GAV 좌표 — 위의 group/version과 동일. (여기만 써도 되지만 둘 다 맞춰둠)
+	coordinates(
+			"io.github.whitesnakegang", // groupId
+			"ouroboros",                // artifactId
+			version                     // 현재 version 값 사용
+	)
 
-				licenses {
-					license {
-						name = 'The Apache License, Version 2.0'
-						url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
-					}
-				}
+	// POM 메타데이터 (중앙 검증 필수 항목)
+	pom {
+		name = "ouroboros"
+		description = "RESTAPI mock/proxy utilities for JVM apps (Java 17+)."
+		inceptionYear = "2025"
+		url = "https://github.com/whitesnakegang/ouroboros"
+
+		licenses {
+			license {
+				name = "The Apache License, Version 2.0"
+				url  = "https://www.apache.org/licenses/LICENSE-2.0.txt"
+				distribution = "repo"
 			}
 		}
+		developers {
+			developer {
+				id  = "whitesnakegang"
+				name= "Whitesnakegang"
+				url = "https://github.com/whitesnakegang"
+			}
+		}
+		scm {
+			url                 = "https://github.com/whitesnakegang/ouroboros"
+			connection          = "scm:git:https://github.com/whitesnakegang/ouroboros.git"
+			developerConnection = "scm:git:ssh://git@github.com/whitesnakegang/ouroboros.git"
+			tag = "HEAD"
+		}
+	}
+}
+
+/**
+ * 로컬 배포(publishToMavenLocal) 시에는 서명 스킵:
+ * - GPG 키/패스프레이즈 없어도 로컬 테스트 가능
+ * - 중앙 배포(publishToMavenCentral) 시에는 정상 서명
+ */
+gradle.taskGraph.whenReady { graph ->
+	if (graph.hasTask(':publishToMavenLocal')) {
+		tasks.matching { it.name.startsWith('sign') }.configureEach { enabled = false }
 	}
 }
