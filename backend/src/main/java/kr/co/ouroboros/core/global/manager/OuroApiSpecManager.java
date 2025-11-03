@@ -59,6 +59,10 @@ public class OuroApiSpecManager {
         // 1. 파일(YAML) 스펙 파싱
         OuroApiSpec fileSpec = handler.loadFromFile(yamlFileContent);
 
+        if (fileSpec == null) {
+            return;
+        }
+
         // 2. 코드 스캔
         OuroApiSpec scannedSpec = handler.scanCurrentState();
 
