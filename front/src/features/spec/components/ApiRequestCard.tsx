@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { FakerProviderSelect } from "./FakerProviderSelect";
 
 interface KeyValuePair {
   key: string;
@@ -24,6 +25,7 @@ interface ApiRequestCardProps {
   setRequestHeaders: (headers: KeyValuePair[]) => void;
   requestBody: RequestBody;
   setRequestBody: (body: RequestBody) => void;
+  isReadOnly?: boolean;
 }
 
 export function ApiRequestCard({
@@ -31,6 +33,7 @@ export function ApiRequestCard({
   setRequestHeaders,
   requestBody,
   setRequestBody,
+  isReadOnly = false,
 }: ApiRequestCardProps) {
   const bodyTypes: RequestBody["type"][] = [
     "none",
@@ -50,10 +53,12 @@ export function ApiRequestCard({
   ];
 
   const addHeader = () => {
+    if (isReadOnly) return;
     setRequestHeaders([...requestHeaders, { key: "", value: "" }]);
   };
 
   const removeHeader = (index: number) => {
+    if (isReadOnly) return;
     setRequestHeaders(requestHeaders.filter((_, i) => i !== index));
   };
 
@@ -62,6 +67,7 @@ export function ApiRequestCard({
     field: "key" | "value",
     value: string
   ) => {
+    if (isReadOnly) return;
     const updated = [...requestHeaders];
     updated[index] = { ...updated[index], [field]: value };
     setRequestHeaders(updated);
@@ -128,7 +134,12 @@ export function ApiRequestCard({
               </p>
               <button
                 onClick={addHeader}
-                className="px-3 py-1 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+                disabled={isReadOnly}
+                className={`px-3 py-1 text-sm font-medium ${
+                  isReadOnly
+                    ? "text-gray-400 cursor-not-allowed"
+                    : "text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                }`}
               >
                 + Add
               </button>
@@ -140,7 +151,7 @@ export function ApiRequestCard({
                     type="text"
                     value={header.key}
                     onChange={(e) => updateHeader(index, "key", e.target.value)}
-                    placeholder="Key"
+                    placeholder="Header Name (e.g., Content-Type)"
                     className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <input
@@ -149,7 +160,7 @@ export function ApiRequestCard({
                     onChange={(e) =>
                       updateHeader(index, "value", e.target.value)
                     }
-                    placeholder="Value"
+                    placeholder="Header Value (e.g., application/json)"
                     className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <button
@@ -265,27 +276,26 @@ export function ApiRequestCard({
                                   fields: updated,
                                 });
                               }}
-                              placeholder="Field name"
+                              placeholder="예: username, password"
                               className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                           </td>
                           <td className="px-4 py-3">
-                            <input
-                              type="text"
+                            <FakerProviderSelect
                               value={item.value}
-                              onChange={(e) => {
+                              onChange={(newVal) => {
                                 const updated = [...requestBody.fields!];
                                 updated[index] = {
                                   ...updated[index],
-                                  value: e.target.value,
+                                  value: newVal,
                                 };
                                 setRequestBody({
                                   ...requestBody,
                                   fields: updated,
                                 });
                               }}
-                              placeholder="Field value"
-                              className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              placeholder="DataFaker 값만 선택 (예: $internet.email)"
+                              disabled={isReadOnly}
                             />
                           </td>
                           <td className="px-4 py-3">
@@ -367,25 +377,7 @@ export function ApiRequestCard({
         )}
       </div>
 
-      {/* Send Button */}
-      <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
-        <button className="w-full bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2">
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M14 5l7 7m0 0l-7 7m7-7H3"
-            />
-          </svg>
-          Send Request
-        </button>
-      </div>
+      {/* Send Button removed: Spec 작성 화면에서는 실제 전송 기능을 제공하지 않음 */}
     </div>
   );
 }

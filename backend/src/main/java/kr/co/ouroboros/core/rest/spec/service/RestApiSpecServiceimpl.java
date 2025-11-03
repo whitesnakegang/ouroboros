@@ -3,6 +3,7 @@ package kr.co.ouroboros.core.rest.spec.service;
 import kr.co.ouroboros.core.rest.common.yaml.RestApiYamlParser;
 import kr.co.ouroboros.core.rest.spec.dto.*;
 import kr.co.ouroboros.core.rest.spec.model.*;
+import kr.co.ouroboros.core.rest.spec.validator.SchemaValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,6 +28,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 public class RestApiSpecServiceimpl implements RestApiSpecService {
 
     private final RestApiYamlParser yamlParser;
+    private final SchemaValidator schemaValidator;
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
     private static final List<String> HTTP_METHODS = Arrays.asList(
@@ -55,6 +57,12 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
 
             // Add operation to document
             yamlParser.putOperation(openApiDoc, request.getPath(), request.getMethod(), operation);
+
+            // Validate and auto-create missing schema references
+            int createdSchemas = schemaValidator.validateAndCreateMissingSchemas(openApiDoc);
+            if (createdSchemas > 0) {
+                log.info("Auto-created {} missing schema(s)", createdSchemas);
+            }
 
             // Write back to file
             yamlParser.writeDocument(openApiDoc);
@@ -212,6 +220,12 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
                 updateOperationFields(operation, request);
 
                 log.info("Updated REST API spec: {} {} (ID: {})", foundMethod.toUpperCase(), foundPath, id);
+            }
+
+            // Validate and auto-create missing schema references
+            int createdSchemas = schemaValidator.validateAndCreateMissingSchemas(openApiDoc);
+            if (createdSchemas > 0) {
+                log.info("Auto-created {} missing schema(s)", createdSchemas);
             }
 
             // Write back to file
@@ -423,6 +437,9 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
             result.put("$ref", fullRef);
             return result; // Reference mode: ignore other fields
         }
+
+        // Validate schema constraints before conversion
+        schemaValidator.validateAndCorrect(schema);
 
         // Inline mode
         if (schema.getType() != null) {
@@ -746,10 +763,16 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
             // Step 5: Process APIs with schema reference updates
             int importedApis = importApis(importedDoc, existingDoc, renamedList, schemaRenameMap);
 
-            // Step 6: Write merged document back to file
+            // Step 6: Validate and auto-create missing schema references
+            int createdSchemas = schemaValidator.validateAndCreateMissingSchemas(existingDoc);
+            if (createdSchemas > 0) {
+                log.info("📦 Auto-created {} missing schema(s)", createdSchemas);
+            }
+
+            // Step 7: Write merged document back to file
             yamlParser.writeDocument(existingDoc);
 
-            // Step 7: Build response
+            // Step 8: Build response
             String summary = String.format("Successfully imported %d APIs and %d schemas%s",
                     importedApis, importedSchemas,
                     !renamedList.isEmpty() ? ", renamed " + renamedList.size() + " items due to duplicates" : "");
@@ -946,6 +969,7 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
     /**
      * Enriches a schema with missing Ouroboros custom fields.
      * Recursively processes nested object properties and array items.
+     * Also validates and corrects minItems/maxItems constraints.
      *
      * @param schema the schema map to enrich
      */
@@ -959,6 +983,9 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         if (schema.containsKey("$ref")) {
             return;
         }
+
+        // Validate schema constraints (minItems/maxItems, etc.)
+        schemaValidator.validateAndCorrectSchemaMap(schema);
 
         // Process properties if present
         if (schema.containsKey("properties")) {
