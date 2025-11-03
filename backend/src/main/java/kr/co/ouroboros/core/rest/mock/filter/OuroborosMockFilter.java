@@ -47,6 +47,21 @@ public class OuroborosMockFilter implements Filter {
     private final ObjectMapper objectMapper;
     private final XmlMapper xmlMapper;
 
+    /**
+     * Intercepts HTTP requests to route mock endpoints, validate incoming requests, and produce mock responses.
+     *
+     * <p>If the request does not match a registered mock endpoint the method delegates to the filter chain.
+     * For POST/PUT/PATCH requests the request body is parsed (JSON, array, object, or primitive) and stored
+     * as the request attribute "parsedRequestBody" for later use. The request is validated via the validation
+     * service; on validation failure an error response is sent using the validation result's status and message.
+     * On successful validation a mock response is generated and written to the response, and the filter chain is not continued.</p>
+     *
+     * @param req   the incoming servlet request (expected to be an HttpServletRequest)
+     * @param res   the servlet response (expected to be an HttpServletResponse)
+     * @param chain the filter chain to delegate to when the request is not handled as a mock
+     * @throws IOException      if an I/O error occurs while reading the request or writing the response
+     * @throws ServletException if a servlet error occurs during filtering
+     */
     @Override
     public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
             throws IOException, ServletException {
@@ -105,13 +120,18 @@ public class OuroborosMockFilter implements Filter {
     }
 
     /**
-     * Generates mock response based on schema and sends to client.
+     * Build and send the mock HTTP response defined by the endpoint metadata.
      *
-     * @param response    the HTTP response
-     * @param request     the HTTP request (for Accept header)
-     * @param meta        the endpoint metadata
-     * @param requestBody the parsed request body (for deep merge)
-     * @throws IOException if response writing fails
+     * Sets response headers from the response definition, generates a mock body from the response schema (if present),
+     * deep-merges fields from the parsed request body into the generated body when both are maps (request values override),
+     * chooses Content-Type from the response metadata or the request Accept header (XML if Accept indicates XML, otherwise JSON),
+     * applies UTF-8 charset, uses the response definition's status code (or 200 if not specified), serializes the body to XML or JSON, and writes it to the response.
+     *
+     * @param response    the HTTP response to write to
+     * @param request     the HTTP request (used to inspect Accept header)
+     * @param meta        endpoint metadata containing response definition and headers
+     * @param requestBody parsed request body (used for deep merge into generated mock body)
+     * @throws IOException if writing the serialized response to the client fails
      */
     private void respond(HttpServletResponse response, HttpServletRequest request,
                          EndpointMeta meta, Object requestBody)
@@ -187,10 +207,14 @@ public class OuroborosMockFilter implements Filter {
     }
 
     /**
-     * 두 Map을 깊이 병합합니다. source의 값이 target의 값을 덮어씁니다.
+     * Recursively merges entries from `source` into `target`, overriding `target` values with `source` values.
      *
-     * @param target 대상 Map (Faker가 생성한 데이터)
-     * @param source 소스 Map (요청 body 데이터)
+     * The merge mutates the `target` map in place. When a value for the same key is a map in both
+     * `target` and `source`, the maps are merged recursively; otherwise the `source` value replaces
+     * the `target` value.
+     *
+     * @param target the map to be mutated with merged values (e.g., generated mock data)
+     * @param source the map whose values take precedence and will overwrite or be merged into `target` (e.g., request body)
      */
     @SuppressWarnings("unchecked")
     private void deepMerge(Map<String, Object> target, Map<String, Object> source) {

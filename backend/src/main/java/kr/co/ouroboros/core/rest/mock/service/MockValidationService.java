@@ -40,17 +40,18 @@ import java.util.Map;
 public class MockValidationService {
     private final ObjectMapper objectMapper;
     /**
-     * Mock 엔드포인트로 들어온 HTTP 요청을 검증하는 서비스
+     * Validate an incoming HttpServletRequest against the endpoint requirements defined in EndpointMeta for a mock endpoint.
      *
-     * 검증 우선순위:
-     * 1. X-Ouroboros-Error 헤더 (강제 에러 응답)
-     * 2. 인증 헤더 (401)
-     * 3. 필수 헤더 (400)
-     * 4. 필수 쿼리 파라미터 (400)
-     * 5. Request body 존재 여부 (400)
-     * 6. Request body JSON 파싱 가능 여부 (400)
-     * 7. Request body 필드 타입 검증 (400)
-     * 8. Request body 필수 필드 검증 (400)
+     * Performs prioritized checks and returns the first failing ValidationResult:
+     * - forced error via X-Ouroboros-Error header (if parseable as an integer),
+     * - required authentication headers (401),
+     * - required headers (400),
+     * - required query parameters (400),
+     * - request body presence, JSON parsability, field types, and required fields per the request body schema (400).
+     *
+     * @param request the incoming HTTP servlet request to validate
+     * @param meta    the endpoint metadata describing required headers, params, and request body schema/requirements
+     * @return        a ValidationResult representing success or the first encountered error with an HTTP status code and message
      */
     public ValidationResult validate(HttpServletRequest request, EndpointMeta meta) {
         // ===== 우선순위 1: 강제 에러 헤더 체크 =====
@@ -111,11 +112,14 @@ public class MockValidationService {
 
 
     /**
-     * Request body를 검증하는 메서드
-     * - body 존재 여부
-     * - JSON 파싱 가능 여부
-     * - 필드 타입 검증
-     * - 필수 필드 검증
+     * Validate the HTTP request body against the endpoint's schema and requirement flags.
+     *
+     * Performs presence checks, JSON structure checks, required-field checks, and type checks
+     * according to the EndpointMeta.requestBodySchema and EndpointMeta.requestBodyRequired.
+     *
+     * @param request the incoming HttpServletRequest; the method reads the pre-parsed body from the `parsedRequestBody` attribute
+     * @param meta    endpoint metadata containing requestBodySchema and requestBodyRequired
+     * @return        a ValidationResult indicating success when the body satisfies requirements; otherwise an error result with an HTTP status code and message
      */
     @SuppressWarnings("unchecked")
     private ValidationResult validateRequestBody(HttpServletRequest request, EndpointMeta meta) {
@@ -179,11 +183,12 @@ public class MockValidationService {
     }
 
     /**
-     * 스키마에 정의된 필드들을 재귀적으로 검증
+     * Recursively validates object fields against the provided JSON-like schema.
      *
-     * @param data   실제 요청 데이터 (Map)
-     * @param schema 스키마 정의 (type, properties, required 등)
-     * @param path   현재 필드 경로 (에러 메시지용, 예: "address.city")
+     * @param data   the actual request data as a map of field names to values
+     * @param schema the schema definition (may include keys like "type", "properties", "required", "items")
+     * @param path   current field path used in error messages (e.g., "address.city"); may be empty
+     * @return       a ValidationResult that is valid on success; when invalid it contains the HTTP status code and an explanatory message for the first detected violation
      */
     @SuppressWarnings("unchecked")
     private ValidationResult validateSchemaFields(Map<String, Object> data,
@@ -267,9 +272,12 @@ public class MockValidationService {
     }
 
     /**
-     * 단일 필드의 타입을 검증
+     * Validate the runtime type of a single field against the schema's expected type.
      *
-     * 예: "홍길동"이 string 타입인지, 30이 integer 타입인지 등
+     * @param value the actual field value to check; null values are treated as valid here
+     * @param expectedType the schema type name to validate against (e.g. "string", "integer", "number", "boolean", "array", "object")
+     * @param fieldPath the dot-separated field path used in error messages (e.g. "user.address.street")
+     * @return a ValidationResult indicating success when the value matches the expected type (or is null), or an error with status 400 and a message describing the type mismatch
      */
     private ValidationResult validateFieldType(Object value, String expectedType, String fieldPath) {
         if (value == null) {
@@ -299,11 +307,15 @@ public class MockValidationService {
     }
 
     /**
-     * 배열 아이템들을 검증
-     *
-     * 예: previousAddresses: [{city: "부산"}, {city: "대구"}]
-     *     → 각 아이템이 Address 스키마에 맞는지 검증
-     */
+         * Validate each element of an array against the provided item schema and return the first validation error encountered.
+         *
+         * Checks each item's declared type and, if the item type is "object", recursively validates the item's fields using the item schema.
+         *
+         * @param array      the list of items to validate (parsed from the request body)
+         * @param itemSchema a schema map describing the expected type and structure of each array item (expects a "type" entry; may include object properties)
+         * @param fieldPath  the JSON path to this array used in error messages (e.g., "addresses" or "addresses[0]")
+         * @return           a ValidationResult indicating success when all items are valid, or the first error result encountered for an invalid item
+         */
     @SuppressWarnings("unchecked")
     private ValidationResult validateArrayItems(List<Object> array,
                                                 Map<String, Object> itemSchema,
@@ -345,10 +357,22 @@ public class MockValidationService {
             int statusCode,
             String message
     ) {
+        /**
+         * Create a ValidationResult representing a successful validation.
+         *
+         * @return the successful ValidationResult with statusCode 0 and no message
+         */
         public static ValidationResult success() {
             return new ValidationResult(true, 0, null);
         }
 
+        /**
+         * Create a ValidationResult representing a failed validation with the given HTTP status code and message.
+         *
+         * @param statusCode the HTTP status code to associate with the failure
+         * @param message    a human-readable error message describing the failure
+         * @return           a ValidationResult with valid set to false, the provided statusCode, and the provided message
+         */
         public static ValidationResult error(int statusCode, String message) {
             return new ValidationResult(false, statusCode, message);
         }

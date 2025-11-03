@@ -37,10 +37,12 @@ public class RestMockLoaderService {
     private final RestApiYamlParser parser;
 
     /**
-     * OpenAPI YAML 파일을 파싱하여 EndpointMeta 맵으로 변환
-     * 모든 $ref 참조를 실제 스키마로 치환함
+     * Load the OpenAPI YAML, parse its paths into EndpointMeta objects, and resolve all `$ref` schema references.
      *
-     * @return "METHOD:path" → EndpointMeta 맵
+     * The returned map is keyed by "METHOD:/path" (for example, "GET:/api/users"). If the YAML file is missing,
+     * contains no paths, or parsing fails, an empty map is returned.
+     *
+     * @return a map from "METHOD:/path" to the corresponding EndpointMeta; may be empty if no endpoints are available
      */
     public Map<String, EndpointMeta> loadFromYaml() {
         try {
@@ -258,12 +260,12 @@ public class RestMockLoaderService {
     }
 
     /**
-     * Response를 파싱하여 ResponseMeta 생성
+     * Parse an OpenAPI response object and produce a ResponseMeta describing its status, body schema, and content type.
      *
-     * @param statusCode HTTP 상태 코드 (200, 400 등)
-     * @param response response 객체
-     * @param schemas components/schemas 맵 ($ref 해결용)
-     * @return 파싱된 ResponseMeta
+     * @param statusCode the HTTP status code for the response
+     * @param response   the OpenAPI response object (may contain a `content` map)
+     * @param schemas    the components/schemas map used to resolve `$ref` references
+     * @return the parsed ResponseMeta, or `null` if the response has no content or no resolvable schema
      */
     @SuppressWarnings("unchecked")
     private ResponseMeta parseResponse(int statusCode, Map<String, Object> response, Map<String, Object> schemas) {
@@ -301,12 +303,15 @@ public class RestMockLoaderService {
     }
 
     /**
-     * 스키마의 $ref를 재귀적으로 해결
+     * Recursively resolves `$ref` references in an OpenAPI schema to their concrete schema definitions.
      *
-     * @param schema the schema that may contain $ref
-     * @param schemas the components/schemas map for lookup
-     * @param visited set to track visited schemas and prevent circular references
-     * @return resolved schema with all $ref replaced by actual schema definitions
+     * <p>If `schema` is null, a referenced schema is missing, the `$ref` format is invalid, or a circular
+     * reference is detected, an empty map is returned.</p>
+     *
+     * @param schema  the schema that may contain `$ref` entries
+     * @param schemas the components/schemas map used to lookup referenced schemas by name
+     * @param visited a set of visited `$ref` strings to detect and prevent circular references
+     * @return a resolved schema map with `$ref` references replaced by their definitions, or an empty map on error or circular reference
      */
     @SuppressWarnings("unchecked")
     private Map<String, Object> resolveSchema(Map<String, Object> schema, Map<String, Object> schemas, Set<String> visited) {
@@ -371,10 +376,10 @@ public class RestMockLoaderService {
     }
 
     /**
-     * $ref 문자열에서 스키마 이름 추출
+     * Extracts the schema name from an OpenAPI `$ref` string.
      *
-     * @param ref $ref 문자열 (예: "#/components/schemas/User")
-     * @return 스키마 이름 (예: "User"), 잘못된 형식이면 null
+     * @param ref the `$ref` string in the form "#/components/schemas/Name" (e.g. "#/components/schemas/User")
+     * @return the schema name (e.g. "User"), or `null` if the `$ref` is null or not in the expected format
      */
     private String extractSchemaName(String ref) {
         if (ref == null || !ref.startsWith("#/components/schemas/")) {
@@ -391,10 +396,10 @@ public class RestMockLoaderService {
     }
 
     /**
-     * HTTP 메서드인지 확인
+     * Determine whether a string is one of the standard HTTP method names.
      *
-     * @param method 메서드 문자열
-     * @return HTTP 메서드이면 true
+     * @param method the method name to test (case-sensitive; expected values: "get", "post", "put", "delete", "patch", "options", "head", "trace")
+     * @return `true` if the input matches one of the listed HTTP methods, `false` otherwise
      */
     private boolean isHttpMethod(String method) {
         return method.matches("get|post|put|delete|patch|options|head|trace");
