@@ -34,6 +34,7 @@ public class SchemaMockBuilder {
      * @param schema the JSON schema map defining the structure
      * @return built mock object (Map for objects, List for arrays, primitives for other types)
      */
+    @SuppressWarnings("unchecked")
     public Object build(Map<String, Object> schema) {
         if (schema == null) return Collections.emptyMap();
 

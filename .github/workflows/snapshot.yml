@@ -1,0 +1,44 @@
+name: Publish SNAPSHOT (develop)
+
+on:
+  push:
+    branches: [develop]
+
+concurrency:
+  group: snapshot-central
+  cancel-in-progress: true
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Temurin JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      # 버전이 *-SNAPSHOT 인지 방어 (예: 0.1.1-SNAPSHOT)
+      - name: Guard: version must be *-SNAPSHOT
+        shell: bash
+        run: |
+          VER=$(./gradlew -q properties | awk -F': ' '/^version:/ {print $2}')
+          echo "Detected version: $VER"
+          [[ "$VER" == *-SNAPSHOT ]] || { echo "Version is not SNAPSHOT. Skipping."; exit 78; }
+
+      # (선택) Gradle Wrapper 검증
+      # - uses: gradle/actions/wrapper-validation@v3
+
+      - name: Publish SNAPSHOT (no manual portal publish needed)
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.CENTRAL_TOKEN_USER }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.CENTRAL_TOKEN_PASS }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_PRIVATE_KEY_ARMOR }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_PASSPHRASE }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.GPG_KEY_ID }}
+        run: ./gradlew publishToMavenCentral --no-daemon
