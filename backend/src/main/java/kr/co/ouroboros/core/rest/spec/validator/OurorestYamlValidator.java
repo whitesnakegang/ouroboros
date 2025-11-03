@@ -105,8 +105,11 @@ public class OurorestYamlValidator {
             // Step 5: Enrich schema-level fields
             int schemaCount = enrichSchemas(document);
 
-            // Step 6: Save enriched file
-            if (hasFixedFields || operationCount > 0 || schemaCount > 0) {
+            // Step 6: Validate and auto-create missing schema references
+            int createdSchemas = schemaValidator.validateAndCreateMissingSchemas(document);
+
+            // Step 7: Save enriched file
+            if (hasFixedFields || operationCount > 0 || schemaCount > 0 || createdSchemas > 0) {
                 yamlParser.writeDocument(document);
                 log.info("💾 Saved enriched ourorest.yml");
             }
@@ -116,6 +119,9 @@ public class OurorestYamlValidator {
             log.info("✅ ourorest.yml Validation Completed");
             log.info("   📊 Operations enriched: {}", operationCount);
             log.info("   📊 Schemas enriched: {}", schemaCount);
+            if (createdSchemas > 0) {
+                log.info("   📦 Missing schemas auto-created: {}", createdSchemas);
+            }
             log.info("========================================");
 
         } catch (Exception e) {
