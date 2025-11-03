@@ -4,8 +4,12 @@ import { ApiResponseCard } from "./ApiResponseCard";
 import { ProtocolTabs } from "./ProtocolTabs";
 import { CodeSnippetPanel } from "./CodeSnippetPanel";
 import { ImportResultModal } from "./ImportResultModal";
+import { TestLayout } from "@/features/testing/components/TestLayout";
+import { DiffNotification } from "./DiffNotification";
 import { useSpecStore } from "../store/spec.store";
 import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
+import { useTestingStore } from "@/features/testing/store/testing.store";
+import axios from "axios";
 import {
   downloadMarkdown,
   exportAllToMarkdown,
@@ -62,6 +66,16 @@ export function ApiEditorLayout() {
     updateEndpoint,
     endpoints,
   } = useSidebarStore();
+  const {
+    protocol: testProtocol,
+    setProtocol: setTestProtocol,
+    request,
+    setResponse,
+    isLoading,
+    setIsLoading,
+    useDummyResponse,
+    setUseDummyResponse,
+  } = useTestingStore();
   const [activeTab, setActiveTab] = useState<"form" | "test">("form");
   const [isCodeSnippetOpen, setIsCodeSnippetOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -69,6 +83,20 @@ export function ApiEditorLayout() {
     null
   );
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [executionStatus, setExecutionStatus] = useState<
+    "idle" | "running" | "completed" | "error"
+  >("idle");
+
+  // Diff가 있는지 확인 (boolean으로 명시적 변환)
+  const hasDiff = !!(
+    selectedEndpoint?.diff && selectedEndpoint.diff !== "none"
+  );
+
+  // Completed 상태인지 확인
+  const isCompleted = selectedEndpoint?.progress === "completed";
+
+  // 수정/삭제 불가능한 상태인지 확인 (completed이거나 diff가 있는 경우)
+  const isReadOnly = isCompleted || hasDiff;
 
   // Load selected endpoint data when endpoint is clicked
   useEffect(() => {
@@ -237,6 +265,18 @@ export function ApiEditorLayout() {
   const handleDelete = async () => {
     if (!selectedEndpoint) return;
 
+    // completed 상태이거나 diff가 있으면 삭제 불가
+    if (isCompleted) {
+      alert("⚠️ 이미 완료(completed)된 API는 삭제할 수 없습니다.");
+      return;
+    }
+    if (hasDiff) {
+      alert(
+        "⚠️ 명세와 실제 구현이 불일치하는 API는 삭제할 수 없습니다.\n\n먼저 백엔드에서 실제 구현을 제거하거나, 불일치를 해결해주세요."
+      );
+      return;
+    }
+
     if (confirm("이 엔드포인트를 삭제하시겠습니까?")) {
       try {
         await deleteRestApiSpec(selectedEndpoint.id);
@@ -262,6 +302,17 @@ export function ApiEditorLayout() {
   };
 
   const handleEdit = () => {
+    // completed 상태이거나 diff가 있으면 수정 불가
+    if (isCompleted) {
+      alert("⚠️ 이미 완료(completed)된 API는 수정할 수 없습니다.");
+      return;
+    }
+    if (hasDiff) {
+      alert(
+        "⚠️ 명세와 실제 구현이 불일치하는 API는 수정할 수 없습니다.\n\n실제 구현에 맞춰 명세를 업데이트하려면 '실제 구현 → 명세에 자동 반영' 버튼을 사용하세요."
+      );
+      return;
+    }
     setIsEditMode(true);
   };
 
@@ -355,6 +406,150 @@ export function ApiEditorLayout() {
     input.click();
   };
 
+  const handleSyncDiffToSpec = async () => {
+    if (!selectedEndpoint) return;
+
+    if (
+      confirm(
+        "실제 구현의 내용을 명세에 자동으로 반영하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다."
+      )
+    ) {
+      try {
+        // TODO: 백엔드 API 엔드포인트 구현 필요
+        // 백엔드에서 실제 구현된 스펙을 가져와서 명세를 업데이트하는 API 호출
+        alert(
+          "🚧 기능 개발 중입니다.\n\n백엔드에서 실제 구현 → 명세 동기화 API가 필요합니다."
+        );
+
+        // 예시: 향후 구현될 API 호출
+        // const response = await syncImplementationToSpec(selectedEndpoint.id);
+        // await loadEndpointData(selectedEndpoint.id);
+        // await loadEndpoints();
+        // alert("✅ 실제 구현이 명세에 성공적으로 반영되었습니다!");
+      } catch (error: unknown) {
+        console.error("명세 동기화 실패:", error);
+        const errorMessage =
+          error instanceof Error ? error.message : "알 수 없는 오류";
+        alert(`❌ 명세 동기화에 실패했습니다: ${errorMessage}`);
+      }
+    }
+  };
+
+  const handleRun = async () => {
+    setIsLoading(true);
+    setExecutionStatus("running");
+    setResponse(null);
+
+    try {
+      if (useDummyResponse) {
+        // Dummy Response 사용
+        setTimeout(() => {
+          const dummyResponse = {
+            status: 200,
+            statusText: "OK",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Request-ID": "req-123456",
+            },
+            body: JSON.stringify(
+              {
+                token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.mock.token",
+                user: {
+                  id: "123",
+                  email: "test@example.com",
+                  name: "Test User",
+                },
+              },
+              null,
+              2
+            ),
+            responseTime: Math.floor(Math.random() * 200) + 50, // 50-250ms
+          };
+          setResponse(dummyResponse);
+          setExecutionStatus("completed");
+          setIsLoading(false);
+        }, 500);
+      } else {
+        // 실제 API 호출
+        const startTime = performance.now();
+
+        // 헤더 변환
+        const headers: Record<string, string> = {};
+        request.headers.forEach((h) => {
+          if (h.key && h.value) {
+            headers[h.key] = h.value;
+          }
+        });
+
+        // Query 파라미터 추가
+        let url = request.url;
+        if (request.queryParams.length > 0) {
+          const queryString = request.queryParams
+            .filter((p) => p.key && p.value)
+            .map(
+              (p) =>
+                `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`
+            )
+            .join("&");
+          if (queryString) {
+            url += `?${queryString}`;
+          }
+        }
+
+        const response = await axios({
+          method: request.method,
+          url: url,
+          headers: headers,
+          data:
+            request.method !== "GET" && request.body
+              ? JSON.parse(request.body)
+              : undefined,
+        });
+
+        const endTime = performance.now();
+        const responseTime = Math.round(endTime - startTime);
+
+        setResponse({
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers as Record<string, string>,
+          body: JSON.stringify(response.data, null, 2),
+          responseTime,
+        });
+        setExecutionStatus("completed");
+      }
+    } catch (error) {
+      const endTime = performance.now();
+      const startTime = endTime - 100; // 에러 발생 시간 추정
+      const responseTime = Math.round(endTime - startTime);
+
+      if (axios.isAxiosError(error) && error.response) {
+        setResponse({
+          status: error.response.status,
+          statusText: error.response.statusText,
+          headers: error.response.headers as Record<string, string>,
+          body: JSON.stringify(error.response.data, null, 2),
+          responseTime,
+        });
+      } else {
+        setResponse({
+          status: 0,
+          statusText: "Network Error",
+          headers: {},
+          body: JSON.stringify(
+            { error: error instanceof Error ? error.message : "Unknown error" },
+            null,
+            2
+          ),
+          responseTime,
+        });
+      }
+      setExecutionStatus("error");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="h-full flex flex-col bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
       {/* Header Tabs */}
@@ -390,190 +585,284 @@ export function ApiEditorLayout() {
             </button>
           </div>
 
-          {/* Right: Progress Bar & Actions */}
-          <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4 lg:gap-6">
-            {/* Progress Bar */}
-            <div className="flex items-center gap-3">
-              <div className="text-right hidden sm:block">
-                <div className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                  진행률
+          {/* Right: Progress Bar & Actions - 조건부 표시 */}
+          {activeTab === "form" ? (
+            <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4 lg:gap-6">
+              {/* Progress Bar */}
+              <div className="flex items-center gap-3">
+                <div className="text-right hidden sm:block">
+                  <div className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    진행률
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    {completedEndpoints}/{totalEndpoints} 완료
+                  </div>
                 </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">
-                  {completedEndpoints}/{totalEndpoints} 완료
+                <div className="w-24 sm:w-32 h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden shadow-inner">
+                  <div
+                    className="h-full bg-gradient-to-r from-blue-500 to-purple-600 transition-all duration-500 ease-out"
+                    style={{ width: `${progressPercentage}%` }}
+                  />
                 </div>
+                <span className="text-sm font-bold text-gray-700 dark:text-gray-300 min-w-[3rem]">
+                  {progressPercentage}%
+                </span>
               </div>
-              <div className="w-24 sm:w-32 h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden shadow-inner">
-                <div
-                  className="h-full bg-gradient-to-r from-blue-500 to-purple-600 transition-all duration-500 ease-out"
-                  style={{ width: `${progressPercentage}%` }}
-                />
-              </div>
-              <span className="text-sm font-bold text-gray-700 dark:text-gray-300 min-w-[3rem]">
-                {progressPercentage}%
-              </span>
-            </div>
 
-            {/* Action Buttons - Utility만 유지 */}
+              {/* Action Buttons - Utility만 유지 */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Utility Buttons */}
+                <button
+                  onClick={handleImportYAML}
+                  className="px-2 sm:px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 font-medium shadow-sm hover:shadow-md flex items-center gap-2 text-sm sm:text-base"
+                  title="YAML 파일 가져오기"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
+                    />
+                  </svg>
+                  <span className="hidden sm:inline">Import</span>
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await getAllRestApiSpecs();
+                      const md = exportAllToMarkdown(res.data);
+                      downloadMarkdown(
+                        md,
+                        `ALL_APIS_${new Date().getTime()}.md`
+                      );
+                      alert("Markdown 파일이 다운로드되었습니다.");
+                    } catch (e) {
+                      console.error("Markdown 내보내기 오류:", e);
+                      const errorMsg =
+                        e instanceof Error ? e.message : "알 수 없는 오류";
+                      alert(
+                        `전체 Markdown 내보내기에 실패했습니다.\n오류: ${errorMsg}`
+                      );
+                    }
+                  }}
+                  className="px-2 sm:px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 font-medium shadow-sm hover:shadow-md flex items-center gap-2 text-sm sm:text-base"
+                  title="Markdown 파일 내보내기"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                  <span className="hidden sm:inline">Export</span>
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      const [specsRes, schemasRes] = await Promise.all([
+                        getAllRestApiSpecs(),
+                        getAllSchemas().catch((error) => {
+                          console.warn(
+                            "Schema 조회 실패, 빈 배열로 계속 진행:",
+                            error.message
+                          );
+                          return {
+                            status: 200,
+                            data: [],
+                            message: "Schema 조회 실패",
+                          } as GetAllSchemasResponse;
+                        }),
+                      ]);
+                      const yaml = buildOpenApiYamlFromSpecs(
+                        specsRes.data,
+                        (schemasRes as GetAllSchemasResponse).data
+                      );
+                      downloadYaml(
+                        yaml,
+                        `ALL_APIS_${new Date().getTime()}.yml`
+                      );
+                      alert("YAML 파일이 다운로드되었습니다.");
+                    } catch (e) {
+                      console.error("YAML 내보내기 오류:", e);
+                      const errorMsg =
+                        e instanceof Error ? e.message : "알 수 없는 오류";
+                      alert(
+                        `전체 YAML 내보내기에 실패했습니다.\n오류: ${errorMsg}`
+                      );
+                    }
+                  }}
+                  className="px-2 sm:px-3 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-xl transition-all duration-200 font-semibold shadow-sm hover:shadow-md flex items-center gap-2 text-sm sm:text-base"
+                  title="API YAML 파일 생성"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                    />
+                  </svg>
+                  <span className="hidden sm:inline">Generate</span>
+                </button>
+                <button
+                  onClick={() => setIsCodeSnippetOpen(true)}
+                  className="px-2 sm:px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 font-medium shadow-sm hover:shadow-md flex items-center gap-2 text-sm sm:text-base"
+                  title="Code Snippet 보기"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
+                    />
+                  </svg>
+                  Code Snippet
+                </button>
+              </div>
+            </div>
+          ) : (
+            // 테스트 폼일 때 버튼들
             <div className="flex flex-wrap items-center gap-2">
-              {/* Utility Buttons */}
+              {/* Use Dummy Response Checkbox */}
+              <label className="flex items-center gap-2 cursor-pointer px-2 sm:px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 shadow-sm hover:shadow-md">
+                <input
+                  type="checkbox"
+                  checked={useDummyResponse}
+                  onChange={(e) => setUseDummyResponse(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Use Dummy Response
+                </span>
+              </label>
+
+              {/* Run Button */}
               <button
-                onClick={handleImportYAML}
-                className="px-2 sm:px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 font-medium shadow-sm hover:shadow-md flex items-center gap-2 text-sm sm:text-base"
-                title="YAML 파일 가져오기"
+                onClick={handleRun}
+                disabled={isLoading}
+                className="px-2 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-xl transition-all duration-200 font-semibold shadow-md hover:shadow-lg flex items-center gap-2 disabled:cursor-not-allowed text-sm sm:text-base"
               >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
-                  />
-                </svg>
-                <span className="hidden sm:inline">Import</span>
-              </button>
-              <button
-                onClick={async () => {
-                  try {
-                    const res = await getAllRestApiSpecs();
-                    const md = exportAllToMarkdown(res.data);
-                    downloadMarkdown(md, `ALL_APIS_${new Date().getTime()}.md`);
-                    alert("Markdown 파일이 다운로드되었습니다.");
-                  } catch (e) {
-                    console.error("Markdown 내보내기 오류:", e);
-                    const errorMsg =
-                      e instanceof Error ? e.message : "알 수 없는 오류";
-                    alert(
-                      `전체 Markdown 내보내기에 실패했습니다.\n오류: ${errorMsg}`
-                    );
-                  }
-                }}
-                className="px-2 sm:px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 font-medium shadow-sm hover:shadow-md flex items-center gap-2 text-sm sm:text-base"
-                title="Markdown 파일 내보내기"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
-                </svg>
-                <span className="hidden sm:inline">Export</span>
-              </button>
-              <button
-                onClick={async () => {
-                  try {
-                    const [specsRes, schemasRes] = await Promise.all([
-                      getAllRestApiSpecs(),
-                      getAllSchemas().catch((error) => {
-                        console.warn(
-                          "Schema 조회 실패, 빈 배열로 계속 진행:",
-                          error.message
-                        );
-                        return {
-                          status: 200,
-                          data: [],
-                          message: "Schema 조회 실패",
-                        } as GetAllSchemasResponse;
-                      }),
-                    ]);
-                    const yaml = buildOpenApiYamlFromSpecs(
-                      specsRes.data,
-                      (schemasRes as GetAllSchemasResponse).data
-                    );
-                    downloadYaml(yaml, `ALL_APIS_${new Date().getTime()}.yml`);
-                    alert("YAML 파일이 다운로드되었습니다.");
-                  } catch (e) {
-                    console.error("YAML 내보내기 오류:", e);
-                    const errorMsg =
-                      e instanceof Error ? e.message : "알 수 없는 오류";
-                    alert(
-                      `전체 YAML 내보내기에 실패했습니다.\n오류: ${errorMsg}`
-                    );
-                  }
-                }}
-                className="px-2 sm:px-3 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-xl transition-all duration-200 font-semibold shadow-sm hover:shadow-md flex items-center gap-2 text-sm sm:text-base"
-                title="API YAML 파일 생성"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                  />
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                  />
-                </svg>
-                <span className="hidden sm:inline">Generate</span>
-              </button>
-              <button
-                onClick={() => setIsCodeSnippetOpen(true)}
-                className="px-2 sm:px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 font-medium shadow-sm hover:shadow-md flex items-center gap-2 text-sm sm:text-base"
-                title="Code Snippet 보기"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
-                  />
-                </svg>
-                Code Snippet
+                {isLoading ? (
+                  <>
+                    <svg
+                      className="animate-spin h-5 w-5 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                    <span className="hidden sm:inline">실행 중...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg
+                      className="w-5 h-5"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    RUN
+                  </>
+                )}
               </button>
             </div>
-          </div>
+          )}
         </div>
+      </div>
 
-        {/* Protocol Tabs */}
-        <ProtocolTabs
-          selectedProtocol={protocol}
-          onProtocolChange={setProtocol}
-          onNewForm={handleNewForm}
-        />
+      {/* Protocol Tabs - 항상 표시 */}
+      <div className="border-b border-gray-200 dark:border-gray-700 px-6 bg-white dark:bg-gray-800">
+        {activeTab === "form" ? (
+          <ProtocolTabs
+            selectedProtocol={protocol}
+            onProtocolChange={setProtocol}
+            onNewForm={handleNewForm}
+          />
+        ) : (
+          <ProtocolTabs
+            selectedProtocol={testProtocol}
+            onProtocolChange={setTestProtocol}
+            onNewForm={handleNewForm}
+          />
+        )}
       </div>
 
       {/* Main Content */}
       <div className="flex-1 overflow-auto">
         {activeTab === "test" ? (
-          <div className="h-full flex items-center justify-center">
-            <div className="text-center py-12">
-              <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
-                <span className="text-4xl">🧪</span>
+          <>
+            {/* Execution Status - 테스트 폼에서만 표시 */}
+            {executionStatus !== "idle" && (
+              <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-3 bg-white dark:bg-gray-800">
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`px-3 py-1 rounded-lg text-sm font-semibold ${
+                      executionStatus === "running"
+                        ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                        : executionStatus === "completed"
+                        ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                        : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                    }`}
+                  >
+                    {executionStatus === "running"
+                      ? "⏳ 실행 중..."
+                      : executionStatus === "completed"
+                      ? "✅ 완료됨"
+                      : "❌ 에러 발생"}
+                  </div>
+                </div>
               </div>
-              <h3 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                테스트 기능 준비 중
-              </h3>
-              <p className="text-gray-500 dark:text-gray-400">
-                API 테스트 기능이 곧 출시됩니다.
-              </p>
-            </div>
-          </div>
+            )}
+            <TestLayout />
+          </>
         ) : (
           <div className="max-w-6xl mx-auto px-6 py-8">
             {/* Protocol not supported message */}
@@ -594,6 +883,14 @@ export function ApiEditorLayout() {
                   </p>
                 </div>
               </div>
+            )}
+
+            {/* Diff Notification - 불일치가 있을 때만 표시 */}
+            {protocol === "REST" && selectedEndpoint && hasDiff && (
+              <DiffNotification
+                diff={selectedEndpoint.diff || "none"}
+                onSyncToSpec={handleSyncDiffToSpec}
+              />
             )}
 
             {/* Method + URL Card */}
@@ -787,8 +1084,8 @@ export function ApiEditorLayout() {
         )}
       </div>
 
-      {/* 하단 수정/삭제 버튼 - 선택된 엔드포인트가 있을 때만 표시 */}
-      {selectedEndpoint && (
+      {/* 하단 수정/삭제 버튼 - 선택된 엔드포인트가 있을 때만 표시 (명세서 폼에서만) */}
+      {activeTab === "form" && selectedEndpoint && (
         <div className="border-t border-gray-200 dark:border-gray-700 px-6 py-4 bg-white dark:bg-gray-800 shadow-lg">
           <div className="flex items-center justify-end gap-3">
             {isEditMode ? (
@@ -836,7 +1133,19 @@ export function ApiEditorLayout() {
               <>
                 <button
                   onClick={handleEdit}
-                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white rounded-xl transition-all duration-200 font-semibold shadow-sm hover:shadow-md flex items-center gap-2"
+                  disabled={isReadOnly}
+                  className={`px-6 py-3 rounded-xl transition-all duration-200 font-semibold shadow-sm hover:shadow-md flex items-center gap-2 ${
+                    isReadOnly
+                      ? "bg-gray-400 dark:bg-gray-600 text-gray-200 dark:text-gray-400 cursor-not-allowed"
+                      : "bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white"
+                  }`}
+                  title={
+                    isCompleted
+                      ? "완료된 API는 수정할 수 없습니다"
+                      : hasDiff
+                      ? "불일치가 있는 API는 수정할 수 없습니다"
+                      : ""
+                  }
                 >
                   <svg
                     className="w-5 h-5"
@@ -855,7 +1164,19 @@ export function ApiEditorLayout() {
                 </button>
                 <button
                   onClick={handleDelete}
-                  className="px-6 py-3 bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 text-white rounded-xl transition-all duration-200 font-semibold shadow-sm hover:shadow-md flex items-center gap-2"
+                  disabled={isReadOnly}
+                  className={`px-6 py-3 rounded-xl transition-all duration-200 font-semibold shadow-sm hover:shadow-md flex items-center gap-2 ${
+                    isReadOnly
+                      ? "bg-gray-400 dark:bg-gray-600 text-gray-200 dark:text-gray-400 cursor-not-allowed"
+                      : "bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 text-white"
+                  }`}
+                  title={
+                    isCompleted
+                      ? "완료된 API는 삭제할 수 없습니다"
+                      : hasDiff
+                      ? "불일치가 있는 API는 삭제할 수 없습니다"
+                      : ""
+                  }
                 >
                   <svg
                     className="w-5 h-5"
@@ -877,8 +1198,8 @@ export function ApiEditorLayout() {
           </div>
         </div>
       )}
-      {/* 하단 생성/초기화 버튼 - 새 명세 작성 중일 때 표시 */}
-      {!selectedEndpoint && (
+      {/* 하단 생성/초기화 버튼 - 새 명세 작성 중일 때 표시 (명세서 폼에서만) */}
+      {activeTab === "form" && !selectedEndpoint && (
         <div className="border-t border-gray-200 dark:border-gray-700 px-6 py-4 bg-white dark:bg-gray-800 shadow-lg">
           <div className="flex items-center justify-end gap-3">
             <button
