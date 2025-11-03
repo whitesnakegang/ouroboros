@@ -35,12 +35,10 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 public class RestSpecExceptionHandler {
 
     /**
-     * Handles duplicate API specification exceptions.
-     * <p>
-     * Returns 409 Conflict when attempting to create an API spec that already exists.
+     * Converts a DuplicateApiSpecException into a standardized 409 Conflict API response.
      *
-     * @param ex the duplicate API spec exception
-     * @return response entity with 409 status and error details
+     * @param ex the DuplicateApiSpecException that was thrown
+     * @return a ResponseEntity containing a GlobalApiResponse<Void> with HTTP status 409 and error details
      */
     @ExceptionHandler(DuplicateApiSpecException.class)
     public ResponseEntity<GlobalApiResponse<Void>> handleDuplicateApiSpec(DuplicateApiSpecException ex) {
