@@ -40,9 +40,7 @@ public class TestController {
     /**
      * Retrieve a list of users.
      *
-     * The response body contains a `"message"` with a success description and a `"data"` array of user names.
-     *
-     * @return a map with keys `"message"` (success message) and `"data"` (array of user names)
+     * @return a list of User objects, each containing id, name, and email
      */
     @GetMapping("/users")
     @ApiState(state = State.COMPLETED)

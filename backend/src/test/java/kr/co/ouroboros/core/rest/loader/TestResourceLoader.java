@@ -16,13 +16,21 @@ public class TestResourceLoader {
     private final ObjectMapper objectMapper;
     private final Yaml yaml;
 
+    /**
+     * Creates a TestResourceLoader configured with default Jackson {@code ObjectMapper}
+     * and SnakeYAML {@code Yaml} instances for parsing JSON and YAML test fixtures.
+     */
     public TestResourceLoader() {
         this.objectMapper = new ObjectMapper();
         this.yaml = new Yaml();
     }
 
     /**
-     * JSON 파일을 로드하여 OuroRestApiSpec으로 변환
+     * Load a JSON test fixture from the test-fixtures directory and parse it into an OuroRestApiSpec.
+     *
+     * @param filename the filename relative to the "test-fixtures/" directory
+     * @return the deserialized OuroRestApiSpec represented by the JSON file
+     * @throws Exception if the resource cannot be read or the JSON cannot be parsed
      */
     public OuroRestApiSpec loadJsonFromResource(String filename) throws Exception {
         String content = loadResourceAsString(TEST_RESOURCE_DIR + filename);
@@ -30,7 +38,10 @@ public class TestResourceLoader {
     }
 
     /**
-     * YAML 파일을 로드하여 OuroRestApiSpec으로 변환
+     * Load a YAML test resource and convert it to an OuroRestApiSpec.
+     *
+     * @param filename the resource file path relative to "test-fixtures/" (may include subdirectories)
+     * @return the parsed OuroRestApiSpec instance
      */
     public OuroRestApiSpec loadYamlFromResource(String filename) throws Exception {
         String content = loadResourceAsString(TEST_RESOURCE_DIR + filename);
@@ -43,21 +54,32 @@ public class TestResourceLoader {
     }
 
     /**
-     * Response 테스트용 YAML 파일을 로드하여 OuroRestApiSpec으로 변환
+     * Load a response YAML test fixture from the classpath and convert it to an OuroRestApiSpec.
+     *
+     * @param filename the YAML file name located under "test-fixtures/response/"
+     * @return the parsed OuroRestApiSpec represented by the YAML file
      */
     public OuroRestApiSpec loadResponseTest(String filename) throws Exception {
         return loadYamlFromResource("response/" + filename);
     }
 
     /**
-     * Schema 테스트용 YAML 파일을 로드하여 OuroRestApiSpec으로 변환
+     * Load a schema test YAML resource from test-fixtures/schema/ and convert it to an OuroRestApiSpec.
+     *
+     * @param filename relative filename under test-fixtures/schema/ (for example "my-schema.yaml")
+     * @return the deserialized OuroRestApiSpec
+     * @throws Exception if the resource cannot be found, read, or deserialized
      */
     public OuroRestApiSpec loadSchemaTest(String filename) throws Exception {
         return loadYamlFromResource("schema/" + filename);
     }
 
     /**
-     * 리소스 파일을 String으로 로드
+     * Load a classpath resource and return its contents as a UTF-8 string.
+     *
+     * @param resourcePath the classpath-relative path to the resource
+     * @return the resource contents decoded using UTF-8
+     * @throws IllegalArgumentException if the resource cannot be found on the classpath
      */
     private String loadResourceAsString(String resourcePath) throws Exception {
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
@@ -73,4 +95,3 @@ public class TestResourceLoader {
         }
     }
 }
-

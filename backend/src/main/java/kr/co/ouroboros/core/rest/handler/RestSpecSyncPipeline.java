@@ -91,6 +91,13 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
         return restFileSpec;
     }
 
+    /**
+     * Get the Operation for the specified HTTP method from a PathItem.
+     *
+     * @param item the PathItem containing operations for different HTTP methods
+     * @param httpMethod the HTTP method whose Operation should be returned
+     * @return the Operation corresponding to the given method, or null if none is defined
+     */
     private Operation getOperationByMethod(PathItem item, HttpMethod httpMethod) {
         return switch (httpMethod) {
             case GET -> item.getGet();
@@ -102,29 +109,38 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
     }
 
     /**
-     * Compare component schemas between the file-backed and scanned REST API specifications.
+     * Compare component schemas in the file-backed and runtime-scanned REST API specifications and report per-schema match status.
      *
      * @param restFileSpec    the file-based REST API specification to update
      * @param restScannedSpec the runtime-scanned REST API specification to compare against
-     * @return a map keyed by schema name with `true` if the scanned schema matches the file schema, `false` otherwise
+     * @return a map keyed by schema name where `true` indicates the scanned schema matches the file schema, `false` otherwise
      */
     private Map<String, Boolean> compareSchemas(OuroRestApiSpec restFileSpec, OuroRestApiSpec restScannedSpec) {
         return schemaComparator.compareSchemas(restScannedSpec.getComponents(), restFileSpec.getComponents());
     }
 
     /**
-     * Compare request parameters between file and scan operations.
+     * Compare and mark differences between request parameters of the file and scanned operations for a given URL and HTTP method.
      *
-     * This method is called only when both fileOp and scanOp exist for the same URL and HTTP method.
-     * It compares parameters (path and query) and marks differences.
-     *
+     * @param url the request path being compared
      * @param fileOp the operation from the file specification
      * @param scanOp the operation from the scanned specification
+     * @param schemaMatchResults map of component schema names to a boolean indicating whether each schema matches between scan and file
+     * @param method the HTTP method for which parameters are compared
      */
     private void reqCompare(String url, Operation fileOp, Operation scanOp, Map<String, Boolean> schemaMatchResults, HttpMethod method) {
         compareAndMarkRequest(url, fileOp, scanOp, method, schemaMatchResults);
     }
 
+    /**
+     * Compare responses for a specific endpoint and HTTP method using the scanned and file operations.
+     *
+     * @param url                 the endpoint URL (path key)
+     * @param method              the HTTP method for the comparison
+     * @param fileOp              the Operation from the file-based specification
+     * @param scanOp              the Operation from the runtime-scanned specification
+     * @param schemaMatchResults  map of schema names to match status: `true` if the scanned schema matches the file schema, `false` otherwise
+     */
     private void resCompare(String url, HttpMethod method, Operation fileOp, Operation scanOp, Map<String, Boolean> schemaMatchResults) {
         // 이전 로직에 의해 fileOp과 scanOp은 endpoint랑 http-method가 똑같은 삳태가 보장됨.
         // scan은 무조건 null이 아님

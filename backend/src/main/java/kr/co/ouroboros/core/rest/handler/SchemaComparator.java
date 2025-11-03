@@ -80,14 +80,15 @@ public class SchemaComparator {
     }
 
     /**
-     * Recursively compares the detailed content of two Schema objects for equivalence.
-     * <p>
-     * Compares type, `$ref`, format, properties, items (for arrays), required list, and additionalProperties.
+     * Determine whether two Schema objects are equivalent in structure and constraints.
+     *
+     * Compares type, `$ref`, format, properties, items (for arrays), and additionalProperties;
+     * the `schemaName` parameter is used for log context.
      *
      * @param scannedSchema the scanned (reference) schema to compare from
      * @param fileSchema    the file-based schema to compare against
      * @param schemaName    the schema name used for logging/context
-     * @return `true` if the two schemas are equivalent in type, `$ref`, format, properties, items, required, and additionalProperties; `false` otherwise
+     * @return true if the two schemas are equivalent in type, $ref, format, properties, items, required, and additionalProperties; false otherwise
      */
     private boolean compareSchemaDetails(Schema scannedSchema, Schema fileSchema, String schemaName) {
         if (scannedSchema == null && fileSchema == null) {
@@ -150,15 +151,15 @@ public class SchemaComparator {
     }
 
     /**
-     * Compare two schema property maps and determine whether they are equivalent.
-     * <p>
-     * Compares keys and recursively compares each property's Schema; logs and returns false on any missing, extra, or differing property schema. The schemaName is used only for logging context.
-     *
-     * @param scannedProperties the properties from the scanned document (baseline)
-     * @param fileProperties    the properties from the file-based document (to compare against)
-     * @param schemaName        schema name used for log messages and property path construction
-     * @return {@code true} if both property maps contain the same keys and corresponding property schemas match, {@code false} otherwise
-     */
+         * Determine whether two schema property maps are equivalent.
+         *
+         * Compares the key sets and recursively compares each property's Schema; records a mismatch if any property is missing, extra, or differs.
+         *
+         * @param scannedProperties the properties from the scanned document (baseline)
+         * @param fileProperties    the properties from the file-based document to compare against
+         * @param schemaName        schema name used as context for property path construction (used in logging)
+         * @return {@code true} if both property maps contain the same keys and corresponding property schemas match, {@code false} otherwise
+         */
     private boolean compareSchemaProperties(Map<String, Schema> scannedProperties, Map<String, Schema> fileProperties, String schemaName) {
         if (scannedProperties == null && fileProperties == null) {
             return true;

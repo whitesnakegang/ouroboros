@@ -50,10 +50,9 @@ public interface OuroProtocolHandler {
     OuroApiSpec synchronize(OuroApiSpec fileSpec, OuroApiSpec scannedSpec);
 
     /**
-     * Serialize the given OuroApiSpec into a YAML-formatted string for persistence.
-     *
-     * @param specToSave the API specification to serialize (typically a scanned or merged spec)
-     * @return the YAML representation of the provided specification
-     */
+ * Serialize the provided OuroApiSpec and persist its YAML representation to the handler's storage.
+ *
+ * @param specToSave the API specification to serialize and persist
+ */
     void saveYaml(OuroApiSpec specToSave);
 }

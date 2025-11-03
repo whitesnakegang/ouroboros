@@ -44,13 +44,15 @@ public class OuroApiSpecManager {
     }
 
     /**
-     * Processes an API spec for the given protocol by reconciling the provided YAML with the
-     * current runtime state, persisting any validated updates back to the protocol's spec resource,
-     * and updating the in-memory cache.
+     * Reconciles a protocol's API spec YAML with the current runtime state, persists the validated spec,
+     * and updates the in-memory cache for that protocol.
      *
-     * @param protocol        the protocol identifier whose spec is being processed
-     * @param yamlFileContent the YAML content of the spec file to be validated and reconciled with
-     *                        the current state
+     * Performs parsing of the provided YAML, scans the live runtime state, synchronizes differences
+     * to produce the validated spec that will be persisted via the protocol handler, and caches the
+     * scanned specification for subsequent reads.
+     *
+     * @param protocol        the protocol whose API specification is being processed
+     * @param yamlFileContent the YAML content of the protocol's spec file to reconcile with the runtime state
      */
     public void processAndCacheSpec(Protocol protocol, String yamlFileContent) {
         OuroProtocolHandler handler = getHandler(protocol);
