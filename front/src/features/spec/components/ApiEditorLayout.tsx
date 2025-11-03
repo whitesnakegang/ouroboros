@@ -1,12 +1,23 @@
 import { useState, useEffect, useCallback } from "react";
 import { ApiRequestCard } from "./ApiRequestCard";
 import { ApiResponseCard } from "./ApiResponseCard";
-import { ApiPreviewCard } from "./ApiPreviewCard";
 import { ProtocolTabs } from "./ProtocolTabs";
 import { CodeSnippetPanel } from "./CodeSnippetPanel";
+import { ImportResultModal } from "./ImportResultModal";
 import { useSpecStore } from "../store/spec.store";
 import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
-import { exportToMarkdown, downloadMarkdown } from "../utils/markdownExporter";
+import {
+  downloadMarkdown,
+  exportAllToMarkdown,
+} from "../utils/markdownExporter";
+import { buildOpenApiYamlFromSpecs, downloadYaml } from "../utils/yamlExporter";
+import {
+  getAllRestApiSpecs,
+  getAllSchemas,
+  type GetAllSchemasResponse,
+  importYaml,
+  type ImportYamlResponse,
+} from "../services/api";
 import {
   createRestApiSpec,
   updateRestApiSpec,
@@ -54,6 +65,10 @@ export function ApiEditorLayout() {
   const [activeTab, setActiveTab] = useState<"form" | "test">("form");
   const [isCodeSnippetOpen, setIsCodeSnippetOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [importResult, setImportResult] = useState<ImportYamlResponse | null>(
+    null
+  );
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   // Load selected endpoint data when endpoint is clicked
   useEffect(() => {
@@ -72,7 +87,8 @@ export function ApiEditorLayout() {
       const spec = response.data;
       setMethod(spec.method);
       setUrl(spec.path);
-      setDescription(spec.description || spec.summary || "");
+      setDescription(spec.description || "");
+      setSummary(spec.summary || "");
       setTags(spec.tags ? spec.tags.join(", ") : "");
       // 추가 데이터 로드 필요시 여기에 구현
     } catch (error) {
@@ -86,6 +102,7 @@ export function ApiEditorLayout() {
   const [url, setUrl] = useState("");
   const [tags, setTags] = useState("");
   const [description, setDescription] = useState("");
+  const [summary, setSummary] = useState("");
   const [owner, setOwner] = useState("");
 
   // Request state
@@ -125,7 +142,7 @@ export function ApiEditorLayout() {
         const updateRequest = {
           path: url, // path 수정 가능
           method, // method 수정 가능
-          summary: description,
+          summary,
           description,
           tags: tags ? tags.split(",").map((tag) => tag.trim()) : [],
           progress: "mock",
@@ -170,7 +187,7 @@ export function ApiEditorLayout() {
         const apiRequest = {
           path: url,
           method,
-          summary: description,
+          summary,
           description,
           tags: tags ? tags.split(",").map((tag) => tag.trim()) : [],
           progress: "mock",
@@ -258,10 +275,11 @@ export function ApiEditorLayout() {
   const handleReset = () => {
     if (confirm("작성 중인 내용을 초기화하시겠습니까?")) {
       setMethod("POST");
-      setUrl("/api/auth/login");
-      setTags("AUTH");
-      setDescription("사용자 로그인");
-      setOwner("SMART-TEAM");
+      setUrl("");
+      setTags("");
+      setDescription("");
+      setSummary("");
+      setOwner("");
       setRequestBody({
         type: "json",
         contentType: "application/json",
@@ -279,6 +297,7 @@ export function ApiEditorLayout() {
     setUrl("");
     setTags("");
     setDescription("");
+    setSummary("");
     setOwner("");
     setRequestHeaders([]);
     setRequestBody({
@@ -297,29 +316,43 @@ export function ApiEditorLayout() {
     }
   }, [triggerNewForm, handleNewForm, setTriggerNewForm]);
 
-  const handleExportMarkdown = () => {
-    const markdownContent = exportToMarkdown({
-      method,
-      url,
-      description,
-      tags,
-      owner,
-      headers: requestHeaders,
-      requestBody,
-      statusCodes,
-    });
+  const handleImportYAML = async () => {
+    // 파일 선택 input 생성
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".yml,.yaml";
 
-    const filename = `${method.toUpperCase()}_${url.replace(/\//g, "_")}.md`;
-    downloadMarkdown(markdownContent, filename);
-    alert("Markdown 파일이 다운로드되었습니다.");
-  };
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
 
-  const handleImportYAML = () => {
-    alert("Import YAML 기능은 구현 중입니다.");
-  };
+      // 파일 확장자 검증
+      const fileName = file.name.toLowerCase();
+      if (!fileName.endsWith(".yml") && !fileName.endsWith(".yaml")) {
+        alert("YAML 파일(.yml 또는 .yaml)만 업로드 가능합니다.");
+        return;
+      }
 
-  const handleGenerateApiYaml = () => {
-    alert("Generate api.yaml 기능은 구현 중입니다.");
+      try {
+        // Import 실행
+        const result: ImportYamlResponse = await importYaml(file);
+
+        // 모달로 결과 표시
+        setImportResult(result);
+        setIsImportModalOpen(true);
+
+        // 사이드바 목록 새로고침
+        await loadEndpoints();
+      } catch (error) {
+        console.error("YAML Import 오류:", error);
+        const errorMsg =
+          error instanceof Error ? error.message : "알 수 없는 오류";
+        alert(`❌ YAML Import 실패\n\n${errorMsg}`);
+      }
+    };
+
+    // 파일 선택 다이얼로그 열기
+    input.click();
   };
 
   return (
@@ -382,53 +415,6 @@ export function ApiEditorLayout() {
 
             {/* Action Buttons - Utility만 유지 */}
             <div className="flex flex-wrap items-center gap-2">
-              {/* 새 엔드포인트 작성 모드: 생성 버튼만 상단에 유지 */}
-              {!selectedEndpoint && (
-                <>
-                  <button
-                    onClick={handleSave}
-                    className="px-3 sm:px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white rounded-xl transition-all duration-200 font-semibold shadow-sm hover:shadow-md flex items-center gap-2 text-sm sm:text-base"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                      />
-                    </svg>
-                    <span className="hidden sm:inline">생성</span>
-                  </button>
-                  <button
-                    onClick={handleReset}
-                    className="px-3 sm:px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 font-semibold shadow-sm hover:shadow-md flex items-center gap-2 text-sm sm:text-base"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                      />
-                    </svg>
-                    <span className="hidden sm:inline">초기화</span>
-                  </button>
-                </>
-              )}
-
-              {/* Divider */}
-              <div className="w-px h-8 bg-gray-300 dark:bg-gray-600 hidden sm:block"></div>
-
               {/* Utility Buttons */}
               <button
                 onClick={handleImportYAML}
@@ -451,7 +437,21 @@ export function ApiEditorLayout() {
                 <span className="hidden sm:inline">Import</span>
               </button>
               <button
-                onClick={handleExportMarkdown}
+                onClick={async () => {
+                  try {
+                    const res = await getAllRestApiSpecs();
+                    const md = exportAllToMarkdown(res.data);
+                    downloadMarkdown(md, `ALL_APIS_${new Date().getTime()}.md`);
+                    alert("Markdown 파일이 다운로드되었습니다.");
+                  } catch (e) {
+                    console.error("Markdown 내보내기 오류:", e);
+                    const errorMsg =
+                      e instanceof Error ? e.message : "알 수 없는 오류";
+                    alert(
+                      `전체 Markdown 내보내기에 실패했습니다.\n오류: ${errorMsg}`
+                    );
+                  }
+                }}
                 className="px-2 sm:px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 font-medium shadow-sm hover:shadow-md flex items-center gap-2 text-sm sm:text-base"
                 title="Markdown 파일 내보내기"
               >
@@ -471,7 +471,37 @@ export function ApiEditorLayout() {
                 <span className="hidden sm:inline">Export</span>
               </button>
               <button
-                onClick={handleGenerateApiYaml}
+                onClick={async () => {
+                  try {
+                    const [specsRes, schemasRes] = await Promise.all([
+                      getAllRestApiSpecs(),
+                      getAllSchemas().catch((error) => {
+                        console.warn(
+                          "Schema 조회 실패, 빈 배열로 계속 진행:",
+                          error.message
+                        );
+                        return {
+                          status: 200,
+                          data: [],
+                          message: "Schema 조회 실패",
+                        } as GetAllSchemasResponse;
+                      }),
+                    ]);
+                    const yaml = buildOpenApiYamlFromSpecs(
+                      specsRes.data,
+                      (schemasRes as GetAllSchemasResponse).data
+                    );
+                    downloadYaml(yaml, `ALL_APIS_${new Date().getTime()}.yml`);
+                    alert("YAML 파일이 다운로드되었습니다.");
+                  } catch (e) {
+                    console.error("YAML 내보내기 오류:", e);
+                    const errorMsg =
+                      e instanceof Error ? e.message : "알 수 없는 오류";
+                    alert(
+                      `전체 YAML 내보내기에 실패했습니다.\n오류: ${errorMsg}`
+                    );
+                  }
+                }}
                 className="px-2 sm:px-3 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-xl transition-all duration-200 font-semibold shadow-sm hover:shadow-md flex items-center gap-2 text-sm sm:text-base"
                 title="API YAML 파일 생성"
               >
@@ -495,6 +525,26 @@ export function ApiEditorLayout() {
                   />
                 </svg>
                 <span className="hidden sm:inline">Generate</span>
+              </button>
+              <button
+                onClick={() => setIsCodeSnippetOpen(true)}
+                className="px-2 sm:px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 font-medium shadow-sm hover:shadow-md flex items-center gap-2 text-sm sm:text-base"
+                title="Code Snippet 보기"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
+                  />
+                </svg>
+                Code Snippet
               </button>
             </div>
           </div>
@@ -651,19 +701,16 @@ export function ApiEditorLayout() {
                             : ""
                         }`}
                       />
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        쉼표로 구분하여 여러 태그를 입력할 수 있습니다
-                      </p>
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-                        Description
+                        Summary
                       </label>
                       <input
                         type="text"
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        placeholder="예: 사용자 로그인, 상품 목록 조회, 주문 생성"
+                        value={summary}
+                        onChange={(e) => setSummary(e.target.value)}
+                        placeholder="예: 사용자 로그인 생성"
                         disabled={!!(selectedEndpoint && !isEditMode)}
                         className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
                           selectedEndpoint && !isEditMode
@@ -689,6 +736,25 @@ export function ApiEditorLayout() {
                         }`}
                       />
                     </div>
+                  </div>
+
+                  {/* Description - place below Tags/Summary/Owner */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                      Description
+                    </label>
+                    <input
+                      type="text"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="예: 사용자 로그인, 상품 목록 조회, 주문 생성"
+                      disabled={!!(selectedEndpoint && !isEditMode)}
+                      className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
+                        selectedEndpoint && !isEditMode
+                          ? "bg-gray-100 dark:bg-gray-800 cursor-not-allowed opacity-60"
+                          : ""
+                      }`}
+                    />
                   </div>
                 </div>
               </div>
@@ -716,55 +782,7 @@ export function ApiEditorLayout() {
               </div>
             )}
 
-            {/* Preview Card */}
-            {protocol === "REST" && (
-              <div className="mt-8">
-                <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-700 p-8 hover:shadow-xl transition-shadow duration-300">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center shadow-lg">
-                        <span className="text-white text-xl">📄</span>
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                          API Preview
-                        </h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          작성한 API 명세서의 미리보기입니다
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setIsCodeSnippetOpen(true)}
-                      className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-xl transition-all duration-200 font-semibold shadow-sm hover:shadow-md flex items-center gap-2"
-                    >
-                      <svg
-                        className="w-5 h-5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
-                        />
-                      </svg>
-                      Code Snippet
-                    </button>
-                  </div>
-                  <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-6">
-                    <ApiPreviewCard
-                      method={method}
-                      url={url}
-                      tags={tags}
-                      description={description}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
+            {/* Preview 제거: 상세 보기에서는 Code Snippet만 노출 */}
           </div>
         )}
       </div>
@@ -859,6 +877,51 @@ export function ApiEditorLayout() {
           </div>
         </div>
       )}
+      {/* 하단 생성/초기화 버튼 - 새 명세 작성 중일 때 표시 */}
+      {!selectedEndpoint && (
+        <div className="border-t border-gray-200 dark:border-gray-700 px-6 py-4 bg-white dark:bg-gray-800 shadow-lg">
+          <div className="flex items-center justify-end gap-3">
+            <button
+              onClick={handleReset}
+              className="px-6 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 font-semibold shadow-sm hover:shadow-md flex items-center gap-2"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+              초기화
+            </button>
+            <button
+              onClick={handleSave}
+              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white rounded-xl transition-all duration-200 font-semibold shadow-sm hover:shadow-md flex items-center gap-2"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                />
+              </svg>
+              생성
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Code Snippet Panel */}
       <CodeSnippetPanel
@@ -869,6 +932,18 @@ export function ApiEditorLayout() {
         headers={requestHeaders}
         requestBody={requestBody}
       />
+
+      {/* Import Result Modal */}
+      {importResult && (
+        <ImportResultModal
+          isOpen={isImportModalOpen}
+          onClose={() => {
+            setIsImportModalOpen(false);
+            setImportResult(null);
+          }}
+          result={importResult.data}
+        />
+      )}
     </div>
   );
 }

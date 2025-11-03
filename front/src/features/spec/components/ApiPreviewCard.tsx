@@ -1,8 +1,25 @@
+import { buildOpenApiYaml, downloadYaml } from "../utils/yamlExporter";
+import { exportToMarkdown, downloadMarkdown } from "../utils/markdownExporter";
+
+interface KeyValuePair { key: string; value: string }
+
+interface RequestBodyField { key: string; value: string; type: string; description?: string; required?: boolean }
+interface RequestBody {
+  type: "none" | "form-data" | "x-www-form-urlencoded" | "json" | "xml";
+  contentType: string;
+  fields: RequestBodyField[];
+}
+
+interface StatusCode { code: string; type: "Success" | "Error"; message: string }
+
 interface ApiPreviewCardProps {
   method: string;
   url: string;
   tags: string;
   description: string;
+  headers: KeyValuePair[];
+  requestBody: RequestBody;
+  statusCodes: StatusCode[];
 }
 
 export function ApiPreviewCard({
@@ -10,19 +27,19 @@ export function ApiPreviewCard({
   url,
   tags,
   description,
+  headers,
+  requestBody,
+  statusCodes,
 }: ApiPreviewCardProps) {
-  const previewYaml = `openapi: 3.0.0
-info:
-  title: ${url}
-  version: 1.0.0
-  
-paths:
-  ${url}:
-    ${method.toLowerCase()}:
-      summary: ${description}
-      tags: [${tags}]
-      # ... additional spec
-`;
+  const previewYaml = buildOpenApiYaml({
+    method,
+    url,
+    description,
+    tags,
+    headers,
+    requestBody,
+    statusCodes,
+  });
 
   return (
     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6 shadow-sm">
@@ -87,10 +104,40 @@ paths:
 
         {/* Export Buttons */}
         <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-          <button className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium">
+          <button
+            onClick={() => {
+              const content = buildOpenApiYaml({
+                method,
+                url,
+                description,
+                tags,
+                headers,
+                requestBody,
+                statusCodes,
+              });
+              const filename = `${method.toUpperCase()}_${url.replace(/\//g, "_")}.yml`;
+              downloadYaml(content, filename);
+            }}
+            className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium"
+          >
             Export YAML
           </button>
-          <button className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium">
+          <button
+            onClick={() => {
+              const md = exportToMarkdown({
+                method,
+                url,
+                description,
+                tags,
+                headers,
+                requestBody,
+                statusCodes,
+              });
+              const filename = `${method.toUpperCase()}_${url.replace(/\//g, "_")}.md`;
+              downloadMarkdown(md, filename);
+            }}
+            className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium"
+          >
             Export Markdown
           </button>
         </div>
