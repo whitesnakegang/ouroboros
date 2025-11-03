@@ -15,15 +15,11 @@ import org.springframework.context.annotation.Configuration;
 public class OpenApiCustomizerConfig {
 
     /**
-     * Attach ApiState-derived extensions to an OpenAPI operation when the handler method is annotated with {@code ApiState}.
+     * Attach ApiState- and response-derived extensions to an OpenAPI operation when the handler method is annotated with {@code ApiState}.
      *
-     * Adds or initializes operation extensions and sets:
-     * - {@code x-ouroboros-progress} to {@code "COMPLETED"} when the annotation's state is {@code State.COMPLETED}, otherwise {@code "MOCK"}.
-     * - {@code x-ouroboros-tag} to an empty string for {@code State.COMPLETED}, otherwise to the annotation state's name.
+     * Sets the extension {@code x-ouroboros-progress} to {@code "COMPLETED"} when the annotation's state is {@code State.COMPLETED}, otherwise to {@code "MOCK"}. Sets {@code x-ouroboros-tag} to an empty string for {@code State.COMPLETED}, otherwise to the annotation state's name. If the handler method also has {@code @ApiResponse} or {@code @ApiResponses}, sets {@code x-ouroboros-response} to {@code "use"}. If the handler method has no {@code ApiState} annotation, the operation is returned unchanged.
      *
-     * The operation is returned unchanged if the handler method has no {@code ApiState} annotation.
-     *
-     * @return an {@code OperationCustomizer} that injects the {@code x-ouroboros-progress} and {@code x-ouroboros-tag} extensions based on {@code ApiState}
+     * @return the {@code OperationCustomizer} that injects OpenAPI operation extensions based on {@code ApiState} and response annotations
      */
 
     @Bean

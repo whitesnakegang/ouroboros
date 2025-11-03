@@ -24,18 +24,26 @@ public final class RequestDiffHelper {
     // 메서드 타입
     public enum HttpMethod {GET, POST, PUT, PATCH, DELETE}
 
+    /**
+     * Return an empty map when the given map is null, otherwise return the given map.
+     *
+     * @param m the map that may be null
+     * @return the same map if non-null, otherwise an immutable empty map
+     */
     public static <K, V> Map<K, V> safe(Map<K, V> m) {
         return (m == null) ? Collections.emptyMap() : m;
     }
 
     /**
-     * Compare request parameters between file and scan operations and mark differences.
-     * 
-     * This is called only when both fileOp and scanOp exist for the same URL and HTTP method.
-     * Compares path and query parameters, and marks DIFF_REQUEST if different, DIFF_NONE otherwise.
+     * Compare a file operation against a scanned operation for the same endpoint and mark the file operation's diff and progress.
      *
-     * @param fileOp the operation from the file specification (will be updated)
-     * @param scanOp the operation from the scanned specification
+     * Compares path and query parameters and request body schemas; if any difference is detected, sets the file operation's XOuroborosDiff to "request" and progress to "MOCK", otherwise sets diff to "none" and progress to "COMPLETED".
+     *
+     * @param url the endpoint path being compared
+     * @param fileOp the operation from the file specification; this object will be updated with diff and progress state
+     * @param scanOp the operation from the scanned specification to compare against
+     * @param method the HTTP method for the operation
+     * @param schemaMatchResults a map of schema reference name to boolean indicating whether referenced schemas are considered equivalent; used when comparing referenced schemas
      */
     public static void compareAndMarkRequest(String url, Operation fileOp, Operation scanOp, HttpMethod method, Map<String, Boolean> schemaMatchResults) {
         log.info("=====REQUEST VALID FUNC==== [{}] [{}]", url, method);
@@ -66,12 +74,11 @@ public final class RequestDiffHelper {
     }
 
     /**
-     * Compare parameters between file and scan.
-     * Path와 Query parameter를 분리하여 비교한다.
-     * 
-     * @param fileParams parameters from file specification
-     * @param scanParams parameters from scanned specification
-     * @return true if parameters differ, false otherwise
+     * Determine whether path or query parameters differ between the file and scanned parameter lists.
+     *
+     * @param fileParams parameters from the file specification
+     * @param scanParams parameters from the scanned specification
+     * @return `true` if either path or query parameters differ, `false` otherwise
      */
     private static boolean compareParameters(List<Parameter> fileParams, List<Parameter> scanParams) {
         List<Parameter> fileList = safeList(fileParams);
@@ -94,8 +101,13 @@ public final class RequestDiffHelper {
     }
 
     /**
-     * Compare path parameters between file and scan.
-     * Path parameter는 이름과 타입을 모두 비교한다.
+     * Determine whether path parameters differ between the file and scanned operations.
+     *
+     * If the scanned operation has no path parameters, this method treats them as identical.
+     *
+     * @param fileParams list of parameters from the file specification
+     * @param scanParams list of parameters from the scanned specification
+     * @return `true` if a difference is found (count, names, presence, or type), `false` otherwise
      */
     private static boolean comparePathParams(List<Parameter> fileParams, List<Parameter> scanParams) {
         List<Parameter> filePathParams = filterByIn(fileParams, "path");
@@ -142,8 +154,13 @@ public final class RequestDiffHelper {
     }
 
     /**
-     * Compare query parameters between file and scan.
-     * Query parameter는 타입별 개수만 비교한다.
+     * Determines whether query parameters differ between the file specification and the scanned specification.
+     *
+     * If the scanned specification contains no query parameters, this method reports no difference.
+     *
+     * @param fileParams list of parameters from the file specification
+     * @param scanParams list of parameters from the scanned specification
+     * @return true if query parameters differ by count or by per-type distribution, false otherwise
      */
     private static boolean compareQueryParams(List<Parameter> fileParams, List<Parameter> scanParams) {
         List<Parameter> fileQueryParams = filterByIn(fileParams, "query");
@@ -168,11 +185,14 @@ public final class RequestDiffHelper {
     }
 
     /**
-     * Count parameters by their schema type.
-     * 
-     * @param params the list of parameters to analyze
-     * @return map of type -> count
-     */
+         * Produce counts of parameters grouped by their schema type.
+         *
+         * <p>Parameters that are null or whose schema is null are counted under the
+         * "unknown" key.</p>
+         *
+         * @param params the list of parameters to analyze; may contain null entries
+         * @return a map from type name to count (key "unknown" represents parameters with missing schemas)
+         */
     private static Map<String, Integer> countTypesByType(List<Parameter> params) {
         Map<String, Integer> typeCounts = new HashMap<>();
         for (Parameter p : params) {
@@ -188,10 +208,10 @@ public final class RequestDiffHelper {
     }
 
     /**
-     * Extract type identifier from Schema.
-     * 
-     * @param schema the Schema to extract type from
-     * @return type identifier string (schema type만 사용, format 무시)
+     * Produce a compact type identifier for the given Schema.
+     *
+     * @param schema the Schema to inspect; may be null
+     * @return `'ref'` if the schema is a `$ref`, the schema's `type` value if present, or `'unknown'` otherwise (format is ignored)
      */
     private static String extractType(Schema schema) {
         if (schema == null) {
@@ -214,12 +234,16 @@ public final class RequestDiffHelper {
     }
 
     /**
-     * Compare request body between file and scan operations.
-     * 
-     * @param fileReqBody request body from file specification
-     * @param scanReqBody request body from scanned specification
-     * @param schemaMatchResults schema match results map
-     * @return true if request body differs, false otherwise
+     * Determines whether the request bodies differ between the file specification and the scanned specification.
+     *
+     * <p>Comparison considers presence/absence of the request body, equality of media type keys, and per-media-type
+     * schema differences. Referenced schemas are resolved using {@code schemaMatchResults} when available.</p>
+     *
+     * @param fileReqBody         request body from the file specification
+     * @param scanReqBody         request body from the scanned specification
+     * @param schemaMatchResults  map of referenced schema names to booleans indicating whether the file's referenced
+     *                            schema is considered a match to the scanned schema; may be empty or null
+     * @return                    `true` if the request bodies differ, `false` otherwise
      */
     private static boolean compareRequestBody(RequestBody fileReqBody, RequestBody scanReqBody, Map<String, Boolean> schemaMatchResults) {
         // 둘 다 없으면 동일
@@ -260,12 +284,16 @@ public final class RequestDiffHelper {
     }
 
     /**
-     * Compare schemas from request body.
-     * 
-     * @param fileSchema schema from file specification
-     * @param scanSchema schema from scanned specification
-     * @param schemaMatchResults schema match results map
-     * @return true if schemas differ, false otherwise
+     * Determine whether two request body schemas differ.
+     *
+     * When both schemas use `$ref`, equal ref names are resolved using {@code schemaMatchResults}: a mapped
+     * value of `true` means the schemas are considered identical, `false` means they differ; if no mapping
+     * exists, the function defers (considers them identical only insofar as a direct comparison is required).
+     *
+     * @param fileSchema          the schema from the file specification
+     * @param scanSchema          the schema from the scanned specification
+     * @param schemaMatchResults  map from schema ref name to a Boolean indicating whether the referenced schemas match
+     * @return                    `true` if the schemas differ, `false` otherwise
      */
     private static boolean compareRequestSchema(Schema fileSchema, Schema scanSchema, Map<String, Boolean> schemaMatchResults) {
         // 둘 다 없으면 동일
@@ -318,7 +346,10 @@ public final class RequestDiffHelper {
     }
 
     /**
-     * Extract $ref from Schema
+     * Retrieve the `$ref` string from a Schema.
+     *
+     * @param schema the schema to inspect; may be null
+     * @return the `$ref` value if present, otherwise an empty string
      */
     private static String extractSchemaRef(Schema schema) {
         if (schema == null) {
@@ -328,8 +359,10 @@ public final class RequestDiffHelper {
     }
 
     /**
-     * Extract schema name from $ref
-     * e.g., "#/components/schemas/User" -> "User"
+     * Extracts the schema name from a JSON Reference (`$ref`) string.
+     *
+     * @param ref the `$ref` string (e.g., "#/components/schemas/User"); may be empty
+     * @return the substring after the last '/' (e.g., "User"), the original `ref` if no '/' is present, or an empty string if `ref` is empty
      */
     private static String extractRefName(String ref) {
         if (ref.isEmpty()) {
@@ -343,8 +376,12 @@ public final class RequestDiffHelper {
     }
 
     /**
-     * Filter parameters by 'in' value
-     */
+         * Return parameters whose `in` property matches the given value (case-insensitive).
+         *
+         * @param list    list of parameters to filter; null elements within the list are ignored
+         * @param inValue target `in` value to match (null is treated as empty)
+         * @return        a new list containing parameters whose `in` equals `inValue` (case-insensitive)
+         */
     private static List<Parameter> filterByIn(List<Parameter> list, String inValue) {
         List<Parameter> out = new ArrayList<>();
         String targetIn = nullToEmpty(inValue).toLowerCase();
@@ -359,7 +396,10 @@ public final class RequestDiffHelper {
     }
 
     /**
-     * Index parameters by name (lowercase)
+     * Index parameters by their lowercase name.
+     *
+     * @param params the list of parameters to index; null entries are ignored
+     * @return a map from lowercase parameter name to the corresponding Parameter; parameters with null or empty names are omitted
      */
     private static Map<String, Parameter> indexByName(List<Parameter> params) {
         Map<String, Parameter> indexed = new HashMap<>();
@@ -373,12 +413,24 @@ public final class RequestDiffHelper {
         return indexed;
     }
 
-    // ==================== null-safe helpers ====================
+    /**
+     * Normalize a possibly-null list to a non-null list.
+     *
+     * @param l a list that may be null
+     * @param <T> the list element type
+     * @return the original list if non-null, otherwise an empty immutable list
+     */
 
     private static <T> List<T> safeList(List<T> l) {
         return (l == null) ? Collections.emptyList() : l;
     }
 
+    /**
+     * Convert a possibly null string to an empty string.
+     *
+     * @param s the input string that may be null
+     * @return `""` if `s` is null, otherwise the original `s`
+     */
     private static String nullToEmpty(String s) {
         return (s == null) ? "" : s;
     }

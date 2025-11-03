@@ -56,10 +56,9 @@ public class OuroRestHandler implements OuroProtocolHandler {
     }
 
     /**
-     * Scans the running application's OpenAPI model and produces an API specification.
+     * Produce an OuroRestApiSpec from the running application's cached OpenAPI model.
      *
-     * <p>Fetches the cached OpenAPI model for Locale.KOREA and converts it into an OuroRestApiSpec.
-     * If the model contains an info object with a missing version, sets that version to "v1".</p>
+     * <p>Retrieves the cached OpenAPI model for Locale.KOREA and converts it to an OuroRestApiSpec. If the spec's Info exists but its version is null, sets the version to "v1".</p>
      *
      * @return the scanned REST API specification
      * @throws IllegalStateException if the OpenAPI model cannot be retrieved or converted
@@ -97,17 +96,24 @@ public class OuroRestHandler implements OuroProtocolHandler {
     }
 
     /**
-     * Produces a synchronized API specification by reconciling the specification loaded from file with the currently scanned specification.
+     * Reconciles the API specification loaded from file with the specification scanned from the running application into a single synchronized specification.
      *
-     * @param fileSpec    the API specification parsed from the repository/file source
-     * @param scannedSpec the API specification obtained from the running application's OpenAPI model
-     * @return            the resulting OuroApiSpec that represents the reconciled/synchronized API specification
+     * @param fileSpec    the API specification parsed from the repository or file
+     * @param scannedSpec the API specification obtained from the application's OpenAPI model
+     * @return            the reconciled OuroApiSpec representing the synchronized specification
      */
     @Override
     public OuroApiSpec synchronize(OuroApiSpec fileSpec, OuroApiSpec scannedSpec) {
         return pipeline.validate(fileSpec, scannedSpec);
     }
     
+    /**
+     * Serialize an OuroRestApiSpec to YAML and persist it to the file path provided by the YAML parser.
+     *
+     * @param specToSave the spec to serialize; must be an instance of {@code OuroRestApiSpec}
+     * @throws IllegalArgumentException if {@code specToSave} is not an {@code OuroRestApiSpec}
+     * @throws IllegalStateException if serialization or file I/O fails while creating directories or writing the YAML file
+     */
     @Override
     public void saveYaml(OuroApiSpec specToSave) {
         try {
