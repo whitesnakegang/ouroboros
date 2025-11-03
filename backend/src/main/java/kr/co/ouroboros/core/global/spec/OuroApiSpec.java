@@ -1,9 +1,16 @@
 package kr.co.ouroboros.core.global.spec;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+
 /**
  * 모든 API 스펙(REST, gRPC, Thrift 등)의
  * 최상위 공통 데이터 인터페이스
  */
+@JsonAutoDetect(
+        fieldVisibility = JsonAutoDetect.Visibility.ANY,
+        getterVisibility = JsonAutoDetect.Visibility.NONE,
+        isGetterVisibility = JsonAutoDetect.Visibility.NONE
+)
 public interface OuroApiSpec {
     /**
  * Gets the protocol identifier for this API specification.
