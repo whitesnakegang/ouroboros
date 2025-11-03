@@ -152,7 +152,7 @@ public class ResponseComparator {
                             endpoint, method, statusCode);
                     continue;
                 }
-                log.debug("[CONTENT TYPE MISSING] {} {} - Status {}: Content-Type '%s'가 파일 스펙에 없습니다.",
+                log.debug("[CONTENT TYPE MISSING] {} {} - Status {}: Content-Type {}가 파일 스펙에 없습니다.",
                         endpoint, method, statusCode, contentType);
                 return false;
             }
