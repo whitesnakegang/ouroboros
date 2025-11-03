@@ -1,5 +1,6 @@
-package kr.co.ouroboros.core.rest.spec.dto;
+package kr.co.ouroboros.ui.rest.spec.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import kr.co.ouroboros.core.rest.spec.model.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -10,10 +11,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Request DTO for updating an existing REST API specification.
+ * Response DTO for REST API specification operations.
  * <p>
- * All fields are optional - only provided fields will be updated.
- * If path or method is changed, the operation will be moved to the new location.
+ * Returns the complete REST API specification including all endpoint details
+ * and Ouroboros custom metadata fields.
  *
  * @since 0.0.1
  */
@@ -21,19 +22,21 @@ import java.util.Map;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class UpdateRestApiRequest {
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class RestApiSpecResponse {
+
+    /**
+     * Unique identifier (UUID)
+     */
+    private String id;
 
     /**
      * API endpoint path (e.g., "/api/users/{id}")
-     * <p>
-     * If changed, the operation will be moved from the old path to the new path
      */
     private String path;
 
     /**
      * HTTP method (GET, POST, PUT, DELETE, PATCH)
-     * <p>
-     * If changed, the operation will be moved from the old method to the new method
      */
     private String method;
 
@@ -71,4 +74,19 @@ public class UpdateRestApiRequest {
      * Security requirements
      */
     private List<SecurityRequirement> security;
+
+    /**
+     * Development progress (mock or completed)
+     */
+    private String progress;
+
+    /**
+     * Development tag (none, implementing, bugfix)
+     */
+    private String tag;
+
+    /**
+     * Diff status (none, added, modified, deleted)
+     */
+    private String diff;
 }

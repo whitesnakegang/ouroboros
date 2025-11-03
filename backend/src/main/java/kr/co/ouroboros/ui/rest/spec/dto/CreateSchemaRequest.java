@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.spec.dto;
+package kr.co.ouroboros.ui.rest.spec.dto;
 
 import kr.co.ouroboros.core.rest.spec.model.Property;
 import lombok.AllArgsConstructor;
@@ -10,9 +10,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Request DTO for updating an existing schema definition.
+ * Request DTO for creating a new schema definition.
  * <p>
- * All fields are optional - only provided fields will be updated.
+ * Used to define reusable data schemas in the OpenAPI components/schemas section.
+ * Schemas can be referenced by API operations for request/response body definitions.
  *
  * @since 0.0.1
  */
@@ -20,12 +21,22 @@ import java.util.Map;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class UpdateSchemaRequest {
+public class CreateSchemaRequest {
+
+    /**
+     * Schema name (identifier used for $ref references)
+     * <p>
+     * Example: "User", "Book", "ErrorResponse"
+     */
+    private String schemaName;
 
     /**
      * Schema type (typically "object" for complex types)
+     * <p>
+     * Defaults to "object" if not provided
      */
-    private String type;
+    @Builder.Default
+    private String type = "object";
 
     /**
      * Human-readable title for the schema

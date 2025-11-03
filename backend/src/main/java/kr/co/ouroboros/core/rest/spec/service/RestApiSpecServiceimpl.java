@@ -1,9 +1,13 @@
 package kr.co.ouroboros.core.rest.spec.service;
 
 import kr.co.ouroboros.core.rest.common.yaml.RestApiYamlParser;
-import kr.co.ouroboros.core.rest.spec.dto.*;
 import kr.co.ouroboros.core.rest.spec.model.*;
 import kr.co.ouroboros.core.rest.spec.validator.SchemaValidator;
+import kr.co.ouroboros.ui.rest.spec.dto.CreateRestApiRequest;
+import kr.co.ouroboros.ui.rest.spec.dto.ImportYamlResponse;
+import kr.co.ouroboros.ui.rest.spec.dto.RenamedItem;
+import kr.co.ouroboros.ui.rest.spec.dto.RestApiSpecResponse;
+import kr.co.ouroboros.ui.rest.spec.dto.UpdateRestApiRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

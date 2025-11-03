@@ -1,8 +1,8 @@
 package kr.co.ouroboros.core.rest.spec.service;
 
-import kr.co.ouroboros.core.rest.spec.dto.CreateSchemaRequest;
-import kr.co.ouroboros.core.rest.spec.dto.SchemaResponse;
-import kr.co.ouroboros.core.rest.spec.dto.UpdateSchemaRequest;
+import kr.co.ouroboros.ui.rest.spec.dto.CreateSchemaRequest;
+import kr.co.ouroboros.ui.rest.spec.dto.SchemaResponse;
+import kr.co.ouroboros.ui.rest.spec.dto.UpdateSchemaRequest;
 
 import java.util.List;
 
