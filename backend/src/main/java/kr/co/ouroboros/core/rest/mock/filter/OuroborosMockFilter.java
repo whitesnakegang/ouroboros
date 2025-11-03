@@ -125,7 +125,7 @@ public class OuroborosMockFilter implements Filter{
 
         // 요청 body와 merge (요청 필드가 있으면 덮어씀)
         if (body instanceof Map && requestJson != null) {
-            ((Map<String, Object>) body).putAll(requestJson);
+            deepMerge((Map<String, Object>) body, requestJson);
         }
 
         // Content type 결정
@@ -168,5 +168,24 @@ public class OuroborosMockFilter implements Filter{
         response.setContentType("application/json;charset=UTF-8");
         Map<String, String> error = Map.of("error", message);
         response.getWriter().write(objectMapper.writeValueAsString(error));
+    }
+
+    /**
+     * 두 Map을 깊이 병합합니다. source의 값이 target의 값을 덮어씁니다.
+     */
+    @SuppressWarnings("unchecked")
+    private void deepMerge(Map<String, Object> target, Map<String, Object> source) {
+        for (Map.Entry<String, Object> entry : source.entrySet()) {
+            String key = entry.getKey();
+            Object sourceValue = entry.getValue();
+
+            if (sourceValue instanceof Map && target.get(key) instanceof Map) {
+                // 양쪽 모두 Map이면 재귀적으로 병합
+                deepMerge((Map<String, Object>) target.get(key), (Map<String, Object>) sourceValue);
+            } else {
+                // 그 외의 경우 source 값으로 덮어씀
+                target.put(key, sourceValue);
+            }
+        }
     }
 }
