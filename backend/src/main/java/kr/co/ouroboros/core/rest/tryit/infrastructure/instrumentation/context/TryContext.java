@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.tryit.context;
+package kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.context;
 
 import io.opentelemetry.api.baggage.Baggage;
 import io.opentelemetry.api.baggage.BaggageBuilder;
@@ -56,14 +56,19 @@ public class TryContext {
      * @return the try session ID, or null if not set
      */
     public static UUID getTryId() {
-        String id = getTryIdFromBaggage();
-        if (id != null) {
-            try {
-                return UUID.fromString(id);
-            } catch (IllegalArgumentException e) {
-                log.warn("Invalid tryId format in baggage: {}", id);
-                return null;
+        try {
+            String id = Baggage.current().getEntryValue(BAGGAGE_KEY);
+            if (id != null) {
+                try {
+                    return UUID.fromString(id);
+                } catch (IllegalArgumentException e) {
+                    log.warn("Invalid tryId format in baggage: {}", id);
+                    return null;
+                }
             }
+        } catch (Exception e) {
+            // OpenTelemetry Baggage not available
+            return null;
         }
         return null;
     }
@@ -74,7 +79,7 @@ public class TryContext {
      * @return true if tryId is set, false otherwise
      */
     public static boolean hasTryId() {
-        return getTryIdFromBaggage() != null;
+        return getTryId() != null;
     }
     
     /**
@@ -95,20 +100,6 @@ public class TryContext {
             }
         } catch (Exception e) {
             log.trace("OpenTelemetry Baggage not available: {}", e.getMessage());
-        }
-    }
-    
-    /**
-     * Gets the tryId from OpenTelemetry Baggage.
-     * Useful for Conditional Sampler to check if this is a Try request.
-     * 
-     * @return the try session ID from Baggage, or null if not set
-     */
-    public static String getTryIdFromBaggage() {
-        try {
-            return Baggage.current().getEntryValue(BAGGAGE_KEY);
-        } catch (Exception e) {
-            return null;
         }
     }
 }

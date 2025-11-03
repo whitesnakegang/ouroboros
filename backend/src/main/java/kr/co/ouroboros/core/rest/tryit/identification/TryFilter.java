@@ -4,7 +4,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import kr.co.ouroboros.core.rest.tryit.context.TryContext;
+import kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.context.TryContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -58,8 +58,11 @@ public class TryFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
         } finally {
             // At the end (also for ERROR dispatch), ensure header is set if possible
-            String tryIdStr = TryContext.getTryIdFromBaggage();
-            if (tryIdStr == null) {
+            String tryIdStr = null;
+            UUID tryId = TryContext.getTryId();
+            if (tryId != null) {
+                tryIdStr = tryId.toString();
+            } else {
                 Object v = request.getAttribute(REQUEST_TRY_ID_ATTR);
                 if (v != null) tryIdStr = String.valueOf(v);
             }
