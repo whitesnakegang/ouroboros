@@ -51,11 +51,6 @@ public class RestApiSpecResponse {
     private String description;
 
     /**
-     * Whether this endpoint is deprecated
-     */
-    private Boolean deprecated;
-
-    /**
      * Grouping tags
      */
     private List<String> tags;
