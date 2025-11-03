@@ -22,17 +22,17 @@ export function RootLayout() {
   }, [isDarkMode]);
 
   return (
-    <div className="h-screen flex flex-col bg-white dark:bg-gray-900 transition-colors">
-      <header className="border-b bg-white dark:bg-gray-800 dark:border-gray-700 px-4 py-2 flex items-center justify-between">
+    <div className="h-screen flex flex-col bg-white dark:bg-[#0D1117] transition-colors">
+      <header className="border-b border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#0D1117] px-4 py-2 flex items-center justify-between">
         <div className="flex items-center gap-3">
           {/* 모바일 메뉴 버튼 */}
           <button
             onClick={toggle}
-            className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            className="lg:hidden p-2 rounded-md hover:bg-gray-100 dark:hover:bg-[#161B22] transition-colors"
             aria-label="메뉴 토글"
           >
             <svg
-              className="w-6 h-6 text-gray-600 dark:text-gray-300"
+              className="w-6 h-6 text-gray-600 dark:text-[#8B949E]"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -45,7 +45,7 @@ export function RootLayout() {
               />
             </svg>
           </button>
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+          <h1 className="text-xl font-bold text-gray-900 dark:text-[#E6EDF3]">
             Ouroboros API
           </h1>
         </div>
@@ -61,7 +61,7 @@ export function RootLayout() {
 
         {/* 사이드바 */}
         <aside
-          className={`fixed lg:static inset-y-0 left-0 z-50 lg:z-auto w-80 border-r dark:border-gray-700 bg-white dark:bg-gray-800 transition-transform duration-300 transform ${
+          className={`fixed lg:static inset-y-0 left-0 z-50 lg:z-auto w-80 border-r border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#0D1117] transition-transform duration-300 transform ${
             isOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
@@ -69,7 +69,7 @@ export function RootLayout() {
         </aside>
 
         {/* 메인 콘텐츠 */}
-        <main className="flex-1 overflow-auto bg-gray-50 dark:bg-gray-900">
+        <main className="flex-1 overflow-auto bg-white dark:bg-[#0D1117]">
           <Outlet />
         </main>
       </div>
