@@ -18,7 +18,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.FileCopyUtils;
 
 @Component
-@Slf4j
 public class OuroApiSpecManager {
 
     private final Map<Protocol, OuroApiSpec> apiCache = new ConcurrentHashMap<>();
