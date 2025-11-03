@@ -127,7 +127,7 @@ public class MockValidationService {
         }
 
         // ===== Attribute에서 미리 파싱된 body 가져오기 =====
-        Map<String, Object> requestBody = (Map<String, Object>) request.getAttribute("parsedRequestBody");
+        Object requestBody = request.getAttribute("parsedRequestBody");
 
         if (requestBody == null) {
             // InputStream이 비어있거나 파싱 실패
@@ -137,18 +137,45 @@ public class MockValidationService {
             return ValidationResult.success();
         }
 
-        // ===== body가 required인데 비어있으면 에러 =====
-        if (meta.isRequestBodyRequired() && requestBody.isEmpty()) {
-            return ValidationResult.error(400, "Request body is required but missing");
-        }
-
         // ===== 스키마가 없으면 필드 검증 스킵 =====
         if (meta.getRequestBodySchema() == null) {
             return ValidationResult.success();
         }
 
-        // ===== 우선순위 7 & 8: 필드 타입 & 필수 필드 검증 =====
-        return validateSchemaFields(requestBody, meta.getRequestBodySchema(), "");
+        // ==== 스키마의 루트 타입 확인 ====
+        Map<String, Object> schema = meta.getRequestBodySchema();
+        String rootType = (String) schema.get("type");
+
+        if (rootType == null) {
+            return ValidationResult.success();
+        }
+
+        // 루트 타입에 따라 분기 처리
+        if ("object".equals(rootType)) {
+            if (!(requestBody instanceof Map<?, ?> bodyMap)) {
+                return ValidationResult.error(400, "Request body must be a JSON object");
+            }
+            return validateSchemaFields((Map<String, Object>) bodyMap, schema, "");
+        }
+
+        if ("array".equals(rootType)) {
+            if (!(requestBody instanceof List<?> bodyList)) {
+                return ValidationResult.error(400, "Request body must be a JSON array");
+            }
+            Map<String, Object> itemSchema = (Map<String, Object>) schema.get("items");
+            if (itemSchema == null) {
+                return ValidationResult.success();
+            }
+            return validateArrayItems((List<Object>) bodyList, itemSchema, "");
+        }
+
+        // 프리미티브 타입 (string, number, boolean 등)
+        ValidationResult rootTypeValidation = validateFieldType(requestBody, rootType, "requestBody");
+        if (!rootTypeValidation.valid()) {
+            return rootTypeValidation;
+        }
+
+        return ValidationResult.success();
     }
 
     /**

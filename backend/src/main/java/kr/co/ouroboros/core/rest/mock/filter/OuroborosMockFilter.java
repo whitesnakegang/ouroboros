@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Optional;
 
@@ -53,47 +54,54 @@ public class OuroborosMockFilter implements Filter {
         HttpServletRequest request = (HttpServletRequest) req;
         HttpServletResponse response = (HttpServletResponse) res;
 
-        // ===== Phase 1: Routing - Check if endpoint should be mocked =====
+        // ===== 1단계: 라우팅 - Mock 엔드포인트인지 확인 =====
         Optional<EndpointMeta> metaOpt = registry.find(request.getRequestURI(), request.getMethod());
 
         if (metaOpt.isEmpty()) {
-            // Not a mock endpoint - pass through to next filter
+            // Mock 엔드포인트가 아니면 다음 필터로 전달
             chain.doFilter(req, res);
             return;
         }
 
         EndpointMeta meta = metaOpt.get();
-        log.debug("Mock endpoint matched: {} {}", meta.getMethod(), meta.getPath());
 
-        // ===== Request Body 파싱 (Validation 전에 미리 읽기) =====
-        Map<String, Object> requestJson = null;
+        // ===== 2단계: Request Body 파싱 (검증 전에 미리 읽기) =====
+        Object requestJson = null;
         if ("POST".equalsIgnoreCase(request.getMethod())
                 || "PUT".equalsIgnoreCase(request.getMethod())
                 || "PATCH".equalsIgnoreCase(request.getMethod())) {
             try {
-                // InputStream은 한 번만 읽을 수 있으므로 여기서 미리 읽음
-                requestJson = objectMapper.readValue(request.getInputStream(), Map.class);
-                log.debug("Request body parsed for merge: {}", requestJson);
+                // InputStream은 한 번만 읽을 수 있으므로 byte[]로 읽어서 저장
+                byte[] bodyBytes = request.getInputStream().readAllBytes();
+                if (bodyBytes.length > 0) {
+                    String body = new String(bodyBytes, StandardCharsets.UTF_8);
 
-                // Validation에서 사용할 수 있도록 attribute에 저장
+                    // JSON 전체 파싱 (object, array, primitive 모두 허용)
+                    requestJson = objectMapper.readValue(body, Object.class);
+                } else {
+                    log.warn("Request body is empty (0 bytes)");
+                }
+                //  검증 단계에서 사용할 수 있도록 attribute에 저장
                 request.setAttribute("parsedRequestBody", requestJson);
             } catch (Exception e) {
-                log.debug("No readable request body found (ignored): {}", e.getMessage());
+                log.error("Failed to parse request body", e);
+                // 파싱 실패 시 attribute에 null을 명시적으로 저장
+                request.setAttribute("parsedRequestBody", null);
             }
         }
 
-        // ===== Phase 2: Validation - Delegate to validation service =====
+        // ===== 3단계: 검증 - Validation Service에 위임 =====
         ValidationResult validationResult = validationService.validate(request, meta);
 
         if (!validationResult.valid()) {
-            // Validation failed - send error response and stop
+            // 검증 실패 - 에러 응답 전송 후 종료
             sendError(response, validationResult.statusCode(), validationResult.message());
             return;
         }
 
-        // ===== Phase 3: Response - Generate and send mock response =====
+        // ===== 4단계: Mock 응답 생성 및 전송 =====
         respond(response, request, meta, requestJson);
-        // Do NOT call chain.doFilter() - execution stops here for mock endpoints
+        // chain.doFilter() 호출하지 않음 - mock 엔드포인트는 여기서 실행 종료
     }
 
     /**
@@ -102,11 +110,11 @@ public class OuroborosMockFilter implements Filter {
      * @param response    the HTTP response
      * @param request     the HTTP request (for Accept header)
      * @param meta        the endpoint metadata
-     * @param requestJson the parsed request body (for deep merge)
+     * @param requestBody the parsed request body (for deep merge)
      * @throws IOException if response writing fails
      */
     private void respond(HttpServletResponse response, HttpServletRequest request,
-                         EndpointMeta meta, Map<String, Object> requestJson)
+                         EndpointMeta meta, Object requestBody)
             throws IOException {
 
         int statusCode = 200;
@@ -118,7 +126,7 @@ public class OuroborosMockFilter implements Filter {
             return;
         }
 
-        // Set response headers
+        // 응답 헤더 설정
         if (responseMeta.getHeaders() != null) {
             for (var entry : responseMeta.getHeaders().entrySet()) {
                 response.setHeader(entry.getKey(), String.valueOf(entry.getValue()));
@@ -131,12 +139,12 @@ public class OuroborosMockFilter implements Filter {
             body = schemaMockBuilder.build(responseMeta.getBody());
         }
 
-        // ===== 요청 body와 merge (요청 필드가 있으면 덮어씀) =====
-        if (body instanceof Map && requestJson != null) {
-            deepMerge((Map<String, Object>) body, requestJson);
+        // ===== 요청 body와 병합 (요청 필드가 있으면 덮어씀) =====
+        if (body instanceof Map<?, ?> bodyMap && requestBody instanceof Map<?, ?> requestMap) {
+            deepMerge((Map<String, Object>) bodyMap, (Map<String, Object>) requestMap);
         }
 
-        // ===== Content type 결정 =====
+        // ===== Content-Type 결정 =====
         String contentType = responseMeta.getContentType();
         String accept = request.getHeader("Accept");
 
