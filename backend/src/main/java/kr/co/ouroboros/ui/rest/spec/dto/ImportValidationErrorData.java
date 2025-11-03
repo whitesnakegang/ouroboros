@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.spec.dto;
+package kr.co.ouroboros.ui.rest.spec.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

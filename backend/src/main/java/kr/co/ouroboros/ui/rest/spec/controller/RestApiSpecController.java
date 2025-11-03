@@ -1,12 +1,12 @@
-package kr.co.ouroboros.ui.controller;
+package kr.co.ouroboros.ui.rest.spec.controller;
 
 import kr.co.ouroboros.core.global.response.GlobalApiResponse;
-import kr.co.ouroboros.core.rest.spec.dto.CreateRestApiRequest;
-import kr.co.ouroboros.core.rest.spec.dto.ImportValidationErrorData;
-import kr.co.ouroboros.core.rest.spec.dto.ImportYamlResponse;
-import kr.co.ouroboros.core.rest.spec.dto.RestApiSpecResponse;
-import kr.co.ouroboros.core.rest.spec.dto.UpdateRestApiRequest;
-import kr.co.ouroboros.core.rest.spec.dto.ValidationError;
+import kr.co.ouroboros.ui.rest.spec.dto.CreateRestApiRequest;
+import kr.co.ouroboros.ui.rest.spec.dto.ImportValidationErrorData;
+import kr.co.ouroboros.ui.rest.spec.dto.ImportYamlResponse;
+import kr.co.ouroboros.ui.rest.spec.dto.RestApiSpecResponse;
+import kr.co.ouroboros.ui.rest.spec.dto.UpdateRestApiRequest;
+import kr.co.ouroboros.ui.rest.spec.dto.ValidationError;
 import kr.co.ouroboros.core.rest.spec.service.RestApiSpecService;
 import kr.co.ouroboros.core.rest.spec.validator.ImportYamlValidator;
 import lombok.RequiredArgsConstructor;
