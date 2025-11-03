@@ -1,6 +1,7 @@
 package kr.co.ouroboros.core.rest.spec.service;
 
 import kr.co.ouroboros.core.rest.spec.dto.CreateRestApiRequest;
+import kr.co.ouroboros.core.rest.spec.dto.ImportYamlResponse;
 import kr.co.ouroboros.core.rest.spec.dto.RestApiSpecResponse;
 import kr.co.ouroboros.core.rest.spec.dto.UpdateRestApiRequest;
 
@@ -74,4 +75,16 @@ public interface RestApiSpecService {
      * @throws Exception if specification not found or deletion fails
      */
     void deleteRestApiSpec(String id) throws Exception;
+
+    /**
+     * Imports external OpenAPI 3.1.0 YAML file and merges into ourorest.yml.
+     * <p>
+     * Validates the imported content, enriches with Ouroboros custom fields,
+     * handles duplicates by auto-renaming, and updates $ref references accordingly.
+     *
+     * @param yamlContent the OpenAPI YAML content to import
+     * @return import result with counts and renamed items
+     * @throws Exception if validation fails or import operation fails
+     */
+    ImportYamlResponse importYaml(String yamlContent) throws Exception;
 }

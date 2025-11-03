@@ -6,7 +6,7 @@
  * <p>
  * <b>Key Components:</b>
  * <ul>
- *   <li>{@link kr.co.ouroboros.core.rest.validator.OurorestYamlValidator} - Main validator component</li>
+ *   <li>{@link kr.co.ouroboros.core.rest.spec.validator.OurorestYamlValidator} - Main validator component</li>
  * </ul>
  * <p>
  * <b>Features:</b>
@@ -28,9 +28,9 @@
  *   → Protocol initialization continues
  * </pre>
  *
- * @see kr.co.ouroboros.core.rest.validator.OurorestYamlValidator
+ * @see kr.co.ouroboros.core.rest.spec.validator.OurorestYamlValidator
  * @see kr.co.ouroboros.core.global.runner.OpenApiDumpOnReady
  * @see kr.co.ouroboros.core.rest.common.yaml.RestApiYamlParser
  * @since 0.0.1
  */
-package kr.co.ouroboros.core.rest.validator;
+package kr.co.ouroboros.core.rest.spec.validator;

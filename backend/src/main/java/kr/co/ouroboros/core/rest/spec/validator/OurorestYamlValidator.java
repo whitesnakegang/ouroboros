@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.validator;
+package kr.co.ouroboros.core.rest.spec.validator;
 
 import kr.co.ouroboros.core.rest.common.yaml.RestApiYamlParser;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +43,7 @@ import java.util.*;
 public class OurorestYamlValidator {
 
     private final RestApiYamlParser yamlParser;
+    private final SchemaValidator schemaValidator;
 
     // HTTP methods to check for operations
     private static final List<String> HTTP_METHODS = Arrays.asList(
@@ -104,8 +105,11 @@ public class OurorestYamlValidator {
             // Step 5: Enrich schema-level fields
             int schemaCount = enrichSchemas(document);
 
-            // Step 6: Save enriched file
-            if (hasFixedFields || operationCount > 0 || schemaCount > 0) {
+            // Step 6: Validate and auto-create missing schema references
+            int createdSchemas = schemaValidator.validateAndCreateMissingSchemas(document);
+
+            // Step 7: Save enriched file
+            if (hasFixedFields || operationCount > 0 || schemaCount > 0 || createdSchemas > 0) {
                 yamlParser.writeDocument(document);
                 log.info("💾 Saved enriched ourorest.yml");
             }
@@ -115,6 +119,9 @@ public class OurorestYamlValidator {
             log.info("✅ ourorest.yml Validation Completed");
             log.info("   📊 Operations enriched: {}", operationCount);
             log.info("   📊 Schemas enriched: {}", schemaCount);
+            if (createdSchemas > 0) {
+                log.info("   📦 Missing schemas auto-created: {}", createdSchemas);
+            }
             log.info("========================================");
 
         } catch (Exception e) {
@@ -489,9 +496,10 @@ public class OurorestYamlValidator {
      * </ul>
      * <p>
      * Only processes schemas that have a 'properties' field. Skips $ref schemas.
+     * Also validates and corrects minItems/maxItems constraints.
      *
      * @param schema the schema map to enrich
-     * @return true if any field was added, false if all fields already existed
+     * @return true if any field was added or corrected, false if all fields already existed
      */
     @SuppressWarnings("unchecked")
     private boolean enrichSchemaFields(Map<String, Object> schema) {
@@ -500,9 +508,15 @@ public class OurorestYamlValidator {
         }
 
         boolean modified = false;
+
+        // Validate schema constraints (minItems/maxItems, etc.)
+        if (schemaValidator.validateAndCorrectSchemaMap(schema)) {
+            modified = true;
+        }
+
         Object propertiesObj = schema.get("properties");
         if (!(propertiesObj instanceof Map)) {
-            return false;
+            return modified;
         }
         Map<String, Object> properties = (Map<String, Object>) propertiesObj;
 

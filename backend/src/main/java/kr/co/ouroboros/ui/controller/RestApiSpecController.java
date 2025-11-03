@@ -2,15 +2,21 @@ package kr.co.ouroboros.ui.controller;
 
 import kr.co.ouroboros.core.global.response.GlobalApiResponse;
 import kr.co.ouroboros.core.rest.spec.dto.CreateRestApiRequest;
+import kr.co.ouroboros.core.rest.spec.dto.ImportValidationErrorData;
+import kr.co.ouroboros.core.rest.spec.dto.ImportYamlResponse;
 import kr.co.ouroboros.core.rest.spec.dto.RestApiSpecResponse;
 import kr.co.ouroboros.core.rest.spec.dto.UpdateRestApiRequest;
+import kr.co.ouroboros.core.rest.spec.dto.ValidationError;
 import kr.co.ouroboros.core.rest.spec.service.RestApiSpecService;
+import kr.co.ouroboros.core.rest.spec.validator.ImportYamlValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 /**
@@ -29,6 +35,7 @@ import java.util.List;
 public class RestApiSpecController {
 
     private final RestApiSpecService restApiSpecService;
+    private final ImportYamlValidator importYamlValidator;
 
     /**
      * Creates a new REST API specification.
@@ -145,5 +152,86 @@ public class RestApiSpecController {
 
 
 
+    }
+
+    /**
+     * Imports external OpenAPI 3.1.0 YAML file and merges into ourorest.yml.
+     * <p>
+     * Validates the uploaded YAML file, handles duplicate APIs and schemas by auto-renaming,
+     * enriches with Ouroboros custom fields, and updates $ref references accordingly.
+     * <p>
+     * <b>File Requirements:</b>
+     * <ul>
+     *   <li>Extension: .yml or .yaml</li>
+     *   <li>Format: OpenAPI 3.1.0 specification</li>
+     *   <li>Required fields: openapi, info (title, version), paths</li>
+     *   <li>Valid HTTP methods: GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD, TRACE</li>
+     * </ul>
+     * <p>
+     * <b>Duplicate Handling:</b>
+     * <ul>
+     *   <li>APIs: Duplicate path+method combinations are renamed with "-import" suffix</li>
+     *   <li>Schemas: Duplicate schema names are renamed with "-import" suffix</li>
+     *   <li>$ref references are automatically updated to point to renamed schemas</li>
+     * </ul>
+     * <p>
+     * Exceptions are handled by {@link kr.co.ouroboros.core.rest.spec.exception.RestSpecExceptionHandler}.
+     *
+     * @param file the OpenAPI YAML file to import
+     * @return import result with counts and renamed items
+     * @throws Exception if validation fails or import operation fails
+     */
+    @PostMapping("/import")
+    public ResponseEntity<GlobalApiResponse<?>> importYaml(
+            @RequestParam("file") MultipartFile file) throws Exception {
+
+        log.info("Received YAML import request: filename={}, size={}", file.getOriginalFilename(), file.getSize());
+
+        // Step 1: Validate file extension
+        String filename = file.getOriginalFilename();
+        List<ValidationError> fileErrors = importYamlValidator.validateFileExtension(filename);
+        if (!fileErrors.isEmpty()) {
+            ValidationError error = fileErrors.get(0);
+            GlobalApiResponse<ImportYamlResponse> response = GlobalApiResponse.error(
+                    HttpStatus.BAD_REQUEST.value(),
+                    error.getMessage()
+            );
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+
+        // Step 2: Read file content
+        String yamlContent = new String(file.getBytes(), StandardCharsets.UTF_8);
+
+        // Step 3: Validate YAML content
+        List<ValidationError> contentErrors = importYamlValidator.validate(yamlContent);
+        if (!contentErrors.isEmpty()) {
+            // Build error response with validation errors in data field
+            ImportValidationErrorData errorData = ImportValidationErrorData.builder()
+                    .validationErrors(contentErrors)
+                    .build();
+
+            String message = String.format("YAML validation failed with %d error%s",
+                    contentErrors.size(),
+                    contentErrors.size() > 1 ? "s" : "");
+
+            GlobalApiResponse<ImportValidationErrorData> response = GlobalApiResponse.error(
+                    HttpStatus.BAD_REQUEST.value(),
+                    message,
+                    "VALIDATION_FAILED",
+                    contentErrors.size() + " validation error" + (contentErrors.size() > 1 ? "s" : "") + " found in the uploaded YAML file"
+            );
+            response.setData(errorData);
+
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+
+        // Step 4: Import YAML
+        ImportYamlResponse data = restApiSpecService.importYaml(yamlContent);
+
+        GlobalApiResponse<ImportYamlResponse> response = GlobalApiResponse.success(
+                data,
+                "YAML import completed successfully"
+        );
+        return ResponseEntity.ok(response);
     }
 }
