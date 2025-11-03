@@ -80,12 +80,20 @@ public class OuroborosMockFilter implements Filter{
     }
 
     /**
-     * Generates mock response based on schema and sends to client.
+     * Generate and send a mock HTTP response for the given endpoint metadata.
      *
-     * @param response the HTTP response
-     * @param request  the HTTP request (for Accept header)
-     * @param meta     the endpoint metadata
-     * @throws IOException if response writing fails
+     * Applies any headers defined in the response metadata, builds a mock body from the response schema,
+     * and (for POST/PUT) merges a parsed JSON request body into the generated body when both are maps.
+     * Chooses the Content-Type from the response metadata or, if absent, from the request Accept header
+     * (uses "application/xml" when Accept contains "xml", otherwise "application/json"), then serializes
+     * the body with the XML or JSON mapper and writes it to the response. Uses status 200 as the default
+     * and prefers a positive status code from the response metadata when present. If no 200 response
+     * definition exists in the endpoint metadata, sends a 500 error instead.
+     *
+     * @param response the HTTP response to populate and send
+     * @param request  the HTTP request (used for Accept header and optional request body merging)
+     * @param meta     endpoint metadata containing response definitions, headers, and schema
+     * @throws IOException if writing the serialized response to the client fails
      */
     private void respond(HttpServletResponse response, HttpServletRequest request, EndpointMeta meta)
             throws IOException {
@@ -106,13 +114,29 @@ public class OuroborosMockFilter implements Filter{
             }
         }
 
-        // Generate mock body
+        // 요청 body 읽기 (POST, PUT 등)
+        Map<String, Object> requestJson = null;
+        if ("POST".equalsIgnoreCase(request.getMethod()) || "PUT".equalsIgnoreCase(request.getMethod())) {
+            try {
+                requestJson = objectMapper.readValue(request.getInputStream(), Map.class);
+                log.debug("Request body parsed for merge: {}", requestJson);
+            } catch (Exception e) {
+                log.debug("No readable request body found (ignored): {}", e.getMessage());
+            }
+        }
+
+        // Faker 기반 Mock body 생성
         Object body = null;
         if (responseMeta.getBody() != null && !responseMeta.getBody().isEmpty()) {
             body = schemaMockBuilder.build(responseMeta.getBody());
         }
 
-        // Determine content type
+        // 요청 body와 merge (요청 필드가 있으면 덮어씀)
+        if (body instanceof Map && requestJson != null) {
+            deepMerge((Map<String, Object>) body, requestJson);
+        }
+
+        // Content type 결정
         String contentType = responseMeta.getContentType();
         String accept = request.getHeader("Accept");
 
@@ -125,7 +149,7 @@ public class OuroborosMockFilter implements Filter{
         response.setContentType(contentType + ";charset=UTF-8");
         response.setStatus(responseMeta.getStatusCode() > 0 ? responseMeta.getStatusCode() : statusCode);
 
-        // Serialize and send response
+        // 직렬화 및 전송
         String bodyText = "";
         if (body != null) {
             if (contentType.contains("xml")) {
@@ -136,7 +160,7 @@ public class OuroborosMockFilter implements Filter{
         }
 
         response.getWriter().write(bodyText);
-        log.debug("Mock response sent: {} {} -> {}", meta.getMethod(), meta.getPath(), statusCode);
+        log.debug("Mock response sent with merged request: {} {} -> {}", meta.getMethod(), meta.getPath(), statusCode);
     }
 
     /**
@@ -152,5 +176,31 @@ public class OuroborosMockFilter implements Filter{
         response.setContentType("application/json;charset=UTF-8");
         Map<String, String> error = Map.of("error", message);
         response.getWriter().write(objectMapper.writeValueAsString(error));
+    }
+
+    /**
+     * Deeply merges entries from {@code source} into {@code target}, overriding target values with source values.
+     *
+     * For keys present in both maps where both values are maps, the merge is applied recursively.
+     * For all other keys, the value from {@code source} replaces the value in {@code target}.
+     * The merge mutates the {@code target} map in place.
+     *
+     * @param target the destination map that will be modified to contain merged values
+     * @param source the source map whose entries will overwrite or be merged into {@code target}
+     */
+    @SuppressWarnings("unchecked")
+    private void deepMerge(Map<String, Object> target, Map<String, Object> source) {
+        for (Map.Entry<String, Object> entry : source.entrySet()) {
+            String key = entry.getKey();
+            Object sourceValue = entry.getValue();
+
+            if (sourceValue instanceof Map && target.get(key) instanceof Map) {
+                // 양쪽 모두 Map이면 재귀적으로 병합
+                deepMerge((Map<String, Object>) target.get(key), (Map<String, Object>) sourceValue);
+            } else {
+                // 그 외의 경우 source 값으로 덮어씀
+                target.put(key, sourceValue);
+            }
+        }
     }
 }
