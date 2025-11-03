@@ -3,6 +3,7 @@ package kr.co.ouroboros.core.rest.spec.service;
 import kr.co.ouroboros.core.rest.common.yaml.RestApiYamlParser;
 import kr.co.ouroboros.core.rest.spec.dto.*;
 import kr.co.ouroboros.core.rest.spec.model.*;
+import kr.co.ouroboros.core.rest.spec.validator.SchemaValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,6 +28,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 public class RestApiSpecServiceimpl implements RestApiSpecService {
 
     private final RestApiYamlParser yamlParser;
+    private final SchemaValidator schemaValidator;
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
     private static final List<String> HTTP_METHODS = Arrays.asList(
@@ -423,6 +425,9 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
             result.put("$ref", fullRef);
             return result; // Reference mode: ignore other fields
         }
+
+        // Validate schema constraints before conversion
+        schemaValidator.validateAndCorrect(schema);
 
         // Inline mode
         if (schema.getType() != null) {
@@ -946,6 +951,7 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
     /**
      * Enriches a schema with missing Ouroboros custom fields.
      * Recursively processes nested object properties and array items.
+     * Also validates and corrects minItems/maxItems constraints.
      *
      * @param schema the schema map to enrich
      */
@@ -959,6 +965,9 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         if (schema.containsKey("$ref")) {
             return;
         }
+
+        // Validate schema constraints (minItems/maxItems, etc.)
+        schemaValidator.validateAndCorrectSchemaMap(schema);
 
         // Process properties if present
         if (schema.containsKey("properties")) {
