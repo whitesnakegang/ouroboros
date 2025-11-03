@@ -1,6 +1,6 @@
 package kr.co.ouroboros.core.rest.spec.validator;
 
-import kr.co.ouroboros.core.rest.spec.dto.ValidationError;
+import kr.co.ouroboros.ui.rest.spec.dto.ValidationError;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.yaml.snakeyaml.LoaderOptions;
