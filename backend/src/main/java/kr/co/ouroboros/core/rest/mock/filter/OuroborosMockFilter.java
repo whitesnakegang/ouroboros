@@ -80,12 +80,20 @@ public class OuroborosMockFilter implements Filter{
     }
 
     /**
-     * Generates mock response based on schema and sends to client.
+     * Generate and send a mock HTTP response for the given endpoint metadata.
      *
-     * @param response the HTTP response
-     * @param request  the HTTP request (for Accept header)
-     * @param meta     the endpoint metadata
-     * @throws IOException if response writing fails
+     * Applies any headers defined in the response metadata, builds a mock body from the response schema,
+     * and (for POST/PUT) merges a parsed JSON request body into the generated body when both are maps.
+     * Chooses the Content-Type from the response metadata or, if absent, from the request Accept header
+     * (uses "application/xml" when Accept contains "xml", otherwise "application/json"), then serializes
+     * the body with the XML or JSON mapper and writes it to the response. Uses status 200 as the default
+     * and prefers a positive status code from the response metadata when present. If no 200 response
+     * definition exists in the endpoint metadata, sends a 500 error instead.
+     *
+     * @param response the HTTP response to populate and send
+     * @param request  the HTTP request (used for Accept header and optional request body merging)
+     * @param meta     endpoint metadata containing response definitions, headers, and schema
+     * @throws IOException if writing the serialized response to the client fails
      */
     private void respond(HttpServletResponse response, HttpServletRequest request, EndpointMeta meta)
             throws IOException {
@@ -171,7 +179,14 @@ public class OuroborosMockFilter implements Filter{
     }
 
     /**
-     * 두 Map을 깊이 병합합니다. source의 값이 target의 값을 덮어씁니다.
+     * Deeply merges entries from {@code source} into {@code target}, overriding target values with source values.
+     *
+     * For keys present in both maps where both values are maps, the merge is applied recursively.
+     * For all other keys, the value from {@code source} replaces the value in {@code target}.
+     * The merge mutates the {@code target} map in place.
+     *
+     * @param target the destination map that will be modified to contain merged values
+     * @param source the source map whose entries will overwrite or be merged into {@code target}
      */
     @SuppressWarnings("unchecked")
     private void deepMerge(Map<String, Object> target, Map<String, Object> source) {
