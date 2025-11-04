@@ -168,12 +168,11 @@ public class SpanMethodParser {
                             .build();
                 }
                 String paramsStr = methodPart.substring(openParen + 1, closeParen);
-                
-                // Parse parameters
+
+                // Parse parameters (handle generic types with commas)
                 List<SpanMethodInfo.Parameter> parameters = new ArrayList<>();
                 if (!paramsStr.isEmpty()) {
-                    parameters = Arrays.stream(paramsStr.split(","))
-                            .map(String::trim)
+                    parameters = splitParameters(paramsStr).stream()
                             .map(this::parseParameter)
                             .collect(Collectors.toList());
                 }
@@ -199,6 +198,39 @@ public class SpanMethodParser {
                     .parameters(new ArrayList<>())
                     .build();
         }
+    }
+
+    /**
+     * Split parameter string by comma, respecting angle brackets for generic types.
+     *
+     * @param paramsStr comma-separated parameter string (e.g., "Map<String, Integer>, List<Long>")
+     * @return list of individual parameter strings
+     */
+    private List<String> splitParameters(String paramsStr) {
+        List<String> params = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        int depth = 0;
+
+        for (char c : paramsStr.toCharArray()) {
+            if (c == '<') {
+                depth++;
+                current.append(c);
+            } else if (c == '>') {
+                depth--;
+                current.append(c);
+            } else if (c == ',' && depth == 0) {
+                params.add(current.toString().trim());
+                current.setLength(0);
+            } else {
+                current.append(c);
+            }
+        }
+
+        if (!current.isEmpty()) {
+            params.add(current.toString().trim());
+        }
+
+        return params;
     }
     
     /**
