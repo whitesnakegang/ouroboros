@@ -56,7 +56,7 @@ export function exportToMarkdown(data: MarkdownExportData): string {
       if (requestBody.fields && requestBody.fields.length > 0) {
         markdown += `| Field | Type | Value | Description |\n`;
         markdown += `|---|---|---|---|\n`;
-        requestBody.fields.forEach((field) => {
+        requestBody.fields.forEach((field: { key: string; type: string; value?: string; description?: string }) => {
           markdown += `| ${field.key} | ${field.type} | ${
             field.value || "-"
           } | ${field.description || "-"} |\n`;

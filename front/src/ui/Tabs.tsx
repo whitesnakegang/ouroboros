@@ -1,5 +1,3 @@
-import { ReactNode } from "react";
-
 interface TabsProps {
   tabs: Array<{ id: string; label: string }>;
   activeTab: string;

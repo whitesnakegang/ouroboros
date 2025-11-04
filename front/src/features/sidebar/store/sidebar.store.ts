@@ -63,7 +63,7 @@ function convertSpecToEndpoint(spec: RestApiSpecResponse): Endpoint {
     path: spec.path,
     description: spec.description || spec.summary || "",
     implementationStatus: mapTagToStatus(spec.tag, spec.progress),
-    hasSpecError: spec.isValid === false ? true : undefined,
+    hasSpecError: spec.diff && spec.diff !== "none" ? true : undefined,
     tags: spec.tags,
     progress: spec.progress,
     tag: spec.tag,

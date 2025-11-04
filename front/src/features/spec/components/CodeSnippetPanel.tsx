@@ -32,10 +32,6 @@ export function CodeSnippetPanel({
   const [copied, setCopied] = useState(false);
 
   const generateSnippet = (lang: string): string => {
-    const authHeader = headers.find(
-      (h) => h.key.toLowerCase() === "authorization"
-    );
-
     switch (lang) {
       case "javascript":
         return generateJavaScriptSnippet(method, url, headers, requestBody);
@@ -248,7 +244,7 @@ function generateJavaSnippet(
   method: string,
   url: string,
   headers: Array<{ key: string; value: string }>,
-  requestBody?: any
+  _requestBody?: any
 ): string {
   const headerString = headers
     .map((h) => `      .header("${h.key}", "${h.value}")`)
