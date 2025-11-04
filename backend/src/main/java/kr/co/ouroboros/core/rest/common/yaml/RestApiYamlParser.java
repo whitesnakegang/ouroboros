@@ -2,7 +2,10 @@ package kr.co.ouroboros.core.rest.common.yaml;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import kr.co.ouroboros.core.global.Protocol;
+import kr.co.ouroboros.core.global.manager.OuroApiSpecManager;
 import kr.co.ouroboros.core.global.properties.OuroborosProperties;
+import kr.co.ouroboros.core.global.spec.OuroApiSpec;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.yaml.snakeyaml.DumperOptions;
@@ -42,13 +45,9 @@ public class RestApiYamlParser {
     private final DumperOptions dumperOptions;
     private final OuroborosProperties properties;
     private final ObjectMapper objectMapper;
+    private final OuroApiSpecManager specManager;
 
-    // Cache fields
-    private volatile Map<String, Object> cachedDocument;
-    private volatile long cachedFileTimestamp;
-    private final Object cacheLock = new Object();
-
-    public RestApiYamlParser(OuroborosProperties properties) {
+    public RestApiYamlParser(OuroborosProperties properties, OuroApiSpecManager specManager) {
         this.loaderOptions = new LoaderOptions();
         this.loaderOptions.setCodePointLimit(50 * 1024 * 1024); // 50MB limit to prevent buffer overflow
 
@@ -59,6 +58,7 @@ public class RestApiYamlParser {
 
         this.properties = properties;
         this.objectMapper = new ObjectMapper();
+        this.specManager = specManager;
     }
 
     /**
@@ -92,12 +92,12 @@ public class RestApiYamlParser {
     }
 
     /**
-     * Reads the OpenAPI document from the YAML file with caching.
-     * Uses file timestamp to invalidate cache if file was modified externally.
+     * Reads the OpenAPI document from OuroApiSpecManager cache.
+     * Retrieves the cached OuroApiSpec and converts it to Map representation.
      * Returns a deep copy to prevent cache pollution.
      *
      * @return OpenAPI document as a map (deep copy)
-     * @throws Exception if file reading fails
+     * @throws Exception if file reading fails or cache is not initialized
      */
     @SuppressWarnings("unchecked")
     public Map<String, Object> readDocument() throws Exception {
@@ -106,41 +106,14 @@ public class RestApiYamlParser {
             throw new IllegalStateException("YAML file does not exist: " + filePath);
         }
 
-        long currentTimestamp = Files.getLastModifiedTime(filePath).toMillis();
+        // Get cached spec from OuroApiSpecManager
+        OuroApiSpec cachedSpec = specManager.getApiSpec(Protocol.REST);
 
-        // Check if cache is valid (fast path - no synchronization needed for read)
-        if (cachedDocument != null && cachedFileTimestamp == currentTimestamp) {
-            log.debug("Cache hit for OpenAPI document (timestamp: {})", currentTimestamp);
-            return deepCopy(cachedDocument);
-        }
+        // Convert OuroApiSpec to Map
+        Map<String, Object> document = specManager.convertSpecToMap(cachedSpec);
 
-        // Cache miss - need to load from file
-        synchronized (cacheLock) {
-            // Double-check: another thread might have loaded it while we were waiting
-            if (cachedDocument != null && cachedFileTimestamp == currentTimestamp) {
-                log.debug("Cache hit after waiting (timestamp: {})", currentTimestamp);
-                return deepCopy(cachedDocument);
-            }
-
-            // Load from file
-            log.debug("Cache miss - loading from file (timestamp: {})", currentTimestamp);
-            try (InputStream is = Files.newInputStream(filePath)) {
-                Yaml yaml = createYaml();
-                Object loaded = yaml.load(is);
-                Map<String, Object> document = (loaded instanceof Map)
-                        ? (Map<String, Object>) loaded
-                        : new LinkedHashMap<>();
-
-                // Update cache
-                cachedDocument = deepCopy(document);
-                cachedFileTimestamp = currentTimestamp;
-
-                log.debug("OpenAPI document cached (size: {} keys, timestamp: {})",
-                        document.size(), currentTimestamp);
-
-                return deepCopy(document);
-            }
-        }
+        // Return deep copy to prevent modification of cached object
+        return deepCopy(document);
     }
 
     /**
@@ -186,32 +159,27 @@ public class RestApiYamlParser {
     }
 
     /**
-     * Writes the OpenAPI document to the YAML file and updates cache.
-     * Uses write-through caching strategy.
+     * Writes the OpenAPI document to the YAML file.
+     * Note: This method is deprecated and will be removed.
+     * Use OuroApiSpecManager.processAndCacheSpec() instead for CUD operations.
      *
      * @param document OpenAPI document to write
      * @throws Exception if file writing fails
+     * @deprecated Use {@link OuroApiSpecManager#processAndCacheSpec(Protocol, Map)} instead
      */
+    @Deprecated
     public void writeDocument(Map<String, Object> document) throws Exception {
         Path filePath = getYamlFilePath();
 
-        synchronized (cacheLock) {
-            // Ensure directory exists
-            Files.createDirectories(filePath.getParent());
+        // Ensure directory exists
+        Files.createDirectories(filePath.getParent());
 
-            try (FileWriter writer = new FileWriter(filePath.toFile())) {
-                Yaml yaml = createYaml();
-                yaml.dump(document, writer);
-            }
-
-            // Update cache with write-through strategy
-            long newTimestamp = Files.getLastModifiedTime(filePath).toMillis();
-            cachedDocument = document;
-            cachedFileTimestamp = newTimestamp;
-
-            log.debug("Wrote OpenAPI document to: {} (cached with timestamp: {})",
-                    filePath, newTimestamp);
+        try (FileWriter writer = new FileWriter(filePath.toFile())) {
+            Yaml yaml = createYaml();
+            yaml.dump(document, writer);
         }
+
+        log.debug("Wrote OpenAPI document to: {}", filePath);
     }
 
     /**
@@ -426,18 +394,6 @@ public class RestApiYamlParser {
         }
 
         return removed;
-    }
-
-    /**
-     * Invalidates the cache manually.
-     * Useful when file is modified externally or for testing purposes.
-     */
-    public void invalidateCache() {
-        synchronized (cacheLock) {
-            cachedDocument = null;
-            cachedFileTimestamp = 0;
-            log.debug("Cache invalidated manually");
-        }
     }
 
     /**
