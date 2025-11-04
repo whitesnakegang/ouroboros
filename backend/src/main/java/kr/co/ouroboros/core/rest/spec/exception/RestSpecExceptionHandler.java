@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  * Converts them into standardized {@link GlobalApiResponse} format with appropriate HTTP status codes.
  * <p>
  * This handler has higher priority than {@link kr.co.ouroboros.core.global.exception.GlobalExceptionHandler}
- * and only applies to controllers in the {@code kr.co.ouroboros.ui.controller} package
+ * and only applies to controllers in the {@code kr.co.ouroboros.ui.rest.spec} package
  * (REST API spec and schema controllers).
  * <p>
  * <b>Handled Exceptions:</b>
@@ -29,18 +29,16 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  *
  * @since 0.0.1
  */
-@RestControllerAdvice(basePackages = "kr.co.ouroboros.ui.controller")
+@RestControllerAdvice(basePackages = "kr.co.ouroboros.ui.rest.spec")
 @Order(10) // Higher priority than GlobalExceptionHandler
 @Slf4j
 public class RestSpecExceptionHandler {
 
     /**
-     * Handles duplicate API specification exceptions.
-     * <p>
-     * Returns 409 Conflict when attempting to create an API spec that already exists.
+     * Converts a DuplicateApiSpecException into a standardized 409 Conflict API response.
      *
-     * @param ex the duplicate API spec exception
-     * @return response entity with 409 status and error details
+     * @param ex the DuplicateApiSpecException that was thrown
+     * @return a ResponseEntity containing a GlobalApiResponse<Void> with HTTP status 409 and error details
      */
     @ExceptionHandler(DuplicateApiSpecException.class)
     public ResponseEntity<GlobalApiResponse<Void>> handleDuplicateApiSpec(DuplicateApiSpecException ex) {

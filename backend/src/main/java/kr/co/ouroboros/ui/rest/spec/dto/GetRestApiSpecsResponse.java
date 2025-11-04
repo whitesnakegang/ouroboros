@@ -81,10 +81,5 @@ public class GetRestApiSpecsResponse {
          * Development tag (x-ouroboros-tag value: "none", "bugfix", "implementing")
          */
         private String tag;
-
-        /**
-         * Validity flag
-         */
-        private Boolean isValid;
     }
 }

@@ -29,15 +29,9 @@ public class CreateRestApiRequest {
     private String method;
     private String summary;
     private String description;
-    private boolean deprecated;
     private List<String> tags;
     private List<Parameter> parameters;
     private RequestBody requestBody;
     private Map<String, ApiResponse> responses;
     private List<SecurityRequirement> security;
-
-    // Ouroboros custom fields
-    private String progress;  // mock or completed (default: mock)
-    private String tag;       // bugfix, implementing, or none (default: none)
-    private String diff;      // none, request, response, endpoint, or both (default: none)
 }

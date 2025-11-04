@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Optional;
 
@@ -39,13 +40,28 @@ import java.util.Optional;
  */
 @Slf4j
 @RequiredArgsConstructor
-public class OuroborosMockFilter implements Filter{
+public class OuroborosMockFilter implements Filter {
     private final RestMockRegistry registry;
     private final MockValidationService validationService;
     private final SchemaMockBuilder schemaMockBuilder;
     private final ObjectMapper objectMapper;
     private final XmlMapper xmlMapper;
 
+    /**
+     * Intercepts HTTP requests to route mock endpoints, validate incoming requests, and produce mock responses.
+     *
+     * <p>If the request does not match a registered mock endpoint the method delegates to the filter chain.
+     * For POST/PUT/PATCH requests the request body is parsed (JSON, array, object, or primitive) and stored
+     * as the request attribute "parsedRequestBody" for later use. The request is validated via the validation
+     * service; on validation failure an error response is sent using the validation result's status and message.
+     * On successful validation a mock response is generated and written to the response, and the filter chain is not continued.</p>
+     *
+     * @param req   the incoming servlet request (expected to be an HttpServletRequest)
+     * @param res   the servlet response (expected to be an HttpServletResponse)
+     * @param chain the filter chain to delegate to when the request is not handled as a mock
+     * @throws IOException      if an I/O error occurs while reading the request or writing the response
+     * @throws ServletException if a servlet error occurs during filtering
+     */
     @Override
     public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
             throws IOException, ServletException {
@@ -53,49 +69,72 @@ public class OuroborosMockFilter implements Filter{
         HttpServletRequest request = (HttpServletRequest) req;
         HttpServletResponse response = (HttpServletResponse) res;
 
-        // Phase 1: Routing - Check if endpoint should be mocked
+        // ===== 1단계: 라우팅 - Mock 엔드포인트인지 확인 =====
         Optional<EndpointMeta> metaOpt = registry.find(request.getRequestURI(), request.getMethod());
 
         if (metaOpt.isEmpty()) {
-            // Not a mock endpoint - pass through to next filter
+            // Mock 엔드포인트가 아니면 다음 필터로 전달
             chain.doFilter(req, res);
             return;
         }
 
         EndpointMeta meta = metaOpt.get();
-        log.debug("Mock endpoint matched: {} {}", meta.getMethod(), meta.getPath());
 
-        // Phase 2: Validation - Delegate to validation service
+        // ===== 2단계: Request Body 파싱 (검증 전에 미리 읽기) =====
+        Object requestJson = null;
+        if ("POST".equalsIgnoreCase(request.getMethod())
+                || "PUT".equalsIgnoreCase(request.getMethod())
+                || "PATCH".equalsIgnoreCase(request.getMethod())) {
+            try {
+                // InputStream은 한 번만 읽을 수 있으므로 byte[]로 읽어서 저장
+                byte[] bodyBytes = request.getInputStream().readAllBytes();
+                if (bodyBytes.length > 0) {
+                    String body = new String(bodyBytes, StandardCharsets.UTF_8);
+
+                    // JSON 전체 파싱 (object, array, primitive 모두 허용)
+                    requestJson = objectMapper.readValue(body, Object.class);
+                } else {
+                    log.warn("Request body is empty (0 bytes)");
+                }
+                //  검증 단계에서 사용할 수 있도록 attribute에 저장
+                request.setAttribute("parsedRequestBody", requestJson);
+            } catch (Exception e) {
+                log.error("Failed to parse request body", e);
+                // 파싱 실패 시 attribute에 null을 명시적으로 저장
+                request.setAttribute("parsedRequestBody", null);
+            }
+        }
+
+        // ===== 3단계: 검증 - Validation Service에 위임 =====
         ValidationResult validationResult = validationService.validate(request, meta);
 
-        if (!validationResult.isValid()) {
-            // Validation failed - send error response and stop
-            sendError(response, validationResult.getStatusCode(), validationResult.getMessage());
+        if (!validationResult.valid()) {
+            // 검증 실패 - 에러 응답 전송 후 종료
+            sendError(response, validationResult.statusCode(), validationResult.message());
             return;
         }
 
-        // Phase 3: Response - Generate and send mock response
-        respond(response, request, meta);
-        // Do NOT call chain.doFilter() - execution stops here for mock endpoints
+        // ===== 4단계: Mock 응답 생성 및 전송 =====
+        respond(response, request, meta, requestJson);
+        // chain.doFilter() 호출하지 않음 - mock 엔드포인트는 여기서 실행 종료
     }
 
     /**
-     * Generate and send a mock HTTP response for the given endpoint metadata.
+     * Build and send the mock HTTP response defined by the endpoint metadata.
      *
-     * Applies any headers defined in the response metadata, builds a mock body from the response schema,
-     * and (for POST/PUT) merges a parsed JSON request body into the generated body when both are maps.
-     * Chooses the Content-Type from the response metadata or, if absent, from the request Accept header
-     * (uses "application/xml" when Accept contains "xml", otherwise "application/json"), then serializes
-     * the body with the XML or JSON mapper and writes it to the response. Uses status 200 as the default
-     * and prefers a positive status code from the response metadata when present. If no 200 response
-     * definition exists in the endpoint metadata, sends a 500 error instead.
+     * Sets response headers from the response definition, generates a mock body from the response schema (if present),
+     * deep-merges fields from the parsed request body into the generated body when both are maps (request values override),
+     * chooses Content-Type from the response metadata or the request Accept header (XML if Accept indicates XML, otherwise JSON),
+     * applies UTF-8 charset, uses the response definition's status code (or 200 if not specified), serializes the body to XML or JSON, and writes it to the response.
      *
-     * @param response the HTTP response to populate and send
-     * @param request  the HTTP request (used for Accept header and optional request body merging)
-     * @param meta     endpoint metadata containing response definitions, headers, and schema
+     * @param response    the HTTP response to write to
+     * @param request     the HTTP request (used to inspect Accept header)
+     * @param meta        endpoint metadata containing response definition and headers
+     * @param requestBody parsed request body (used for deep merge into generated mock body)
      * @throws IOException if writing the serialized response to the client fails
      */
-    private void respond(HttpServletResponse response, HttpServletRequest request, EndpointMeta meta)
+    private void respond(HttpServletResponse response, HttpServletRequest request,
+                         EndpointMeta meta, Object requestBody)
             throws IOException {
 
         int statusCode = 200;
@@ -107,36 +146,25 @@ public class OuroborosMockFilter implements Filter{
             return;
         }
 
-        // Set response headers
+        // 응답 헤더 설정
         if (responseMeta.getHeaders() != null) {
             for (var entry : responseMeta.getHeaders().entrySet()) {
                 response.setHeader(entry.getKey(), String.valueOf(entry.getValue()));
             }
         }
 
-        // 요청 body 읽기 (POST, PUT 등)
-        Map<String, Object> requestJson = null;
-        if ("POST".equalsIgnoreCase(request.getMethod()) || "PUT".equalsIgnoreCase(request.getMethod())) {
-            try {
-                requestJson = objectMapper.readValue(request.getInputStream(), Map.class);
-                log.debug("Request body parsed for merge: {}", requestJson);
-            } catch (Exception e) {
-                log.debug("No readable request body found (ignored): {}", e.getMessage());
-            }
-        }
-
-        // Faker 기반 Mock body 생성
+        // ===== Faker 기반 Mock body 생성 =====
         Object body = null;
         if (responseMeta.getBody() != null && !responseMeta.getBody().isEmpty()) {
             body = schemaMockBuilder.build(responseMeta.getBody());
         }
 
-        // 요청 body와 merge (요청 필드가 있으면 덮어씀)
-        if (body instanceof Map && requestJson != null) {
-            deepMerge((Map<String, Object>) body, requestJson);
+        // ===== 요청 body와 병합 (요청 필드가 있으면 덮어씀) =====
+        if (body instanceof Map<?, ?> bodyMap && requestBody instanceof Map<?, ?> requestMap) {
+            deepMerge((Map<String, Object>) bodyMap, (Map<String, Object>) requestMap);
         }
 
-        // Content type 결정
+        // ===== Content-Type 결정 =====
         String contentType = responseMeta.getContentType();
         String accept = request.getHeader("Accept");
 
@@ -149,7 +177,7 @@ public class OuroborosMockFilter implements Filter{
         response.setContentType(contentType + ";charset=UTF-8");
         response.setStatus(responseMeta.getStatusCode() > 0 ? responseMeta.getStatusCode() : statusCode);
 
-        // 직렬화 및 전송
+        // ===== 직렬화 및 전송 =====
         String bodyText = "";
         if (body != null) {
             if (contentType.contains("xml")) {
@@ -179,14 +207,14 @@ public class OuroborosMockFilter implements Filter{
     }
 
     /**
-     * Deeply merges entries from {@code source} into {@code target}, overriding target values with source values.
+     * Recursively merges entries from `source` into `target`, overriding `target` values with `source` values.
      *
-     * For keys present in both maps where both values are maps, the merge is applied recursively.
-     * For all other keys, the value from {@code source} replaces the value in {@code target}.
-     * The merge mutates the {@code target} map in place.
+     * The merge mutates the `target` map in place. When a value for the same key is a map in both
+     * `target` and `source`, the maps are merged recursively; otherwise the `source` value replaces
+     * the `target` value.
      *
-     * @param target the destination map that will be modified to contain merged values
-     * @param source the source map whose entries will overwrite or be merged into {@code target}
+     * @param target the map to be mutated with merged values (e.g., generated mock data)
+     * @param source the map whose values take precedence and will overwrite or be merged into `target` (e.g., request body)
      */
     @SuppressWarnings("unchecked")
     private void deepMerge(Map<String, Object> target, Map<String, Object> source) {

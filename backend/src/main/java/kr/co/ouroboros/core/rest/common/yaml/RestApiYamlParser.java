@@ -1,13 +1,19 @@
 package kr.co.ouroboros.core.rest.common.yaml;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.co.ouroboros.core.global.properties.OuroborosProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
+import org.yaml.snakeyaml.representer.Representer;
 
-import java.io.FileInputStream;
 import java.io.FileWriter;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -32,16 +38,39 @@ public class RestApiYamlParser {
     private static final String RESOURCE_PATH = System.getProperty("user.dir") + "/src/main/resources";
     private static final String YAML_FILE_PATH = "ouroboros/rest/ourorest.yml";
 
-    private final Yaml yaml;
+    private final LoaderOptions loaderOptions;
+    private final DumperOptions dumperOptions;
     private final OuroborosProperties properties;
+    private final ObjectMapper objectMapper;
+
+    // Cache fields
+    private volatile Map<String, Object> cachedDocument;
+    private volatile long cachedFileTimestamp;
+    private final Object cacheLock = new Object();
 
     public RestApiYamlParser(OuroborosProperties properties) {
-        DumperOptions options = new DumperOptions();
-        options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
-        options.setPrettyFlow(true);
-        options.setIndent(2);
-        this.yaml = new Yaml(options);
+        this.loaderOptions = new LoaderOptions();
+        this.loaderOptions.setCodePointLimit(50 * 1024 * 1024); // 50MB limit to prevent buffer overflow
+
+        this.dumperOptions = new DumperOptions();
+        this.dumperOptions.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+        this.dumperOptions.setPrettyFlow(true);
+        this.dumperOptions.setIndent(2);
+
         this.properties = properties;
+        this.objectMapper = new ObjectMapper();
+    }
+
+    /**
+     * Creates a new Yaml instance for thread-safe parsing.
+     * SnakeYAML Yaml instances are not thread-safe, so we create a new one for each operation.
+     *
+     * @return new Yaml instance
+     */
+    private Yaml createYaml() {
+        SafeConstructor constructor = new SafeConstructor(loaderOptions);
+        Representer representer = new Representer(dumperOptions);
+        return new Yaml(constructor, representer, dumperOptions);
     }
 
     /**
@@ -63,9 +92,11 @@ public class RestApiYamlParser {
     }
 
     /**
-     * Reads the OpenAPI document from the YAML file.
+     * Reads the OpenAPI document from the YAML file with caching.
+     * Uses file timestamp to invalidate cache if file was modified externally.
+     * Returns a deep copy to prevent cache pollution.
      *
-     * @return OpenAPI document as a map
+     * @return OpenAPI document as a map (deep copy)
      * @throws Exception if file reading fails
      */
     @SuppressWarnings("unchecked")
@@ -75,12 +106,40 @@ public class RestApiYamlParser {
             throw new IllegalStateException("YAML file does not exist: " + filePath);
         }
 
-        try (FileInputStream fis = new FileInputStream(filePath.toFile())) {
-            Object loaded = yaml.load(fis);
-            if (loaded instanceof Map) {
-                return (Map<String, Object>) loaded;
+        long currentTimestamp = Files.getLastModifiedTime(filePath).toMillis();
+
+        // Check if cache is valid (fast path - no synchronization needed for read)
+        if (cachedDocument != null && cachedFileTimestamp == currentTimestamp) {
+            log.debug("Cache hit for OpenAPI document (timestamp: {})", currentTimestamp);
+            return deepCopy(cachedDocument);
+        }
+
+        // Cache miss - need to load from file
+        synchronized (cacheLock) {
+            // Double-check: another thread might have loaded it while we were waiting
+            if (cachedDocument != null && cachedFileTimestamp == currentTimestamp) {
+                log.debug("Cache hit after waiting (timestamp: {})", currentTimestamp);
+                return deepCopy(cachedDocument);
             }
-            return new LinkedHashMap<>();
+
+            // Load from file
+            log.debug("Cache miss - loading from file (timestamp: {})", currentTimestamp);
+            try (InputStream is = Files.newInputStream(filePath)) {
+                Yaml yaml = createYaml();
+                Object loaded = yaml.load(is);
+                Map<String, Object> document = (loaded instanceof Map)
+                        ? (Map<String, Object>) loaded
+                        : new LinkedHashMap<>();
+
+                // Update cache
+                cachedDocument = deepCopy(document);
+                cachedFileTimestamp = currentTimestamp;
+
+                log.debug("OpenAPI document cached (size: {} keys, timestamp: {})",
+                        document.size(), currentTimestamp);
+
+                return deepCopy(document);
+            }
         }
     }
 
@@ -127,7 +186,8 @@ public class RestApiYamlParser {
     }
 
     /**
-     * Writes the OpenAPI document to the YAML file.
+     * Writes the OpenAPI document to the YAML file and updates cache.
+     * Uses write-through caching strategy.
      *
      * @param document OpenAPI document to write
      * @throws Exception if file writing fails
@@ -135,14 +195,23 @@ public class RestApiYamlParser {
     public void writeDocument(Map<String, Object> document) throws Exception {
         Path filePath = getYamlFilePath();
 
-        // Ensure directory exists
-        Files.createDirectories(filePath.getParent());
+        synchronized (cacheLock) {
+            // Ensure directory exists
+            Files.createDirectories(filePath.getParent());
 
-        try (FileWriter writer = new FileWriter(filePath.toFile())) {
-            yaml.dump(document, writer);
+            try (FileWriter writer = new FileWriter(filePath.toFile())) {
+                Yaml yaml = createYaml();
+                yaml.dump(document, writer);
+            }
+
+            // Update cache with write-through strategy
+            long newTimestamp = Files.getLastModifiedTime(filePath).toMillis();
+            cachedDocument = document;
+            cachedFileTimestamp = newTimestamp;
+
+            log.debug("Wrote OpenAPI document to: {} (cached with timestamp: {})",
+                    filePath, newTimestamp);
         }
-
-        log.debug("Wrote OpenAPI document to: {}", filePath);
     }
 
     /**
@@ -357,5 +426,37 @@ public class RestApiYamlParser {
         }
 
         return removed;
+    }
+
+    /**
+     * Invalidates the cache manually.
+     * Useful when file is modified externally or for testing purposes.
+     */
+    public void invalidateCache() {
+        synchronized (cacheLock) {
+            cachedDocument = null;
+            cachedFileTimestamp = 0;
+            log.debug("Cache invalidated manually");
+        }
+    }
+
+    /**
+     * Deep copies a document using Jackson serialization/deserialization.
+     * This prevents cache pollution by ensuring callers cannot modify the cached instance.
+     *
+     * @param original the original document to copy
+     * @return a deep copy of the document
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> deepCopy(Map<String, Object> original) {
+        try {
+            // Serialize to bytes and deserialize back - creates complete deep copy
+            byte[] bytes = objectMapper.writeValueAsBytes(original);
+            return objectMapper.readValue(bytes, new TypeReference<Map<String, Object>>() {});
+        } catch (IOException e) {
+            log.error("Failed to deep copy OpenAPI document, returning original (UNSAFE!)", e);
+            // Fallback: return original (not ideal but prevents total failure)
+            return original;
+        }
     }
 }
