@@ -39,7 +39,7 @@ public class OpenApiCustomizerConfig {
 
             if (apiState.state() == State.COMPLETED) {
                 operation.getExtensions().put("x-ouroboros-progress", "COMPLETED");
-                operation.getExtensions().put("x-ouroboros-tag", "");
+                operation.getExtensions().put("x-ouroboros-tag", "none");
             } else {
                 operation.getExtensions().put("x-ouroboros-progress", "MOCK");
                 operation.getExtensions().put("x-ouroboros-tag", apiState.state().name());

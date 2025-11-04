@@ -43,6 +43,7 @@ public final class EndpointDiffHelper {
             Operation op = getOperationByMethod(addedPath, method);
             if (op != null) {
                 op.setXOuroborosDiff("endpoint");
+                op.setXOuroborosTag("none");
             }
         }
 
@@ -77,6 +78,7 @@ public final class EndpointDiffHelper {
         setOperationByMethod(pathItem, method, scanOp);
         Operation operationByMethod = getOperationByMethod(pathItem, method);
         operationByMethod.setXOuroborosDiff("endpoint");
+        operationByMethod.setXOuroborosTag("none");
     }
 
     /**
