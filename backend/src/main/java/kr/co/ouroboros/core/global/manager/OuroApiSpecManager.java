@@ -10,7 +10,7 @@ import java.util.stream.Collectors;
 import kr.co.ouroboros.core.global.Protocol;
 import kr.co.ouroboros.core.global.handler.OuroProtocolHandler;
 import kr.co.ouroboros.core.global.spec.OuroApiSpec;
-import lombok.extern.slf4j.Slf4j;
+import kr.co.ouroboros.core.rest.common.dto.OuroRestApiSpec;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
@@ -59,12 +59,17 @@ public class OuroApiSpecManager {
         // 1. 파일(YAML) 스펙 파싱
         OuroApiSpec fileSpec = handler.loadFromFile(yamlFileContent);
 
-        if (fileSpec == null) {
-            return;
-        }
-
         // 2. 코드 스캔
         OuroApiSpec scannedSpec = handler.scanCurrentState();
+
+        OuroRestApiSpec restApiSpec = null;
+        if (scannedSpec instanceof OuroRestApiSpec) {
+            restApiSpec = (OuroRestApiSpec) scannedSpec;
+            if (fileSpec == null && restApiSpec.getPaths()
+                    .isEmpty()) {
+                return;
+            }
+        }
 
         // 3. 불일치 검증
         // 비교 후, 최종적으로 저장할 ApiSpec 반환
@@ -74,7 +79,7 @@ public class OuroApiSpecManager {
         handler.saveYaml(validationResult);
 
         // 5. 캐시 최신화
-        apiCache.put(protocol, scannedSpec);
+        apiCache.put(protocol, validationResult);
     }
 
     /**
