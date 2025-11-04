@@ -1,6 +1,5 @@
 package kr.co.ouroboros.core.rest.handler;
 
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import kr.co.ouroboros.core.global.handler.SpecSyncPipeline;
@@ -26,6 +25,8 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
     @Autowired
     private SchemaComparator schemaComparator;
 
+
+
     /**
      * Synchronizes the file-based REST API specification with the scanned runtime specification.
      * <p>
@@ -38,11 +39,44 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
     @Override
     public OuroApiSpec validate(OuroApiSpec fileSpec, OuroApiSpec scannedSpec) {
 
-        // TODO 파이프라인 구성
         OuroRestApiSpec restFileSpec = (OuroRestApiSpec) fileSpec;
         OuroRestApiSpec restScannedSpec = (OuroRestApiSpec) scannedSpec;
 
+        if (fileSpec == null && !restScannedSpec.getPaths().isEmpty()) {
+            restFileSpec = restScannedSpec;
+            Map<String, PathItem> paths = restFileSpec.getPaths();
+            for(String url : paths.keySet()){
+                PathItem pathItem = paths.get(url);
+                for(HttpMethod httpMethod : HttpMethod.values()){
+                    Operation operationByMethod = getOperationByMethod(pathItem, httpMethod);
+                    if(operationByMethod != null){
+                        // Generate x-ouroboros-id if not present
+                        if (operationByMethod.getXOuroborosId() == null) {
+                            operationByMethod.setXOuroborosId(java.util.UUID.randomUUID().toString());
+                            log.debug("Generated x-ouroboros-id for {} {}: {}", httpMethod, url, operationByMethod.getXOuroborosId());
+                        }
+                        operationByMethod.setXOuroborosDiff("endpoint");
+                        operationByMethod.setXOuroborosTag("none");
+                    }
+                }
+            }
+            return restFileSpec;
+        }
+
         Map<String, Boolean> schemaMatchResults = compareSchemas(restFileSpec, restScannedSpec);
+
+        // Preserve components.securitySchemes from fileSpec (scannedSpec doesn't have securitySchemes from annotation)
+        if (restFileSpec != null && restFileSpec.getComponents() != null && 
+            restFileSpec.getComponents().getSecuritySchemes() != null) {
+            // scannedSpec에 fileSpec의 securitySchemes 복사
+            if (restScannedSpec.getComponents() == null) {
+                restScannedSpec.setComponents(new kr.co.ouroboros.core.rest.common.dto.Components());
+            }
+            restScannedSpec.getComponents().setSecuritySchemes(restFileSpec.getComponents().getSecuritySchemes());
+            log.info("✓ Preserved {} security scheme(s) from file spec: {}", 
+                restFileSpec.getComponents().getSecuritySchemes().size(),
+                restFileSpec.getComponents().getSecuritySchemes().keySet());
+        }
 
         Map<String, PathItem> pathsScanned = safe(restScannedSpec.getPaths());
         Map<String, PathItem> pathsFile = restFileSpec.getPaths();

@@ -1,5 +1,7 @@
 package kr.co.ouroboros.core.rest.spec.service;
 
+import kr.co.ouroboros.core.global.Protocol;
+import kr.co.ouroboros.core.global.manager.OuroApiSpecManager;
 import kr.co.ouroboros.core.rest.common.yaml.RestApiYamlParser;
 import kr.co.ouroboros.ui.rest.spec.dto.CreateSchemaRequest;
 import kr.co.ouroboros.ui.rest.spec.dto.SchemaResponse;
@@ -27,6 +29,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 public class SchemaServiceImpl implements SchemaService {
 
     private final RestApiYamlParser yamlParser;
+    private final OuroApiSpecManager specManager;
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
     @Override
@@ -47,8 +50,8 @@ public class SchemaServiceImpl implements SchemaService {
             // Add schema to document
             yamlParser.putSchema(openApiDoc, request.getSchemaName(), schemaDefinition);
 
-            // Write back to file
-            yamlParser.writeDocument(openApiDoc);
+            // Process and cache: writes to file + validates with scanned state + updates cache
+            specManager.processAndCacheSpec(Protocol.REST, openApiDoc);
 
             log.info("Created schema: {}", request.getSchemaName());
 
@@ -148,8 +151,8 @@ public class SchemaServiceImpl implements SchemaService {
                 existingSchema.put("xml", xml);
             }
 
-            // Write back to file
-            yamlParser.writeDocument(openApiDoc);
+            // Process and cache: writes to file + validates with scanned state + updates cache
+            specManager.processAndCacheSpec(Protocol.REST, openApiDoc);
 
             log.info("Updated schema: {}", schemaName);
 
@@ -175,8 +178,8 @@ public class SchemaServiceImpl implements SchemaService {
                 throw new IllegalArgumentException("Schema '" + schemaName + "' not found");
             }
 
-            // Write back to file
-            yamlParser.writeDocument(openApiDoc);
+            // Process and cache: writes to file + validates with scanned state + updates cache
+            specManager.processAndCacheSpec(Protocol.REST, openApiDoc);
 
             log.info("Deleted schema: {}", schemaName);
         } finally {

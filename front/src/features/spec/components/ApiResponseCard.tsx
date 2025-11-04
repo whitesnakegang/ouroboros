@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { SchemaModal } from "./SchemaModal";
+import { MockExpressionModal } from "./MockExpressionModal";
 import { getAllSchemas, createSchema, updateSchema } from "../services/api";
 import type {
   SchemaResponse,
@@ -11,9 +12,10 @@ interface StatusCode {
   code: string;
   type: "Success" | "Error";
   message: string;
+  headers?: Array<{ key: string; value: string }>;  // Response headers
   schema?: {
-    ref?: string; // 스키마 참조 (예: "User")
-    properties?: Record<string, any>; // 인라인 스키마
+    ref?: string;  // 스키마 참조 (예: "User")
+    properties?: Record<string, any>;  // 인라인 스키마
   };
 }
 
@@ -23,6 +25,14 @@ interface SchemaField {
   description?: string;
   mockExpression?: string;
   ref?: string;
+}
+
+interface SchemaConfig {
+  mode: "inline" | "reference";
+  schemaType: "object" | "array" | "string" | "number" | "boolean";
+  reference?: string;
+  fields?: SchemaField[];
+  arrayItemType?: "object" | "string" | "number" | "boolean";
 }
 
 interface ApiResponseCardProps {
@@ -87,13 +97,22 @@ export function ApiResponseCard({
   const [currentSchemaDescription, setCurrentSchemaDescription] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
+  
   // StatusCode별 Schema 선택 모달 상태
-  const [isResponseSchemaModalOpen, setIsResponseSchemaModalOpen] =
-    useState(false);
-  const [selectedStatusCodeIndex, setSelectedStatusCodeIndex] = useState<
-    number | null
-  >(null);
+  const [isResponseSchemaModalOpen, setIsResponseSchemaModalOpen] = useState(false);
+  const [selectedStatusCodeIndex, setSelectedStatusCodeIndex] = useState<number | null>(null);
+  
+  // Mock Expression Modal 상태
+  const [isMockModalOpen, setIsMockModalOpen] = useState(false);
+  const [currentMockFieldIndex, setCurrentMockFieldIndex] = useState<number | null>(null);
+  const [currentMockValue, setCurrentMockValue] = useState("");
+  
+  // Response Headers 상태
+  const [expandedStatusCode, setExpandedStatusCode] = useState<number | null>(null);
+  
+  // Schema Type 상태
+  const [schemaType, setSchemaType] = useState<"object" | "array" | "string" | "number" | "boolean">("object");
+  const [arrayItemType, setArrayItemType] = useState<"object" | "string" | "number" | "boolean">("object");
 
   // 컴포넌트 마운트 시 스키마 목록 로드
   useEffect(() => {
@@ -309,15 +328,19 @@ export function ApiResponseCard({
                     <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
                       Schema
                     </th>
+                    <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
+                      Headers
+                    </th>
                     <th className="px-4 py-3"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {statusCodes.map((statusCode, index) => (
-                    <tr
-                      key={index}
-                      className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-[#161B22]"
-                    >
+                    <>
+                      <tr
+                        key={index}
+                        className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-[#161B22]"
+                      >
                       <td className="px-4 py-3">
                         <input
                           type="text"
@@ -371,10 +394,7 @@ export function ApiResponseCard({
                             <button
                               onClick={() => {
                                 const updated = [...statusCodes];
-                                updated[index] = {
-                                  ...updated[index],
-                                  schema: undefined,
-                                };
+                                updated[index] = { ...updated[index], schema: undefined };
                                 setStatusCodes(updated);
                               }}
                               className="p-1 text-red-500 hover:text-red-600"
@@ -399,6 +419,50 @@ export function ApiResponseCard({
                       </td>
                       <td className="px-4 py-3">
                         <button
+                          onClick={() => {
+                            if (expandedStatusCode === index) {
+                              setExpandedStatusCode(null);
+                            } else {
+                              setExpandedStatusCode(index);
+                              // headers 초기화 (없으면 빈 배열)
+                              if (!statusCode.headers) {
+                                const updated = [...statusCodes];
+                                updated[index] = {
+                                  ...updated[index],
+                                  headers: [{ key: "Content-Type", value: "application/json" }],
+                                };
+                                setStatusCodes(updated);
+                              }
+                            }
+                          }}
+                          className="px-3 py-1.5 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] transition-colors flex items-center gap-1"
+                        >
+                          {statusCode.headers && statusCode.headers.length > 0 ? (
+                            <span className="text-blue-600 dark:text-blue-400">
+                              {statusCode.headers.length} header(s)
+                            </span>
+                          ) : (
+                            <span>+ Headers</span>
+                          )}
+                          <svg
+                            className={`w-4 h-4 transition-transform ${
+                              expandedStatusCode === index ? "rotate-180" : ""
+                            }`}
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 9l-7 7-7-7"
+                            />
+                          </svg>
+                        </button>
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
                           onClick={() => removeStatusCode(index)}
                           className="p-2 text-red-500 hover:text-red-600"
                         >
@@ -417,7 +481,78 @@ export function ApiResponseCard({
                           </svg>
                         </button>
                       </td>
-                    </tr>
+                      </tr>
+                      {/* Headers Expandable Row */}
+                      {expandedStatusCode === index && statusCode.headers && (
+                        <tr className="bg-gray-50 dark:bg-[#161B22]">
+                        <td colSpan={6} className="px-4 py-4">
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                Response Headers
+                              </h4>
+                              <button
+                                onClick={() => {
+                                  const updated = [...statusCodes];
+                                  updated[index] = {
+                                    ...updated[index],
+                                    headers: [
+                                      ...(updated[index].headers || []),
+                                      { key: "", value: "" },
+                                    ],
+                                  };
+                                  setStatusCodes(updated);
+                                }}
+                                className="px-3 py-1 text-xs text-blue-600 dark:text-blue-400 border border-blue-600 dark:border-blue-400 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                              >
+                                + Add Header
+                              </button>
+                            </div>
+                            {statusCode.headers.map((header, headerIndex) => (
+                              <div key={headerIndex} className="flex items-center gap-3">
+                                <input
+                                  type="text"
+                                  value={header.key}
+                                  onChange={(e) => {
+                                    const updated = [...statusCodes];
+                                    updated[index].headers![headerIndex].key = e.target.value;
+                                    setStatusCodes(updated);
+                                  }}
+                                  placeholder="Header Key (e.g., Content-Type)"
+                                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
+                                <input
+                                  type="text"
+                                  value={header.value}
+                                  onChange={(e) => {
+                                    const updated = [...statusCodes];
+                                    updated[index].headers![headerIndex].value = e.target.value;
+                                    setStatusCodes(updated);
+                                  }}
+                                  placeholder="Header Value (e.g., application/json)"
+                                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
+                                <button
+                                  onClick={() => {
+                                    const updated = [...statusCodes];
+                                    updated[index].headers = updated[index].headers!.filter(
+                                      (_, i) => i !== headerIndex
+                                    );
+                                    setStatusCodes(updated);
+                                  }}
+                                  className="p-2 text-red-500 hover:text-red-600"
+                                >
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+                        </tr>
+                      )}
+                    </>
                   ))}
                 </tbody>
               </table>
@@ -479,44 +614,95 @@ export function ApiResponseCard({
                 />
               </div>
 
-              <div className="mb-3 flex items-center justify-between">
-                <button
-                  onClick={() => {
-                    setSchemaFields([
-                      ...schemaFields,
-                      {
-                        name: "",
-                        type: "string",
-                        description: "",
-                        mockExpression: "",
-                      },
-                    ]);
-                  }}
-                  className="px-3 py-1 text-sm text-[#2563EB] hover:text-[#1E40AF] font-medium"
-                >
-                  + Add Field
-                </button>
-                {currentSchemaName && schemaFields.length > 0 && (
-                  <button
-                    onClick={saveSchema}
-                    disabled={isLoading}
-                    className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50"
+              {/* Schema Type 선택 */}
+              <div className="mb-4 grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Schema Type
+                  </label>
+                  <select
+                    value={schemaType}
+                    onChange={(e) => setSchemaType(e.target.value as any)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
                   >
-                    {isLoading ? "저장 중..." : "Save Schema"}
-                  </button>
+                    <option value="object">Object (객체)</option>
+                    <option value="array">Array (배열)</option>
+                    <option value="string">String (문자열)</option>
+                    <option value="number">Number (숫자)</option>
+                    <option value="boolean">Boolean (참/거짓)</option>
+                  </select>
+                </div>
+                
+                {schemaType === "array" && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Array Item Type
+                    </label>
+                    <select
+                      value={arrayItemType}
+                      onChange={(e) => setArrayItemType(e.target.value as any)}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
+                    >
+                      <option value="object">Object</option>
+                      <option value="string">String</option>
+                      <option value="number">Number</option>
+                      <option value="boolean">Boolean</option>
+                    </select>
+                  </div>
                 )}
               </div>
+              
+              {(schemaType === "string" || schemaType === "number" || schemaType === "boolean") && (
+                <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
+                  <p className="text-sm text-blue-700 dark:text-blue-300">
+                    ℹ️ <strong>{schemaType}</strong> 타입은 단일 값을 반환합니다. 필드를 추가할 필요가 없습니다.
+                  </p>
+                </div>
+              )}
 
-              <div className="mb-2">
-                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Schema Fields
-                </h4>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  각 필드의 이름, 타입, mock 값, 설명을 입력하세요
-                </p>
-              </div>
+              {(schemaType === "object" || (schemaType === "array" && arrayItemType === "object")) && (
+                <div className="mb-3 flex items-center justify-between">
+                  <button
+                    onClick={() => {
+                      setSchemaFields([
+                        ...schemaFields,
+                        {
+                          name: "",
+                          type: "string",
+                          description: "",
+                          mockExpression: "",
+                        },
+                      ]);
+                    }}
+                    className="px-3 py-1 text-sm text-[#2563EB] hover:text-[#1E40AF] font-medium"
+                  >
+                    + Add Field
+                  </button>
+                  {currentSchemaName && schemaFields.length > 0 && (
+                    <button
+                      onClick={saveSchema}
+                      disabled={isLoading}
+                      className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50"
+                    >
+                      {isLoading ? "저장 중..." : "Save Schema"}
+                    </button>
+                  )}
+                </div>
+              )}
 
-              <div className="overflow-x-auto">
+              {(schemaType === "object" || (schemaType === "array" && arrayItemType === "object")) && (
+                <div className="mb-2">
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Schema Fields {schemaType === "array" && "(Array Items)"}
+                  </h4>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    각 필드의 이름, 타입, mock 값, 설명을 입력하세요
+                  </p>
+                </div>
+              )}
+
+              {(schemaType === "object" || (schemaType === "array" && arrayItemType === "object")) && (
+                <div className="overflow-x-auto">
                 <table className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-md">
                   <thead>
                     <tr className="bg-gray-50 dark:bg-[#161B22]">
@@ -579,20 +765,28 @@ export function ApiResponseCard({
                           </select>
                         </td>
                         <td className="px-4 py-3">
-                          <input
-                            type="text"
-                            value={field.mockExpression || ""}
-                            onChange={(e) => {
-                              const updated = [...schemaFields];
-                              updated[index] = {
-                                ...updated[index],
-                                mockExpression: e.target.value,
-                              };
-                              setSchemaFields(updated);
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCurrentMockFieldIndex(index);
+                              setCurrentMockValue(field.mockExpression || "");
+                              setIsMockModalOpen(true);
                             }}
-                            placeholder="예: {{$random.uuid}}, {{$name.fullName}}"
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
-                          />
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-left hover:bg-gray-50 dark:hover:bg-[#161B22] transition-colors group"
+                          >
+                            {field.mockExpression ? (
+                              <span className="font-mono text-sm text-green-600 dark:text-green-400">
+                                {field.mockExpression}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 dark:text-[#8B949E] text-sm flex items-center gap-2">
+                                <span>클릭하여 Mock 표현식 선택</span>
+                                <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                  🎯
+                                </span>
+                              </span>
+                            )}
+                          </button>
                         </td>
                         <td className="px-4 py-3">
                           <input
@@ -639,7 +833,8 @@ export function ApiResponseCard({
                     ))}
                   </tbody>
                 </table>
-              </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -682,6 +877,30 @@ export function ApiResponseCard({
         }}
         schemas={schemas}
         setSchemas={setSchemas}
+      />
+      
+      {/* Mock Expression Modal */}
+      <MockExpressionModal
+        isOpen={isMockModalOpen}
+        onClose={() => {
+          setIsMockModalOpen(false);
+          setCurrentMockFieldIndex(null);
+          setCurrentMockValue("");
+        }}
+        onSelect={(expression) => {
+          if (currentMockFieldIndex !== null) {
+            const updated = [...schemaFields];
+            updated[currentMockFieldIndex] = {
+              ...updated[currentMockFieldIndex],
+              mockExpression: expression,
+            };
+            setSchemaFields(updated);
+          }
+          setIsMockModalOpen(false);
+          setCurrentMockFieldIndex(null);
+          setCurrentMockValue("");
+        }}
+        initialValue={currentMockValue}
       />
     </div>
   );

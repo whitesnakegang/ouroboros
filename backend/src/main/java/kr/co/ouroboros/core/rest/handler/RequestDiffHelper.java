@@ -4,7 +4,6 @@ import java.util.*;
 import kr.co.ouroboros.core.rest.common.dto.MediaType;
 import kr.co.ouroboros.core.rest.common.dto.Operation;
 import kr.co.ouroboros.core.rest.common.dto.Parameter;
-import kr.co.ouroboros.core.rest.common.dto.PathItem;
 import kr.co.ouroboros.core.rest.common.dto.RequestBody;
 import kr.co.ouroboros.core.rest.common.dto.Schema;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +19,8 @@ public final class RequestDiffHelper {
     // diff states
     public static final String DIFF_NONE = "none";
     public static final String DIFF_REQUEST = "request";
+    public static final String DIFF_MOCK = "mock";
+    public static final String DIFF_COMPLETED = "completed";
 
     // 메서드 타입
     public enum HttpMethod {GET, POST, PUT, PATCH, DELETE}
@@ -53,7 +54,8 @@ public final class RequestDiffHelper {
         if (paramsDiff) {
             log.info("[{}], [{}]: 파라미터 다름", url, method);
             fileOp.setXOuroborosDiff(DIFF_REQUEST);
-            fileOp.setXOuroborosProgress("mock");
+            fileOp.setXOuroborosProgress(DIFF_MOCK);
+            fileOp.setXOuroborosTag(DIFF_NONE);
             return;
         }
         log.info("[{}], [{}]: 파라미터 똑같음", url, method);
@@ -63,14 +65,16 @@ public final class RequestDiffHelper {
         if (bodyDiff) {
             log.info("[{}], [{}]: Request Body 다름", url, method);
             fileOp.setXOuroborosDiff(DIFF_REQUEST);
-            fileOp.setXOuroborosProgress("mock");
+            fileOp.setXOuroborosProgress(DIFF_MOCK);
+            fileOp.setXOuroborosTag(DIFF_NONE);
             return;
         }
         log.info("[{}], [{}]: Request Body 똑같음", url, method);
         
         // 3. 모든 검증 통과
         fileOp.setXOuroborosDiff(DIFF_NONE);
-        fileOp.setXOuroborosProgress("completed");
+        fileOp.setXOuroborosProgress(DIFF_COMPLETED);
+        fileOp.setXOuroborosTag(DIFF_NONE);
     }
 
     /**

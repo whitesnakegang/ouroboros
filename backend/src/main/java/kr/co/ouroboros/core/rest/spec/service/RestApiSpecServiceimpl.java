@@ -1,5 +1,7 @@
 package kr.co.ouroboros.core.rest.spec.service;
 
+import kr.co.ouroboros.core.global.Protocol;
+import kr.co.ouroboros.core.global.manager.OuroApiSpecManager;
 import kr.co.ouroboros.core.rest.common.yaml.RestApiYamlParser;
 import kr.co.ouroboros.core.rest.spec.model.*;
 import kr.co.ouroboros.core.rest.spec.validator.SchemaValidator;
@@ -33,6 +35,7 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
 
     private final RestApiYamlParser yamlParser;
     private final SchemaValidator schemaValidator;
+    private final OuroApiSpecManager specManager;
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
     private static final List<String> HTTP_METHODS = Arrays.asList(
@@ -62,14 +65,32 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
             // Add operation to document
             yamlParser.putOperation(openApiDoc, request.getPath(), request.getMethod(), operation);
 
+            // Auto-create security schemes if security is specified
+            if (request.getSecurity() != null && !request.getSecurity().isEmpty()) {
+                autoCreateSecuritySchemes(openApiDoc, request.getSecurity());
+                
+                // Debug: Verify securitySchemes were added
+                @SuppressWarnings("unchecked")
+                Map<String, Object> components = (Map<String, Object>) openApiDoc.get("components");
+                if (components != null) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> securitySchemes = (Map<String, Object>) components.get("securitySchemes");
+                    if (securitySchemes != null) {
+                        log.info("✓ SecuritySchemes in openApiDoc before save: {}", securitySchemes.keySet());
+                    } else {
+                        log.warn("⚠️ SecuritySchemes is null after autoCreate!");
+                    }
+                }
+            }
+
             // Validate and auto-create missing schema references
             int createdSchemas = schemaValidator.validateAndCreateMissingSchemas(openApiDoc);
             if (createdSchemas > 0) {
                 log.info("Auto-created {} missing schema(s)", createdSchemas);
             }
 
-            // Write back to file
-            yamlParser.writeDocument(openApiDoc);
+            // Process and cache: writes to file + validates with scanned state + updates cache
+            specManager.processAndCacheSpec(Protocol.REST, openApiDoc);
 
             log.info("Created REST API spec: {} {} (ID: {})", request.getMethod().toUpperCase(), request.getPath(), id);
 
@@ -226,14 +247,19 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
                 log.info("Updated REST API spec: {} {} (ID: {})", foundMethod.toUpperCase(), foundPath, id);
             }
 
+            // Auto-create security schemes if security is updated
+            if (request.getSecurity() != null && !request.getSecurity().isEmpty()) {
+                autoCreateSecuritySchemes(openApiDoc, request.getSecurity());
+            }
+
             // Validate and auto-create missing schema references
             int createdSchemas = schemaValidator.validateAndCreateMissingSchemas(openApiDoc);
             if (createdSchemas > 0) {
                 log.info("Auto-created {} missing schema(s)", createdSchemas);
             }
 
-            // Write back to file
-            yamlParser.writeDocument(openApiDoc);
+            // Process and cache: writes to file + validates with scanned state + updates cache
+            specManager.processAndCacheSpec(Protocol.REST, openApiDoc);
 
             return convertToResponse(id, finalPath, finalMethod, operation);
         } finally {
@@ -279,8 +305,8 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
                 throw new IllegalArgumentException("REST API specification with ID '" + id + "' not found");
             }
 
-            // Write back to file
-            yamlParser.writeDocument(openApiDoc);
+            // Process and cache: writes to file + validates with scanned state + updates cache
+            specManager.processAndCacheSpec(Protocol.REST, openApiDoc);
         } finally {
             lock.writeLock().unlock();
         }
@@ -318,7 +344,9 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         }
 
         if (request.getSecurity() != null && !request.getSecurity().isEmpty()) {
-            operation.put("security", convertSecurity(request.getSecurity()));
+            List<Map<String, List<String>>> securityList = convertSecurity(request.getSecurity());
+            operation.put("security", securityList);
+            log.info("✓ Security added to operation: {}", securityList);
         }
 
         // Add Ouroboros custom fields (auto-generated)
@@ -350,9 +378,16 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         if (request.getResponses() != null) {
             operation.put("responses", convertResponses(request.getResponses()));
         }
-        if (request.getSecurity() != null) {
-            operation.put("security", convertSecurity(request.getSecurity()));
+        if (request.getSecurity() != null && !request.getSecurity().isEmpty()) {
+            List<Map<String, List<String>>> securityList = convertSecurity(request.getSecurity());
+            operation.put("security", securityList);
+            log.info("✓ Security updated in operation: {}", securityList);
         }
+
+        // Reset x-ouroboros-diff to "none" when user explicitly updates the spec
+        // This indicates the user has acknowledged the endpoint and it's no longer a "diff"
+        operation.put("x-ouroboros-diff", "none");
+
         // Note: progress and tag are NOT updated via API
         // They are managed internally or by YAML parser
     }
@@ -526,8 +561,12 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
     private List<Map<String, List<String>>> convertSecurity(List<SecurityRequirement> security) {
         List<Map<String, List<String>>> result = new ArrayList<>();
         for (SecurityRequirement req : security) {
-            result.add(req.getRequirements());
+            if (req.getRequirements() != null && !req.getRequirements().isEmpty()) {
+                result.add(req.getRequirements());
+                log.debug("Converting security requirement: {}", req.getRequirements());
+            }
         }
+        log.info("Converted {} security requirement(s)", result.size());
         return result;
     }
 
@@ -1062,6 +1101,103 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
             List<Object> list = (List<Object>) obj;
             for (Object item : list) {
                 updateSchemaReferences(item, schemaRenameMap);
+            }
+        }
+    }
+
+    /**
+     * Auto-creates security schemes in components/securitySchemes based on security requirements.
+     * <p>
+     * When an operation has security requirements (e.g., [{ BearerAuth: [] }]),
+     * this method automatically creates the corresponding security scheme definition
+     * in components/securitySchemes if it doesn't already exist.
+     * <p>
+     * Supported security schemes:
+     * - BearerAuth: HTTP Bearer token (JWT)
+     * - BasicAuth: HTTP Basic authentication
+     * - ApiKeyAuth: API Key in header
+     * - OAuth2: OAuth 2.0
+     * - OAuth1: OAuth 1.0
+     * - DigestAuth: HTTP Digest authentication
+     *
+     * @param openApiDoc the OpenAPI document
+     * @param securityRequirements list of security requirements from the operation
+     */
+    @SuppressWarnings("unchecked")
+    private void autoCreateSecuritySchemes(Map<String, Object> openApiDoc, List<SecurityRequirement> securityRequirements) {
+        // Get or create components section
+        Map<String, Object> components = (Map<String, Object>) openApiDoc.computeIfAbsent("components", k -> new LinkedHashMap<>());
+        
+        // Get or create securitySchemes section
+        Map<String, Object> securitySchemes = (Map<String, Object>) components.computeIfAbsent("securitySchemes", k -> new LinkedHashMap<>());
+
+        // Process each security requirement
+        for (SecurityRequirement requirement : securityRequirements) {
+            if (requirement.getRequirements() == null) continue;
+            
+            for (String schemeName : requirement.getRequirements().keySet()) {
+                // Skip if already exists
+                if (securitySchemes.containsKey(schemeName)) {
+                    continue;
+                }
+
+                // Create appropriate security scheme based on name
+                Map<String, Object> scheme = new LinkedHashMap<>();
+                
+                switch (schemeName) {
+                    case "BearerAuth":
+                        scheme.put("type", "http");
+                        scheme.put("scheme", "bearer");
+                        scheme.put("bearerFormat", "JWT");
+                        scheme.put("description", "JWT Bearer token authentication");
+                        break;
+                        
+                    case "BasicAuth":
+                        scheme.put("type", "http");
+                        scheme.put("scheme", "basic");
+                        scheme.put("description", "HTTP Basic authentication");
+                        break;
+                        
+                    case "ApiKeyAuth":
+                        scheme.put("type", "apiKey");
+                        scheme.put("in", "header");
+                        scheme.put("name", "X-API-Key");
+                        scheme.put("description", "API Key authentication");
+                        break;
+                        
+                    case "OAuth2":
+                        scheme.put("type", "oauth2");
+                        Map<String, Object> flows = new LinkedHashMap<>();
+                        Map<String, Object> authCodeFlow = new LinkedHashMap<>();
+                        authCodeFlow.put("authorizationUrl", "https://example.com/oauth/authorize");
+                        authCodeFlow.put("tokenUrl", "https://example.com/oauth/token");
+                        authCodeFlow.put("scopes", new LinkedHashMap<>());
+                        flows.put("authorizationCode", authCodeFlow);
+                        scheme.put("flows", flows);
+                        scheme.put("description", "OAuth 2.0 authentication");
+                        break;
+                        
+                    case "OAuth1":
+                        scheme.put("type", "oauth2");
+                        scheme.put("description", "OAuth 1.0 authentication (using OAuth2 type as fallback)");
+                        break;
+                        
+                    case "DigestAuth":
+                        scheme.put("type", "http");
+                        scheme.put("scheme", "digest");
+                        scheme.put("description", "HTTP Digest authentication");
+                        break;
+                        
+                    default:
+                        // Unknown security scheme - create a basic Bearer token scheme
+                        scheme.put("type", "http");
+                        scheme.put("scheme", "bearer");
+                        scheme.put("description", "Authentication required");
+                        break;
+                }
+                
+                securitySchemes.put(schemeName, scheme);
+                log.info("Auto-created security scheme: {}", schemeName);
             }
         }
     }

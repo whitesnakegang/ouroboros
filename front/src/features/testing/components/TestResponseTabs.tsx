@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTestingStore } from "../store/testing.store";
 import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
+import type { TryMethod, TryMethodParameter } from "@/features/spec/services/api";
 
 export function TestResponseTabs() {
   const { response, methodList, totalDurationMs, useDummyResponse } = useTestingStore();
@@ -170,7 +171,7 @@ function ResponseContent({
           Headers
         </label>
         <div className="bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] rounded-md p-4">
-          {Object.entries(response.headers).map(([key, value]) => (
+          {Object.entries(response.headers).map(([key, value]: [string, string]) => (
             <div
               key={key}
               className="flex gap-2 py-1 text-sm font-mono text-gray-900 dark:text-[#E6EDF3]"
@@ -288,7 +289,7 @@ function TestContent({
           메서드별 실행 시간 ({methodList.length}개)
         </div>
         <div className="space-y-2">
-          {methodList.map((method, index) => (
+          {methodList.map((method: TryMethod, index: number) => (
             <div
               key={method.spanId || index}
               className="p-4 bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] rounded-md hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
@@ -303,7 +304,7 @@ function TestContent({
                   </div>
                   {method.parameters && method.parameters.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1">
-                      {method.parameters.map((param, paramIndex) => (
+                      {method.parameters.map((param: TryMethodParameter, paramIndex: number) => (
                         <span
                           key={paramIndex}
                           className="px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded"

@@ -32,6 +32,9 @@ import {
 interface KeyValuePair {
   key: string;
   value: string;
+  required?: boolean;
+  description?: string;
+  type?: string;
 }
 
 // Import RequestBody type from ApiRequestCard
@@ -52,6 +55,7 @@ interface StatusCode {
   code: string;
   type: "Success" | "Error";
   message: string;
+  headers?: Array<{ key: string; value: string }>;  // Response headers
   schema?: {
     ref?: string; // 스키마 참조 (예: "User")
     properties?: Record<string, any>; // 인라인 스키마
@@ -126,7 +130,34 @@ export function ApiEditorLayout() {
       setSummary(spec.summary || "");
       setTags(spec.tags ? spec.tags.join(", ") : "");
 
-      // 테스트 스토어에 엔드포인트 정보 동기화
+      // Security를 auth state로 변환
+      if (spec.security && Array.isArray(spec.security) && spec.security.length > 0) {
+        const firstSecurity = spec.security[0] as { requirements?: Record<string, unknown> };
+        if (firstSecurity && firstSecurity.requirements) {
+          const schemeName = Object.keys(firstSecurity.requirements)[0];
+          
+          switch(schemeName) {
+            case "BearerAuth":
+              setAuth({ type: "bearer", bearer: { token: "" } });
+              break;
+            case "BasicAuth":
+              setAuth({ type: "basicAuth", basicAuth: { username: "", password: "" } });
+              break;
+            case "ApiKeyAuth":
+              setAuth({ type: "apiKey", apiKey: { key: "X-API-Key", value: "", addTo: "header" } });
+              break;
+            default:
+              setAuth({ type: "none" });
+          }
+          console.log("✓ Loaded security from backend:", schemeName);
+        }
+      } else {
+        setAuth({ type: "none" });
+      }
+
+      // Parameters를 폼 state와 테스트 스토어로 분리
+      const formHeaders: KeyValuePair[] = [];
+      const formQueryParams: KeyValuePair[] = [];
       const testHeaders: Array<{ key: string; value: string }> = [];
       const testQueryParams: Array<{ key: string; value: string }> = [];
       let testBody = "";
@@ -135,11 +166,29 @@ export function ApiEditorLayout() {
       if (spec.parameters && Array.isArray(spec.parameters)) {
         spec.parameters.forEach((param: any) => {
           if (param.in === "header") {
+            // 폼 state (편집용)
+            formHeaders.push({
+              key: param.name || "",
+              value: param.schema?.default || "",
+              required: param.required || false,
+              description: param.description || "",
+              type: param.schema?.type || "string",
+            });
+            // 테스트 스토어 (Try It 용)
             testHeaders.push({
               key: param.name || "",
               value: param.example || param.schema?.default || "",
             });
           } else if (param.in === "query") {
+            // 폼 state (편집용)
+            formQueryParams.push({
+              key: param.name || "",
+              value: param.schema?.default || "",
+              required: param.required || false,
+              description: param.description || "",
+              type: param.schema?.type || "string",
+            });
+            // 테스트 스토어 (Try It 용)
             testQueryParams.push({
               key: param.name || "",
               value: param.example || param.schema?.default || "",
@@ -147,6 +196,10 @@ export function ApiEditorLayout() {
           }
         });
       }
+      
+      // 폼 state 업데이트
+      setQueryParams(formQueryParams);
+      setRequestHeaders(formHeaders.length > 0 ? formHeaders : [{ key: "Content-Type", value: "application/json" }]);
 
       // 기본 Content-Type 헤더 추가
       if (!testHeaders.find((h) => h.key.toLowerCase() === "content-type")) {
@@ -212,9 +265,18 @@ export function ApiEditorLayout() {
   const [tags, setTags] = useState("");
   const [description, setDescription] = useState("");
   const [summary, setSummary] = useState("");
-  const [owner, setOwner] = useState("");
+  
+  // Auth state
+  const [auth, setAuth] = useState<{
+    type: "none" | "apiKey" | "bearer" | "jwtBearer" | "basicAuth" | "digestAuth" | "oauth2" | "oauth1";
+    apiKey?: { key: string; value: string; addTo: "header" | "query" };
+    bearer?: { token: string };
+    basicAuth?: { username: string; password: string };
+    oauth2?: { accessToken: string; tokenType?: string };
+  }>({ type: "none" });
 
   // Request state
+  const [queryParams, setQueryParams] = useState<KeyValuePair[]>([]);
   const [requestHeaders, setRequestHeaders] = useState<KeyValuePair[]>([
     { key: "Content-Type", value: "application/json" },
   ]);
@@ -320,6 +382,23 @@ export function ApiEditorLayout() {
   };
 
   /**
+   * queryParams를 OpenAPI parameters 구조로 변환
+   */
+  const convertQueryParamsToParameters = (params: KeyValuePair[]): any[] => {
+    return params
+      .filter((param) => param.key)
+      .map((param) => ({
+        name: param.key,
+        in: "query",
+        description: param.description || `Query parameter: ${param.key}`,
+        required: param.required || false,
+        schema: {
+          type: param.type || "string",
+        },
+      }));
+  };
+
+  /**
    * requestHeaders를 OpenAPI parameters 구조로 변환
    * (Content-Type 같은 일반 헤더는 제외하고, API 스펙에 필요한 헤더만 parameters로 변환)
    */
@@ -332,12 +411,64 @@ export function ApiEditorLayout() {
       .map((header) => ({
         name: header.key,
         in: "header",
-        description: `Header: ${header.key}`,
-        required: false, // 기본값은 optional
+        description: header.description || `Header: ${header.key}`,
+        required: header.required || false,
         schema: {
           type: "string",
         },
       }));
+  };
+
+  /**
+   * Auth 상태를 OpenAPI security 구조로 변환
+   * 백엔드 형식: List<SecurityRequirement> 
+   * SecurityRequirement = { requirements: Map<String, List<String>> }
+   */
+  const convertAuthToSecurity = (): any[] => {
+    console.log("🔐 convertAuthToSecurity called, auth.type:", auth.type);
+    
+    if (auth.type === "none") {
+      return [];
+    }
+    
+    let schemeName = "";
+    
+    switch (auth.type) {
+      case "bearer":
+      case "jwtBearer":
+        schemeName = "BearerAuth";
+        break;
+      case "basicAuth":
+        schemeName = "BasicAuth";
+        break;
+      case "apiKey":
+        schemeName = "ApiKeyAuth";
+        break;
+      case "oauth2":
+        schemeName = "OAuth2";
+        break;
+      case "oauth1":
+        schemeName = "OAuth1";
+        break;
+      case "digestAuth":
+        schemeName = "DigestAuth";
+        break;
+    }
+    
+    if (!schemeName) {
+      console.warn("⚠️ No schemeName matched for auth.type:", auth.type);
+      return [];
+    }
+    
+    // 백엔드 SecurityRequirement 형식으로 변환
+    const result = [{
+      requirements: {
+        [schemeName]: []
+      }
+    }];
+    
+    console.log("✓ Converted security:", result);
+    return result;
   };
 
   /**
@@ -347,6 +478,10 @@ export function ApiEditorLayout() {
     statusCodes: StatusCode[]
   ): Record<string, any> => {
     return statusCodes.reduce((acc, code) => {
+      // 빈 status code는 무시 (YAML에 ? '' 같은 이상한 키 생성 방지)
+      if (!code.code || code.code.trim() === "") {
+        return acc;
+      }
       let schema: any;
 
       // StatusCode에 schema 정보가 있으면 사용
@@ -377,7 +512,7 @@ export function ApiEditorLayout() {
         };
       }
 
-      acc[code.code] = {
+      const response: any = {
         description: code.message,
         content: {
           "application/json": {
@@ -385,6 +520,26 @@ export function ApiEditorLayout() {
           },
         },
       };
+
+      // Response headers를 OpenAPI 형식으로 변환
+      // 프론트: [{ key: "Content-Type", value: "application/json" }]
+      // 백엔드: { "Content-Type": { description: "", schema: { type: "string" } } }
+      if (code.headers && code.headers.length > 0) {
+        const headers: Record<string, any> = {};
+        code.headers.forEach((header: { key: string; value: string }) => {
+          if (header.key) {
+            headers[header.key] = {
+              description: header.value || `${header.key} header`,
+              schema: {
+                type: "string",
+              },
+            };
+          }
+        });
+        response.headers = headers;
+      }
+
+      acc[code.code] = response;
       return acc;
     }, {} as Record<string, any>);
   };
@@ -404,10 +559,13 @@ export function ApiEditorLayout() {
           summary,
           description,
           tags: tags ? tags.split(",").map((tag) => tag.trim()) : [],
-          parameters: convertHeadersToParameters(requestHeaders),
+          parameters: [
+            ...convertQueryParamsToParameters(queryParams),
+            ...convertHeadersToParameters(requestHeaders),
+          ],
           requestBody: convertRequestBodyToOpenAPI(requestBody),
           responses: convertResponsesToOpenAPI(statusCodes),
-          security: [],
+          security: convertAuthToSecurity(),
         };
 
         await updateRestApiSpec(selectedEndpoint.id, updateRequest);
@@ -439,11 +597,18 @@ export function ApiEditorLayout() {
           summary,
           description,
           tags: tags ? tags.split(",").map((tag) => tag.trim()) : [],
-          parameters: convertHeadersToParameters(requestHeaders),
+          parameters: [
+            ...convertQueryParamsToParameters(queryParams),
+            ...convertHeadersToParameters(requestHeaders),
+          ],
           requestBody: convertRequestBodyToOpenAPI(requestBody),
           responses: convertResponsesToOpenAPI(statusCodes),
-          security: [],
+          security: convertAuthToSecurity(),
         };
+
+        console.log("🔍 API Request:", JSON.stringify(apiRequest, null, 2));
+        console.log("🔐 Auth state:", auth);
+        console.log("🔐 Security:", apiRequest.security);
 
         const response = await createRestApiSpec(apiRequest);
 
@@ -511,7 +676,6 @@ export function ApiEditorLayout() {
         setUrl("/api/auth/login");
         setTags("AUTH");
         setDescription("사용자 로그인");
-        setOwner("SMART-TEAM");
         setIsEditMode(false);
         loadEndpoints();
       } catch (error: unknown) {
@@ -552,7 +716,8 @@ export function ApiEditorLayout() {
       setTags("");
       setDescription("");
       setSummary("");
-      setOwner("");
+      setQueryParams([]);
+      setAuth({ type: "none" });
       setRequestBody({
         type: "json",
         contentType: "application/json",
@@ -571,7 +736,8 @@ export function ApiEditorLayout() {
     setTags("");
     setDescription("");
     setSummary("");
-    setOwner("");
+    setQueryParams([]);
+    setAuth({ type: "none" });
     setRequestHeaders([]);
     setRequestBody({
       type: "json",
@@ -1250,26 +1416,9 @@ export function ApiEditorLayout() {
                         }`}
                       />
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                        Owner
-                      </label>
-                      <input
-                        type="text"
-                        value={owner}
-                        onChange={(e) => setOwner(e.target.value)}
-                        placeholder="예: SMART-TEAM, 김개발, 백엔드팀"
-                        disabled={!!(selectedEndpoint && !isEditMode)}
-                        className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
-                          selectedEndpoint && !isEditMode
-                            ? "opacity-60 cursor-not-allowed"
-                            : ""
-                        }`}
-                      />
-                    </div>
                   </div>
 
-                  {/* Description - place below Tags/Summary/Owner */}
+                  {/* Description */}
                   <div>
                     <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
                       Description
@@ -1294,10 +1443,14 @@ export function ApiEditorLayout() {
             {/* Request Card */}
             {protocol === "REST" && (
               <ApiRequestCard
+                queryParams={queryParams}
+                setQueryParams={setQueryParams}
                 requestHeaders={requestHeaders}
                 setRequestHeaders={setRequestHeaders}
                 requestBody={requestBody}
                 setRequestBody={setRequestBody}
+                auth={auth}
+                setAuth={setAuth}
                 isReadOnly={!!(selectedEndpoint && !isEditMode)}
               />
             )}
