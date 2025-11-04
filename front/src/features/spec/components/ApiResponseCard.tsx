@@ -12,8 +12,8 @@ interface StatusCode {
   type: "Success" | "Error";
   message: string;
   schema?: {
-    ref?: string;  // 스키마 참조 (예: "User")
-    properties?: Record<string, any>;  // 인라인 스키마
+    ref?: string; // 스키마 참조 (예: "User")
+    properties?: Record<string, any>; // 인라인 스키마
   };
 }
 
@@ -87,10 +87,13 @@ export function ApiResponseCard({
   const [currentSchemaDescription, setCurrentSchemaDescription] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   // StatusCode별 Schema 선택 모달 상태
-  const [isResponseSchemaModalOpen, setIsResponseSchemaModalOpen] = useState(false);
-  const [selectedStatusCodeIndex, setSelectedStatusCodeIndex] = useState<number | null>(null);
+  const [isResponseSchemaModalOpen, setIsResponseSchemaModalOpen] =
+    useState(false);
+  const [selectedStatusCodeIndex, setSelectedStatusCodeIndex] = useState<
+    number | null
+  >(null);
 
   // 컴포넌트 마운트 시 스키마 목록 로드
   useEffect(() => {
@@ -368,7 +371,10 @@ export function ApiResponseCard({
                             <button
                               onClick={() => {
                                 const updated = [...statusCodes];
-                                updated[index] = { ...updated[index], schema: undefined };
+                                updated[index] = {
+                                  ...updated[index],
+                                  schema: undefined,
+                                };
                                 setStatusCodes(updated);
                               }}
                               className="p-1 text-red-500 hover:text-red-600"

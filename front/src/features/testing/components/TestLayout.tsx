@@ -1,5 +1,5 @@
 import { TestRequestPanel } from "./TestRequestPanel";
-import { TestResponsePanel } from "./TestResponsePanel";
+import { TestResponseTabs } from "./TestResponseTabs";
 import { useTestingStore } from "../store/testing.store";
 
 export function TestLayout() {
@@ -12,7 +12,7 @@ export function TestLayout() {
         {protocol === "REST" ? (
           <div className="max-w-6xl mx-auto space-y-6">
             <TestRequestPanel />
-            <TestResponsePanel />
+            <TestResponseTabs />
           </div>
         ) : (
           <div className="h-full flex items-center justify-center">

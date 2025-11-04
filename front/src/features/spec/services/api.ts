@@ -35,9 +35,9 @@ export interface RestApiSpecResponse {
   requestBody?: unknown;
   responses?: Record<string, unknown>;
   security?: unknown[];
-  progress: string;      // Response에만 유지 (읽기 전용)
-  tag: string;           // Response에만 유지 (읽기 전용)
-  diff?: string;         // Response에만 유지
+  progress: string; // Response에만 유지 (읽기 전용)
+  tag: string; // Response에만 유지 (읽기 전용)
+  diff?: string; // Response에만 유지
 }
 
 export interface GetAllSpecsResponse {
@@ -303,7 +303,11 @@ export async function updateRestApiSpec(
       response,
       `API 스펙 수정 실패: ${response.status} ${response.statusText}`
     );
-    console.error("API 스펙 수정 실패:", { id, request, status: response.status });
+    console.error("API 스펙 수정 실패:", {
+      id,
+      request,
+      status: response.status,
+    });
     throw new Error(errorMessage);
   }
 
@@ -435,7 +439,11 @@ export async function updateSchema(
       response,
       `Schema 수정 실패: ${response.status} ${response.statusText}`
     );
-    console.error("Schema 수정 실패:", { schemaName, request, status: response.status });
+    console.error("Schema 수정 실패:", {
+      schemaName,
+      request,
+      status: response.status,
+    });
     throw new Error(errorMessage);
   }
 
@@ -496,20 +504,20 @@ export async function importYaml(file: File): Promise<ImportYamlResponse> {
 
   if (!response.ok) {
     let errorMessage = `YAML Import 실패: ${response.status} ${response.statusText}`;
-    
+
     // 검증 에러 상세 정보 추출
     try {
       const errorData: ImportYamlErrorResponse = await response.json();
-      
+
       // GlobalApiResponse 구조에서 메시지 추출
       if (errorData.message) {
         errorMessage = errorData.message;
       }
-      
+
       if (errorData.error?.details) {
         errorMessage += `\n상세: ${errorData.error.details}`;
       }
-      
+
       // 검증 에러가 있으면 상세 표시
       if (errorData.data?.validationErrors) {
         const validationMessages = errorData.data.validationErrors
@@ -522,6 +530,78 @@ export async function importYaml(file: File): Promise<ImportYamlResponse> {
     }
 
     console.error("YAML Import 실패:", { status: response.status });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+// Try 관련 API 인터페이스
+export interface TryMethodParameter {
+  type: string;
+  name: string;
+}
+
+export interface TryMethod {
+  spanId: string;
+  name: string;
+  methodName: string;
+  className: string;
+  parameters?: TryMethodParameter[] | null;
+  selfDurationMs: number;
+  selfPercentage: number;
+}
+
+export interface TryMethodListData {
+  tryId: string;
+  traceId: string | null;
+  totalDurationMs: number;
+  totalCount: number;
+  page: number;
+  size: number;
+  hasMore: boolean;
+  methods: TryMethod[];
+}
+
+export interface TryMethodListResponse {
+  status: number;
+  data: TryMethodListData;
+  message: string;
+  error?: {
+    code: string;
+    details: string;
+  } | null;
+}
+
+const TRY_API_BASE_URL = "/ouro/tries";
+
+/**
+ * Try 메소드 리스트 조회 (페이지네이션)
+ */
+export async function getTryMethodList(
+  tryId: string,
+  page: number = 0,
+  size: number = 100
+): Promise<TryMethodListResponse> {
+  const response = await fetch(
+    `${TRY_API_BASE_URL}/${tryId}/methods?page=${page}&size=${size}`,
+    {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `Try 메소드 리스트 조회 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("Try 메소드 리스트 조회 실패:", {
+      tryId,
+      status: response.status,
+    });
     throw new Error(errorMessage);
   }
 

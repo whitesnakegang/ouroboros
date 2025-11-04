@@ -1,16 +1,29 @@
 import { buildOpenApiYaml, downloadYaml } from "../utils/yamlExporter";
 import { exportToMarkdown, downloadMarkdown } from "../utils/markdownExporter";
 
-interface KeyValuePair { key: string; value: string }
+interface KeyValuePair {
+  key: string;
+  value: string;
+}
 
-interface RequestBodyField { key: string; value: string; type: string; description?: string; required?: boolean }
+interface RequestBodyField {
+  key: string;
+  value: string;
+  type: string;
+  description?: string;
+  required?: boolean;
+}
 interface RequestBody {
   type: "none" | "form-data" | "x-www-form-urlencoded" | "json" | "xml";
   contentType: string;
   fields: RequestBodyField[];
 }
 
-interface StatusCode { code: string; type: "Success" | "Error"; message: string }
+interface StatusCode {
+  code: string;
+  type: "Success" | "Error";
+  message: string;
+}
 
 interface ApiPreviewCardProps {
   method: string;
@@ -115,7 +128,10 @@ export function ApiPreviewCard({
                 requestBody,
                 statusCodes,
               });
-              const filename = `${method.toUpperCase()}_${url.replace(/\//g, "_")}.yml`;
+              const filename = `${method.toUpperCase()}_${url.replace(
+                /\//g,
+                "_"
+              )}.yml`;
               downloadYaml(content, filename);
             }}
             className="flex-1 px-4 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] transition-colors font-medium"
@@ -133,7 +149,10 @@ export function ApiPreviewCard({
                 requestBody,
                 statusCodes,
               });
-              const filename = `${method.toUpperCase()}_${url.replace(/\//g, "_")}.md`;
+              const filename = `${method.toUpperCase()}_${url.replace(
+                /\//g,
+                "_"
+              )}.md`;
               downloadMarkdown(md, filename);
             }}
             className="flex-1 px-4 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] transition-colors font-medium"
