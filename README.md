@@ -73,6 +73,7 @@
 - ✅ **Implementation Comparison**: Sync code and specs with `@ApiState` annotation
 - ✅ **Automatic Enrichment**: Automatically add missing Ouroboros extension fields
 - ✅ **Error Reporting**: Detailed validation error messages
+- ✅ **Try Feature**: API execution tracking and analysis (📖 [Setup Guide](../../backend/src/main/java/kr/co/ouroboros/core/rest/tryit/OUROBOROS_TRY_SETUP.md))
 
 ---
 
@@ -314,6 +315,7 @@ Ouroboros will automatically:
 - [Project Documentation](./backend/PROJECT_DOCUMENTATION.md)
 - [GraphQL Design](./backend/docs/graphql/DESIGN.md)
 - [Troubleshooting](./backend/docs/troubleshooting/README.md)
+- [Try Feature Setup Guide](../../backend/src/main/java/kr/co/ouroboros/core/rest/tryit/OUROBOROS_TRY_SETUP.md)
 
 ### OpenAPI Extension Fields
 
