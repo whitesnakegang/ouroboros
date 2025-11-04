@@ -9,6 +9,7 @@
 3. [Tempo 연동 설정](#3-tempo-연동-설정)
 4. [Try 기능 사용 방법](#4-try-기능-사용-방법)
 5. [Gitignore 설정](#5-gitignore-설정)
+6. [자주 묻는 질문 (QnA)](#6-자주-묻는-질문-qna)
 
 ---
 
@@ -375,6 +376,26 @@ logs/
    - Docker 네트워크 실행 시: `TEMPO_HOST=tempo`
 5. **Tempo UI 접속**: [http://localhost:3200](http://localhost:3200)에서 Tempo UI가 정상적으로 표시되는지 확인
 6. **프로토콜 확인**: HTTP 프로토콜만 사용하므로 gRPC 관련 설정이 없는지 확인
+
+---
+
+## 6. 자주 묻는 질문 (QnA)
+
+### OTLP 포트 변경
+
+**Q. OTLP 포트를 바꿀 수 있나요?**  
+A. 가능은 하지만 권장하지 않습니다. 4317(gRPC), 4318(HTTP)은 OpenTelemetry 표준 포트입니다.
+
+### Tempo UI 포트 변경
+
+**Q. Tempo UI 포트를 바꾸고 싶어요.**  
+A. `.env` 파일에서 `TEMPO_UI_PORT=3300`으로 변경 후 `docker compose down && docker compose up -d`로 재시작하세요.
+
+### 트레이스 데이터 저장 위치
+
+**Q. 트레이스 데이터는 어디에 저장되나요?**  
+A. `./tempo-data/` 폴더에 로컬 저장됩니다.  
+   운영 환경에서는 `tempo.yaml`을 수정해 S3 또는 MinIO 같은 객체 스토리지로 전환하세요.
 
 ---
 

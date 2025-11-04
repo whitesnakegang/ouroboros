@@ -73,7 +73,7 @@
 - ✅ **실제 구현 비교**: `@ApiState` 어노테이션으로 코드와 명세 동기화
 - ✅ **자동 Enrichment**: 누락된 Ouroboros 확장 필드 자동 추가
 - ✅ **에러 리포팅**: 상세한 검증 에러 메시지
-- ✅ **Try 기능**: API 실행 추적 및 분석 (📖 [설정 가이드](../../backend/src/main/java/kr/co/ouroboros/core/rest/tryit/OUROBOROS_TRY_SETUP.md))
+- ✅ **Try 기능**: API 실행 추적 및 분석 (📖 [설정 가이드](./OUROBOROS_TRY_SETUP.md))
 
 ---
 
@@ -315,7 +315,7 @@ Ouroboros가 자동으로:
 - [프로젝트 문서](../../backend/PROJECT_DOCUMENTATION.md)
 - [GraphQL 설계](../../backend/docs/graphql/DESIGN.md)
 - [트러블슈팅](../../backend/docs/troubleshooting/README.md)
-- [Try 기능 설정 가이드](../../backend/src/main/java/kr/co/ouroboros/core/rest/tryit/OUROBOROS_TRY_SETUP.md)
+- [Try 기능 설정 가이드](./OUROBOROS_TRY_SETUP.md)
 
 ### OpenAPI 확장 필드
 
