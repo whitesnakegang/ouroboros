@@ -55,7 +55,7 @@ public final class RequestDiffHelper {
             log.info("[{}], [{}]: 파라미터 다름", url, method);
             fileOp.setXOuroborosDiff(DIFF_REQUEST);
             fileOp.setXOuroborosProgress(DIFF_MOCK);
-            fileOp.setXOuroborosTag(scanOp.getXOuroborosTag());
+            fileOp.setXOuroborosTag(DIFF_NONE);
             return;
         }
         log.info("[{}], [{}]: 파라미터 똑같음", url, method);
