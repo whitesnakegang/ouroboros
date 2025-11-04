@@ -158,9 +158,16 @@ public class SpanMethodParser {
             int openParen = methodPart.indexOf('(');
             
             if (openParen > 0) {
-                // Has parameters
                 String methodName = methodPart.substring(0, openParen);
-                String paramsStr = methodPart.substring(openParen + 1, methodPart.lastIndexOf(')'));
+                int closeParen = methodPart.lastIndexOf(')');
+                if (closeParen <= openParen) {
+                    return SpanMethodInfo.builder()
+                            .className(className)
+                            .methodName(methodName)
+                            .parameters(new ArrayList<>())
+                            .build();
+                }
+                String paramsStr = methodPart.substring(openParen + 1, closeParen);
                 
                 // Parse parameters
                 List<SpanMethodInfo.Parameter> parameters = new ArrayList<>();
