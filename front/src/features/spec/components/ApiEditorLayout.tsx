@@ -44,7 +44,7 @@ type RequestBody = {
     type: string;
     description?: string;
     required?: boolean;
-    ref?: string;  // 스키마 참조 시 사용 (예: "User")
+    ref?: string; // 스키마 참조 시 사용 (예: "User")
   }>;
 };
 
@@ -53,8 +53,8 @@ interface StatusCode {
   type: "Success" | "Error";
   message: string;
   schema?: {
-    ref?: string;  // 스키마 참조 (예: "User")
-    properties?: Record<string, any>;  // 인라인 스키마
+    ref?: string; // 스키마 참조 (예: "User")
+    properties?: Record<string, any>; // 인라인 스키마
   };
 }
 
@@ -75,6 +75,7 @@ export function ApiEditorLayout() {
     protocol: testProtocol,
     setProtocol: setTestProtocol,
     request,
+    setRequest,
     setResponse,
     isLoading,
     setIsLoading,
@@ -111,6 +112,7 @@ export function ApiEditorLayout() {
     } else {
       setIsEditMode(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEndpoint]);
 
   // Load endpoint data from backend
@@ -123,7 +125,81 @@ export function ApiEditorLayout() {
       setDescription(spec.description || "");
       setSummary(spec.summary || "");
       setTags(spec.tags ? spec.tags.join(", ") : "");
-      // 추가 데이터 로드 필요시 여기에 구현
+
+      // 테스트 스토어에 엔드포인트 정보 동기화
+      const testHeaders: Array<{ key: string; value: string }> = [];
+      const testQueryParams: Array<{ key: string; value: string }> = [];
+      let testBody = "";
+
+      // Parameters를 헤더와 쿼리 파라미터로 분리
+      if (spec.parameters && Array.isArray(spec.parameters)) {
+        spec.parameters.forEach((param: any) => {
+          if (param.in === "header") {
+            testHeaders.push({
+              key: param.name || "",
+              value: param.example || param.schema?.default || "",
+            });
+          } else if (param.in === "query") {
+            testQueryParams.push({
+              key: param.name || "",
+              value: param.example || param.schema?.default || "",
+            });
+          }
+        });
+      }
+
+      // 기본 Content-Type 헤더 추가
+      if (!testHeaders.find((h) => h.key.toLowerCase() === "content-type")) {
+        testHeaders.unshift({ key: "Content-Type", value: "application/json" });
+      }
+
+      // RequestBody 처리
+      if (spec.requestBody) {
+        const reqBody = spec.requestBody as any;
+        if (reqBody.content && reqBody.content["application/json"]) {
+          const schema = reqBody.content["application/json"].schema;
+          if (schema && schema.properties) {
+            // 스키마에서 기본 JSON 객체 생성
+            const bodyObj: Record<string, any> = {};
+            Object.keys(schema.properties).forEach((key) => {
+              const prop = schema.properties[key];
+              if (prop.example !== undefined) {
+                bodyObj[key] = prop.example;
+              } else if (prop.type === "string") {
+                bodyObj[key] = prop.default || "string";
+              } else if (prop.type === "number" || prop.type === "integer") {
+                bodyObj[key] = prop.default || 0;
+              } else if (prop.type === "boolean") {
+                bodyObj[key] = prop.default || false;
+              }
+            });
+            testBody = JSON.stringify(bodyObj, null, 2);
+          }
+        } else if (reqBody.content) {
+          // 다른 content-type 처리 (예: text/plain)
+          const contentType = Object.keys(reqBody.content)[0];
+          const content = reqBody.content[contentType];
+          if (content.example !== undefined) {
+            testBody =
+              typeof content.example === "string"
+                ? content.example
+                : JSON.stringify(content.example, null, 2);
+          }
+        }
+      }
+
+      // 테스트 스토어 업데이트
+      setRequest({
+        method: spec.method,
+        url: spec.path,
+        description: spec.description || spec.summary || "",
+        headers:
+          testHeaders.length > 0
+            ? testHeaders
+            : [{ key: "Content-Type", value: "application/json" }],
+        queryParams: testQueryParams,
+        body: testBody,
+      });
     } catch (error) {
       console.error("API 스펙 로드 실패:", error);
       alert("API 스펙을 불러오는데 실패했습니다.");
@@ -174,7 +250,12 @@ export function ApiEditorLayout() {
     content: Record<string, any>;
   } | null => {
     // null이거나 type이 "none"이면 null 반환
-    if (!frontendBody || frontendBody.type === "none" || !frontendBody.fields || frontendBody.fields.length === 0) {
+    if (
+      !frontendBody ||
+      frontendBody.type === "none" ||
+      !frontendBody.fields ||
+      frontendBody.fields.length === 0
+    ) {
       return null;
     }
 
@@ -198,20 +279,20 @@ export function ApiEditorLayout() {
         if ((field as any).ref) {
           // Reference 모드: ref만 전송 (다른 필드 무시)
           properties[field.key] = {
-            ref: (field as any).ref,  // 예: "User"
+            ref: (field as any).ref, // 예: "User"
           };
         } else {
           // Inline 모드: 모든 필드 정보 포함
           const property: any = {
             type: field.type || "string",
           };
-          
+
           if (field.description) {
             property.description = field.description;
           }
-          
+
           if (field.value) {
-            property.mockExpression = field.value;  // DataFaker 표현식
+            property.mockExpression = field.value; // DataFaker 표현식
           }
 
           properties[field.key] = property;
@@ -242,12 +323,10 @@ export function ApiEditorLayout() {
    * requestHeaders를 OpenAPI parameters 구조로 변환
    * (Content-Type 같은 일반 헤더는 제외하고, API 스펙에 필요한 헤더만 parameters로 변환)
    */
-  const convertHeadersToParameters = (
-    headers: KeyValuePair[]
-  ): any[] => {
+  const convertHeadersToParameters = (headers: KeyValuePair[]): any[] => {
     // Content-Type은 requestBody의 content에 포함되므로 parameters에서 제외
     const standardHeaders = ["Content-Type", "Accept"];
-    
+
     return headers
       .filter((header) => header.key && !standardHeaders.includes(header.key))
       .map((header) => ({
@@ -269,7 +348,7 @@ export function ApiEditorLayout() {
   ): Record<string, any> => {
     return statusCodes.reduce((acc, code) => {
       let schema: any;
-      
+
       // StatusCode에 schema 정보가 있으면 사용
       if (code.schema) {
         if (code.schema.ref) {
