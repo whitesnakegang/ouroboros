@@ -50,7 +50,13 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
                 for(HttpMethod httpMethod : HttpMethod.values()){
                     Operation operationByMethod = getOperationByMethod(pathItem, httpMethod);
                     if(operationByMethod != null){
+                        // Generate x-ouroboros-id if not present
+                        if (operationByMethod.getXOuroborosId() == null) {
+                            operationByMethod.setXOuroborosId(java.util.UUID.randomUUID().toString());
+                            log.debug("Generated x-ouroboros-id for {} {}: {}", httpMethod, url, operationByMethod.getXOuroborosId());
+                        }
                         operationByMethod.setXOuroborosDiff("endpoint");
+                        operationByMethod.setXOuroborosTag("none");
                     }
                 }
             }
@@ -58,6 +64,19 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
         }
 
         Map<String, Boolean> schemaMatchResults = compareSchemas(restFileSpec, restScannedSpec);
+
+        // Preserve components.securitySchemes from fileSpec (scannedSpec doesn't have securitySchemes from annotation)
+        if (restFileSpec != null && restFileSpec.getComponents() != null && 
+            restFileSpec.getComponents().getSecuritySchemes() != null) {
+            // scannedSpec에 fileSpec의 securitySchemes 복사
+            if (restScannedSpec.getComponents() == null) {
+                restScannedSpec.setComponents(new kr.co.ouroboros.core.rest.common.dto.Components());
+            }
+            restScannedSpec.getComponents().setSecuritySchemes(restFileSpec.getComponents().getSecuritySchemes());
+            log.info("✓ Preserved {} security scheme(s) from file spec: {}", 
+                restFileSpec.getComponents().getSecuritySchemes().size(),
+                restFileSpec.getComponents().getSecuritySchemes().keySet());
+        }
 
         Map<String, PathItem> pathsScanned = safe(restScannedSpec.getPaths());
         Map<String, PathItem> pathsFile = restFileSpec.getPaths();

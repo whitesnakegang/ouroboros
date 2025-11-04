@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { FakerProviderSelect } from "./FakerProviderSelect";
 
 interface KeyValuePair {
   key: string;
   value: string;
+  required?: boolean;
+  description?: string;
+  type?: string;
 }
 
 interface BodyField {
@@ -20,19 +22,35 @@ interface RequestBody {
   fields: BodyField[]; // 표 형식 데이터
 }
 
+interface AuthConfig {
+  type: "none" | "apiKey" | "bearer" | "jwtBearer" | "basicAuth" | "digestAuth" | "oauth2" | "oauth1";
+  apiKey?: { key: string; value: string; addTo: "header" | "query" };
+  bearer?: { token: string };
+  basicAuth?: { username: string; password: string };
+  oauth2?: { accessToken: string; tokenType?: string };
+}
+
 interface ApiRequestCardProps {
+  queryParams: KeyValuePair[];
+  setQueryParams: (params: KeyValuePair[]) => void;
   requestHeaders: KeyValuePair[];
   setRequestHeaders: (headers: KeyValuePair[]) => void;
   requestBody: RequestBody;
   setRequestBody: (body: RequestBody) => void;
+  auth: AuthConfig;
+  setAuth: (auth: AuthConfig) => void;
   isReadOnly?: boolean;
 }
 
 export function ApiRequestCard({
+  queryParams,
+  setQueryParams,
   requestHeaders,
   setRequestHeaders,
   requestBody,
   setRequestBody,
+  auth,
+  setAuth,
   isReadOnly = false,
 }: ApiRequestCardProps) {
   const bodyTypes: RequestBody["type"][] = [
@@ -54,7 +72,7 @@ export function ApiRequestCard({
 
   const addHeader = () => {
     if (isReadOnly) return;
-    setRequestHeaders([...requestHeaders, { key: "", value: "" }]);
+    setRequestHeaders([...requestHeaders, { key: "", value: "", required: false }]);
   };
 
   const removeHeader = (index: number) => {
@@ -73,7 +91,7 @@ export function ApiRequestCard({
     setRequestHeaders(updated);
   };
 
-  const [activeTab, setActiveTab] = useState("headers");
+  const [activeTab, setActiveTab] = useState("body");
 
   return (
     <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm mb-6">
@@ -140,12 +158,24 @@ export function ApiRequestCard({
             </div>
             <div className="space-y-2">
               {requestHeaders.map((header, index) => (
-                <div key={index} className="flex gap-2">
+                <div key={index} className="flex gap-2 items-center">
+                  <input
+                    type="checkbox"
+                    checked={header.required || false}
+                    onChange={(e) => {
+                      const updated = [...requestHeaders];
+                      updated[index].required = e.target.checked;
+                      setRequestHeaders(updated);
+                    }}
+                    disabled={isReadOnly}
+                    className="w-4 h-4"
+                    title="Required"
+                  />
                   <input
                     type="text"
                     value={header.key}
                     onChange={(e) => updateHeader(index, "key", e.target.value)}
-                    placeholder="Header Name (e.g., Content-Type)"
+                    placeholder="Header Name (e.g., X-API-Key)"
                     disabled={isReadOnly}
                     className="flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm"
                   />
@@ -155,7 +185,7 @@ export function ApiRequestCard({
                     onChange={(e) =>
                       updateHeader(index, "value", e.target.value)
                     }
-                    placeholder="Header Value (e.g., application/json)"
+                    placeholder="Header Value (e.g., abc123)"
                     disabled={isReadOnly}
                     className="flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm"
                   />
@@ -279,21 +309,23 @@ export function ApiRequestCard({
                             />
                           </td>
                           <td className="px-4 py-3">
-                            <FakerProviderSelect
+                            <input
+                              type="text"
                               value={item.value}
-                              onChange={(newVal) => {
+                              onChange={(e) => {
                                 const updated = [...requestBody.fields!];
                                 updated[index] = {
                                   ...updated[index],
-                                  value: newVal,
+                                  value: e.target.value,
                                 };
                                 setRequestBody({
                                   ...requestBody,
                                   fields: updated,
                                 });
                               }}
-                              placeholder="DataFaker 값만 선택 (예: $internet.email)"
+                              placeholder="예: John Doe, 123"
                               disabled={isReadOnly}
+                              className="w-full px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
                             />
                           </td>
                           <td className="px-4 py-3">
@@ -363,14 +395,124 @@ export function ApiRequestCard({
         )}
 
         {activeTab === "params" && (
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-            <p>Query Parameters 기능은 준비 중입니다.</p>
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs text-gray-600 dark:text-[#8B949E]">
+                쿼리 파라미터 설정 (URL 뒤에 ?key=value 형태)
+              </p>
+              <button
+                onClick={() => setQueryParams([...queryParams, { key: "", value: "", type: "string", required: false }])}
+                disabled={isReadOnly}
+                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                  isReadOnly
+                    ? "text-gray-400 dark:text-[#8B949E] cursor-not-allowed"
+                    : "text-[#2563EB] hover:text-[#1E40AF]"
+                }`}
+              >
+                + Add Param
+              </button>
+            </div>
+            <div className="space-y-2">
+              {queryParams.length === 0 ? (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  <p className="text-sm">쿼리 파라미터가 없습니다.</p>
+                </div>
+              ) : (
+                queryParams.map((param, index) => (
+                  <div key={index} className="flex gap-2 items-center">
+                    <input
+                      type="checkbox"
+                      checked={param.required || false}
+                      onChange={(e) => {
+                        const updated = [...queryParams];
+                        updated[index].required = e.target.checked;
+                        setQueryParams(updated);
+                      }}
+                      disabled={isReadOnly}
+                      className="w-4 h-4"
+                      title="Required"
+                    />
+                    <input
+                      type="text"
+                      value={param.key}
+                      onChange={(e) => {
+                        const updated = [...queryParams];
+                        updated[index].key = e.target.value;
+                        setQueryParams(updated);
+                      }}
+                      placeholder="Key (예: page, limit)"
+                      disabled={isReadOnly}
+                      className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
+                    />
+                    <select
+                      value={param.type || "string"}
+                      onChange={(e) => {
+                        const updated = [...queryParams];
+                        updated[index].type = e.target.value;
+                        setQueryParams(updated);
+                      }}
+                      disabled={isReadOnly}
+                      className="px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
+                    >
+                      <option value="string">string</option>
+                      <option value="number">number</option>
+                      <option value="integer">integer</option>
+                      <option value="boolean">boolean</option>
+                    </select>
+                    <input
+                      type="text"
+                      value={param.value}
+                      onChange={(e) => {
+                        const updated = [...queryParams];
+                        updated[index].value = e.target.value;
+                        setQueryParams(updated);
+                      }}
+                      placeholder="Value (예: 1, true)"
+                      disabled={isReadOnly}
+                      className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
+                    />
+                    <button
+                      onClick={() => setQueryParams(queryParams.filter((_, i) => i !== index))}
+                      disabled={isReadOnly}
+                      className="p-1.5 text-red-500 hover:text-red-600 disabled:opacity-50"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         )}
 
         {activeTab === "auth" && (
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-            <p>인증 설정 기능은 준비 중입니다.</p>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Authentication Type
+              </label>
+              <select
+                value={auth.type}
+                onChange={(e) => setAuth({ ...auth, type: e.target.value as any })}
+                disabled={isReadOnly}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-[#30363D] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="none">No Auth</option>
+                <option value="bearer">Bearer Token</option>
+                <option value="apiKey">API Key</option>
+                <option value="basicAuth">Basic Auth</option>
+              </select>
+            </div>
+
+            {auth.type !== "none" && (
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
+                <p className="text-sm text-blue-700 dark:text-blue-300">
+                  ✓ <strong>{auth.type}</strong> 인증이 활성화됩니다. Mock 서버가 Authorization 헤더를 검증합니다.
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>

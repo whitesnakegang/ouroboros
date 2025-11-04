@@ -37,7 +37,8 @@ public final class EndpointDiffHelper {
             return false;
         }
 
-        pathsFile.put(url, pathsScanned.get(url));
+        PathItem scannedPath = pathsScanned.get(url);
+        pathsFile.put(url, scannedPath);
         PathItem addedPath = pathsFile.get(url);
         log.info("URL : {} 존재하지 않는 경우", url);
         for (RequestDiffHelper.HttpMethod method : RequestDiffHelper.HttpMethod.values()) {
@@ -50,6 +51,7 @@ public final class EndpointDiffHelper {
                 }
                 op.setXOuroborosDiff("endpoint");
                 op.setXOuroborosTag("none");
+                // Note: security is preserved from scannedPath (will be empty from annotation scan)
             }
         }
 
@@ -81,6 +83,13 @@ public final class EndpointDiffHelper {
     public static void markDiffEndpoint(String url, Operation scanOp, Map<String, PathItem> restFileSpec, HttpMethod method) {
         log.info("METHOD: [{}], URL: [{}]은 같지만 METHOD는 다름", method, url);
         PathItem pathItem = restFileSpec.get(url);
+
+        // Preserve security from existing operation (if exists)
+        Operation existingOp = getOperationByMethod(pathItem, method);
+        if (existingOp != null && existingOp.getSecurity() != null && !existingOp.getSecurity().isEmpty()) {
+            scanOp.setSecurity(existingOp.getSecurity());
+            log.debug("Preserved {} security requirement(s) from existing operation", existingOp.getSecurity().size());
+        }
 
         // Generate x-ouroboros-id if not present
         if (scanOp.getXOuroborosId() == null) {
