@@ -93,7 +93,7 @@ public class RestApiYamlParser {
 
     /**
      * Reads the OpenAPI document from OuroApiSpecManager cache.
-     * Retrieves the cached OuroApiSpec and converts it to Map representation.
+     * Falls back to direct file reading if cache is not available (e.g., during initialization).
      * Returns a deep copy to prevent cache pollution.
      *
      * @return OpenAPI document as a map (deep copy)
@@ -106,14 +106,36 @@ public class RestApiYamlParser {
             throw new IllegalStateException("YAML file does not exist: " + filePath);
         }
 
-        // Get cached spec from OuroApiSpecManager
-        OuroApiSpec cachedSpec = specManager.getApiSpec(Protocol.REST);
+        try {
+            // Try to get cached spec from OuroApiSpecManager
+            OuroApiSpec cachedSpec = specManager.getApiSpec(Protocol.REST);
+            Map<String, Object> document = specManager.convertSpecToMap(cachedSpec);
+            return deepCopy(document);
+        } catch (Exception e) {
+            // Fallback: read directly from file during initialization
+            log.debug("Cache not available, reading directly from file: {}", e.getMessage());
+            return readDocumentDirectly();
+        }
+    }
 
-        // Convert OuroApiSpec to Map
-        Map<String, Object> document = specManager.convertSpecToMap(cachedSpec);
-
-        // Return deep copy to prevent modification of cached object
-        return deepCopy(document);
+    /**
+     * Reads the OpenAPI document directly from the file without using cache.
+     * Used as fallback during initialization when cache is not yet available.
+     *
+     * @return OpenAPI document as a map
+     * @throws Exception if file reading fails
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> readDocumentDirectly() throws Exception {
+        Path filePath = getYamlFilePath();
+        try (InputStream is = Files.newInputStream(filePath)) {
+            Yaml yaml = createYaml();
+            Object loaded = yaml.load(is);
+            Map<String, Object> document = (loaded instanceof Map)
+                    ? (Map<String, Object>) loaded
+                    : new LinkedHashMap<>();
+            return deepCopy(document);
+        }
     }
 
     /**

@@ -8,13 +8,14 @@ import io.swagger.v3.oas.models.OpenAPI;
 import java.io.FileWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Locale;
 import java.util.Map;
 import kr.co.ouroboros.core.global.Protocol;
 import kr.co.ouroboros.core.global.handler.OuroProtocolHandler;
 import kr.co.ouroboros.core.global.spec.OuroApiSpec;
 import kr.co.ouroboros.core.rest.common.dto.OuroRestApiSpec;
-import kr.co.ouroboros.core.rest.common.yaml.RestApiYamlParser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springdoc.core.service.OpenAPIService;
@@ -29,10 +30,11 @@ public class OuroRestHandler implements OuroProtocolHandler {
 
     private final OpenAPIService openAPIService;
     private final RestSpecSyncPipeline pipeline;
-    private final RestApiYamlParser yamlParser;
 
     private static final ObjectMapper mapper = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true); // DTO에 @JsonIgnoreProperties로 안전
+
+    private static final String RESOURCE_PATH = System.getProperty("user.dir") + "/src/main/resources";
 
 
     /**
@@ -108,7 +110,7 @@ public class OuroRestHandler implements OuroProtocolHandler {
     }
     
     /**
-     * Serialize an OuroRestApiSpec to YAML and persist it to the file path provided by the YAML parser.
+     * Serialize an OuroRestApiSpec to YAML and persist it to the file path calculated from getSpecFilePath().
      *
      * @param specToSave the spec to serialize; must be an instance of {@code OuroRestApiSpec}
      * @throws IllegalArgumentException if {@code specToSave} is not an {@code OuroRestApiSpec}
@@ -136,8 +138,12 @@ public class OuroRestHandler implements OuroProtocolHandler {
             Yaml yaml = new Yaml(options);
             String yamlContent = yaml.dump(map);
 
-            // yamlParser에서 저장 경로 가져와서 파일에 저장
-            var filePath = yamlParser.getYamlFilePath();
+            // getSpecFilePath()를 활용해서 파일 경로 계산
+            String specPath = getSpecFilePath();
+            // "/ouroboros/rest/ourorest.yml" -> "ouroboros/rest/ourorest.yml"
+            String relativePath = specPath.startsWith("/") ? specPath.substring(1) : specPath;
+            Path filePath = Paths.get(RESOURCE_PATH, relativePath);
+
             Files.createDirectories(filePath.getParent());
 
             try (FileWriter writer = new FileWriter(filePath.toFile(), StandardCharsets.UTF_8)) {
