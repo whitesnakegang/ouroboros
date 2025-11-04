@@ -1,6 +1,5 @@
 package kr.co.ouroboros.core.rest.handler;
 
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import kr.co.ouroboros.core.global.handler.SpecSyncPipeline;
@@ -26,6 +25,8 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
     @Autowired
     private SchemaComparator schemaComparator;
 
+
+
     /**
      * Synchronizes the file-based REST API specification with the scanned runtime specification.
      * <p>
@@ -38,9 +39,23 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
     @Override
     public OuroApiSpec validate(OuroApiSpec fileSpec, OuroApiSpec scannedSpec) {
 
-        // TODO 파이프라인 구성
         OuroRestApiSpec restFileSpec = (OuroRestApiSpec) fileSpec;
         OuroRestApiSpec restScannedSpec = (OuroRestApiSpec) scannedSpec;
+
+        if (fileSpec == null && !restScannedSpec.getPaths().isEmpty()) {
+            restFileSpec = restScannedSpec;
+            Map<String, PathItem> paths = restFileSpec.getPaths();
+            for(String url : paths.keySet()){
+                PathItem pathItem = paths.get(url);
+                for(HttpMethod httpMethod : HttpMethod.values()){
+                    Operation operationByMethod = getOperationByMethod(pathItem, httpMethod);
+                    if(operationByMethod != null){
+                        operationByMethod.setXOuroborosDiff("endpoint");
+                    }
+                }
+            }
+            return restFileSpec;
+        }
 
         Map<String, Boolean> schemaMatchResults = compareSchemas(restFileSpec, restScannedSpec);
 

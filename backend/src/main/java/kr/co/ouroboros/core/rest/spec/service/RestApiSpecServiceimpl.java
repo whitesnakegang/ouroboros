@@ -1,5 +1,7 @@
 package kr.co.ouroboros.core.rest.spec.service;
 
+import kr.co.ouroboros.core.global.Protocol;
+import kr.co.ouroboros.core.global.manager.OuroApiSpecManager;
 import kr.co.ouroboros.core.rest.common.yaml.RestApiYamlParser;
 import kr.co.ouroboros.core.rest.spec.model.*;
 import kr.co.ouroboros.core.rest.spec.validator.SchemaValidator;
@@ -33,6 +35,7 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
 
     private final RestApiYamlParser yamlParser;
     private final SchemaValidator schemaValidator;
+    private final OuroApiSpecManager specManager;
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
     private static final List<String> HTTP_METHODS = Arrays.asList(
@@ -68,8 +71,8 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
                 log.info("Auto-created {} missing schema(s)", createdSchemas);
             }
 
-            // Write back to file
-            yamlParser.writeDocument(openApiDoc);
+            // Process and cache: writes to file + validates with scanned state + updates cache
+            specManager.processAndCacheSpec(Protocol.REST, openApiDoc);
 
             log.info("Created REST API spec: {} {} (ID: {})", request.getMethod().toUpperCase(), request.getPath(), id);
 
@@ -232,8 +235,8 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
                 log.info("Auto-created {} missing schema(s)", createdSchemas);
             }
 
-            // Write back to file
-            yamlParser.writeDocument(openApiDoc);
+            // Process and cache: writes to file + validates with scanned state + updates cache
+            specManager.processAndCacheSpec(Protocol.REST, openApiDoc);
 
             return convertToResponse(id, finalPath, finalMethod, operation);
         } finally {
@@ -279,8 +282,8 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
                 throw new IllegalArgumentException("REST API specification with ID '" + id + "' not found");
             }
 
-            // Write back to file
-            yamlParser.writeDocument(openApiDoc);
+            // Process and cache: writes to file + validates with scanned state + updates cache
+            specManager.processAndCacheSpec(Protocol.REST, openApiDoc);
         } finally {
             lock.writeLock().unlock();
         }
@@ -353,6 +356,11 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         if (request.getSecurity() != null) {
             operation.put("security", convertSecurity(request.getSecurity()));
         }
+
+        // Reset x-ouroboros-diff to "none" when user explicitly updates the spec
+        // This indicates the user has acknowledged the endpoint and it's no longer a "diff"
+        operation.put("x-ouroboros-diff", "none");
+
         // Note: progress and tag are NOT updated via API
         // They are managed internally or by YAML parser
     }
