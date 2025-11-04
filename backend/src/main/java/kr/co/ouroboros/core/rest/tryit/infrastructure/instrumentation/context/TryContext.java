@@ -105,19 +105,8 @@ public class TryContext {
      * the tryId into unrelated executions.
      */
     public static void clear() {
-        try {
-            Baggage currentBaggage = Baggage.current();
-            String existingId = currentBaggage.getEntryValue(BAGGAGE_KEY);
-            
-            if (existingId != null) {
-                BaggageBuilder builder = currentBaggage.toBuilder();
-                builder.remove(BAGGAGE_KEY);
-                Baggage updatedBaggage = builder.build();
-                updatedBaggage.makeCurrent();
-                log.debug("Cleared tryId from baggage: {}", existingId);
-            }
-        } catch (Exception e) {
-            log.trace("OpenTelemetry Baggage not available: {}", e.getMessage());
-        }
+        // Scope.close()를 통해 자동으로 정리되므로 명시적 clear는 불필요
+        // 이 메서드는 하위 호환성을 위해 유지하되, 실제 동작은 Scope.close()에 위임
+        log.debug("TryContext.clear() called - context will be cleared by Scope.close()");
     }
 }
