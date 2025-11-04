@@ -78,6 +78,7 @@ public class MethodTracingConfig {
 
         // ClassFilter: 사용자 루트 패키지 하위만 허용, SDK/인프라/자바/OTel/Micrometer 등은 제외
         ClassFilter classFilter = clazz -> {
+            if (!props.isEnabled()) return false;
             // 허용 목록이 비어있으면 관찰 비활성화
             if (roots.isEmpty()) return false;
 
