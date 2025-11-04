@@ -55,7 +55,7 @@ interface StatusCode {
   code: string;
   type: "Success" | "Error";
   message: string;
-  headers?: Array<{ key: string; value: string }>;  // Response headers
+  headers?: Array<{ key: string; value: string }>; // Response headers
   schema?: {
     ref?: string; // 스키마 참조 (예: "User")
     properties?: Record<string, any>; // 인라인 스키마
@@ -131,20 +131,32 @@ export function ApiEditorLayout() {
       setTags(spec.tags ? spec.tags.join(", ") : "");
 
       // Security를 auth state로 변환
-      if (spec.security && Array.isArray(spec.security) && spec.security.length > 0) {
-        const firstSecurity = spec.security[0] as { requirements?: Record<string, unknown> };
+      if (
+        spec.security &&
+        Array.isArray(spec.security) &&
+        spec.security.length > 0
+      ) {
+        const firstSecurity = spec.security[0] as {
+          requirements?: Record<string, unknown>;
+        };
         if (firstSecurity && firstSecurity.requirements) {
           const schemeName = Object.keys(firstSecurity.requirements)[0];
-          
-          switch(schemeName) {
+
+          switch (schemeName) {
             case "BearerAuth":
               setAuth({ type: "bearer", bearer: { token: "" } });
               break;
             case "BasicAuth":
-              setAuth({ type: "basicAuth", basicAuth: { username: "", password: "" } });
+              setAuth({
+                type: "basicAuth",
+                basicAuth: { username: "", password: "" },
+              });
               break;
             case "ApiKeyAuth":
-              setAuth({ type: "apiKey", apiKey: { key: "X-API-Key", value: "", addTo: "header" } });
+              setAuth({
+                type: "apiKey",
+                apiKey: { key: "X-API-Key", value: "", addTo: "header" },
+              });
               break;
             default:
               setAuth({ type: "none" });
@@ -196,10 +208,14 @@ export function ApiEditorLayout() {
           }
         });
       }
-      
+
       // 폼 state 업데이트
       setQueryParams(formQueryParams);
-      setRequestHeaders(formHeaders.length > 0 ? formHeaders : [{ key: "Content-Type", value: "application/json" }]);
+      setRequestHeaders(
+        formHeaders.length > 0
+          ? formHeaders
+          : [{ key: "Content-Type", value: "application/json" }]
+      );
 
       // 기본 Content-Type 헤더 추가
       if (!testHeaders.find((h) => h.key.toLowerCase() === "content-type")) {
@@ -265,10 +281,18 @@ export function ApiEditorLayout() {
   const [tags, setTags] = useState("");
   const [description, setDescription] = useState("");
   const [summary, setSummary] = useState("");
-  
+
   // Auth state
   const [auth, setAuth] = useState<{
-    type: "none" | "apiKey" | "bearer" | "jwtBearer" | "basicAuth" | "digestAuth" | "oauth2" | "oauth1";
+    type:
+      | "none"
+      | "apiKey"
+      | "bearer"
+      | "jwtBearer"
+      | "basicAuth"
+      | "digestAuth"
+      | "oauth2"
+      | "oauth1";
     apiKey?: { key: string; value: string; addTo: "header" | "query" };
     bearer?: { token: string };
     basicAuth?: { username: string; password: string };
@@ -421,18 +445,18 @@ export function ApiEditorLayout() {
 
   /**
    * Auth 상태를 OpenAPI security 구조로 변환
-   * 백엔드 형식: List<SecurityRequirement> 
+   * 백엔드 형식: List<SecurityRequirement>
    * SecurityRequirement = { requirements: Map<String, List<String>> }
    */
   const convertAuthToSecurity = (): any[] => {
     console.log("🔐 convertAuthToSecurity called, auth.type:", auth.type);
-    
+
     if (auth.type === "none") {
       return [];
     }
-    
+
     let schemeName = "";
-    
+
     switch (auth.type) {
       case "bearer":
       case "jwtBearer":
@@ -454,19 +478,21 @@ export function ApiEditorLayout() {
         schemeName = "DigestAuth";
         break;
     }
-    
+
     if (!schemeName) {
       console.warn("⚠️ No schemeName matched for auth.type:", auth.type);
       return [];
     }
-    
+
     // 백엔드 SecurityRequirement 형식으로 변환
-    const result = [{
-      requirements: {
-        [schemeName]: []
-      }
-    }];
-    
+    const result = [
+      {
+        requirements: {
+          [schemeName]: [],
+        },
+      },
+    ];
+
     console.log("✓ Converted security:", result);
     return result;
   };
