@@ -54,10 +54,11 @@ export function Sidebar({ onAddNew }: SidebarProps) {
         const ep = endpoint as {
           progress?: string;
         };
+        const progressLower = ep.progress?.toLowerCase();
         if (activeFilter === "mock") {
-          return ep.progress !== "completed";
+          return progressLower !== "completed";
         } else {
-          return ep.progress === "completed";
+          return progressLower === "completed";
         }
       });
 

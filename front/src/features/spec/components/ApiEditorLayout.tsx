@@ -103,7 +103,7 @@ export function ApiEditorLayout() {
   );
 
   // Completed 상태인지 확인
-  const isCompleted = selectedEndpoint?.progress === "completed";
+  const isCompleted = selectedEndpoint?.progress?.toLowerCase() === "completed";
 
   // 수정/삭제 불가능한 상태인지 확인 (completed이거나 diff가 있는 경우)
   const isReadOnly = isCompleted || hasDiff;
@@ -319,7 +319,7 @@ export function ApiEditorLayout() {
   const allEndpoints = Object.values(endpoints || {}).flat();
   const totalEndpoints = allEndpoints.length || 0;
   const completedEndpoints = allEndpoints.filter(
-    (ep) => ep.progress === "completed"
+    (ep) => ep.progress?.toLowerCase() === "completed"
   ).length;
   const progressPercentage = totalEndpoints
     ? Math.round((completedEndpoints / totalEndpoints) * 100)
@@ -480,7 +480,7 @@ export function ApiEditorLayout() {
     }
 
     if (!schemeName) {
-      console.warn("⚠️ No schemeName matched for auth.type:", auth.type);
+      console.warn("No schemeName matched for auth.type:", auth.type);
       return [];
     }
 

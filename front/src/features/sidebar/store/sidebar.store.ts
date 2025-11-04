@@ -45,7 +45,7 @@ function convertSpecToEndpoint(spec: RestApiSpecResponse): Endpoint {
     tag?: string,
     progress?: string
   ): Endpoint["implementationStatus"] => {
-    if (progress === "completed") return undefined;
+    if (progress?.toLowerCase() === "completed") return undefined;
     switch (tag) {
       case "implementing":
         return "in-progress";

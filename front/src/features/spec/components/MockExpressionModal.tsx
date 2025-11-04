@@ -215,7 +215,19 @@ export function MockExpressionModal({
             ) : (
               <div className="flex items-center justify-center h-full text-gray-400 dark:text-[#8B949E]">
                 <div className="text-center">
-                  <div className="text-4xl mb-2">👈</div>
+                  <svg
+                    className="w-12 h-12 mx-auto mb-2 text-gray-300 dark:text-[#6B7280]"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5l7 7-7 7"
+                    />
+                  </svg>
                   <p>Provider를 선택하세요</p>
                 </div>
               </div>
@@ -311,7 +323,19 @@ export function MockExpressionModal({
             ) : (
               <div className="flex items-center justify-center h-full text-gray-400 dark:text-[#8B949E]">
                 <div className="text-center">
-                  <div className="text-4xl mb-2">👈</div>
+                  <svg
+                    className="w-12 h-12 mx-auto mb-2 text-gray-300 dark:text-[#6B7280]"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5l7 7-7 7"
+                    />
+                  </svg>
                   <p>메소드를 선택하세요</p>
                 </div>
               </div>
