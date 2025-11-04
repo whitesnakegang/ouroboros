@@ -62,9 +62,7 @@ public class OuroApiSpecManager {
         // 2. 코드 스캔
         OuroApiSpec scannedSpec = handler.scanCurrentState();
 
-        OuroRestApiSpec restApiSpec = null;
-        if (scannedSpec instanceof OuroRestApiSpec) {
-            restApiSpec = (OuroRestApiSpec) scannedSpec;
+        if (scannedSpec instanceof OuroRestApiSpec restApiSpec) {
             if (fileSpec == null && restApiSpec.getPaths()
                     .isEmpty()) {
                 return;
