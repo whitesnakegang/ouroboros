@@ -1,6 +1,5 @@
 package kr.co.ouroboros.core.rest.mock.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import kr.co.ouroboros.core.rest.mock.model.EndpointMeta;
 import lombok.RequiredArgsConstructor;
@@ -35,7 +34,6 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class MockValidationService {
-    private final ObjectMapper objectMapper;
     /**
      * Validate an incoming HttpServletRequest against the endpoint requirements defined in EndpointMeta for a mock endpoint.
      *
