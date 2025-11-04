@@ -50,9 +50,9 @@ public class MethodTracingProperties {
     private java.util.List<String> allowedPackages = new java.util.ArrayList<>();
 
     /**
-     * Returns whether method tracing is enabled.
+     * Indicates whether method-level tracing is enabled.
      *
-     * @return true if enabled, false otherwise
+     * @return `true` if method tracing is enabled, `false` otherwise
      */
     public boolean isEnabled() {
         return enabled;
@@ -68,26 +68,24 @@ public class MethodTracingProperties {
     }
 
     /**
-     * Returns the list of allowed package prefixes for tracing.
-     * <p>
-     * Only classes in these packages (or implementing/extending classes
-     * from these packages) will be traced.
-     *
-     * @return List of package prefixes (never null, may be empty)
-     */
+         * Package prefixes that determine which classes are eligible for method-level tracing.
+         * <p>
+         * Only classes whose package starts with one of these prefixes, and their related interfaces or subclasses, will be traced.
+         *
+         * @return the list of package prefixes; never {@code null}, may be empty
+         */
     public java.util.List<String> getAllowedPackages() {
         return allowedPackages;
     }
 
     /**
-     * Sets the list of allowed package prefixes for tracing.
-     * <p>
-     * If null is provided, sets to empty list (effectively disables tracing).
+     * Set the package prefixes for which method tracing is enabled.
      *
-     * @param allowedPackages List of package prefixes, or null to clear
+     * If `allowedPackages` is `null` it is replaced with an empty list, which disables tracing.
+     *
+     * @param allowedPackages package prefixes to enable tracing for, or `null` to clear the list
      */
     public void setAllowedPackages(java.util.List<String> allowedPackages) {
         this.allowedPackages = (allowedPackages != null) ? allowedPackages : new java.util.ArrayList<>();
     }
 }
-

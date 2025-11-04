@@ -42,19 +42,10 @@ public class TryIssuesService {
     private final IssueAnalyzer issueAnalyzer;
     
     /**
-     * Retrieves detected issues for a Try without trace spans.
-     * <p>
-     * This method is optimized for performance by skipping tree building:
-     * <ol>
-     *   <li>Retrieves trace data from Tempo using tryId</li>
-     *   <li>Analyzes spans for performance issues</li>
-     *   <li>Detects bottlenecks, N+1 queries, slow calls</li>
-     *   <li>Returns issue list with recommendations</li>
-     * </ol>
+     * Retrieve detected performance issues for a Try session without constructing a trace tree.
      *
-     * @param tryIdStr Try session ID (must be a valid UUID)
-     * @return Issues response with detected issues and recommendations
-     * @throws Exception if retrieval fails
+     * @param tryIdStr Try session ID as a UUID string used to locate trace data
+     * @return a TryIssuesResponse containing the given tryId and the list of detected issues (empty list when no trace or on failure)
      */
     public TryIssuesResponse getIssues(String tryIdStr) {
         log.info("Retrieving issues for tryId: {}", tryIdStr);
@@ -150,4 +141,3 @@ public class TryIssuesService {
         return (maxEnd - minStart) / 1_000_000; // Convert nanoseconds to milliseconds
     }
 }
-

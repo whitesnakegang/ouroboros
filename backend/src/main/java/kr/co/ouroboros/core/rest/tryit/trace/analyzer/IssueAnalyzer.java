@@ -121,13 +121,14 @@ public class IssueAnalyzer {
     }
     
     /**
-     * Checks if span represents an HTTP operation.
-     * <p>
-     * Identifies HTTP spans by checking span name for HTTP-related patterns:
-     * starts with "HTTP" or "http", or contains "http.method" or "http.status_code".
+     * Determines whether the given span represents an HTTP operation.
      *
-     * @param span Span information to check
-     * @return true if span represents an HTTP operation, false otherwise
+     * Identifies HTTP spans by the span name containing HTTP-related indicators
+     * such as starting with "HTTP" or "http", or containing "http.method" or
+     * "http.status_code" (case-insensitive for contained tokens).
+     *
+     * @param span span information to evaluate
+     * @return `true` if the span represents an HTTP operation, `false` otherwise
      */
     private boolean isHttpSpan(TraceSpanInfo span) {
         String name = span.getName() != null ? span.getName() : "";
@@ -164,13 +165,10 @@ public class IssueAnalyzer {
     }
     
     /**
-     * Builds evidence list for a detected issue.
-     * <p>
-     * Creates a list of evidence strings including duration, kind, and name
-     * to support the issue detection.
+     * Build a list of evidence strings extracted from the given span.
      *
-     * @param span Span information to extract evidence from
-     * @return List of evidence strings supporting the issue detection
+     * @param span span information to extract evidence from; if the span's duration is null, the duration entry will be "unknown"
+     * @return a list of strings containing entries for duration (milliseconds or "unknown"), kind, and name
      */
     private List<String> buildEvidence(TraceSpanInfo span) {
         List<String> evidence = new ArrayList<>();
@@ -181,4 +179,3 @@ public class IssueAnalyzer {
         return evidence;
     }
 }
-

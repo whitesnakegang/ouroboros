@@ -70,15 +70,13 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Handles illegal argument exceptions (validation errors).
-     * <p>
-     * Returns 400 Bad Request when request parameters or data are invalid.
-     * <p>
-     * Note: Detailed exception message is logged but not exposed to client for security.
-     *
-     * @param ex the illegal argument exception
-     * @return response entity with 400 status and error details
-     */
+         * Handle IllegalArgumentException thrown for invalid request parameters or data.
+         *
+         * Returns an HTTP 400 Bad Request with a generic error payload; detailed exception information is logged but not exposed to the client.
+         *
+         * @param ex the IllegalArgumentException caused by invalid input
+         * @return a ResponseEntity containing a GlobalApiResponse<Void> with HTTP 400 and an error code indicating an invalid request
+         */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<GlobalApiResponse<Void>> handleIllegalArgument(IllegalArgumentException ex) {
         // Log detailed error for debugging
@@ -96,13 +94,10 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Handles class cast exceptions (type mismatch errors).
-     * <p>
-     * Returns 400 Bad Request when data structure contains type mismatches.
-     * Logs detailed error information but returns generic message to client.
+     * Produce a standardized 400 Bad Request response for type mismatch errors represented by ClassCastException.
      *
-     * @param ex the class cast exception
-     * @return response entity with 400 status and error details
+     * @param ex the caught ClassCastException
+     * @return a ResponseEntity containing a GlobalApiResponse<Void> with HTTP 400 and an `INVALID_FORMAT` error indicating an invalid data format
      */
     @ExceptionHandler(ClassCastException.class)
     public ResponseEntity<GlobalApiResponse<Void>> handleClassCast(ClassCastException ex) {
@@ -121,13 +116,10 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Handles null pointer exceptions (null value errors).
-     * <p>
-     * Returns 400 Bad Request when data contains unexpected null values.
-     * Logs detailed error information but returns generic message to client.
+     * Handle NullPointerException thrown during request processing and return a 400 Bad Request response.
      *
-     * @param ex the null pointer exception
-     * @return response entity with 400 status and error details
+     * @param ex the NullPointerException that was thrown
+     * @return a GlobalApiResponse<Void> with HTTP status 400 and an error payload indicating an invalid data structure
      */
     @ExceptionHandler(NullPointerException.class)
     public ResponseEntity<GlobalApiResponse<Void>> handleNullPointer(NullPointerException ex) {
@@ -146,15 +138,12 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Handles all other uncaught exceptions.
-     * <p>
-     * Returns 500 Internal Server Error as a catch-all for unexpected errors.
-     * Logs detailed error information but returns generic message to client.
-     * <p>
-     * This handler catches any exceptions not handled by package-specific handlers.
+     * Catch-all handler for uncaught exceptions thrown by controllers.
      *
-     * @param ex the exception
-     * @return response entity with 500 status and error details
+     * Constructs a standardized error response with HTTP 500 and error code `INTERNAL_ERROR`.
+     *
+     * @param ex the uncaught exception
+     * @return a ResponseEntity containing a GlobalApiResponse<Void> with HTTP 500 and error code `INTERNAL_ERROR`
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<GlobalApiResponse<Void>> handleGeneral(Exception ex) {
@@ -172,4 +161,3 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }
 }
-

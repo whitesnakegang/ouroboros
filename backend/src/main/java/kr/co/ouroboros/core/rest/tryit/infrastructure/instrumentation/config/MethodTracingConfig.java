@@ -53,30 +53,15 @@ import java.util.Set;
 public class MethodTracingConfig {
 
     /**
-     * Creates AOP advisor for method-level tracing.
-     * <p>
-     * Configures Spring AOP advisor that:
-     * <ul>
-     *   <li>Intercepts all methods in classes matching ClassFilter criteria</li>
-     *   <li>Uses {@link MethodTracingMethodInterceptor} to create observation spans</li>
-     *   <li>Applies only to classes in allowed packages from properties</li>
-     *   <li>Excludes SDK classes (kr.co.ouroboros.*)</li>
-     * </ul>
-     * <p>
-     * ClassFilter checks:
-     * <ol>
-     *   <li>Target class itself is in allowed package</li>
-     *   <li>Implemented interfaces include class in allowed package</li>
-     *   <li>Superclass chain includes class in allowed package</li>
-     * </ol>
-     * <p>
-     * If allowedPackages is empty, returns an advisor that matches no classes
-     * (effectively disables method tracing).
+     * Creates an AOP advisor that applies method-level tracing to application classes.
      *
-     * @param observationRegistryProvider Provider for ObservationRegistry (optional)
-     * @param props Method tracing properties containing allowed packages
-     * @param beanFactory Bean factory (currently unused, reserved for future use)
-     * @return AOP advisor for method tracing
+     * The returned advisor applies MethodTracingMethodInterceptor to methods of classes whose packages are allowed by
+     * MethodTracingProperties; if no allowed packages are configured the advisor matches no classes (tracing disabled).
+     *
+     * @param observationRegistryProvider optional provider for ObservationRegistry used by the interceptor
+     * @param props configuration properties containing allowed packages for tracing
+     * @param beanFactory reserved for future use
+     * @return an Advisor that instruments methods in configured allowed packages using MethodTracingMethodInterceptor
      */
     @Bean
     @ConditionalOnMissingBean(name = "ouroborosMethodTracingAdvisor")
@@ -129,11 +114,23 @@ public class MethodTracingConfig {
 
         // 모든 메서드 허용(클래스 필터로만 제한)
         Pointcut pointcut = new StaticMethodMatcherPointcut() {
+            /**
+             * Matches every method unconditionally so method-level filtering is disabled.
+             *
+             * @param method the method being evaluated
+             * @param targetClass the class on which the method is declared or invoked
+             * @return true indicating this pointcut matches all methods
+             */
             @Override
             public boolean matches(Method method, Class<?> targetClass) {
                 return true;
             }
 
+            /**
+             * Provide the ClassFilter used by the pointcut to determine which classes are eligible for method tracing.
+             *
+             * @return the ClassFilter that enforces configured allowed package roots and excludes SDK/infrastructure packages
+             */
             @Override
             public ClassFilter getClassFilter() {
                 return classFilter;
@@ -144,4 +141,3 @@ public class MethodTracingConfig {
         return new DefaultPointcutAdvisor(pointcut, advice);
     }
 }
-

@@ -43,15 +43,13 @@ import lombok.extern.slf4j.Slf4j;
 public class TryConfig {
     
     /**
-     * Registers the TrySpanProcessor to automatically add tryId attributes to spans.
-     * <p>
-     * Spring Boot's Micrometer Tracing auto-configuration will automatically collect
-     * all SpanProcessor beans and register them with OpenTelemetry SDK.
-     * <p>
-     * The TrySpanProcessor adds the tryId attribute to spans based on the
-     * X-Ouroboros-Try header or tryId from the Try context.
+     * Register a TrySpanProcessor bean that enriches OpenTelemetry spans with a `tryId` attribute.
      *
-     * @return TrySpanProcessor instance
+     * The bean is created only if no other bean named `trySpanProcessor` is present. Spring Boot's
+     * Micrometer Tracing auto-configuration will discover SpanProcessor beans and register them with
+     * the OpenTelemetry SDK so spans receive the `tryId` from the `X-Ouroboros-Try` header or Try context.
+     *
+     * @return the created TrySpanProcessor instance as a `SpanProcessor`
      */
     @Bean
     @ConditionalOnMissingBean(name = "trySpanProcessor")

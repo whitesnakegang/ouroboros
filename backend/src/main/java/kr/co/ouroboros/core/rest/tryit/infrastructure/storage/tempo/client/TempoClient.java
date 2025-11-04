@@ -24,46 +24,35 @@ import java.util.List;
 public interface TempoClient {
     
     /**
-     * Searches for traces using TraceQL query.
-     * <p>
-     * Executes a TraceQL query against Tempo and returns matching trace IDs.
-     *
-     * @param query TraceQL query string (e.g., "{ span.ouro.try_id = \"tryId\" }")
-     * @return List of trace IDs matching the query, empty list if none found
-     */
+ * Finds trace IDs that match the given TraceQL query.
+ *
+ * @param query TraceQL query string (e.g., "{ span.ouro.try_id = \"tryId\" }")
+ * @return a list of trace IDs that match the query, or an empty list if none are found
+ */
     List<String> searchTraces(String query);
     
     /**
-     * Fetches trace data by trace ID.
-     * <p>
-     * Retrieves full trace data from Tempo for the specified trace ID.
-     * The returned data format depends on Tempo API (typically JSON).
-     *
-     * @param traceId the trace ID to fetch
-     * @return Trace data in JSON format, or null if not found
-     */
+ * Retrieve the full trace data for the specified Tempo trace ID.
+ *
+ * The returned payload is produced by the Tempo API (typically JSON).
+ *
+ * @param traceId the Tempo trace ID to fetch
+ * @return the trace data payload as returned by Tempo, or `null` if no trace was found
+ */
     String getTrace(String traceId);
     
     /**
-     * Polls for traces matching the query until found or timeout.
-     * <p>
-     * Repeatedly searches for traces matching the query with a polling interval
-     * until a trace is found or timeout is reached. Useful for waiting for
-     * traces that may not be immediately available in Tempo.
-     *
-     * @param query TraceQL query string (e.g., "{ span.ouro.try_id = \"tryId\" }")
-     * @return Trace ID if found, null if timeout
-     */
+ * Polls Tempo for traces matching the TraceQL query until a trace is found or a timeout is reached.
+ *
+ * @param query TraceQL query string, e.g. "{ span.ouro.try_id = \"tryId\" }"
+ * @return the found trace ID, or null if no trace is found before timeout
+ */
     String pollForTrace(String query);
     
     /**
-     * Checks if Tempo is enabled and available.
-     * <p>
-     * Determines whether Tempo integration is configured and available.
-     * Returns false if Tempo is disabled or not configured.
-     *
-     * @return true if Tempo is enabled and available, false otherwise
-     */
+ * Checks whether Tempo integration is configured and reachable.
+ *
+ * @return `true` if Tempo integration is configured and reachable, `false` otherwise
+ */
     boolean isEnabled();
 }
-

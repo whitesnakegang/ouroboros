@@ -36,13 +36,11 @@ public class TryContext {
     private static final String BAGGAGE_KEY = "ouro.try_id";
     
     /**
-     * Sets the current tryId in OpenTelemetry Baggage.
-     * <p>
-     * If null is provided, clears the current tryId.
-     * The tryId is stored in OpenTelemetry Baggage and automatically
-     * propagated across thread boundaries and async operations.
+     * Store the given try session UUID in OpenTelemetry Baggage so it is propagated across threads and async boundaries.
      *
-     * @param tryId the try session ID (UUID), or null to clear
+     * If `tryId` is null the current tryId is cleared.
+     *
+     * @param tryId the try session ID to set, or null to clear the current tryId
      */
     public static void setTryId(UUID tryId) {
         if (tryId != null) {
@@ -64,12 +62,11 @@ public class TryContext {
     }
     
     /**
-     * Gets the current tryId from OpenTelemetry Baggage.
-     * <p>
-     * Retrieves the tryId from the current OpenTelemetry Baggage context.
-     * Returns null if not set or if OpenTelemetry Baggage is not available.
+     * Retrieve the current try session ID from OpenTelemetry Baggage.
      *
-     * @return the try session ID (UUID), or null if not set or unavailable
+     * If a value is present and parses as a UUID, returns that UUID; otherwise returns `null`.
+     *
+     * @return the `UUID` of the current try session if present and valid, `null` otherwise
      */
     public static UUID getTryId() {
         try {
@@ -101,11 +98,11 @@ public class TryContext {
     }
     
     /**
-     * Clears the current tryId from OpenTelemetry Baggage.
-     * <p>
-     * Removes the tryId from OpenTelemetry Baggage context.
-     * Should be called after request processing to prevent memory leaks
-     * and ensure clean context state.
+     * Remove the current tryId from the OpenTelemetry Baggage context.
+     *
+     * <p>If a tryId entry exists under the BAGGAGE_KEY, it is removed and the updated baggage
+     * is made current. Intended to be called after request processing to avoid leaking
+     * the tryId into unrelated executions.
      */
     public static void clear() {
         try {
@@ -124,4 +121,3 @@ public class TryContext {
         }
     }
 }
-

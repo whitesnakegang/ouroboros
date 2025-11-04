@@ -31,20 +31,16 @@ import java.util.stream.Collectors;
 public class SpanMethodParser {
     
     /**
-     * Parses method information from a span, preferring OpenTelemetry attributes.
-     * <p>
-     * First attempts to extract method information from OpenTelemetry attributes:
-     * <ul>
-     *   <li>code.namespace → className</li>
-     *   <li>code.function → methodName</li>
-     *   <li>code.parameter.* → parameters</li>
-     * </ul>
-     * <p>
-     * If attributes are not available, falls back to parsing span name
-     * using patterns like "ClassName.methodName" or "ClassName.methodName(Type1, Type2)".
+     * Parse method metadata from a TraceSpanInfo, preferring OpenTelemetry attributes.
      *
-     * @param span Span information containing method data
-     * @return Parsed method information with className, methodName, and parameters
+     * <p>When present, uses OpenTelemetry attributes (`code.namespace`, `code.function`, and
+     * `code.parameter.*`) to populate className, methodName, and parameters. If those attributes
+     * are absent, falls back to parsing the span name using patterns like
+     * "ClassName.methodName" or "ClassName.methodName(Type1, Type2)". HTTP-style span names that
+     * start with "http " are treated specially.
+     *
+     * @param span the TraceSpanInfo to extract method information from
+     * @return a SpanMethodInfo containing the extracted className, methodName, and parameters
      */
     public SpanMethodInfo parse(TraceSpanInfo span) {
         if (span == null) {
@@ -68,20 +64,16 @@ public class SpanMethodParser {
     }
     
     /**
-     * Parses method information from OpenTelemetry attributes.
-     * <p>
-     * Extracts method information from OpenTelemetry standard attributes:
-     * <ul>
-     *   <li>code.namespace → extracts className (last segment after dot)</li>
-     *   <li>code.function → methodName</li>
-     *   <li>code.parameter.{index}.type → parameter types</li>
-     *   <li>code.parameter.{index}.name → parameter names</li>
-     * </ul>
+     * Create a SpanMethodInfo from OpenTelemetry "code.*" attributes.
      *
-     * @param span Span information containing attributes
-     * @param namespace Namespace attribute (code.namespace)
-     * @param function Function attribute (code.function)
-     * @return Parsed method information from attributes
+     * <p>Derives the className from the last segment of `code.namespace`, uses
+     * `code.function` as the methodName, and builds parameters from
+     * `code.parameter.{index}.type` and `code.parameter.{index}.name` pairs.
+     *
+     * @param span the trace span containing attributes to read
+     * @param namespace the value of `code.namespace` (may be null)
+     * @param function the value of `code.function` (may be null)
+     * @return a SpanMethodInfo populated from the provided attributes (className, methodName, and parameters)
      */
     private SpanMethodInfo parseFromAttributes(TraceSpanInfo span, String namespace, String function) {
         String className = null;
@@ -120,18 +112,17 @@ public class SpanMethodParser {
     }
     
     /**
-     * Parses method information from span name.
-     * <p>
-     * Handles various span name patterns:
-     * <ul>
-     *   <li>"ClassName.methodName" → className and methodName</li>
-     *   <li>"ClassName.methodName(ParamType)" → with single parameter</li>
-     *   <li>"ClassName.methodName(Type1, Type2)" → with multiple parameters</li>
-     *   <li>"http get /api/users/{id}" → HTTP spans (special handling)</li>
-     * </ul>
+     * Parse the span's name to extract a class name, method name, and parameter list.
      *
-     * @param span Span information containing name
-     * @return Parsed method information from span name
+     * <p>Recognizes common patterns such as "ClassName.methodName", "ClassName.methodName(Type...)".
+     * Span names that start with "http " are treated as HTTP spans (className set to "HTTP" and
+     * methodName set to the full span name). If the span name is null or cannot be parsed into a
+     * class/method form, the result will contain nulls for className/methodName and an empty
+     * parameter list.
+     *
+     * @param span span information whose name will be parsed
+     * @return a {@code SpanMethodInfo} containing the extracted className, methodName, and parameters;
+     *         fields are {@code null} or empty when the corresponding information is not available
      */
     private SpanMethodInfo parseFromSpanName(TraceSpanInfo span) {
         String spanName = span.getName();
@@ -204,16 +195,14 @@ public class SpanMethodParser {
     }
     
     /**
-     * Parses a parameter string into Parameter object.
-     * <p>
-     * Supports various parameter string formats:
-     * <ul>
-     *   <li>"Type" → only type, no name (e.g., "String", "Long")</li>
-     *   <li>"Type name" → type and name separated by space (e.g., "String userId")</li>
-     * </ul>
+     * Parse a parameter declaration string into a SpanMethodInfo.Parameter.
      *
-     * @param paramStr Parameter string to parse
-     * @return Parameter object with type and name
+     * <p>Accepts either a bare type (e.g., "String") or a type followed by a name
+     * separated by whitespace (e.g., "String userId"). Null or empty input yields
+     * a Parameter with both type and name set to empty strings.
+     *
+     * @param paramStr the parameter string to parse; may be null or empty
+     * @return a Parameter whose `type` is the parsed type and whose `name` is the parsed name (empty string if absent)
      */
     private SpanMethodInfo.Parameter parseParameter(String paramStr) {
         if (paramStr == null || paramStr.isEmpty()) {
@@ -244,4 +233,3 @@ public class SpanMethodParser {
         }
     }
 }
-

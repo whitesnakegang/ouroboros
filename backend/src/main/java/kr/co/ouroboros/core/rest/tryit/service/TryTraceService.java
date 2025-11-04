@@ -43,19 +43,12 @@ public class TryTraceService {
     private final TraceTreeBuilder traceTreeBuilder;
     
     /**
-     * Retrieves full call trace for a Try without issue analysis.
-     * <p>
-     * This method is optimized for performance by skipping issue detection:
-     * <ol>
-     *   <li>Retrieves trace data from Tempo using tryId</li>
-     *   <li>Builds hierarchical trace tree</li>
-     *   <li>Calculates total duration</li>
-     *   <li>Returns tree structure with spans</li>
-     * </ol>
+     * Retrieve the full call trace for a Try without performing issue analysis.
      *
-     * @param tryIdStr Try session ID (must be a valid UUID)
-     * @return Trace response with hierarchical spans
-     * @throws Exception if retrieval fails
+     * <p>If Tempo is disabled or no trace data is found, an empty TryTraceResponse is returned.
+     *
+     * @param tryIdStr Try session ID; expected to be a UUID string
+     * @return TryTraceResponse containing the tryId, the found traceId (or null), totalDurationMs, and a hierarchical span tree; an empty response is returned when no trace is available
      */
     public TryTraceResponse getTrace(String tryIdStr) {
         log.info("Retrieving trace for tryId: {}", tryIdStr);
@@ -155,4 +148,3 @@ public class TryTraceService {
         return (maxEnd - minStart) / 1_000_000; // Convert nanoseconds to milliseconds
     }
 }
-

@@ -46,24 +46,16 @@ public class TryMethodListService {
     private final SpanFlattener spanFlattener;
     
     /**
-     * Retrieves paginated list of methods for a Try, sorted by selfDurationMs (descending).
-     * <p>
-     * This method:
-     * <ol>
-     *   <li>Retrieves trace data from Tempo using tryId</li>
-     *   <li>Builds hierarchical trace tree</li>
-     *   <li>Flattens tree into list of spans</li>
-     *   <li>Sorts by selfDurationMs (descending)</li>
-     *   <li>Applies pagination</li>
-     *   <li>Converts spans to method information</li>
-     * </ol>
+     * Retrieves a paginated list of methods for the given Try, sorted by `selfDurationMs` in descending order.
      *
-     * @param tryIdStr Try session ID (must be a valid UUID)
-     * @param page Page number (0-based, must be non-negative)
-     * @param size Page size (must be between 1 and 100)
-     * @return Paginated method list response with sorted methods
-     * @throws Exception if retrieval fails
-     */
+     * If Tempo is disabled or a trace for the given tryId is not found (or cannot be retrieved), returns an empty response
+     * with zeroed metadata and an empty method list.
+     *
+     * @param tryIdStr Try session ID (expected to be a valid UUID)
+     * @param page     Page number (0-based; must be >= 0)
+     * @param size     Page size (must be between 1 and 100)
+     * @return         A TryMethodListResponse containing method entries sorted by selfDurationMs and pagination metadata;
+     *                 `traceId` may be null when no trace is available.
     public TryMethodListResponse getMethodList(String tryIdStr, int page, int size) {
         log.info("Retrieving method list for tryId: {}, page: {}, size: {}", tryIdStr, page, size);
         
@@ -147,12 +139,13 @@ public class TryMethodListService {
     }
     
     /**
-     * Builds an empty response when no trace data is available.
+     * Produce a TryMethodListResponse representing an empty result for the given try session.
      *
-     * @param tryId Try session ID
-     * @param page Page number
-     * @param size Page size
-     * @return Empty method list response with zero counts
+     * @param tryId the try session identifier to include in the response
+     * @param page the requested page number to include in the response metadata
+     * @param size the requested page size to include in the response metadata
+     * @return a TryMethodListResponse with {@code traceId} set to {@code null}, {@code totalDurationMs} = 0,
+     *         {@code totalCount} = 0, {@code hasMore} = {@code false}, and an empty {@code methods} list
      */
     private TryMethodListResponse buildEmptyResponse(String tryId, int page, int size) {
         return TryMethodListResponse.builder()
@@ -199,13 +192,10 @@ public class TryMethodListService {
     }
     
     /**
-     * Converts SpanNode to MethodInfo for response.
-     * <p>
-     * Extracts method information including span ID, name, class name,
-     * method name, parameters, duration, and percentage.
+     * Create a MethodInfo DTO representing the given span node.
      *
-     * @param spanNode Span node to convert
-     * @return Method information DTO
+     * @param spanNode the span node to convert into a MethodInfo
+     * @return a MethodInfo populated with spanId, name, className, methodName, parameters, selfDurationMs, and selfPercentage
      */
     private TryMethodListResponse.MethodInfo convertToMethodInfo(SpanNode spanNode) {
         // Convert parameters

@@ -51,13 +51,12 @@ public class SpanFlattener {
     }
     
     /**
-     * Recursively flattens a span node and its children using DFS.
-     * <p>
-     * Adds the current node to the flat list, then recursively processes
-     * all children nodes in depth-first order.
+     * Flatten a SpanNode subtree into a flat list in depth-first order.
      *
-     * @param node Current span node to process
-     * @param flatList Accumulated flat list to add spans to
+     * Adds the given node followed by all of its descendants to the provided list.
+     *
+     * @param node the root of the subtree to flatten; if null this method returns immediately
+     * @param flatList the list to append nodes to; must be non-null
      */
     private void flattenRecursive(SpanNode node, List<SpanNode> flatList) {
         if (node == null) {
@@ -75,4 +74,3 @@ public class SpanFlattener {
         }
     }
 }
-

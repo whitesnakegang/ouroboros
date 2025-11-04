@@ -44,13 +44,9 @@ import java.util.UUID;
 public class TryResponseAdvice implements ResponseBodyAdvice<Object> {
 
     /**
-     * Determines whether this advice supports the given return type and converter.
-     * <p>
-     * Returns true if TryContext has a tryId, indicating this is a Try request.
+     * Apply this advice only when the current request carries a Try identifier.
      *
-     * @param returnType Return type of the controller method
-     * @param converterType Selected HTTP message converter type
-     * @return true if TryContext has tryId, false otherwise
+     * @return true if TryContext has a tryId, false otherwise.
      */
     @Override
     public boolean supports(MethodParameter returnType, Class<? extends HttpMessageConverter<?>> converterType) {
@@ -59,19 +55,13 @@ public class TryResponseAdvice implements ResponseBodyAdvice<Object> {
     }
 
     /**
-     * Sets tryId in response header before body is written.
-     * <p>
-     * This method executes just before the response body is written,
-     * allowing safe header modification. Checks if header is already
-     * set by Filter; if not, sets it as a safety net.
+     * Ensures a TryContext identifier is propagated to the HTTP response headers when applicable.
      *
-     * @param body Response body (not modified)
-     * @param returnType Return type of the controller method
-     * @param selectedContentType Selected media type
-     * @param selectedConverterType Selected HTTP message converter type
-     * @param request HTTP request
-     * @param response HTTP response (header is modified here)
-     * @return Original response body (not modified)
+     * If TryContext contains a tryId and the response does not already have the X-Ouroboros-Try-Id header,
+     * this method sets that header to the tryId value.
+     *
+     * @param response the HTTP response whose headers may receive the `X-Ouroboros-Try-Id` header
+     * @return the original response body unchanged
      */
     @Override
     public Object beforeBodyWrite(Object body, MethodParameter returnType, MediaType selectedContentType,
@@ -105,4 +95,3 @@ public class TryResponseAdvice implements ResponseBodyAdvice<Object> {
         return body;
     }
 }
-

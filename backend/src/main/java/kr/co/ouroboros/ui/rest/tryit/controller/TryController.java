@@ -59,23 +59,15 @@ public class TryController {
     private final TrySummaryService trySummaryService;
     
     /**
-     * Retrieves Try summary without detailed trace or issues.
-     * <p>
-     * Contains only metadata, counts, and status information:
-     * <ul>
-     *   <li>tryId and traceId</li>
-     *   <li>Analysis status (PENDING, COMPLETED, FAILED)</li>
-     *   <li>HTTP status code</li>
-     *   <li>Total duration in milliseconds</li>
-     *   <li>Span count and issue count</li>
-     * </ul>
-     * <p>
-     * Exceptions are handled by {@link kr.co.ouroboros.core.rest.tryit.exception.TryExceptionHandler}.
-     * 
-     * @param tryIdStr Try session ID (must be a valid UUID)
-     * @return Summary response wrapped in GlobalApiResponse
-     * @throws InvalidTryIdException if tryId format is invalid
-     * @throws Exception if retrieval fails
+     * Retrieves summary metadata for the given Try session.
+     *
+     * The summary includes tryId, traceId, analysis status (PENDING, COMPLETED, FAILED),
+     * HTTP status code, total duration in milliseconds, span count, and issue count.
+     *
+     * @param tryIdStr Try session ID; must be a valid UUID
+     * @return GlobalApiResponse containing a TrySummaryResponse with the requested summary metadata
+     * @throws InvalidTryIdException if tryIdStr is not a valid UUID
+     * @throws Exception if retrieval of the summary fails
      */
     @GetMapping("/{tryId}")
     public ResponseEntity<GlobalApiResponse<TrySummaryResponse>> getSummary(
@@ -92,23 +84,13 @@ public class TryController {
     }
     
     /**
-     * Retrieves paginated list of methods for a Try, sorted by selfDurationMs (descending).
-     * <p>
-     * Returns a paginated list of methods with:
-     * <ul>
-     *   <li>Method information (name, class, parameters)</li>
-     *   <li>Self-duration and percentage</li>
-     *   <li>Pagination metadata (page, size, totalCount, hasMore)</li>
-     * </ul>
-     * <p>
-     * Exceptions are handled by {@link kr.co.ouroboros.core.rest.tryit.exception.TryExceptionHandler}.
-     * 
-     * @param tryIdStr Try session ID (must be a valid UUID)
-     * @param page Page number (default: 0, must be non-negative)
-     * @param size Page size (default: 5, must be between 1 and 100)
-     * @return Paginated method list wrapped in GlobalApiResponse
-     * @throws InvalidTryIdException if tryId format is invalid
-     * @throws Exception if retrieval fails
+     * Retrieve a paginated list of methods for a Try ordered by self-duration (descending).
+     *
+     * @param tryIdStr Try session ID as a UUID string
+     * @param page     Page index (must be greater than or equal to 0)
+     * @param size     Page size (must be between 1 and 100)
+     * @return         a GlobalApiResponse containing a TryMethodListResponse with method entries and pagination metadata
+     * @throws kr.co.ouroboros.core.rest.tryit.exception.InvalidTryIdException if `tryIdStr` is not a valid UUID
      */
     @GetMapping("/{tryId}/methods")
     public ResponseEntity<GlobalApiResponse<TryMethodListResponse>> getMethods(
@@ -128,21 +110,13 @@ public class TryController {
     }
 
     /**
-     * Retrieves full call trace for a Try without analysis issues.
-     * <p>
-     * Optimized for call trace visualization (toggle tree view):
-     * <ul>
-     *   <li>Hierarchical span structure</li>
-     *   <li>Parent-child relationships</li>
-     *   <li>Total duration</li>
-     *   <li>Skips issue detection for performance</li>
-     * </ul>
-     * <p>
-     * Exceptions are handled by {@link kr.co.ouroboros.core.rest.tryit.exception.TryExceptionHandler}.
+     * Retrieve the hierarchical call trace for a Try session optimized for visualization.
      *
-     * @param tryIdStr Try session ID (must be a valid UUID)
-     * @return Trace response with hierarchical spans wrapped in GlobalApiResponse
-     * @throws InvalidTryIdException if tryId format is invalid
+     * <p>The response contains hierarchical spans with parent-child relationships and total durations; issue detection is omitted for performance.</p>
+     *
+     * @param tryIdStr Try session ID as a UUID string
+     * @return a TryTraceResponse containing hierarchical spans wrapped in a GlobalApiResponse
+     * @throws InvalidTryIdException if tryIdStr is not a valid UUID
      * @throws Exception if retrieval fails
      */
     @GetMapping("/{tryId}/trace")
@@ -160,22 +134,15 @@ public class TryController {
     }
 
     /**
-     * Retrieves detected issues for a Try without trace spans.
-     * <p>
-     * Optimized for issues analysis and recommendations:
-     * <ul>
-     *   <li>Performance bottlenecks</li>
-     *   <li>N+1 query problems</li>
-     *   <li>Slow HTTP calls and database queries</li>
-     *   <li>Issue severity and recommendations</li>
-     * </ul>
-     * <p>
-     * Exceptions are handled by {@link kr.co.ouroboros.core.rest.tryit.exception.TryExceptionHandler}.
+     * Retrieve detected issues and recommendations for a Try session without including trace spans.
      *
-     * @param tryIdStr Try session ID (must be a valid UUID)
-     * @return Issues response wrapped in GlobalApiResponse
-     * @throws InvalidTryIdException if tryId format is invalid
-     * @throws Exception if retrieval fails
+     * Identifies performance bottlenecks such as N+1 queries, slow HTTP calls, and slow database queries,
+     * and provides severity and remediation recommendations.
+     *
+     * @param tryIdStr the Try session ID; must be a valid UUID
+     * @return a GlobalApiResponse containing detected issues and recommendations for the specified Try
+     * @throws InvalidTryIdException if the provided tryIdStr is not a valid UUID
+     * @throws Exception if retrieval of issues fails
      */
     @GetMapping("/{tryId}/issues")
     public ResponseEntity<GlobalApiResponse<TryIssuesResponse>> getIssues(
@@ -192,13 +159,10 @@ public class TryController {
     }
     
     /**
-     * Validates tryId format (must be a valid UUID).
-     * <p>
-     * Checks if the tryId string is a valid UUID format.
-     * Throws {@link InvalidTryIdException} if validation fails.
+     * Validate that the given tryId string is a valid UUID.
      *
-     * @param tryIdStr tryId string to validate
-     * @throws InvalidTryIdException if tryId format is invalid (not a valid UUID)
+     * @param tryIdStr the try identifier string to validate as a UUID
+     * @throws InvalidTryIdException if {@code tryIdStr} is not a valid UUID
      */
     private void validateTryId(String tryIdStr) {
         try {
@@ -208,4 +172,3 @@ public class TryController {
         }
     }
 }
-
