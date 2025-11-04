@@ -38,7 +38,6 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
     @Override
     public OuroApiSpec validate(OuroApiSpec fileSpec, OuroApiSpec scannedSpec) {
 
-        // TODO 파이프라인 구성
         OuroRestApiSpec restFileSpec = (OuroRestApiSpec) fileSpec;
         OuroRestApiSpec restScannedSpec = (OuroRestApiSpec) scannedSpec;
 
