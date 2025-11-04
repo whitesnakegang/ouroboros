@@ -86,7 +86,8 @@ public class MethodTracingConfig {
 
             // 1) 대상 클래스 자체가 허용 패키지인지
             for (String root : roots) {
-                if (clazz.getName().startsWith(root)) return true;
+                String className = clazz.getName();
+                if (className.equals(root) || className.startsWith(root + ".")) return true;
             }
 
             // 2) 구현 인터페이스 중 허용 패키지에 속하는 것이 있는지 (Spring Data JPA Repository 등)
@@ -94,7 +95,7 @@ public class MethodTracingConfig {
             for (Class<?> iface : ifaces) {
                 String in = iface.getName();
                 for (String root : roots) {
-                    if (in.startsWith(root)) return true;
+                    if (in.equals(root) || in.startsWith(root + ".")) return true;
                 }
             }
 
@@ -104,7 +105,7 @@ public class MethodTracingConfig {
                 String sn = sc.getName();
                 if (sn.startsWith("kr.co.ouroboros.")) return false; // SDK 제외 우선
                 for (String root : roots) {
-                    if (sn.startsWith(root)) return true;
+                    if (sn.equals(root) || sn.startsWith(root + ".")) return true;
                 }
                 sc = sc.getSuperclass();
             }
