@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useTestingStore } from "../store/testing.store";
 import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
 import type { TryMethod, TryMethodParameter } from "@/features/spec/services/api";
+import type { TestResponse } from "../store/testing.store";
 
 export function TestResponseTabs() {
   const { response, methodList, totalDurationMs, useDummyResponse } = useTestingStore();
@@ -108,7 +109,7 @@ function ResponseContent({
   getStatusColor,
   isMockEndpoint,
 }: {
-  response: NonNullable<ReturnType<typeof useTestingStore>["response"]>;
+  response: TestResponse;
   getStatusColor: (status: number) => string;
   isMockEndpoint: boolean;
 }) {
@@ -171,7 +172,7 @@ function ResponseContent({
           Headers
         </label>
         <div className="bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] rounded-md p-4">
-          {Object.entries(response.headers).map(([key, value]: [string, string]) => (
+          {Object.entries(response.headers as Record<string, string>).map(([key, value]) => (
             <div
               key={key}
               className="flex gap-2 py-1 text-sm font-mono text-gray-900 dark:text-[#E6EDF3]"
@@ -193,8 +194,8 @@ function TestContent({
   totalDurationMs,
   isMockEndpoint,
 }: {
-  methodList: ReturnType<typeof useTestingStore>["methodList"];
-  totalDurationMs: ReturnType<typeof useTestingStore>["totalDurationMs"];
+  methodList: TryMethod[] | null;
+  totalDurationMs: number | null;
   isMockEndpoint: boolean;
 }) {
   // Mock 엔드포인트인 경우 메서드 실행 정보가 없음을 표시

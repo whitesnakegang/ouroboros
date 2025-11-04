@@ -27,14 +27,6 @@ interface SchemaField {
   ref?: string;
 }
 
-interface SchemaConfig {
-  mode: "inline" | "reference";
-  schemaType: "object" | "array" | "string" | "number" | "boolean";
-  reference?: string;
-  fields?: SchemaField[];
-  arrayItemType?: "object" | "string" | "number" | "boolean";
-}
-
 interface ApiResponseCardProps {
   statusCodes: StatusCode[];
   setStatusCodes: (codes: StatusCode[]) => void;
