@@ -68,14 +68,13 @@ export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
 
         {/* Completed 탭: 오류 또는 불일치 표시 아이콘 (왼쪽) */}
         {filterType === "completed" && (endpoint.hasSpecError || (endpoint.diff && endpoint.diff !== "none")) && (
-          <div className="mt-1.5 flex-shrink-0">
+          <div className="mt-1.5 flex-shrink-0" title={endpoint.diff && endpoint.diff !== "none" ? "명세와 구현이 일치하지 않습니다" : undefined}>
             {endpoint.diff && endpoint.diff !== "none" ? (
               <svg
                 className="w-3.5 h-3.5 text-amber-500"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
-                title="명세와 구현이 일치하지 않습니다"
               >
                 <path
                   strokeLinecap="round"
