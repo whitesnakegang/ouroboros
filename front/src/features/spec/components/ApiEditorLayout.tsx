@@ -85,6 +85,7 @@ export function ApiEditorLayout() {
     setIsLoading,
     useDummyResponse,
     setUseDummyResponse,
+    setTryId,
   } = useTestingStore();
   const [activeTab, setActiveTab] = useState<"form" | "test">("form");
   const [isCodeSnippetOpen, setIsCodeSnippetOpen] = useState(false);
@@ -895,6 +896,9 @@ export function ApiEditorLayout() {
           }
         });
 
+        // X-Ouroboros-Try:on 헤더 추가
+        headers["X-Ouroboros-Try"] = "on";
+
         // Query 파라미터 추가
         let url = request.url;
         if (request.queryParams.length > 0) {
@@ -910,38 +914,80 @@ export function ApiEditorLayout() {
           }
         }
 
+        // URL이 상대 경로인 경우 그대로 사용 (Vite 프록시 사용)
+        // 절대 URL(http://로 시작)인 경우에만 그대로 사용
+        const fullUrl = url.startsWith("http") ? url : url;
+
+        // Request body 파싱 (GET 메서드가 아니고 body가 있을 때만)
+        let requestData = undefined;
+        if (request.method !== "GET" && request.body && request.body.trim()) {
+          try {
+            requestData = JSON.parse(request.body);
+          } catch (e) {
+            console.error("Request body 파싱 실패:", e);
+            throw new Error(
+              `Request body가 유효한 JSON 형식이 아닙니다: ${
+                e instanceof Error ? e.message : String(e)
+              }`
+            );
+          }
+        }
+
+        console.log("API 요청 전송:", {
+          method: request.method,
+          url: fullUrl,
+          headers,
+          data: requestData,
+        });
+
         const response = await axios({
           method: request.method,
-          url: url,
+          url: fullUrl,
           headers: headers,
-          data:
-            request.method !== "GET" && request.body
-              ? JSON.parse(request.body)
-              : undefined,
+          data: requestData,
         });
 
         const endTime = performance.now();
         const responseTime = Math.round(endTime - startTime);
 
+        // 응답 헤더에서 X-Ouroboros-Try-Id 추출
+        const responseHeaders = response.headers as Record<string, string>;
+        const tryIdValue =
+          responseHeaders["x-ouroboros-try-id"] ||
+          responseHeaders["X-Ouroboros-Try-Id"];
+        if (tryIdValue) {
+          setTryId(tryIdValue);
+        }
+
         setResponse({
           status: response.status,
           statusText: response.statusText,
-          headers: response.headers as Record<string, string>,
+          headers: responseHeaders,
           body: JSON.stringify(response.data, null, 2),
           responseTime,
         });
         setExecutionStatus("completed");
       }
     } catch (error) {
+      console.error("API 요청 실패:", error);
       const endTime = performance.now();
       const startTime = endTime - 100; // 에러 발생 시간 추정
       const responseTime = Math.round(endTime - startTime);
 
       if (axios.isAxiosError(error) && error.response) {
+        // 에러 응답에서도 X-Ouroboros-Try-Id 추출 시도
+        const errorHeaders = error.response.headers as Record<string, string>;
+        const tryIdValue =
+          errorHeaders["x-ouroboros-try-id"] ||
+          errorHeaders["X-Ouroboros-Try-Id"];
+        if (tryIdValue) {
+          setTryId(tryIdValue);
+        }
+
         setResponse({
           status: error.response.status,
           statusText: error.response.statusText,
-          headers: error.response.headers as Record<string, string>,
+          headers: errorHeaders,
           body: JSON.stringify(error.response.data, null, 2),
           responseTime,
         });

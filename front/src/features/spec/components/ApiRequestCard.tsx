@@ -23,7 +23,15 @@ interface RequestBody {
 }
 
 interface AuthConfig {
-  type: "none" | "apiKey" | "bearer" | "jwtBearer" | "basicAuth" | "digestAuth" | "oauth2" | "oauth1";
+  type:
+    | "none"
+    | "apiKey"
+    | "bearer"
+    | "jwtBearer"
+    | "basicAuth"
+    | "digestAuth"
+    | "oauth2"
+    | "oauth1";
   apiKey?: { key: string; value: string; addTo: "header" | "query" };
   bearer?: { token: string };
   basicAuth?: { username: string; password: string };
@@ -72,7 +80,10 @@ export function ApiRequestCard({
 
   const addHeader = () => {
     if (isReadOnly) return;
-    setRequestHeaders([...requestHeaders, { key: "", value: "", required: false }]);
+    setRequestHeaders([
+      ...requestHeaders,
+      { key: "", value: "", required: false },
+    ]);
   };
 
   const removeHeader = (index: number) => {
@@ -401,7 +412,12 @@ export function ApiRequestCard({
                 쿼리 파라미터 설정 (URL 뒤에 ?key=value 형태)
               </p>
               <button
-                onClick={() => setQueryParams([...queryParams, { key: "", value: "", type: "string", required: false }])}
+                onClick={() =>
+                  setQueryParams([
+                    ...queryParams,
+                    { key: "", value: "", type: "string", required: false },
+                  ])
+                }
                 disabled={isReadOnly}
                 className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
                   isReadOnly
@@ -472,12 +488,26 @@ export function ApiRequestCard({
                       className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
                     />
                     <button
-                      onClick={() => setQueryParams(queryParams.filter((_, i) => i !== index))}
+                      onClick={() =>
+                        setQueryParams(
+                          queryParams.filter((_, i) => i !== index)
+                        )
+                      }
                       disabled={isReadOnly}
                       className="p-1.5 text-red-500 hover:text-red-600 disabled:opacity-50"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
                       </svg>
                     </button>
                   </div>
@@ -495,7 +525,9 @@ export function ApiRequestCard({
               </label>
               <select
                 value={auth.type}
-                onChange={(e) => setAuth({ ...auth, type: e.target.value as any })}
+                onChange={(e) =>
+                  setAuth({ ...auth, type: e.target.value as any })
+                }
                 disabled={isReadOnly}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-[#30363D] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
@@ -509,7 +541,8 @@ export function ApiRequestCard({
             {auth.type !== "none" && (
               <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
                 <p className="text-sm text-blue-700 dark:text-blue-300">
-                  ✓ <strong>{auth.type}</strong> 인증이 활성화됩니다. Mock 서버가 Authorization 헤더를 검증합니다.
+                  ✓ <strong>{auth.type}</strong> 인증이 활성화됩니다. Mock
+                  서버가 Authorization 헤더를 검증합니다.
                 </p>
               </div>
             )}

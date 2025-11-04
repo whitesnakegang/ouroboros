@@ -49,6 +49,10 @@ interface TestingState {
   setMethodList: (methods: TryMethod[] | null) => void;
   totalDurationMs: number | null;
   setTotalDurationMs: (duration: number | null) => void;
+  
+  // Try ID State
+  tryId: string | null;
+  setTryId: (tryId: string | null) => void;
 }
 
 export const useTestingStore = create<TestingState>((set) => ({
@@ -127,5 +131,8 @@ export const useTestingStore = create<TestingState>((set) => ({
   setMethodList: (methods) => set({ methodList: methods }),
   totalDurationMs: null,
   setTotalDurationMs: (duration) => set({ totalDurationMs: duration }),
+  
+  tryId: null,
+  setTryId: (tryId) => set({ tryId }),
 }));
 
