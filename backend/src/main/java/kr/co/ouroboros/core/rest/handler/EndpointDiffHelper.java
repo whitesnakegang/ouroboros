@@ -49,6 +49,7 @@ public final class EndpointDiffHelper {
                     log.debug("Generated x-ouroboros-id for {} {}: {}", method, url, op.getXOuroborosId());
                 }
                 op.setXOuroborosDiff("endpoint");
+                op.setXOuroborosTag("none");
             }
         }
 
@@ -90,6 +91,7 @@ public final class EndpointDiffHelper {
         setOperationByMethod(pathItem, method, scanOp);
         Operation operationByMethod = getOperationByMethod(pathItem, method);
         operationByMethod.setXOuroborosDiff("endpoint");
+        operationByMethod.setXOuroborosTag("none");
     }
 
     /**

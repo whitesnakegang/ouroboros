@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 import kr.co.ouroboros.core.global.Protocol;
 import kr.co.ouroboros.core.global.handler.OuroProtocolHandler;
 import kr.co.ouroboros.core.global.spec.OuroApiSpec;
-import lombok.extern.slf4j.Slf4j;
+import kr.co.ouroboros.core.rest.common.dto.OuroRestApiSpec;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
@@ -25,7 +25,6 @@ import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 
 @Component
-@Slf4j
 public class OuroApiSpecManager {
 
     private final Map<Protocol, OuroApiSpec> apiCache = new ConcurrentHashMap<>();
@@ -35,7 +34,7 @@ public class OuroApiSpecManager {
     private final ResourceLoader resourceLoader;
 
     private static final ObjectMapper objectMapper = Json31.mapper();
-    
+
     /**
      * Constructs an OuroApiSpecManager, registering protocol handlers and storing the
      * ResourceLoader.
@@ -71,6 +70,13 @@ public class OuroApiSpecManager {
 
         // 2. 코드 스캔
         OuroApiSpec scannedSpec = handler.scanCurrentState();
+
+        if (scannedSpec instanceof OuroRestApiSpec restApiSpec) {
+            if (fileSpec == null && restApiSpec.getPaths()
+                    .isEmpty()) {
+                return;
+            }
+        }
 
         // 3. 불일치 검증
         // 비교 후, 최종적으로 저장할 ApiSpec 반환
@@ -179,7 +185,6 @@ public class OuroApiSpecManager {
         }
 
         // File doesn't exist - scan only and cache
-        log.warn("Spec file not found for protocol {}, using scanned state only", protocol);
         OuroApiSpec scannedSpec = handler.scanCurrentState();
         apiCache.put(protocol, scannedSpec);
         return scannedSpec;
