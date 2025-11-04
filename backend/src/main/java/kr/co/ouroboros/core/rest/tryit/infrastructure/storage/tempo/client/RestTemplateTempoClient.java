@@ -48,6 +48,7 @@ public class RestTemplateTempoClient implements TempoClient {
     
     private final TempoProperties properties;
     private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
     
     /**
      * Create a RestTemplateTempoClient configured with the provided TempoProperties and RestTemplateBuilder.
@@ -64,6 +65,7 @@ public class RestTemplateTempoClient implements TempoClient {
                 .connectTimeout(Duration.ofSeconds(5))
                 .readTimeout(Duration.ofSeconds(properties.getQueryTimeoutSeconds()))
                 .build();
+        this.objectMapper = new ObjectMapper();
     }
     
     /**
@@ -203,8 +205,7 @@ public class RestTemplateTempoClient implements TempoClient {
      */
     private List<String> parseTraceIds(String jsonResponse) {
         try {
-            ObjectMapper mapper = new ObjectMapper();
-            JsonNode root = mapper.readTree(jsonResponse);
+            JsonNode root = objectMapper.readTree(jsonResponse);
             JsonNode tracesNode = root.get("traces");
             
             if (tracesNode == null || !tracesNode.isArray()) {
