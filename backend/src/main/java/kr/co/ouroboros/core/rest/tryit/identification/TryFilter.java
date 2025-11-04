@@ -1,5 +1,6 @@
 package kr.co.ouroboros.core.rest.tryit.identification;
 
+import io.opentelemetry.context.Scope;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -19,15 +20,15 @@ import java.util.UUID;
  * <p>
  * This filter intercepts HTTP requests to identify Try requests and sets tryId
  * in the OpenTelemetry context for distributed tracing.
- * Response modification (header and body) is handled by {@link TryResponseAdvice}
- * for better safety.
  * <p>
  * <b>Behavior:</b>
  * <ol>
  *   <li>If X-Ouroboros-Try header equals "on", generate tryId (UUID)</li>
- *   <li>Set tryId in TryContext for context propagation</li>
+ *   <li>Set tryId in TryContext (returns Scope for cleanup)</li>
  *   <li>Set tryId in response header early (as safety net)</li>
- *   <li>Response modification is handled by TryResponseAdvice</li>
+ *   <li>Store tryId as request attribute for downstream dispatches (e.g., ERROR)</li>
+ *   <li>In finally block, ensure header is set if tryId exists (from context or attribute)</li>
+ *   <li>Close Scope to clean up context</li>
  *   <li>If missing or not "on", process as normal request</li>
  * </ol>
  * <p>
@@ -49,12 +50,13 @@ public class TryFilter extends OncePerRequestFilter {
 
     /**
      * Detects "Try" requests and ensures a try identifier is propagated for tracing and responses.
-     *
+     * <p>
      * If the incoming request has header "X-Ouroboros-Try" equal to "on" during the initial REQUEST dispatch,
-     * a UUID tryId is generated, stored in TryContext, added as the "X-Ouroboros-Try-Id" response header,
-     * and saved as a request attribute for downstream dispatches. The filter always attempts to set the
-     * response header at the end of processing (including ERROR dispatches) if the header can still be written.
-     * If the filter generated the tryId on this request, it clears TryContext when processing completes.
+     * a UUID tryId is generated, stored in TryContext (which returns a Scope), added as the "X-Ouroboros-Try-Id"
+     * response header, and saved as a request attribute for downstream dispatches. The filter always attempts
+     * to set the response header at the end of processing (including ERROR dispatches) if the header can still
+     * be written. If the filter generated the tryId on this request, it closes the Scope to clean up the context
+     * when processing completes.
      */
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, 
@@ -62,16 +64,15 @@ public class TryFilter extends OncePerRequestFilter {
         
         String tryHeader = request.getHeader(HEADER_NAME);
         boolean isTryRequest = TRY_VALUE.equalsIgnoreCase(tryHeader);
-        boolean generatedHere = false;
+        Scope tryScope = null;
 
         if (isTryRequest && request.getDispatcherType() == jakarta.servlet.DispatcherType.REQUEST) {
             UUID tryId = UUID.randomUUID();
             log.debug("Try request detected, generating tryId: {}", tryId);
-            TryContext.setTryId(tryId);
+            tryScope = TryContext.setTryId(tryId);
             // Set header early to cover cases where response may be committed within the chain (e.g., 404 basic error)
             response.setHeader(RESPONSE_TRY_ID_HEADER, tryId.toString());
             request.setAttribute(REQUEST_TRY_ID_ATTR, tryId.toString());
-            generatedHere = true;
         }
 
         try {
@@ -90,9 +91,8 @@ public class TryFilter extends OncePerRequestFilter {
             if (tryIdStr != null && !tryIdStr.isEmpty() && !response.isCommitted()) {
                 response.setHeader(RESPONSE_TRY_ID_HEADER, tryIdStr);
             }
-            // Clean up only if we created it here on the initial REQUEST dispatch
-            if (generatedHere) {
-                TryContext.clear();
+            if(tryScope != null){
+                tryScope.close();
             }
         }
     }

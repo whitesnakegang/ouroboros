@@ -2,6 +2,7 @@ package kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.context;
 
 import io.opentelemetry.api.baggage.Baggage;
 import io.opentelemetry.api.baggage.BaggageBuilder;
+import io.opentelemetry.context.Scope;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.UUID;
@@ -37,27 +38,31 @@ public class TryContext {
     
     /**
      * Store the given try session UUID in OpenTelemetry Baggage so it is propagated across threads and async boundaries.
-     *
-     * If `tryId` is null the current tryId is cleared.
+     * <p>
+     * Returns a {@link Scope} that should be closed when the try session ends to clean up the context.
+     * If `tryId` is null, returns null.
      *
      * @param tryId the try session ID to set, or null to clear the current tryId
+     * @return a {@link Scope} that should be closed to clean up the context, or null if tryId is null or OpenTelemetry is not available
      */
-    public static void setTryId(UUID tryId) {
+    public static Scope setTryId(UUID tryId) {
         if (tryId != null) {
             try {
                 Baggage currentBaggage = Baggage.current();
                 BaggageBuilder builder = currentBaggage.toBuilder();
                 builder.put(BAGGAGE_KEY, tryId.toString());
                 Baggage updatedBaggage = builder.build();
-                updatedBaggage.makeCurrent();
+                Scope scope = updatedBaggage.makeCurrent();
                 log.debug("Set tryId in baggage: {}", tryId);
+                return scope;
             } catch (Exception e) {
                 // OpenTelemetry not available, just log
                 log.trace("OpenTelemetry Baggage not available: {}", e.getMessage());
                 log.debug("Failed to set tryId in baggage: {}", tryId);
+                return null;
             }
         } else {
-            clear();
+            return null;
         }
     }
     

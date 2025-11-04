@@ -47,7 +47,8 @@ public class TryMethodListService {
     
     /**
      * Retrieves a paginated list of methods for the given Try, sorted by `selfDurationMs` in descending order.
-     *
+     * <p>
+     * Queries Tempo using the trace query format: {@code { span.ouro.try_id = "tryId" }}.
      * If Tempo is disabled or a trace for the given tryId is not found (or cannot be retrieved), returns an empty response
      * with zeroed metadata and an empty method list.
      *
@@ -56,6 +57,7 @@ public class TryMethodListService {
      * @param size     Page size (must be between 1 and 100)
      * @return         A TryMethodListResponse containing method entries sorted by selfDurationMs and pagination metadata;
      *                 `traceId` may be null when no trace is available.
+     */
     public TryMethodListResponse getMethodList(String tryIdStr, int page, int size) {
         log.info("Retrieving method list for tryId: {}, page: {}, size: {}", tryIdStr, page, size);
         
