@@ -1,6 +1,6 @@
 package kr.co.ouroboros.core.rest.mock.service;
 
-import kr.co.ouroboros.core.global.mock.model.ResponseMeta;
+import kr.co.ouroboros.core.rest.mock.model.RestResponseMeta;
 import kr.co.ouroboros.core.rest.common.yaml.RestApiYamlParser;
 import kr.co.ouroboros.core.rest.mock.model.EndpointMeta;
 import lombok.RequiredArgsConstructor;
@@ -225,7 +225,7 @@ public class RestMockLoaderService {
         }
 
         // ===== Response 파싱 =====
-        Map<Integer, ResponseMeta> responses = new HashMap<>();
+        Map<Integer, RestResponseMeta> responses = new HashMap<>();
         Map<String, Object> responsesMap = (Map<String, Object>) operation.get("responses");
         if (responsesMap != null) {
             for (Map.Entry<String, Object> responseEntry : responsesMap.entrySet()) {
@@ -234,7 +234,7 @@ public class RestMockLoaderService {
                     int statusCode = Integer.parseInt(responseEntry.getKey());
                     Map<String, Object> responseObj = (Map<String, Object>) responseEntry.getValue();
 
-                    ResponseMeta responseMeta = parseResponse(statusCode, responseObj, schemas);
+                    RestResponseMeta responseMeta = parseResponse(statusCode, responseObj, schemas);
                     if (responseMeta != null) {
                         responses.put(statusCode, responseMeta);
                     }
@@ -268,7 +268,7 @@ public class RestMockLoaderService {
      * @return the parsed ResponseMeta, or `null` if the response has no content or no resolvable schema
      */
     @SuppressWarnings("unchecked")
-    private ResponseMeta parseResponse(int statusCode, Map<String, Object> response, Map<String, Object> schemas) {
+    private RestResponseMeta parseResponse(int statusCode, Map<String, Object> response, Map<String, Object> schemas) {
         Map<String, Object> content = (Map<String, Object>) response.get("content");
         if (content == null) {
             return null;
@@ -295,7 +295,7 @@ public class RestMockLoaderService {
         // $ref 있으면 실제 스키마로 치환
         Map<String, Object> resolvedSchema = resolveSchema(schema, schemas, new HashSet<>());
 
-        return ResponseMeta.builder()
+        return RestResponseMeta.builder()
                 .statusCode(statusCode)
                 .body(resolvedSchema)
                 .contentType(contentType)
