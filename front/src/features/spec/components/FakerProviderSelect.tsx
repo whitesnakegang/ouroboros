@@ -28,14 +28,10 @@ export function FakerProviderSelect({
     return arr.map((p: any) => String(p.name));
   }, []);
 
-  const isValidValue = (val: string) => {
-    return names.includes(val);
-  };
-
   const filtered = useMemo(() => {
     const q = (query || value || "").trim().toLowerCase();
     if (!q) return names.slice(0, 50);
-    return names.filter((n) => n.toLowerCase().includes(q)).slice(0, 50);
+    return names.filter((n: string) => n.toLowerCase().includes(q)).slice(0, 50);
   }, [names, query, value]);
 
   useEffect(() => {
@@ -129,7 +125,7 @@ export function FakerProviderSelect({
             width: `${position.width}px`,
           }}
         >
-          {filtered.map((name, idx) => (
+          {filtered.map((name: string, idx: number) => (
             <button
               key={name}
               type="button"

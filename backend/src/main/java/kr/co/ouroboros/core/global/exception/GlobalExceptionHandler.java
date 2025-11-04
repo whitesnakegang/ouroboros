@@ -1,5 +1,6 @@
 package kr.co.ouroboros.core.global.exception;
 
+import jakarta.validation.ConstraintViolationException;
 import kr.co.ouroboros.core.global.response.GlobalApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  * <p>
  * <b>Handled Exceptions:</b>
  * <ul>
+ *   <li>{@link ConstraintViolationException} - 400 Bad Request (validation errors)</li>
  *   <li>{@link IllegalArgumentException} - 400 Bad Request</li>
  *   <li>{@link ClassCastException} - 400 Bad Request (type mismatch error)</li>
  *   <li>{@link NullPointerException} - 400 Bad Request (null value error)</li>
@@ -42,11 +44,39 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 public class GlobalExceptionHandler {
 
     /**
-     * Handle IllegalArgumentException by returning a standardized 400 Bad Request error response.
+     * Handles constraint violation exceptions (Bean Validation errors).
+     * <p>
+     * Returns 400 Bad Request when request parameters fail validation (e.g., @Min, @Max).
+     * <p>
+     * Note: Detailed exception message is logged but not exposed to client for security.
      *
-     * @return ResponseEntity containing a GlobalApiResponse<Void> with HTTP status 400, message "Invalid request data",
-     *         error code "INVALID_REQUEST", and details "The request contains invalid data".
+     * @param ex the constraint violation exception
+     * @return response entity with 400 status and error details
      */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<GlobalApiResponse<Void>> handleConstraintViolation(ConstraintViolationException ex) {
+        // Log detailed error for debugging
+        log.error("Validation constraint violation: {}", ex.getMessage());
+
+        // Return generic message to client
+        GlobalApiResponse<Void> response = GlobalApiResponse.error(
+                HttpStatus.BAD_REQUEST.value(),
+                "Invalid request data",
+                "VALIDATION_ERROR",
+                "The request parameters are invalid"
+        );
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    /**
+         * Handle IllegalArgumentException thrown for invalid request parameters or data.
+         *
+         * Returns an HTTP 400 Bad Request with a generic error payload; detailed exception information is logged but not exposed to the client.
+         *
+         * @param ex the IllegalArgumentException caused by invalid input
+         * @return a ResponseEntity containing a GlobalApiResponse<Void> with HTTP 400 and an error code indicating an invalid request
+         */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<GlobalApiResponse<Void>> handleIllegalArgument(IllegalArgumentException ex) {
         // Log detailed error for debugging
@@ -64,10 +94,10 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Handles ClassCastException by mapping it to a standardized 400 Bad Request response.
+     * Produce a standardized 400 Bad Request response for type mismatch errors represented by ClassCastException.
      *
-     * @return a GlobalApiResponse<Void> with HTTP status 400, error code "INVALID_FORMAT",
-     *         and a client-facing message indicating an invalid data format.
+     * @param ex the caught ClassCastException
+     * @return a ResponseEntity containing a GlobalApiResponse<Void> with HTTP 400 and an `INVALID_FORMAT` error indicating an invalid data format
      */
     @ExceptionHandler(ClassCastException.class)
     public ResponseEntity<GlobalApiResponse<Void>> handleClassCast(ClassCastException ex) {
@@ -86,10 +116,10 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Converts a NullPointerException into a 400 Bad Request API response indicating an invalid data structure.
+     * Handle NullPointerException thrown during request processing and return a 400 Bad Request response.
      *
-     * @param ex the thrown NullPointerException
-     * @return a ResponseEntity containing a GlobalApiResponse<Void> with status 400 and error code "INVALID_STRUCTURE"
+     * @param ex the NullPointerException that was thrown
+     * @return a GlobalApiResponse<Void> with HTTP status 400 and an error payload indicating an invalid data structure
      */
     @ExceptionHandler(NullPointerException.class)
     public ResponseEntity<GlobalApiResponse<Void>> handleNullPointer(NullPointerException ex) {
@@ -108,9 +138,12 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Handles uncaught exceptions not handled by other exception handlers.
+     * Catch-all handler for uncaught exceptions thrown by controllers.
      *
-     * @return ResponseEntity containing a GlobalApiResponse<Void> with HTTP status 500 and an internal error payload
+     * Constructs a standardized error response with HTTP 500 and error code `INTERNAL_ERROR`.
+     *
+     * @param ex the uncaught exception
+     * @return a ResponseEntity containing a GlobalApiResponse<Void> with HTTP 500 and error code `INTERNAL_ERROR`
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<GlobalApiResponse<Void>> handleGeneral(Exception ex) {

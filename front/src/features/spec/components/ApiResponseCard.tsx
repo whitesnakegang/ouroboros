@@ -11,6 +11,10 @@ interface StatusCode {
   code: string;
   type: "Success" | "Error";
   message: string;
+  schema?: {
+    ref?: string;  // 스키마 참조 (예: "User")
+    properties?: Record<string, any>;  // 인라인 스키마
+  };
 }
 
 interface SchemaField {
@@ -83,6 +87,10 @@ export function ApiResponseCard({
   const [currentSchemaDescription, setCurrentSchemaDescription] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // StatusCode별 Schema 선택 모달 상태
+  const [isResponseSchemaModalOpen, setIsResponseSchemaModalOpen] = useState(false);
+  const [selectedStatusCodeIndex, setSelectedStatusCodeIndex] = useState<number | null>(null);
 
   // 컴포넌트 마운트 시 스키마 목록 로드
   useEffect(() => {
@@ -275,7 +283,7 @@ export function ApiResponseCard({
                 </select>
                 <button
                   onClick={() => addStatusCode()}
-                  className="px-3 py-1 text-sm text-[#2563EB] hover:text-[#1E40AF] font-medium border border-[#2563EB] rounded-md hover:bg-[#2563EB] hover:text-white transition-colors"
+                  className="px-3 py-1 text-sm text-[#2563EB] font-medium border border-[#2563EB] rounded-md hover:bg-[#2563EB] hover:text-white transition-colors"
                 >
                   + Add Custom
                 </button>
@@ -294,6 +302,9 @@ export function ApiResponseCard({
                     </th>
                     <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
                       Message / Description
+                    </th>
+                    <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
+                      Schema
                     </th>
                     <th className="px-4 py-3"></th>
                   </tr>
@@ -337,6 +348,48 @@ export function ApiResponseCard({
                           placeholder="예: 요청이 성공적으로 처리됨"
                           className="w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
                         />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setSelectedStatusCodeIndex(index);
+                              setIsResponseSchemaModalOpen(true);
+                            }}
+                            className="px-3 py-1.5 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] transition-colors"
+                          >
+                            {statusCode.schema?.ref
+                              ? `Schema: ${statusCode.schema.ref}`
+                              : statusCode.schema?.properties
+                              ? "Inline Schema"
+                              : "Schema 선택"}
+                          </button>
+                          {statusCode.schema && (
+                            <button
+                              onClick={() => {
+                                const updated = [...statusCodes];
+                                updated[index] = { ...updated[index], schema: undefined };
+                                setStatusCodes(updated);
+                              }}
+                              className="p-1 text-red-500 hover:text-red-600"
+                              title="Schema 제거"
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M6 18L18 6M6 6l12 12"
+                                />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <button
@@ -586,7 +639,7 @@ export function ApiResponseCard({
         )}
       </div>
 
-      {/* Schema Modal */}
+      {/* Schema Modal (스키마 편집용) */}
       <SchemaModal
         isOpen={isSchemaModalOpen}
         onClose={() => setIsSchemaModalOpen(false)}
@@ -594,6 +647,32 @@ export function ApiResponseCard({
           setCurrentSchemaName(schema.name);
           setCurrentSchemaDescription(schema.description || "");
           setSchemaFields(schema.fields);
+        }}
+        schemas={schemas}
+        setSchemas={setSchemas}
+      />
+
+      {/* Response Schema 선택 모달 */}
+      <SchemaModal
+        isOpen={isResponseSchemaModalOpen}
+        onClose={() => {
+          setIsResponseSchemaModalOpen(false);
+          setSelectedStatusCodeIndex(null);
+        }}
+        onSelect={(schema) => {
+          if (selectedStatusCodeIndex !== null) {
+            const updated = [...statusCodes];
+            // Schema를 ref 형태로 저장 (스키마 이름만 저장)
+            updated[selectedStatusCodeIndex] = {
+              ...updated[selectedStatusCodeIndex],
+              schema: {
+                ref: schema.name,
+              },
+            };
+            setStatusCodes(updated);
+          }
+          setIsResponseSchemaModalOpen(false);
+          setSelectedStatusCodeIndex(null);
         }}
         schemas={schemas}
         setSchemas={setSchemas}
