@@ -44,20 +44,15 @@ public class TraceTreeBuilder {
     private final SpanMethodParser spanMethodParser;
     
     /**
-     * Builds hierarchical span tree from flat span list.
-     * <p>
-     * This method:
-     * <ol>
-     *   <li>Groups spans by parentSpanId</li>
-     *   <li>Identifies root spans (spans with no parent or parent not in trace)</li>
-     *   <li>Recursively builds tree structure with parent-child relationships</li>
-     *   <li>Calculates durations and percentages for each node</li>
-     *   <li>Parses method information and formats display names</li>
-     * </ol>
+     * Builds a hierarchical tree of SpanNode objects from a flat list of TraceSpanInfo spans.
      *
-     * @param spans Flat list of trace spans
-     * @param totalDurationMs Total duration of the trace in milliseconds
-     * @return List of root span nodes with hierarchical children structure
+     * Root spans are those with no parent, an empty or "0" parent ID, or whose parent is not present
+     * in the provided list. Child relationships, durations, self-durations, and percentages are
+     * computed for each node; method information and display names are derived for presentation.
+     *
+     * @param spans flat list of trace spans (may be null or empty)
+     * @param totalDurationMs total duration of the entire trace in milliseconds used to compute percentages
+     * @return list of root SpanNode objects, each containing its nested child nodes
      */
     public List<SpanNode> buildTree(List<TraceSpanInfo> spans, long totalDurationMs) {
         if (spans == null || spans.isEmpty()) {
@@ -95,26 +90,15 @@ public class TraceTreeBuilder {
     }
     
     /**
-     * Recursively builds a span node with its children.
-     * <p>
-     * Creates a SpanNode with:
-     * <ul>
-     *   <li>Method information parsed from span name</li>
-     *   <li>Duration calculations (total and self)</li>
-     *   <li>Percentage calculations (total and self)</li>
-     *   <li>Child nodes recursively built</li>
-     *   <li>Formatted display name</li>
-     * </ul>
-     * <p>
-     * Note: Self duration is calculated as (total duration - sum of children durations).
-     * This is an approximation; if children execute in parallel, actual self duration
-     * might be less.
+     * Recursively constructs a SpanNode for the given span, including its nested children, computed durations, percentages, parsed method info, and formatted display name.
      *
-     * @param span Span information to build node from
-     * @param spanMap Map of span ID to span information for lookup
-     * @param childrenMap Map of parent span ID to list of child spans
-     * @param totalDurationMs Total duration of the trace in milliseconds
-     * @return Span node with children recursively built
+     * <p>Self duration is calculated as (span duration - sum of children durations); this is an approximation and may overestimate self time if children execute in parallel.</p>
+     *
+     * @param span the TraceSpanInfo to convert into a SpanNode
+     * @param spanMap map of span ID to TraceSpanInfo for lookup
+     * @param childrenMap map of parent span ID to its child TraceSpanInfo list
+     * @param totalDurationMs total duration of the trace in milliseconds (used to compute percentages)
+     * @return the constructed SpanNode with children and computed metrics
      */
     private SpanNode buildSpanNode(
             TraceSpanInfo span,
@@ -256,8 +240,13 @@ public class TraceTreeBuilder {
                (methodInfo.getMethodName() != null ? methodInfo.getMethodName() : "HTTP");
     }
     
+    /**
+     * Round a numeric value to two decimal places.
+     *
+     * @param value the number to round
+     * @return the input rounded to two decimal places
+     */
     private double round2(double value) {
         return Math.round(value * 100.0) / 100.0;
     }
 }
-

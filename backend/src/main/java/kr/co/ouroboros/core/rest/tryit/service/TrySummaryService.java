@@ -43,20 +43,11 @@ public class TrySummaryService {
     private final IssueAnalyzer issueAnalyzer;
     
     /**
-     * Retrieves summary information for a Try without trace spans or issues.
-     * <p>
-     * Includes only metadata, counts, and status information:
-     * <ul>
-     *   <li>tryId and traceId</li>
-     *   <li>Analysis status (PENDING, COMPLETED, FAILED)</li>
-     *   <li>HTTP status code</li>
-     *   <li>Total duration in milliseconds</li>
-     *   <li>Span count and issue count</li>
-     * </ul>
+     * Retrieve a compact summary for a Try session without returning trace spans or full issue details.
      *
-     * @param tryIdStr Try session ID (must be a valid UUID)
-     * @return Summary response with metadata and counts
-     * @throws Exception if retrieval fails
+     * @param tryIdStr Try session ID as a UUID string used to locate the corresponding trace.
+     * @return a TrySummaryResponse containing tryId, traceId (if found), analysis status (PENDING, COMPLETED, or FAILED),
+     *         HTTP status code, totalDurationMs, spanCount, issueCount, and an error message when retrieval fails.
      */
     public TrySummaryResponse getSummary(String tryIdStr) {
         log.info("Retrieving summary for tryId: {}", tryIdStr);
@@ -126,12 +117,10 @@ public class TrySummaryService {
     }
     
     /**
-     * Builds an empty summary response when no trace data is available.
-     * <p>
-     * Returns a summary with PENDING status and zero counts.
+     * Build a TrySummaryResponse representing a pending Try with no trace data.
      *
-     * @param tryId Try session ID
-     * @return Empty summary response with PENDING status
+     * @param tryId the Try session ID
+     * @return a TrySummaryResponse with status PENDING, null traceId, and zeroed duration, span, and issue counts
      */
     private TrySummaryResponse buildEmptySummary(String tryId) {
         return TrySummaryResponse.builder()
@@ -220,4 +209,3 @@ public class TrySummaryService {
         return null;
     }
 }
-

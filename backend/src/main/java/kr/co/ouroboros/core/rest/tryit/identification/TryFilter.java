@@ -47,6 +47,15 @@ public class TryFilter extends OncePerRequestFilter {
     private static final String RESPONSE_TRY_ID_HEADER = "X-Ouroboros-Try-Id";
     private static final String REQUEST_TRY_ID_ATTR = "kr.co.ouroboros.tryId";
 
+    /**
+     * Detects "Try" requests and ensures a try identifier is propagated for tracing and responses.
+     *
+     * If the incoming request has header "X-Ouroboros-Try" equal to "on" during the initial REQUEST dispatch,
+     * a UUID tryId is generated, stored in TryContext, added as the "X-Ouroboros-Try-Id" response header,
+     * and saved as a request attribute for downstream dispatches. The filter always attempts to set the
+     * response header at the end of processing (including ERROR dispatches) if the header can still be written.
+     * If the filter generated the tryId on this request, it clears TryContext when processing completes.
+     */
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, 
                                    FilterChain filterChain) throws ServletException, IOException {
@@ -102,4 +111,3 @@ public class TryFilter extends OncePerRequestFilter {
         return false;
     }
 }
-

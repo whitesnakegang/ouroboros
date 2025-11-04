@@ -20,9 +20,11 @@ public class InvalidTryIdException extends IllegalArgumentException {
     private final String tryId;
 
     /**
-     * Constructs a new InvalidTryIdException with the specified tryId.
+     * Creates an exception representing an invalid Try session identifier.
      *
-     * @param tryId the invalid tryId string
+     * <p>Stores the provided `tryId` value; it can be retrieved with {@link #getTryId()}.</p>
+     *
+     * @param tryId the invalid tryId value that does not conform to the required UUID format
      */
     public InvalidTryIdException(String tryId) {
         super(String.format("Invalid tryId format: '%s'. tryId must be a valid UUID.", tryId));
@@ -30,7 +32,7 @@ public class InvalidTryIdException extends IllegalArgumentException {
     }
 
     /**
-     * Returns the invalid tryId that caused this exception.
+     * Retrieve the invalid tryId value that caused this exception.
      *
      * @return the invalid tryId string
      */
@@ -38,4 +40,3 @@ public class InvalidTryIdException extends IllegalArgumentException {
         return tryId;
     }
 }
-

@@ -60,21 +60,12 @@ public class MethodTracingMethodInterceptor implements MethodInterceptor {
     }
 
     /**
-     * Intercepts method invocation and creates observation span.
-     * <p>
-     * This method:
-     * <ol>
-     *   <li>Resolves effective class name from user-defined interfaces/classes</li>
-     *   <li>Creates observation span with method metadata</li>
-     *   <li>Extracts and records parameter types and names</li>
-     *   <li>Executes method invocation within observation scope</li>
-     *   <li>Records errors if method throws exception</li>
-     * </ol>
-     *
-     * @param invocation Method invocation to intercept
-     * @return Method invocation result
-     * @throws Throwable if method invocation throws exception
-     */
+         * Start an Observation for the intercepted method, record method and parameter attributes, execute the invocation, record any thrown error, and stop the Observation.
+         *
+         * @param invocation the intercepted method invocation
+         * @return the result produced by the intercepted method
+         * @throws Throwable if the intercepted method throws an exception
+         */
     @Override
     public Object invoke(MethodInvocation invocation) throws Throwable {
         Class<?> declaringType = invocation.getMethod().getDeclaringClass();
@@ -120,21 +111,13 @@ public class MethodTracingMethodInterceptor implements MethodInterceptor {
     }
 
     /**
-     * Resolves effective class name from user-defined interfaces/classes.
-     * <p>
-     * Prefers user-defined class/interface names over proxy class names.
-     * Checks in order:
-     * <ol>
-     *   <li>Implemented interfaces (for JDK dynamic proxies, e.g., Spring Data JPA repositories)</li>
-     *   <li>Superclass chain (for CGLIB proxies)</li>
-     *   <li>Fallback to declaring class name</li>
-     * </ol>
-     * <p>
-     * Only returns class names from allowed packages as specified in properties.
+     * Determine the effective class name to attribute method traces to, preferring user-defined
+     * interfaces or superclasses from configured package prefixes over proxy class names.
      *
-     * @param invocation Method invocation containing target class information
-     * @param fallbackFqcn Fallback fully qualified class name if no user class found
-     * @return Effective class name from user-defined package, or fallback
+     * @param invocation    the method invocation containing the target instance (may be a proxy)
+     * @param fallbackFqcn  the fully qualified class name to return if no user-defined class is found
+     * @return the fully qualified name of a user-defined interface or superclass from allowed packages,
+     *         or {@code fallbackFqcn} if none is found
      */
     private String resolveEffectiveClassName(MethodInvocation invocation, String fallbackFqcn) {
         // Prefer user-defined interface/class under allowed packages if present on proxy
@@ -175,17 +158,14 @@ public class MethodTracingMethodInterceptor implements MethodInterceptor {
     }
 
     /**
-     * Extracts simple class name from fully qualified class name.
-     * <p>
-     * Returns the last segment after the last dot ('.').
-     * Example: "com.example.service.UserService" → "UserService"
+     * Extracts the simple class name from a fully qualified class name.
      *
-     * @param fqcn Fully qualified class name
-     * @return Simple class name, or original string if no dot found
+     * @param fqcn fully qualified class name, may be {@code null}
+     * @return the substring after the last '.' character; if no '.' is present returns the original input;
+     *         if {@code fqcn} is {@code null} returns an empty string
      */
     private String simpleName(String fqcn) {
         int idx = fqcn != null ? fqcn.lastIndexOf('.') : -1;
         return idx >= 0 ? fqcn.substring(idx + 1) : (fqcn != null ? fqcn : "");
     }
 }
-

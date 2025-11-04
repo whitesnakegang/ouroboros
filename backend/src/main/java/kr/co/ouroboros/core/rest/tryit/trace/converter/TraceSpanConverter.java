@@ -97,13 +97,13 @@ public class TraceSpanConverter {
     }
     
     /**
-     * Extracts attributes from span into a map.
-     * <p>
-     * Converts span attributes from TraceDTO format to a simple key-value map.
-     * Handles various attribute value types (string, int, double, bool).
+     * Convert a span's attributes into a map of string key-value pairs.
      *
-     * @param span Span DTO from Tempo containing attributes
-     * @return Map of attribute keys to string values
+     * <p>Non-string attribute values (int, double, bool) are converted to their string
+     * representation. Attributes with null key or null value are ignored.
+     *
+     * @param span the span DTO containing attributes to extract
+     * @return a map from attribute keys to their stringified values; empty if the span has no attributes
      */
     private java.util.Map<String, String> extractAttributes(TraceDTO.SpanDTO span) {
         java.util.Map<String, String> attributes = new HashMap<>();
@@ -169,4 +169,3 @@ public class TraceSpanConverter {
         }
     }
 }
-

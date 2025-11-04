@@ -36,6 +36,11 @@ public class TrySpanProcessor implements SpanProcessor {
     
     private static final AttributeKey<String> TRY_ID_ATTRIBUTE = AttributeKey.stringKey("ouro.try_id");
     
+    /**
+     * Adds the current Try request's tryId to the span as the `ouro.try_id` attribute when a Try request is active.
+     *
+     * If no Try request is active, the method makes no changes to the span.
+     */
     @Override
     public void onStart(Context parentContext, ReadWriteSpan span) {
         UUID tryId = TryContext.getTryId();
@@ -49,19 +54,33 @@ public class TrySpanProcessor implements SpanProcessor {
         log.debug("Added tryId attribute to span: {}", tryId);
     }
     
+    /**
+     * Indicates that span start processing is required.
+     *
+     * @return `true` if onStart should be called for new spans, `false` otherwise.
+     */
     @Override
     public boolean isStartRequired() {
         return true;
     }
     
+    /**
+     * No-op handler invoked when a span ends; this processor does not modify or record anything on span end.
+     *
+     * @param span the span that has ended
+     */
     @Override
     public void onEnd(ReadableSpan span) {
         // No action needed on span end
     }
     
+    /**
+     * Indicates whether this processor requires onEnd callbacks for spans.
+     *
+     * @return {@code true} if span end processing is required, {@code false} otherwise.
+     */
     @Override
     public boolean isEndRequired() {
         return false;
     }
 }
-
