@@ -86,7 +86,28 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
             restFileSpec.setPaths(pathsFile);
         }
 
+        for (String url : pathsFile.keySet()){
+            // 모든 엔드포인트 검사해서 diff가 endpoint이면 제거
+            // diff가 아닌 것들은 none으로 설정
+            PathItem fileItem = pathsFile.get(url);
+            int cnt = 0;
 
+            for(HttpMethod httpMethod : HttpMethod.values()) {
+                Operation fileOp = getOperationByMethod(fileItem, httpMethod);
+                if(fileOp == null) continue;
+                if(fileOp.getXOuroborosDiff().equals("endpoint")){
+                    setOperationByMethodToNull(fileItem, httpMethod);
+                } else {
+                    cnt++;
+                    fileOp.setXOuroborosDiff("none");
+                    fileOp.setXOuroborosProgress("none");
+                    fileOp.setXOuroborosTag("none");
+                }
+            }
+            if(cnt == 0){
+                pathsFile.remove(url);
+            }
+        }
         for (String url : pathsScanned.keySet()) {
 
             // url이 다른가 먼저 봄
@@ -148,6 +169,18 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
             case DELETE -> item.getDelete();
         };
     }
+
+    private void setOperationByMethodToNull(PathItem item, HttpMethod httpMethod) {
+        switch (httpMethod) {
+            case GET -> item.setGet(null);
+            case POST -> item.setPost(null);
+            case PUT -> item.setPut(null);
+            case PATCH -> item.setPatch(null);
+            case DELETE -> item.setDelete(null);
+        };
+    }
+
+
 
     /**
      * Compare component schemas in the file-backed and runtime-scanned REST API specifications and report per-schema match status.
