@@ -113,13 +113,6 @@ public class SchemaComparator {
             return false;
         }
 
-        // format 비교
-        if (!Objects.equals(scannedSchema.getFormat(), fileSchema.getFormat())) {
-            log.debug("[SCHEMA FORMAT MISMATCH] '{}': format이 다릅니다. (스캔: {}, 파일: {})",
-                    schemaName, scannedSchema.getFormat(), fileSchema.getFormat());
-            return false;
-        }
-
         // Properties 비교 (객체 타입인 경우)
         if (scannedSchema.getProperties() != null || fileSchema.getProperties() != null) {
             if (!compareSchemaProperties(scannedSchema.getProperties(), fileSchema.getProperties(), schemaName)) {
