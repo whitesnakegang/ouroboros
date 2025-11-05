@@ -44,6 +44,24 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
     "object" | "string" | "number" | "boolean"
   >("object");
 
+  // 에러 메시지에서 localhost 주소 제거 및 사용자 친화적인 메시지로 변환
+  const getErrorMessage = (error: unknown): string => {
+    if (error instanceof Error) {
+      let message = error.message;
+      // localhost 주소 제거
+      message = message.replace(/https?:\/\/localhost:\d+/gi, "");
+      message = message.replace(/https?:\/\/127\.0\.0\.1:\d+/gi, "");
+      // 불필요한 공백 정리
+      message = message.trim();
+      // 빈 메시지인 경우 기본 메시지 반환
+      if (!message) {
+        return "알 수 없는 오류가 발생했습니다.";
+      }
+      return message;
+    }
+    return "알 수 없는 오류가 발생했습니다.";
+  };
+
   // 컴포넌트 마운트 시 스키마 목록 로드
   useEffect(() => {
     loadSchemas();
@@ -222,7 +240,8 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
       setCurrentSchemaDescription("");
     } catch (err) {
       console.error("스키마 저장 실패:", err);
-      alert(err instanceof Error ? err.message : "스키마 저장에 실패했습니다.");
+      const errorMessage = getErrorMessage(err);
+      alert(`스키마 저장에 실패했습니다: ${errorMessage}`);
     } finally {
       setIsLoading(false);
     }
