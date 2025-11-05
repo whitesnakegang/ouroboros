@@ -1,0 +1,19 @@
+openapi: "3.1.0"
+info:
+  title: "OpenAPI definition"
+  version: "v0"
+paths:
+  "/api/test/content-type":
+    get:
+      x-ouroboros-id: "55555555-5555-5555-5555-555555555555"
+      x-ouroboros-progress: "completed"
+      x-ouroboros-tag: "none"
+      x-ouroboros-diff: "none"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            text/plain:
+              schema:
+                type: "string"
+

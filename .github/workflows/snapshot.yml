@@ -1,0 +1,88 @@
+name: Publish SNAPSHOT (develop)
+
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch: {}
+
+concurrency:
+  group: snapshot-central
+  cancel-in-progress: true
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Temurin JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Make gradlew executable
+        working-directory: backend
+        run: chmod +x gradlew
+      
+      ##nodejs설치
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: front/package-lock.json
+
+      - name: "Guard: version must be *-SNAPSHOT"
+        shell: bash
+        working-directory: backend
+        run: |
+          VER=$(./gradlew -q properties | grep "^version:" | sed -E 's/^version:\s*//')
+          echo "Detected version: $VER"
+          case "$VER" in
+            *-SNAPSHOT) echo "✅ SNAPSHOT version detected";;
+            *) echo "⏭️ Not a SNAPSHOT version. Skipping."; exit 78;;
+          esac
+
+      ##frontend 빌드
+      - name: Build frontend
+        working-directory: front
+        run: |
+          npm ci
+          npm run build
+
+      # 🧩 GPG 키를 안전하게 주입
+      - name: Prepare signing key (robust)
+        shell: bash
+        run: |
+          set -euo pipefail
+          RAW="${{ secrets.GPG_PRIVATE_KEY_ARMOR }}"
+
+          if echo "$RAW" | grep -q 'BEGIN PGP PRIVATE KEY BLOCK'; then
+            KEY="$RAW"
+          elif echo "$RAW" | grep -q '\\n'; then
+            KEY="$(printf '%b' "$RAW")"
+          else
+            KEY="$(echo "$RAW" | base64 -d)"
+          fi
+
+          echo "Signing key length: $(echo "$KEY" | wc -c)"
+
+          {
+            echo 'ORG_GRADLE_PROJECT_signingInMemoryKey<<EOF'
+            echo "$KEY"
+            echo 'EOF'
+            echo "ORG_GRADLE_PROJECT_signingInMemoryKeyPassword=${{ secrets.GPG_PASSPHRASE }}"
+          } >> "$GITHUB_ENV"
+
+      - name: Publish SNAPSHOT (no manual portal publish needed)
+        shell: bash
+        working-directory: backend
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.CENTRAL_TOKEN_USER }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.CENTRAL_TOKEN_PASS }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.GPG_KEY_ID }}
+        run: ./gradlew publishToMavenCentral --stacktrace --info --no-daemon

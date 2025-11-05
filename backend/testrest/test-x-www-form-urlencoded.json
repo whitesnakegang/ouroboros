@@ -1,0 +1,79 @@
+{
+  "path": "/api/login",
+  "method": "POST",
+  "summary": "User login",
+  "description": "Login with username and password using form-urlencoded",
+  "tags": ["Authentication"],
+  "requestBody": {
+    "required": true,
+    "content": {
+      "application/x-www-form-urlencoded": {
+        "schema": {
+          "type": "object",
+          "required": ["username", "password"],
+          "properties": {
+            "username": {
+              "type": "string",
+              "mockExpression": "testuser"
+            },
+            "password": {
+              "type": "string",
+              "mockExpression": "password123"
+            },
+            "rememberMe": {
+              "type": "boolean",
+              "mockExpression": "false"
+            }
+          }
+        }
+      }
+    }
+  },
+  "responses": {
+    "200": {
+      "description": "Login successful",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "token": {
+                "type": "string",
+                "description": "JWT token",
+                "mockExpression": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+              },
+              "userId": {
+                "type": "string",
+                "description": "User ID",
+                "mockExpression": "user123"
+              }
+            },
+            "required": ["token", "userId"],
+            "orders": ["token", "userId"]
+          }
+        }
+      },
+      "headers": {}
+    },
+    "401": {
+      "description": "Invalid credentials",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "error": {
+                "type": "string",
+                "description": "Error message",
+                "mockExpression": "Invalid username or password"
+              }
+            },
+            "required": ["error"],
+            "orders": ["error"]
+          }
+        }
+      },
+      "headers": {}
+    }
+  }
+}

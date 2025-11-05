@@ -1,0 +1,19 @@
+openapi: "3.1.0"
+info:
+  title: "OpenAPI definition"
+  version: "v0"
+paths:
+  "/api/test/response":
+    get:
+      x-ouroboros-id: "a886a792-b09c-40f2-b4ae-62f74c3c2009"
+      x-ouroboros-progress: "mock"
+      x-ouroboros-tag: "none"
+      x-ouroboros-diff: "request"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            "*/*":
+              schema:
+                type: "integer"
+

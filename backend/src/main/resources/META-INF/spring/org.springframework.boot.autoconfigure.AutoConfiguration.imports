@@ -1,0 +1,8 @@
+# SDK 전역 구성
+kr.co.ouroboros.core.global.config.OuroborosAutoConfiguration
+
+# REST mock 구성
+kr.co.ouroboros.core.rest.mock.config.RestMockAutoConfiguration
+
+# Try 구성
+kr.co.ouroboros.core.rest.tryit.config.TryConfig

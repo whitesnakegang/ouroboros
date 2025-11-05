@@ -1,0 +1,49 @@
+{
+  "schemaName": "Book",
+  "type": "object",
+  "title": "Book Schema",
+  "description": "A book entity",
+  "properties": {
+    "isbn": {
+      "type": "string",
+      "description": "Book ISBN",
+      "mockExpression": "{{$number.digits(13)}}"
+    },
+    "title": {
+      "type": "string",
+      "description": "Book title",
+      "mockExpression": "{{$book.title}}"
+    },
+    "author": {
+      "type": "string",
+      "description": "Book author",
+      "mockExpression": "{{$book.author}}"
+    },
+    "publishedYear": {
+      "type": "integer",
+      "description": "Published year",
+      "mockExpression": "{{$number.numberBetween(1900,2024)}}"
+    },
+    "tags": {
+      "type": "array",
+      "description": "Book tags",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "maxItems": 5
+    }
+  },
+  "required": [
+    "isbn",
+    "title",
+    "author"
+  ],
+  "orders": [
+    "isbn",
+    "title",
+    "author",
+    "publishedYear",
+    "tags"
+  ]
+}

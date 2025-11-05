@@ -1,0 +1,53 @@
+{
+  "path": "/api/users/{id}",
+  "method": "GET",
+  "summary": "Get user by ID",
+  "description": "Retrieves a single user by their ID",
+  "tags": ["Users"],
+  "parameters": [
+    {
+      "name": "id",
+      "in": "path",
+      "description": "User ID",
+      "required": true,
+      "schema": {
+        "type": "string"
+      }
+    }
+  ],
+  "responses": {
+    "200": {
+      "description": "User found",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "User ID",
+                "mockExpression": "{{$random.uuid}}"
+              },
+              "name": {
+                "type": "string",
+                "description": "User name",
+                "mockExpression": "{{$name.fullName}}"
+              },
+              "email": {
+                "type": "string",
+                "description": "User email",
+                "mockExpression": "{{$internet.email}}"
+              }
+            },
+            "required": ["id", "name"]
+          }
+        }
+      }
+    },
+    "404": {
+      "description": "User not found"
+    }
+  },
+  "progress": "completed",
+  "tag": "none"
+}
