@@ -34,7 +34,7 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: front/package-lock.json
 
       - name: "Guard: version must be *-SNAPSHOT"
         shell: bash
@@ -49,7 +49,7 @@ jobs:
 
       ##frontend 빌드
       - name: Build frontend
-        working-directory: frontend
+        working-directory: front
         run: |
           npm ci
           npm run build
