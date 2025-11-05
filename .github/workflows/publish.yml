@@ -38,11 +38,26 @@ jobs:
           distribution: temurin
           java-version: "17"
           cache: gradle
-
+      
       - name: Make gradlew executable
         working-directory: backend
         run: chmod +x gradlew
 
+      ##nodejs설치
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: front/package-lock.json
+
+      ##frontend 빌드
+      - name: Build frontend
+        working-directory: front
+        run: |
+          npm ci
+          npm run build
+        
       # 🧩 GPG 키 주입 (개행 안전)
       - name: Prepare signing key (robust)
         shell: bash
@@ -66,7 +81,9 @@ jobs:
             echo 'EOF'
             echo "ORG_GRADLE_PROJECT_signingInMemoryKeyPassword=${{ secrets.GPG_PASSPHRASE }}"
           } >> "$GITHUB_ENV"
+      
 
+        
       - name: Publish (upload + validate; portal publish manual)
         shell: bash
         working-directory: backend

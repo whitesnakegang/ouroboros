@@ -50,6 +50,7 @@ type RequestBody = {
     required?: boolean;
     ref?: string; // 스키마 참조 시 사용 (예: "User")
   }>;
+  schemaRef?: string; // 전체 스키마 참조 (예: "User")
 };
 
 interface StatusCode {
@@ -398,12 +399,7 @@ export function ApiEditorLayout() {
     content: Record<string, any>;
   } | null => {
     // null이거나 type이 "none"이면 null 반환
-    if (
-      !frontendBody ||
-      frontendBody.type === "none" ||
-      !frontendBody.fields ||
-      frontendBody.fields.length === 0
-    ) {
+    if (!frontendBody || frontendBody.type === "none") {
       return null;
     }
 
@@ -417,34 +413,44 @@ export function ApiEditorLayout() {
       contentType = "application/xml";
     }
 
-    // fields를 OpenAPI properties로 변환
+    // 전체 스키마 참조가 있으면 ref만 사용
+    if (frontendBody.schemaRef) {
+      return {
+        description: "Request body",
+        required: true,
+        content: {
+          [contentType]: {
+            schema: {
+              ref: frontendBody.schemaRef,
+            },
+          },
+        },
+      };
+    }
+
+    // 인라인 스키마: fields를 OpenAPI properties로 변환
+    if (!frontendBody.fields || frontendBody.fields.length === 0) {
+      return null;
+    }
+
     const properties: Record<string, any> = {};
     const required: string[] = [];
 
     frontendBody.fields.forEach((field) => {
       if (field.key) {
-        // ref가 있으면 Reference 모드, 없으면 Inline 모드
-        if ((field as any).ref) {
-          // Reference 모드: ref만 전송 (다른 필드 무시)
-          properties[field.key] = {
-            ref: (field as any).ref, // 예: "User"
-          };
-        } else {
-          // Inline 모드: 모든 필드 정보 포함
-          const property: any = {
-            type: field.type || "string",
-          };
+        const property: any = {
+          type: field.type || "string",
+        };
 
-          if (field.description) {
-            property.description = field.description;
-          }
-
-          if (field.value) {
-            property.mockExpression = field.value; // DataFaker 표현식
-          }
-
-          properties[field.key] = property;
+        if (field.description) {
+          property.description = field.description;
         }
+
+        if (field.value) {
+          property.mockExpression = field.value; // DataFaker 표현식
+        }
+
+        properties[field.key] = property;
 
         if (field.required) {
           required.push(field.key);

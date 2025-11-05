@@ -23,6 +23,7 @@ interface RequestBody {
   type: "none" | "form-data" | "x-www-form-urlencoded" | "json" | "xml";
   contentType: string; // json, xml일 때 사용
   fields: BodyField[]; // 표 형식 데이터
+  schemaRef?: string; // 전체 스키마 참조 (예: "User")
 }
 
 interface AuthConfig {
@@ -133,19 +134,17 @@ export function ApiRequestCard({
     }>;
   }) => {
     if (requestBody.type === "json") {
-      // Schema의 필드들을 BodyField로 변환하여 추가
-      const newFields = schema.fields.map((field) => ({
-        key: field.name,
-        value: field.mockExpression || "",
-        type: field.type,
-        description: field.description,
-        required: false,
-        ref: schema.name, // 스키마 참조 저장
-      }));
-
+      // 전체 스키마 참조로 설정 (fields는 읽기 전용 미리보기로만 표시)
       setRequestBody({
         ...requestBody,
-        fields: [...(requestBody.fields || []), ...newFields],
+        schemaRef: schema.name, // 전체 스키마 참조
+        fields: schema.fields.map((field) => ({
+          key: field.name,
+          value: field.mockExpression || "",
+          type: field.type,
+          description: field.description,
+          required: false,
+        })),
       });
     }
   };
@@ -308,7 +307,32 @@ export function ApiRequestCard({
             {/* Table Format for all types except none */}
             {requestBody.type !== "none" && requestBody.fields && (
               <div>
-                <div className="mb-3 flex gap-2">
+                <div className="mb-3 flex gap-2 items-center">
+                  {/* Schema 참조 표시 */}
+                  {requestBody.schemaRef && (
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-md">
+                      <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                        Schema: {requestBody.schemaRef}
+                      </span>
+                      <button
+                        onClick={() => {
+                          setRequestBody({
+                            ...requestBody,
+                            schemaRef: undefined,
+                            fields: [],
+                          });
+                        }}
+                        disabled={isReadOnly}
+                        className="text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
+                        title="Remove Schema"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                  
                   <button
                     onClick={() => {
                       setRequestBody({
@@ -319,9 +343,9 @@ export function ApiRequestCard({
                         ],
                       });
                     }}
-                    disabled={isReadOnly}
+                    disabled={isReadOnly || !!requestBody.schemaRef}
                     className={`px-3 py-1 text-sm text-[#2563EB] hover:text-[#1E40AF] font-medium ${
-                      isReadOnly ? "opacity-50 cursor-not-allowed" : ""
+                      isReadOnly || requestBody.schemaRef ? "opacity-50 cursor-not-allowed" : ""
                     }`}
                   >
                     + Add Field
@@ -334,7 +358,7 @@ export function ApiRequestCard({
                         isReadOnly ? "opacity-50 cursor-not-allowed" : ""
                       }`}
                     >
-                      + Add Schema
+                      {requestBody.schemaRef ? "Change Schema" : "+ Add Schema"}
                     </button>
                   )}
                 </div>
@@ -376,7 +400,8 @@ export function ApiRequestCard({
                                 });
                               }}
                               placeholder="예: username, password"
-                              className="w-full px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
+                              disabled={isReadOnly || !!requestBody.schemaRef}
+                              className="w-full px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] disabled:opacity-60 disabled:cursor-not-allowed"
                             />
                           </td>
                           <td className="px-4 py-3">
@@ -395,8 +420,8 @@ export function ApiRequestCard({
                                 });
                               }}
                               placeholder="예: John Doe, 123"
-                              disabled={isReadOnly}
-                              className="w-full px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
+                              disabled={isReadOnly || !!requestBody.schemaRef}
+                              className="w-full px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] disabled:opacity-60 disabled:cursor-not-allowed"
                             />
                           </td>
                           <td className="px-4 py-3">
@@ -413,7 +438,8 @@ export function ApiRequestCard({
                                   fields: updated,
                                 });
                               }}
-                              className="w-full px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
+                              disabled={isReadOnly || !!requestBody.schemaRef}
+                              className="w-full px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] disabled:opacity-60 disabled:cursor-not-allowed"
                             >
                               {fieldTypes.map((type) => (
                                 <option key={type} value={type}>
@@ -433,7 +459,8 @@ export function ApiRequestCard({
                                   fields: updated,
                                 });
                               }}
-                              className="text-red-500 hover:text-red-600"
+                              disabled={isReadOnly || !!requestBody.schemaRef}
+                              className="text-red-500 hover:text-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               <svg
                                 className="w-5 h-5"
