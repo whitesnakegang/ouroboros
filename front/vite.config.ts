@@ -2,13 +2,15 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 
-// https://vite.dev/config/
 export default defineConfig(({ mode }) => {
-  // 환경변수 로드
   const env = loadEnv(mode, process.cwd(), "");
+
+  // ✅ 백엔드 리소스 폴더 절대경로
+  const OUT_DIR = path.resolve(__dirname, "../backend/src/main/resources/static/ouroboros");
 
   return {
     plugins: [react()],
+    base: "/ouroboros/",
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
@@ -33,6 +35,12 @@ export default defineConfig(({ mode }) => {
           secure: false,
         },
       },
+    },
+    build: {
+      outDir: OUT_DIR,          // ✅ 여기로 바로 출력
+      assetsDir: "assets",      // /ouroboros/assets/** 로 정적자산 배치
+      emptyOutDir: true,        // ✅ root 바깥으로 내보낼 때 필수 (Vite 5)
+      // manifest: true,        // 필요하면 켜기 (서버에서 자산 매핑 쓸 때)
     },
   };
 });

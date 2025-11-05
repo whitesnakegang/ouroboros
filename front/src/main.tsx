@@ -8,7 +8,7 @@ import "@/index.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <BrowserRouter>
+    <BrowserRouter basename="/ouroboros">
       <AppProvider>
         <Routes>
           <Route path="/" element={<RootLayout />}>
