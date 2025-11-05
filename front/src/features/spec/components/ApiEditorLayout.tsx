@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { ApiRequestCard } from "./ApiRequestCard";
 import { ApiResponseCard } from "./ApiResponseCard";
+import { SchemaCard } from "./SchemaCard";
 import { ProtocolTabs } from "./ProtocolTabs";
 import { CodeSnippetPanel } from "./CodeSnippetPanel";
 import { ImportResultModal } from "./ImportResultModal";
@@ -1535,6 +1536,13 @@ export function ApiEditorLayout() {
                   setStatusCodes={setStatusCodes}
                   isReadOnly={!!(selectedEndpoint && !isEditMode)}
                 />
+              </div>
+            )}
+
+            {/* Schema Card */}
+            {protocol === "REST" && (
+              <div className="mt-6">
+                <SchemaCard isReadOnly={!!(selectedEndpoint && !isEditMode)} />
               </div>
             )}
 
