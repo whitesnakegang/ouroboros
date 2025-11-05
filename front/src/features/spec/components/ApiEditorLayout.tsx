@@ -187,7 +187,22 @@ export function ApiEditorLayout() {
         }
       }, 100);
     } else {
+      // selectedEndpoint가 없을 때 폼 초기화 (새로고침 시 하드코딩된 초기값 제거)
       setIsEditMode(false);
+      setMethod("POST");
+      setUrl("");
+      setTags("");
+      setDescription("");
+      setSummary("");
+      setQueryParams([]);
+      setRequestHeaders([]);
+      setRequestBody({
+        type: "none",
+        contentType: "application/json",
+        fields: [],
+      });
+      setAuth({ type: "none" });
+      setStatusCodes([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEndpoint, activeTab]);
@@ -291,16 +306,7 @@ export function ApiEditorLayout() {
 
       // 폼 state 업데이트
       setQueryParams(formQueryParams);
-      setRequestHeaders(
-        formHeaders.length > 0
-          ? formHeaders
-          : [{ key: "Content-Type", value: "application/json" }]
-      );
-
-      // 기본 Content-Type 헤더 추가
-      if (!testHeaders.find((h) => h.key.toLowerCase() === "content-type")) {
-        testHeaders.unshift({ key: "Content-Type", value: "application/json" });
-      }
+      setRequestHeaders(formHeaders);
 
       // RequestBody 처리
       if (spec.requestBody) {
@@ -342,21 +348,18 @@ export function ApiEditorLayout() {
         method: spec.method,
         url: spec.path,
         description: spec.description || spec.summary || "",
-        headers:
-          testHeaders.length > 0
-            ? testHeaders
-            : [{ key: "Content-Type", value: "application/json" }],
+        headers: testHeaders,
         queryParams: testQueryParams,
         body: testBody,
       });
     } catch (error) {
       console.error("API 스펙 로드 실패:", error);
       const errorMessage = getErrorMessage(error);
-      
+
       // 명세에 없는 내용일 경우 selectedEndpoint 초기화
       alert("명세에 없는 내용입니다. 선택된 엔드포인트가 존재하지 않습니다.");
       setSelectedEndpoint(null);
-      
+
       // 기존 에러 메시지는 콘솔에만 출력
       if (errorMessage) {
         console.error("상세 에러:", errorMessage);
@@ -390,13 +393,11 @@ export function ApiEditorLayout() {
 
   // Request state
   const [queryParams, setQueryParams] = useState<KeyValuePair[]>([]);
-  const [requestHeaders, setRequestHeaders] = useState<KeyValuePair[]>([
-    { key: "Content-Type", value: "application/json" },
-  ]);
+  const [requestHeaders, setRequestHeaders] = useState<KeyValuePair[]>([]);
   const [requestBody, setRequestBody] = useState<RequestBody>({
-    type: "json",
+    type: "none",
     contentType: "application/json",
-    fields: [{ key: "email", value: "string", type: "string" }],
+    fields: [],
   });
 
   // Response state
@@ -835,6 +836,7 @@ export function ApiEditorLayout() {
       setDescription("");
       setSummary("");
       setQueryParams([]);
+      setRequestHeaders([]);
       setAuth({ type: "none" });
       setRequestBody({
         type: "json",
