@@ -20,7 +20,7 @@ export function ImportResultModal({
         className="fixed inset-0 bg-black bg-opacity-50 z-40"
         onClick={onClose}
       />
-      
+
       {/* Modal */}
       <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
         <div className="bg-white dark:bg-[#161B22] rounded-md shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col pointer-events-auto border border-gray-200 dark:border-[#2D333B]">
@@ -102,62 +102,64 @@ export function ImportResultModal({
                   중복으로 인해 이름이 변경된 항목
                 </h3>
                 <div className="space-y-2">
-                  {result.renamedList.map((item: RenamedItem, index: number) => (
-                    <div
-                      key={index}
-                      className="bg-gray-50 dark:bg-[#0D1117] border border-gray-200 dark:border-[#2D333B] rounded-md p-4"
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        <span
-                          className={`px-2 py-1 text-xs font-semibold rounded-[4px] border ${
-                            item.type === "api"
-                              ? "bg-blue-50 dark:bg-[#0D1117] border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400"
-                              : "bg-purple-50 dark:bg-[#0D1117] border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-400"
-                          }`}
-                        >
-                          {item.type === "api" ? "API" : "Schema"}
-                        </span>
-                        {item.method && (
+                  {result.renamedList.map(
+                    (item: RenamedItem, index: number) => (
+                      <div
+                        key={index}
+                        className="bg-gray-50 dark:bg-[#0D1117] border border-gray-200 dark:border-[#2D333B] rounded-md p-4"
+                      >
+                        <div className="flex items-center gap-2 mb-2">
                           <span
-                            className={`px-2 py-1 text-xs font-semibold rounded-[4px] border font-mono ${
-                              item.method === "GET"
-                                ? "bg-emerald-50 dark:bg-[#0D1117] border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400"
-                                : item.method === "POST"
+                            className={`px-2 py-1 text-xs font-semibold rounded-[4px] border ${
+                              item.type === "api"
                                 ? "bg-blue-50 dark:bg-[#0D1117] border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400"
-                                : item.method === "PUT"
-                                ? "bg-amber-50 dark:bg-[#0D1117] border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400"
-                                : item.method === "PATCH"
-                                ? "bg-amber-50 dark:bg-[#0D1117] border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400"
-                                : "bg-red-50 dark:bg-[#0D1117] border-red-200 dark:border-red-800 text-red-700 dark:text-red-400"
+                                : "bg-purple-50 dark:bg-[#0D1117] border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-400"
                             }`}
                           >
-                            {item.method}
+                            {item.type === "api" ? "API" : "Schema"}
                           </span>
-                        )}
+                          {item.method && (
+                            <span
+                              className={`px-2 py-1 text-xs font-semibold rounded-[4px] border font-mono ${
+                                item.method === "GET"
+                                  ? "bg-emerald-50 dark:bg-[#0D1117] border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400"
+                                  : item.method === "POST"
+                                  ? "bg-blue-50 dark:bg-[#0D1117] border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400"
+                                  : item.method === "PUT"
+                                  ? "bg-amber-50 dark:bg-[#0D1117] border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400"
+                                  : item.method === "PATCH"
+                                  ? "bg-amber-50 dark:bg-[#0D1117] border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400"
+                                  : "bg-red-50 dark:bg-[#0D1117] border-red-200 dark:border-red-800 text-red-700 dark:text-red-400"
+                              }`}
+                            >
+                              {item.method}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <code className="text-gray-600 dark:text-[#8B949E] font-mono">
+                            {item.original}
+                          </code>
+                          <svg
+                            className="w-4 h-4 text-gray-400 dark:text-[#8B949E]"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M9 5l7 7-7 7"
+                            />
+                          </svg>
+                          <code className="text-gray-900 dark:text-[#E6EDF3] font-mono font-semibold">
+                            {item.renamed}
+                          </code>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <code className="text-gray-600 dark:text-[#8B949E] font-mono">
-                          {item.original}
-                        </code>
-                        <svg
-                          className="w-4 h-4 text-gray-400 dark:text-[#8B949E]"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M9 5l7 7-7 7"
-                          />
-                        </svg>
-                        <code className="text-gray-900 dark:text-[#E6EDF3] font-mono font-semibold">
-                          {item.renamed}
-                        </code>
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  )}
                 </div>
               </div>
             )}
@@ -177,4 +179,3 @@ export function ImportResultModal({
     </>
   );
 }
-

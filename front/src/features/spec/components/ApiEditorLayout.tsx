@@ -55,6 +55,7 @@ interface StatusCode {
   code: string;
   type: "Success" | "Error";
   message: string;
+  headers?: Array<{ key: string; value: string }>; // Response headers
   schema?: {
     ref?: string; // 스키마 참조 (예: "User")
     properties?: Record<string, any>; // 인라인 스키마
@@ -84,6 +85,7 @@ export function ApiEditorLayout() {
     setIsLoading,
     useDummyResponse,
     setUseDummyResponse,
+    setTryId,
   } = useTestingStore();
   const [activeTab, setActiveTab] = useState<"form" | "test">("form");
   const [isCodeSnippetOpen, setIsCodeSnippetOpen] = useState(false);
@@ -102,7 +104,7 @@ export function ApiEditorLayout() {
   );
 
   // Completed 상태인지 확인
-  const isCompleted = selectedEndpoint?.progress === "completed";
+  const isCompleted = selectedEndpoint?.progress?.toLowerCase() === "completed";
 
   // 수정/삭제 불가능한 상태인지 확인 (completed이거나 diff가 있는 경우)
   const isReadOnly = isCompleted || hasDiff;
@@ -130,20 +132,32 @@ export function ApiEditorLayout() {
       setTags(spec.tags ? spec.tags.join(", ") : "");
 
       // Security를 auth state로 변환
-      if (spec.security && Array.isArray(spec.security) && spec.security.length > 0) {
-        const firstSecurity = spec.security[0];
-        if (firstSecurity.requirements) {
+      if (
+        spec.security &&
+        Array.isArray(spec.security) &&
+        spec.security.length > 0
+      ) {
+        const firstSecurity = spec.security[0] as {
+          requirements?: Record<string, unknown>;
+        };
+        if (firstSecurity && firstSecurity.requirements) {
           const schemeName = Object.keys(firstSecurity.requirements)[0];
-          
-          switch(schemeName) {
+
+          switch (schemeName) {
             case "BearerAuth":
               setAuth({ type: "bearer", bearer: { token: "" } });
               break;
             case "BasicAuth":
-              setAuth({ type: "basicAuth", basicAuth: { username: "", password: "" } });
+              setAuth({
+                type: "basicAuth",
+                basicAuth: { username: "", password: "" },
+              });
               break;
             case "ApiKeyAuth":
-              setAuth({ type: "apiKey", apiKey: { key: "X-API-Key", value: "", addTo: "header" } });
+              setAuth({
+                type: "apiKey",
+                apiKey: { key: "X-API-Key", value: "", addTo: "header" },
+              });
               break;
             default:
               setAuth({ type: "none" });
@@ -195,10 +209,14 @@ export function ApiEditorLayout() {
           }
         });
       }
-      
+
       // 폼 state 업데이트
       setQueryParams(formQueryParams);
-      setRequestHeaders(formHeaders.length > 0 ? formHeaders : [{ key: "Content-Type", value: "application/json" }]);
+      setRequestHeaders(
+        formHeaders.length > 0
+          ? formHeaders
+          : [{ key: "Content-Type", value: "application/json" }]
+      );
 
       // 기본 Content-Type 헤더 추가
       if (!testHeaders.find((h) => h.key.toLowerCase() === "content-type")) {
@@ -264,10 +282,18 @@ export function ApiEditorLayout() {
   const [tags, setTags] = useState("");
   const [description, setDescription] = useState("");
   const [summary, setSummary] = useState("");
-  
+
   // Auth state
   const [auth, setAuth] = useState<{
-    type: "none" | "apiKey" | "bearer" | "jwtBearer" | "basicAuth" | "digestAuth" | "oauth2" | "oauth1";
+    type:
+      | "none"
+      | "apiKey"
+      | "bearer"
+      | "jwtBearer"
+      | "basicAuth"
+      | "digestAuth"
+      | "oauth2"
+      | "oauth1";
     apiKey?: { key: string; value: string; addTo: "header" | "query" };
     bearer?: { token: string };
     basicAuth?: { username: string; password: string };
@@ -294,7 +320,7 @@ export function ApiEditorLayout() {
   const allEndpoints = Object.values(endpoints || {}).flat();
   const totalEndpoints = allEndpoints.length || 0;
   const completedEndpoints = allEndpoints.filter(
-    (ep) => ep.progress === "completed"
+    (ep) => ep.progress?.toLowerCase() === "completed"
   ).length;
   const progressPercentage = totalEndpoints
     ? Math.round((completedEndpoints / totalEndpoints) * 100)
@@ -420,18 +446,18 @@ export function ApiEditorLayout() {
 
   /**
    * Auth 상태를 OpenAPI security 구조로 변환
-   * 백엔드 형식: List<SecurityRequirement> 
+   * 백엔드 형식: List<SecurityRequirement>
    * SecurityRequirement = { requirements: Map<String, List<String>> }
    */
   const convertAuthToSecurity = (): any[] => {
     console.log("🔐 convertAuthToSecurity called, auth.type:", auth.type);
-    
+
     if (auth.type === "none") {
       return [];
     }
-    
+
     let schemeName = "";
-    
+
     switch (auth.type) {
       case "bearer":
       case "jwtBearer":
@@ -453,19 +479,21 @@ export function ApiEditorLayout() {
         schemeName = "DigestAuth";
         break;
     }
-    
+
     if (!schemeName) {
-      console.warn("⚠️ No schemeName matched for auth.type:", auth.type);
+      console.warn("No schemeName matched for auth.type:", auth.type);
       return [];
     }
-    
+
     // 백엔드 SecurityRequirement 형식으로 변환
-    const result = [{
-      requirements: {
-        [schemeName]: []
-      }
-    }];
-    
+    const result = [
+      {
+        requirements: {
+          [schemeName]: [],
+        },
+      },
+    ];
+
     console.log("✓ Converted security:", result);
     return result;
   };
@@ -525,7 +553,7 @@ export function ApiEditorLayout() {
       // 백엔드: { "Content-Type": { description: "", schema: { type: "string" } } }
       if (code.headers && code.headers.length > 0) {
         const headers: Record<string, any> = {};
-        code.headers.forEach((header) => {
+        code.headers.forEach((header: { key: string; value: string }) => {
           if (header.key) {
             headers[header.key] = {
               description: header.value || `${header.key} header`,
@@ -868,6 +896,9 @@ export function ApiEditorLayout() {
           }
         });
 
+        // X-Ouroboros-Try:on 헤더 추가
+        headers["X-Ouroboros-Try"] = "on";
+
         // Query 파라미터 추가
         let url = request.url;
         if (request.queryParams.length > 0) {
@@ -883,38 +914,80 @@ export function ApiEditorLayout() {
           }
         }
 
+        // URL이 상대 경로인 경우 그대로 사용 (Vite 프록시 사용)
+        // 절대 URL(http://로 시작)인 경우에만 그대로 사용
+        const fullUrl = url.startsWith("http") ? url : url;
+
+        // Request body 파싱 (GET 메서드가 아니고 body가 있을 때만)
+        let requestData = undefined;
+        if (request.method !== "GET" && request.body && request.body.trim()) {
+          try {
+            requestData = JSON.parse(request.body);
+          } catch (e) {
+            console.error("Request body 파싱 실패:", e);
+            throw new Error(
+              `Request body가 유효한 JSON 형식이 아닙니다: ${
+                e instanceof Error ? e.message : String(e)
+              }`
+            );
+          }
+        }
+
+        console.log("API 요청 전송:", {
+          method: request.method,
+          url: fullUrl,
+          headers,
+          data: requestData,
+        });
+
         const response = await axios({
           method: request.method,
-          url: url,
+          url: fullUrl,
           headers: headers,
-          data:
-            request.method !== "GET" && request.body
-              ? JSON.parse(request.body)
-              : undefined,
+          data: requestData,
         });
 
         const endTime = performance.now();
         const responseTime = Math.round(endTime - startTime);
 
+        // 응답 헤더에서 X-Ouroboros-Try-Id 추출
+        const responseHeaders = response.headers as Record<string, string>;
+        const tryIdValue =
+          responseHeaders["x-ouroboros-try-id"] ||
+          responseHeaders["X-Ouroboros-Try-Id"];
+        if (tryIdValue) {
+          setTryId(tryIdValue);
+        }
+
         setResponse({
           status: response.status,
           statusText: response.statusText,
-          headers: response.headers as Record<string, string>,
+          headers: responseHeaders,
           body: JSON.stringify(response.data, null, 2),
           responseTime,
         });
         setExecutionStatus("completed");
       }
     } catch (error) {
+      console.error("API 요청 실패:", error);
       const endTime = performance.now();
       const startTime = endTime - 100; // 에러 발생 시간 추정
       const responseTime = Math.round(endTime - startTime);
 
       if (axios.isAxiosError(error) && error.response) {
+        // 에러 응답에서도 X-Ouroboros-Try-Id 추출 시도
+        const errorHeaders = error.response.headers as Record<string, string>;
+        const tryIdValue =
+          errorHeaders["x-ouroboros-try-id"] ||
+          errorHeaders["X-Ouroboros-Try-Id"];
+        if (tryIdValue) {
+          setTryId(tryIdValue);
+        }
+
         setResponse({
           status: error.response.status,
           statusText: error.response.statusText,
-          headers: error.response.headers as Record<string, string>,
+          headers: errorHeaders,
           body: JSON.stringify(error.response.data, null, 2),
           responseTime,
         });

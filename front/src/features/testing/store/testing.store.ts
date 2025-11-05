@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { TryMethod } from "@/features/spec/services/api";
 
 export type Protocol = "REST" | "WebSocket" | "GraphQL";
 
@@ -42,6 +43,16 @@ interface TestingState {
   setIsLoading: (isLoading: boolean) => void;
   useDummyResponse: boolean;
   setUseDummyResponse: (useDummy: boolean) => void;
+
+  // Method List State (for Test tab)
+  methodList: TryMethod[] | null;
+  setMethodList: (methods: TryMethod[] | null) => void;
+  totalDurationMs: number | null;
+  setTotalDurationMs: (duration: number | null) => void;
+  
+  // Try ID State
+  tryId: string | null;
+  setTryId: (tryId: string | null) => void;
 }
 
 export const useTestingStore = create<TestingState>((set) => ({
@@ -115,5 +126,13 @@ export const useTestingStore = create<TestingState>((set) => ({
 
   useDummyResponse: false,
   setUseDummyResponse: (useDummy) => set({ useDummyResponse: useDummy }),
+
+  methodList: null,
+  setMethodList: (methods) => set({ methodList: methods }),
+  totalDurationMs: null,
+  setTotalDurationMs: (duration) => set({ totalDurationMs: duration }),
+  
+  tryId: null,
+  setTryId: (tryId) => set({ tryId }),
 }));
 
