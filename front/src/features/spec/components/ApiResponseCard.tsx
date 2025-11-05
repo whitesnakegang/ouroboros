@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import React from "react";
 import { SchemaModal } from "./SchemaModal";
 import { getAllSchemas, type SchemaResponse } from "../services/api";
 
@@ -191,11 +192,8 @@ export function ApiResponseCard({
               </thead>
               <tbody>
                 {statusCodes.map((statusCode, index) => (
-                  <>
-                    <tr
-                      key={index}
-                      className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-[#161B22]"
-                    >
+                  <React.Fragment key={index}>
+                    <tr className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-[#161B22]">
                       <td className="px-4 py-3">
                         <input
                           type="text"
@@ -433,7 +431,7 @@ export function ApiResponseCard({
                         </td>
                       </tr>
                     )}
-                  </>
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>

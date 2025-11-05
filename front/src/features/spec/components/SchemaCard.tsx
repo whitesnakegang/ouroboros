@@ -73,7 +73,12 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
       return;
     }
 
-    if (schemaFields.length === 0) {
+    // object나 array(object) 타입일 때만 필드 검증
+    if (
+      (schemaType === "object" ||
+        (schemaType === "array" && arrayItemType === "object")) &&
+      schemaFields.length === 0
+    ) {
       alert("최소 하나의 필드를 추가해주세요.");
       return;
     }
@@ -82,33 +87,106 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
       setIsLoading(true);
       setError(null);
 
-      // 필드들을 백엔드 형식으로 변환
-      const properties: Record<string, any> = {};
-      const required: string[] = [];
+      let schemaRequest: CreateSchemaRequest & { items?: any };
 
-      schemaFields.forEach((field) => {
-        if (field.name.trim()) {
-          properties[field.name] = {
-            type: field.type,
-            description: field.description,
-            mockExpression: field.mockExpression,
-            ref: field.ref,
+      if (schemaType === "array") {
+        // Array 타입 처리
+        if (arrayItemType === "object") {
+          // Array of objects: properties 필요
+          const properties: Record<string, any> = {};
+          const required: string[] = [];
+
+          schemaFields.forEach((field) => {
+            if (field.name.trim()) {
+              properties[field.name] = {
+                type: field.type,
+                description: field.description,
+                mockExpression: field.mockExpression,
+                ref: field.ref,
+              };
+              required.push(field.name);
+            }
+          });
+
+          schemaRequest = {
+            schemaName: currentSchemaName.trim(),
+            type: "array",
+            title: `${currentSchemaName} Schema`,
+            description:
+              currentSchemaDescription.trim() ||
+              `${currentSchemaName} 스키마 정의`,
+            items: {
+              type: "object",
+              properties,
+              required: required.length > 0 ? required : undefined,
+            },
+            properties: {}, // array 타입은 properties가 빈 객체
+            required: [],
+            orders: schemaFields.map((f) => f.name),
           };
-          // 필수 필드는 현재 모든 필드로 설정 (실제로는 UI에서 선택할 수 있도록 개선 가능)
-          required.push(field.name);
+        } else {
+          // Array of primitives: items만 필요
+          schemaRequest = {
+            schemaName: currentSchemaName.trim(),
+            type: "array",
+            title: `${currentSchemaName} Schema`,
+            description:
+              currentSchemaDescription.trim() ||
+              `${currentSchemaName} 스키마 정의`,
+            items: {
+              type: arrayItemType,
+            },
+            properties: {},
+            required: [],
+            orders: [],
+          };
         }
-      });
+      } else if (
+        schemaType === "string" ||
+        schemaType === "number" ||
+        schemaType === "boolean"
+      ) {
+        // Primitive 타입: properties 불필요
+        schemaRequest = {
+          schemaName: currentSchemaName.trim(),
+          type: schemaType,
+          title: `${currentSchemaName} Schema`,
+          description:
+            currentSchemaDescription.trim() ||
+            `${currentSchemaName} 스키마 정의`,
+          properties: {},
+          required: [],
+          orders: [],
+        };
+      } else {
+        // Object 타입: properties 필요
+        const properties: Record<string, any> = {};
+        const required: string[] = [];
 
-      const schemaRequest: CreateSchemaRequest = {
-        schemaName: currentSchemaName.trim(),
-        type: "object",
-        title: `${currentSchemaName} Schema`,
-        description:
-          currentSchemaDescription.trim() || `${currentSchemaName} 스키마 정의`,
-        properties,
-        required,
-        orders: schemaFields.map((f) => f.name),
-      };
+        schemaFields.forEach((field) => {
+          if (field.name.trim()) {
+            properties[field.name] = {
+              type: field.type,
+              description: field.description,
+              mockExpression: field.mockExpression,
+              ref: field.ref,
+            };
+            required.push(field.name);
+          }
+        });
+
+        schemaRequest = {
+          schemaName: currentSchemaName.trim(),
+          type: "object",
+          title: `${currentSchemaName} Schema`,
+          description:
+            currentSchemaDescription.trim() ||
+            `${currentSchemaName} 스키마 정의`,
+          properties,
+          required: required.length > 0 ? required : undefined,
+          orders: schemaFields.map((f) => f.name),
+        };
+      }
 
       // 기존 스키마가 있는지 확인
       const existingSchema = schemas.find(
@@ -117,19 +195,21 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
 
       if (existingSchema) {
         // 수정
-        const updateRequest: UpdateSchemaRequest = {
+        const updateRequest: UpdateSchemaRequest & { items?: any } = {
           type: schemaRequest.type,
           title: schemaRequest.title,
           description: schemaRequest.description,
           properties: schemaRequest.properties,
           required: schemaRequest.required,
           orders: schemaRequest.orders,
+          // items 필드가 있으면 포함 (array 타입인 경우)
+          ...(schemaRequest.items && { items: schemaRequest.items }),
         };
         await updateSchema(currentSchemaName, updateRequest);
         alert(`"${currentSchemaName}" 스키마가 수정되었습니다.`);
       } else {
         // 생성
-        await createSchema(schemaRequest);
+        await createSchema(schemaRequest as CreateSchemaRequest & { items?: any });
         alert(`"${currentSchemaName}" 스키마가 생성되었습니다.`);
       }
 
