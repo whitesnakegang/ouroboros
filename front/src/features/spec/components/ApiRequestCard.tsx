@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { SchemaModal } from "./SchemaModal";
+import { getAllSchemas, type SchemaResponse } from "../services/api";
 
 interface KeyValuePair {
   key: string;
@@ -14,6 +16,7 @@ interface BodyField {
   type: string; // "string" | "integer" | "number" | "boolean" | "object" | "array" | "file"
   description?: string;
   required?: boolean;
+  ref?: string; // 스키마 참조 시 사용 (예: "User")
 }
 
 interface RequestBody {
@@ -103,6 +106,49 @@ export function ApiRequestCard({
   };
 
   const [activeTab, setActiveTab] = useState("body");
+  const [schemas, setSchemas] = useState<SchemaResponse[]>([]);
+  const [isSchemaModalOpen, setIsSchemaModalOpen] = useState(false);
+
+  // 스키마 목록 로드
+  useEffect(() => {
+    const loadSchemas = async () => {
+      try {
+        const response = await getAllSchemas();
+        setSchemas(response.data);
+      } catch (err) {
+        console.error("스키마 로드 실패:", err);
+      }
+    };
+    loadSchemas();
+  }, []);
+
+  // Schema 선택 핸들러
+  const handleSchemaSelect = (schema: {
+    name: string;
+    fields: Array<{
+      name: string;
+      type: string;
+      description?: string;
+      mockExpression?: string;
+    }>;
+  }) => {
+    if (requestBody.type === "json") {
+      // Schema의 필드들을 BodyField로 변환하여 추가
+      const newFields = schema.fields.map((field) => ({
+        key: field.name,
+        value: field.mockExpression || "",
+        type: field.type,
+        description: field.description,
+        required: false,
+        ref: schema.name, // 스키마 참조 저장
+      }));
+
+      setRequestBody({
+        ...requestBody,
+        fields: [...(requestBody.fields || []), ...newFields],
+      });
+    }
+  };
 
   return (
     <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm mb-6">
@@ -262,7 +308,7 @@ export function ApiRequestCard({
             {/* Table Format for all types except none */}
             {requestBody.type !== "none" && requestBody.fields && (
               <div>
-                <div className="mb-3">
+                <div className="mb-3 flex gap-2">
                   <button
                     onClick={() => {
                       setRequestBody({
@@ -273,10 +319,24 @@ export function ApiRequestCard({
                         ],
                       });
                     }}
-                    className="px-3 py-1 text-sm text-[#2563EB] hover:text-[#1E40AF] font-medium"
+                    disabled={isReadOnly}
+                    className={`px-3 py-1 text-sm text-[#2563EB] hover:text-[#1E40AF] font-medium ${
+                      isReadOnly ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
                   >
                     + Add Field
                   </button>
+                  {requestBody.type === "json" && (
+                    <button
+                      onClick={() => setIsSchemaModalOpen(true)}
+                      disabled={isReadOnly}
+                      className={`px-3 py-1 text-sm text-emerald-600 hover:text-emerald-700 font-medium ${
+                        isReadOnly ? "opacity-50 cursor-not-allowed" : ""
+                      }`}
+                    >
+                      + Add Schema
+                    </button>
+                  )}
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-md">
@@ -551,6 +611,15 @@ export function ApiRequestCard({
       </div>
 
       {/* Send Button removed: Spec 작성 화면에서는 실제 전송 기능을 제공하지 않음 */}
+
+      {/* Schema Modal */}
+      <SchemaModal
+        isOpen={isSchemaModalOpen}
+        onClose={() => setIsSchemaModalOpen(false)}
+        onSelect={handleSchemaSelect}
+        schemas={schemas}
+        setSchemas={setSchemas}
+      />
     </div>
   );
 }
