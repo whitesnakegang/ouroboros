@@ -110,16 +110,71 @@ export function ApiEditorLayout() {
   // 수정/삭제 불가능한 상태인지 확인 (completed이거나 diff가 있는 경우)
   const isReadOnly = isCompleted || hasDiff;
 
+  // 에러 메시지에서 localhost 주소 제거 및 사용자 친화적인 메시지로 변환
+  const getErrorMessage = (error: unknown): string => {
+    if (error instanceof Error) {
+      let message = error.message || String(error);
+      // localhost 주소 및 관련 텍스트 제거 (다양한 형식 대응)
+      message = message.replace(/localhost:\d+/gi, "");
+      message = message.replace(/127\.0\.0\.1:\d+/gi, "");
+      message = message.replace(/https?:\/\/localhost:\d+/gi, "");
+      message = message.replace(/https?:\/\/127\.0\.0\.1:\d+/gi, "");
+      message = message.replace(/localhost:\d+\s*내용:/gi, "");
+      message = message.replace(/localhost:\d+\s*Content:/gi, "");
+      // "내용:" 또는 "Content:" 뒤의 내용만 남기기
+      message = message.replace(/.*내용:\s*/i, "");
+      message = message.replace(/.*Content:\s*/i, "");
+      // 불필요한 공백 및 줄바꿈 정리
+      message = message.replace(/\s+/g, " ").trim();
+      // 빈 메시지인 경우 기본 메시지 반환
+      if (!message) {
+        return "";
+      }
+      return message;
+    }
+    // Error 객체가 아닌 경우 문자열로 변환 후 처리
+    const errorStr = String(error);
+    const message = errorStr
+      .replace(/localhost:\d+/gi, "")
+      .replace(/127\.0\.0\.1:\d+/gi, "")
+      .replace(/.*내용:\s*/i, "")
+      .replace(/.*Content:\s*/i, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    return message || "";
+  };
+
   // Load selected endpoint data when endpoint is clicked
   useEffect(() => {
     if (selectedEndpoint) {
       setIsEditMode(false); // 항목 선택 시 읽기 전용 모드로 시작
       loadEndpointData(selectedEndpoint.id);
+
+      // 폼 부분으로 스크롤 (activeTab에 따라 다른 컨테이너로 스크롤)
+      setTimeout(() => {
+        if (activeTab === "test") {
+          const testContainer = document.getElementById("test-form-container");
+          if (testContainer) {
+            testContainer.scrollIntoView({
+              behavior: "smooth",
+              block: "start",
+            });
+          }
+        } else {
+          const formContainer = document.getElementById("api-form-container");
+          if (formContainer) {
+            formContainer.scrollIntoView({
+              behavior: "smooth",
+              block: "start",
+            });
+          }
+        }
+      }, 100);
     } else {
       setIsEditMode(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedEndpoint]);
+  }, [selectedEndpoint, activeTab]);
 
   // Load endpoint data from backend
   const loadEndpointData = async (id: string) => {
@@ -273,7 +328,12 @@ export function ApiEditorLayout() {
       });
     } catch (error) {
       console.error("API 스펙 로드 실패:", error);
-      alert("API 스펙을 불러오는데 실패했습니다.");
+      const errorMessage = getErrorMessage(error);
+      alert(
+        `API 스펙을 불러오는데 실패했습니다.${
+          errorMessage ? `\n${errorMessage}` : ""
+        }`
+      );
     }
   };
 
@@ -671,8 +731,7 @@ export function ApiEditorLayout() {
       }
     } catch (error: unknown) {
       console.error("API 저장 실패:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "알 수 없는 오류";
+      const errorMessage = getErrorMessage(error);
       alert(`API 저장에 실패했습니다: ${errorMessage}`);
     }
   };
@@ -708,8 +767,7 @@ export function ApiEditorLayout() {
         loadEndpoints();
       } catch (error: unknown) {
         console.error("API 삭제 실패:", error);
-        const errorMessage =
-          error instanceof Error ? error.message : "알 수 없는 오류";
+        const errorMessage = getErrorMessage(error);
         alert(`API 삭제에 실패했습니다: ${errorMessage}`);
       }
     }
@@ -812,8 +870,7 @@ export function ApiEditorLayout() {
         await loadEndpoints();
       } catch (error) {
         console.error("YAML Import 오류:", error);
-        const errorMsg =
-          error instanceof Error ? error.message : "알 수 없는 오류";
+        const errorMsg = getErrorMessage(error);
         alert(`YAML Import 실패\n\n${errorMsg}`);
       }
     };
@@ -844,8 +901,7 @@ export function ApiEditorLayout() {
         // alert("✅ 실제 구현이 명세에 성공적으로 반영되었습니다!");
       } catch (error: unknown) {
         console.error("명세 동기화 실패:", error);
-        const errorMessage =
-          error instanceof Error ? error.message : "알 수 없는 오류";
+        const errorMessage = getErrorMessage(error);
         alert(`명세 동기화에 실패했습니다: ${errorMessage}`);
       }
     }
@@ -1099,8 +1155,7 @@ export function ApiEditorLayout() {
                       alert("Markdown 파일이 다운로드되었습니다.");
                     } catch (e) {
                       console.error("Markdown 내보내기 오류:", e);
-                      const errorMsg =
-                        e instanceof Error ? e.message : "알 수 없는 오류";
+                      const errorMsg = getErrorMessage(e);
                       alert(
                         `전체 Markdown 내보내기에 실패했습니다.\n오류: ${errorMsg}`
                       );
@@ -1152,8 +1207,7 @@ export function ApiEditorLayout() {
                       alert("YAML 파일이 다운로드되었습니다.");
                     } catch (e) {
                       console.error("YAML 내보내기 오류:", e);
-                      const errorMsg =
-                        e instanceof Error ? e.message : "알 수 없는 오류";
+                      const errorMsg = getErrorMessage(e);
                       alert(
                         `전체 YAML 내보내기에 실패했습니다.\n오류: ${errorMsg}`
                       );
@@ -1319,7 +1373,10 @@ export function ApiEditorLayout() {
             <TestLayout />
           </>
         ) : (
-          <div className="w-full max-w-6xl mx-auto px-6 py-8">
+          <div
+            id="api-form-container"
+            className="w-full max-w-6xl mx-auto px-6 py-8"
+          >
             {/* Protocol not supported message */}
             {protocol !== "REST" && (
               <div className="h-full flex items-center justify-center py-12">

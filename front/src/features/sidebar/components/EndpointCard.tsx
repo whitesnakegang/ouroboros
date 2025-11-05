@@ -34,7 +34,7 @@ const mockStatusColors = {
 };
 
 export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
-  const { setSelectedEndpoint } = useSidebarStore();
+  const { setSelectedEndpoint, selectedEndpoint } = useSidebarStore();
 
   const handleClick = () => {
     setSelectedEndpoint(endpoint);
@@ -44,10 +44,16 @@ export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
     methodTextColors[endpoint.method as keyof typeof methodTextColors] ||
     "text-[#8B949E]";
 
+  const isSelected = selectedEndpoint?.id === endpoint.id;
+
   return (
     <div
       onClick={handleClick}
-      className="px-3 py-2 mx-2 my-1 border-b border-gray-200 dark:border-[#2D333B] cursor-pointer hover:bg-gray-50 dark:hover:bg-[#161B22] transition-colors"
+      className={`px-3 py-2 mx-2 my-1 border-b border-gray-200 dark:border-[#2D333B] cursor-pointer transition-colors ${
+        isSelected
+          ? "bg-blue-50 dark:bg-blue-900/20 border-l-4 border-l-blue-500"
+          : "hover:bg-gray-50 dark:hover:bg-[#161B22]"
+      }`}
     >
       <div className="flex items-start gap-3">
         {/* Mock 탭: 구현 상태 표시 점 (왼쪽) */}
