@@ -1443,10 +1443,11 @@ export function ApiEditorLayout() {
               </div>
             )}
 
-            {/* Diff Notification - 불일치가 있을 때만 표시 */}
+            {/* Diff Notification - 불일치가 있을 때만 표시 (completed 또는 mock 상태 모두) */}
             {protocol === "REST" && selectedEndpoint && hasDiff && (
               <DiffNotification
                 diff={selectedEndpoint.diff || "none"}
+                progress={selectedEndpoint.progress}
                 onSyncToSpec={handleSyncDiffToSpec}
               />
             )}
@@ -1509,18 +1510,43 @@ export function ApiEditorLayout() {
                         </svg>
                       </div>
                     </div>
-                    <input
-                      type="text"
-                      value={url}
-                      onChange={(e) => setUrl(e.target.value)}
-                      placeholder="예: /api/users, /api/auth/login"
-                      disabled={!!(selectedEndpoint && !isEditMode)}
-                      className={`flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm font-mono ${
-                        selectedEndpoint && !isEditMode
-                          ? "opacity-60 cursor-not-allowed"
-                          : ""
-                      }`}
-                    />
+                    <div className="relative flex-1">
+                      <input
+                        type="text"
+                        value={url}
+                        onChange={(e) => setUrl(e.target.value)}
+                        placeholder="예: /api/users, /api/auth/login"
+                        disabled={!!(selectedEndpoint && !isEditMode)}
+                        className={`w-full px-3 py-2 ${
+                          hasDiff ? "pr-10" : ""
+                        } rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm font-mono ${
+                          selectedEndpoint && !isEditMode
+                            ? "opacity-60 cursor-not-allowed"
+                            : ""
+                        }`}
+                      />
+                      {/* Diff 주의 표시 아이콘 (URL 우측) */}
+                      {hasDiff && (
+                        <div
+                          className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"
+                          title="명세와 실제 구현이 일치하지 않습니다"
+                        >
+                          <svg
+                            className="w-4 h-4 text-amber-500"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                            />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Method Badge */}
