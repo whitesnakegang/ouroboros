@@ -4,9 +4,11 @@ import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
 import type {
   TryMethod,
   TryMethodParameter,
+  TryTraceData,
 } from "@/features/spec/services/api";
 import type { TestResponse } from "../store/testing.store";
-import { getTryMethodList } from "@/features/spec/services/api";
+import { getTryMethodList, getTryTrace } from "@/features/spec/services/api";
+import { TraceModal } from "./TraceModal";
 
 export function TestResponseTabs() {
   const {
@@ -21,6 +23,9 @@ export function TestResponseTabs() {
   const { selectedEndpoint } = useSidebarStore();
   const [activeTab, setActiveTab] = useState<"response" | "test">("response");
   const [isLoadingMethods, setIsLoadingMethods] = useState(false);
+  const [isTraceModalOpen, setIsTraceModalOpen] = useState(false);
+  const [traceData, setTraceData] = useState<TryTraceData | null>(null);
+  const [isLoadingTrace, setIsLoadingTrace] = useState(false);
 
   // Mock 엔드포인트인지 확인 (progress가 "mock"이거나 useDummyResponse가 true인 경우)
   const isMockEndpoint =
@@ -29,27 +34,27 @@ export function TestResponseTabs() {
 
   // test 탭이 활성화되고 tryId가 있을 때 메서드 리스트 로드
   useEffect(() => {
+    const loadTryMethods = async () => {
+      if (!tryId || isMockEndpoint) return;
+
+      setIsLoadingMethods(true);
+      try {
+        const response = await getTryMethodList(tryId);
+        setMethodList(response.data.methods);
+        setTotalDurationMs(response.data.totalDurationMs);
+      } catch (error) {
+        console.error("Try 메서드 리스트 로드 실패:", error);
+        setMethodList(null);
+        setTotalDurationMs(null);
+      } finally {
+        setIsLoadingMethods(false);
+      }
+    };
+
     if (activeTab === "test" && tryId && !isMockEndpoint) {
       loadTryMethods();
     }
-  }, [activeTab, tryId, isMockEndpoint]);
-
-  const loadTryMethods = async () => {
-    if (!tryId) return;
-
-    setIsLoadingMethods(true);
-    try {
-      const response = await getTryMethodList(tryId);
-      setMethodList(response.data.methods);
-      setTotalDurationMs(response.data.totalDurationMs);
-    } catch (error) {
-      console.error("Try 메서드 리스트 로드 실패:", error);
-      setMethodList(null);
-      setTotalDurationMs(null);
-    } finally {
-      setIsLoadingMethods(false);
-    }
-  };
+  }, [activeTab, tryId, isMockEndpoint, setMethodList, setTotalDurationMs]);
 
   if (!response) {
     return (
@@ -137,7 +142,6 @@ export function TestResponseTabs() {
           <ResponseContent
             response={response}
             getStatusColor={getStatusColor}
-            isMockEndpoint={isMockEndpoint}
           />
         ) : (
           <TestContent
@@ -146,9 +150,36 @@ export function TestResponseTabs() {
             isMockEndpoint={isMockEndpoint}
             isLoading={isLoadingMethods}
             tryId={tryId}
+            onShowTrace={async () => {
+              if (!tryId) return;
+              setIsLoadingTrace(true);
+              setIsTraceModalOpen(true);
+              try {
+                const response = await getTryTrace(tryId);
+                setTraceData(response.data);
+              } catch (error) {
+                console.error("Trace 조회 실패:", error);
+                setTraceData(null);
+              } finally {
+                setIsLoadingTrace(false);
+              }
+            }}
+            isLoadingTrace={isLoadingTrace}
           />
         )}
       </div>
+
+      {/* Trace Modal */}
+      {traceData && (
+        <TraceModal
+          isOpen={isTraceModalOpen}
+          onClose={() => {
+            setIsTraceModalOpen(false);
+            setTraceData(null);
+          }}
+          traceData={traceData}
+        />
+      )}
     </div>
   );
 }
@@ -156,11 +187,9 @@ export function TestResponseTabs() {
 function ResponseContent({
   response,
   getStatusColor,
-  isMockEndpoint,
 }: {
   response: TestResponse;
   getStatusColor: (status: number) => string;
-  isMockEndpoint: boolean;
 }) {
   return (
     <>
@@ -211,7 +240,7 @@ function ResponseContent({
                 }
                 // body가 객체인 경우 직접 stringify
                 return JSON.stringify(response.body, null, 2);
-              } catch (e) {
+              } catch {
                 // JSON 파싱 실패 시 원본 그대로 표시 (텍스트 응답 등)
                 return response.body;
               }
@@ -251,12 +280,16 @@ function TestContent({
   isMockEndpoint,
   isLoading,
   tryId,
+  onShowTrace,
+  isLoadingTrace,
 }: {
   methodList: TryMethod[] | null;
   totalDurationMs: number | null;
   isMockEndpoint: boolean;
   isLoading: boolean;
   tryId: string | null;
+  onShowTrace: () => void;
+  isLoadingTrace: boolean;
 }) {
   // Mock 엔드포인트인 경우 메서드 실행 정보가 없음을 표시
   if (isMockEndpoint) {
@@ -395,20 +428,70 @@ function TestContent({
                 {totalDurationMs.toLocaleString()}ms
               </div>
             </div>
-            <div className="w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-              <svg
-                className="w-8 h-8 text-blue-600 dark:text-blue-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            <div className="flex items-center gap-3">
+              <button
+                onClick={onShowTrace}
+                disabled={isLoadingTrace || !tryId}
+                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-[#2D333B] disabled:text-gray-500 dark:disabled:text-[#8B949E] text-white rounded-md transition-colors text-sm font-medium flex items-center gap-2 disabled:cursor-not-allowed"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
+                {isLoadingTrace ? (
+                  <>
+                    <svg
+                      className="animate-spin h-4 w-4"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                    로딩 중...
+                  </>
+                ) : (
+                  <>
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                      />
+                    </svg>
+                    Call Trace 보기
+                  </>
+                )}
+              </button>
+              <div className="w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                <svg
+                  className="w-8 h-8 text-blue-600 dark:text-blue-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              </div>
             </div>
           </div>
         </div>

@@ -607,3 +607,66 @@ export async function getTryMethodList(
 
   return response.json();
 }
+
+// Try Trace 관련 인터페이스
+export interface TryTraceParameter {
+  type: string;
+  name: string;
+}
+
+export interface TryTraceSpan {
+  spanId: string;
+  name: string;
+  className: string;
+  methodName: string;
+  parameters?: TryTraceParameter[] | null;
+  durationMs: number;
+  selfDurationMs: number;
+  percentage: number;
+  selfPercentage: number;
+  kind: string;
+  children: TryTraceSpan[];
+}
+
+export interface TryTraceData {
+  tryId: string;
+  traceId: string | null;
+  totalDurationMs: number;
+  spans: TryTraceSpan[];
+}
+
+export interface TryTraceResponse {
+  status: number;
+  data: TryTraceData;
+  message: string;
+  error?: {
+    code: string;
+    details: string;
+  } | null;
+}
+
+/**
+ * Try Trace 조회
+ */
+export async function getTryTrace(tryId: string): Promise<TryTraceResponse> {
+  const response = await fetch(`${TRY_API_BASE_URL}/${tryId}/trace`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `Try Trace 조회 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("Try Trace 조회 실패:", {
+      tryId,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
