@@ -145,9 +145,24 @@ export function ApiEditorLayout() {
     return message || "";
   };
 
+  // endpoints가 업데이트된 후 selectedEndpoint 유효성 검증
+  useEffect(() => {
+    if (selectedEndpoint && endpoints) {
+      // 현재 selectedEndpoint가 실제로 존재하는지 확인
+      const exists = Object.values(endpoints).some((group) =>
+        group.some((ep) => ep.id === selectedEndpoint.id)
+      );
+
+      if (!exists) {
+        // 존재하지 않으면 초기화 (YML에서 삭제된 경우)
+        setSelectedEndpoint(null);
+      }
+    }
+  }, [endpoints, selectedEndpoint, setSelectedEndpoint]);
+
   // Load selected endpoint data when endpoint is clicked
   useEffect(() => {
-    if (selectedEndpoint) {
+    if (selectedEndpoint && selectedEndpoint.id) {
       setIsEditMode(false); // 항목 선택 시 읽기 전용 모드로 시작
       loadEndpointData(selectedEndpoint.id);
 
@@ -179,6 +194,13 @@ export function ApiEditorLayout() {
 
   // Load endpoint data from backend
   const loadEndpointData = async (id: string) => {
+    // restId가 null이거나 유효하지 않은 경우 처리
+    if (!id || id.trim() === "") {
+      alert("명세에 없는 내용입니다. 선택된 엔드포인트가 존재하지 않습니다.");
+      setSelectedEndpoint(null);
+      return;
+    }
+
     try {
       const response = await getRestApiSpec(id);
       const spec = response.data;
@@ -330,11 +352,15 @@ export function ApiEditorLayout() {
     } catch (error) {
       console.error("API 스펙 로드 실패:", error);
       const errorMessage = getErrorMessage(error);
-      alert(
-        `API 스펙을 불러오는데 실패했습니다.${
-          errorMessage ? `\n${errorMessage}` : ""
-        }`
-      );
+      
+      // 명세에 없는 내용일 경우 selectedEndpoint 초기화
+      alert("명세에 없는 내용입니다. 선택된 엔드포인트가 존재하지 않습니다.");
+      setSelectedEndpoint(null);
+      
+      // 기존 에러 메시지는 콘솔에만 출력
+      if (errorMessage) {
+        console.error("상세 에러:", errorMessage);
+      }
     }
   };
 
