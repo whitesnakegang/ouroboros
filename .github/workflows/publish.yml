@@ -54,8 +54,9 @@ jobs:
       ##frontend 빌드
       - name: Build frontend
         working-directory: frontend
-        run: npm ci
-        run: npm run build
+        run: |
+          npm ci
+          npm run build
         
       # 🧩 GPG 키 주입 (개행 안전)
       - name: Prepare signing key (robust)
