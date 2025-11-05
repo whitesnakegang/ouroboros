@@ -216,7 +216,9 @@ export async function getAllRestApiSpecs(): Promise<GetAllSpecsResponse> {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
+      "Cache-Control": "no-cache",
     },
+    cache: "no-store", // 브라우저 HTTP 캐시 방지
   });
 
   if (!response.ok) {
@@ -268,7 +270,9 @@ export async function getRestApiSpec(id: string): Promise<GetSpecResponse> {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
+      "Cache-Control": "no-cache",
     },
+    cache: "no-store", // 브라우저 HTTP 캐시 방지
   });
 
   if (!response.ok) {
