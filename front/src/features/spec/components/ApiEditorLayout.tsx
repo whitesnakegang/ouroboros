@@ -86,8 +86,6 @@ export function ApiEditorLayout() {
     setResponse,
     isLoading,
     setIsLoading,
-    useDummyResponse,
-    setUseDummyResponse,
     setTryId,
   } = useTestingStore();
   const [activeTab, setActiveTab] = useState<"form" | "test">("form");
@@ -318,7 +316,8 @@ export function ApiEditorLayout() {
         fields: [],
       };
 
-      if (spec.requestBody) {
+      // RequestBody 처리 - null이나 undefined 체크
+      if (spec.requestBody != null) {
         const reqBody = spec.requestBody as any;
 
         // content가 없거나 빈 객체인 경우 처리
@@ -988,6 +987,9 @@ export function ApiEditorLayout() {
 
         // 사이드바 목록 다시 로드 (백그라운드에서)
         loadEndpoints();
+
+        // 저장 후 다시 로드하여 백엔드에서 최신 데이터 가져오기
+        await loadEndpointData(selectedEndpoint.id);
       } else {
         // 새 엔드포인트 생성
         const apiRequest = {
@@ -1024,7 +1026,7 @@ export function ApiEditorLayout() {
         // 사이드바 목록 다시 로드
         await loadEndpoints();
 
-        // 수정된 엔드포인트를 다시 선택
+        // 생성된 엔드포인트를 선택하고 저장된 데이터 다시 로드
         const updatedEndpoint = {
           id: response.data.id,
           method,
@@ -1035,6 +1037,9 @@ export function ApiEditorLayout() {
           progress: "mock",
         };
         setSelectedEndpoint(updatedEndpoint);
+
+        // 생성 후 다시 로드하여 백엔드에서 최신 데이터 가져오기
+        await loadEndpointData(response.data.id);
       }
     } catch (error: unknown) {
       console.error("API 저장 실패:", error);
@@ -1209,111 +1214,80 @@ export function ApiEditorLayout() {
     setResponse(null);
 
     try {
-      if (useDummyResponse) {
-        // Dummy Response 사용
-        setTimeout(() => {
-          const dummyResponse = {
-            status: 200,
-            statusText: "OK",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Request-ID": "req-123456",
-            },
-            body: JSON.stringify(
-              {
-                token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.mock.token",
-                user: {
-                  id: "123",
-                  email: "test@example.com",
-                  name: "Test User",
-                },
-              },
-              null,
-              2
-            ),
-            responseTime: Math.floor(Math.random() * 200) + 50, // 50-250ms
-          };
-          setResponse(dummyResponse);
-          setExecutionStatus("completed");
-          setIsLoading(false);
-        }, 500);
-      } else {
-        // 실제 API 호출
-        const startTime = performance.now();
+      // 실제 API 호출 (Mock 엔드포인트는 백엔드에서 faker data 기반 응답 생성, Completed 엔드포인트는 실제 응답)
+      const startTime = performance.now();
 
-        // 헤더 변환
-        const headers: Record<string, string> = {};
-        request.headers.forEach((h) => {
-          if (h.key && h.value) {
-            headers[h.key] = h.value;
-          }
-        });
-
-        // X-Ouroboros-Try:on 헤더 추가
-        headers["X-Ouroboros-Try"] = "on";
-
-        // Query 파라미터 추가
-        let url = request.url;
-        if (request.queryParams.length > 0) {
-          const queryString = request.queryParams
-            .filter((p) => p.key && p.value)
-            .map(
-              (p) =>
-                `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`
-            )
-            .join("&");
-          if (queryString) {
-            url += `?${queryString}`;
-          }
+      // 헤더 변환
+      const headers: Record<string, string> = {};
+      request.headers.forEach((h) => {
+        if (h.key && h.value) {
+          headers[h.key] = h.value;
         }
+      });
 
-        // URL이 상대 경로인 경우 그대로 사용 (Vite 프록시 사용)
-        // 절대 URL(http://로 시작)인 경우에만 그대로 사용
-        const fullUrl = url.startsWith("http") ? url : url;
+      // X-Ouroboros-Try:on 헤더 추가
+      headers["X-Ouroboros-Try"] = "on";
 
-        // Request body 파싱 (GET 메서드가 아니고 body가 있을 때만)
-        let requestData = undefined;
-        if (request.method !== "GET" && request.body && request.body.trim()) {
-          try {
-            requestData = JSON.parse(request.body);
-          } catch (e) {
-            console.error("Request body 파싱 실패:", e);
-            throw new Error(
-              `Request body가 유효한 JSON 형식이 아닙니다: ${
-                e instanceof Error ? e.message : String(e)
-              }`
-            );
-          }
+      // Query 파라미터 추가
+      let url = request.url;
+      if (request.queryParams.length > 0) {
+        const queryString = request.queryParams
+          .filter((p) => p.key && p.value)
+          .map(
+            (p) => `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`
+          )
+          .join("&");
+        if (queryString) {
+          url += `?${queryString}`;
         }
-
-        const response = await axios({
-          method: request.method,
-          url: fullUrl,
-          headers: headers,
-          data: requestData,
-        });
-
-        const endTime = performance.now();
-        const responseTime = Math.round(endTime - startTime);
-
-        // 응답 헤더에서 X-Ouroboros-Try-Id 추출
-        const responseHeaders = response.headers as Record<string, string>;
-        const tryIdValue =
-          responseHeaders["x-ouroboros-try-id"] ||
-          responseHeaders["X-Ouroboros-Try-Id"];
-        if (tryIdValue) {
-          setTryId(tryIdValue);
-        }
-
-        setResponse({
-          status: response.status,
-          statusText: response.statusText,
-          headers: responseHeaders,
-          body: JSON.stringify(response.data, null, 2),
-          responseTime,
-        });
-        setExecutionStatus("completed");
       }
+
+      // URL이 상대 경로인 경우 그대로 사용 (Vite 프록시 사용)
+      // 절대 URL(http://로 시작)인 경우에만 그대로 사용
+      const fullUrl = url.startsWith("http") ? url : url;
+
+      // Request body 파싱 (GET 메서드가 아니고 body가 있을 때만)
+      let requestData = undefined;
+      if (request.method !== "GET" && request.body && request.body.trim()) {
+        try {
+          requestData = JSON.parse(request.body);
+        } catch (e) {
+          console.error("Request body 파싱 실패:", e);
+          throw new Error(
+            `Request body가 유효한 JSON 형식이 아닙니다: ${
+              e instanceof Error ? e.message : String(e)
+            }`
+          );
+        }
+      }
+
+      const response = await axios({
+        method: request.method,
+        url: fullUrl,
+        headers: headers,
+        data: requestData,
+      });
+
+      const endTime = performance.now();
+      const responseTime = Math.round(endTime - startTime);
+
+      // 응답 헤더에서 X-Ouroboros-Try-Id 추출
+      const responseHeaders = response.headers as Record<string, string>;
+      const tryIdValue =
+        responseHeaders["x-ouroboros-try-id"] ||
+        responseHeaders["X-Ouroboros-Try-Id"];
+      if (tryIdValue) {
+        setTryId(tryIdValue);
+      }
+
+      setResponse({
+        status: response.status,
+        statusText: response.statusText,
+        headers: responseHeaders,
+        body: JSON.stringify(response.data, null, 2),
+        responseTime,
+      });
+      setExecutionStatus("completed");
     } catch (error) {
       console.error("API 요청 실패:", error);
       const endTime = performance.now();
@@ -1551,19 +1525,6 @@ export function ApiEditorLayout() {
           ) : (
             // 테스트 폼일 때 버튼들
             <div className="flex flex-wrap items-center gap-2">
-              {/* Use Dummy Response Checkbox */}
-              <label className="flex items-center gap-2 cursor-pointer px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-transparent hover:bg-gray-50 dark:hover:bg-[#161B22] transition-colors">
-                <input
-                  type="checkbox"
-                  checked={useDummyResponse}
-                  onChange={(e) => setUseDummyResponse(e.target.checked)}
-                  className="w-4 h-4 text-[#2563EB] bg-white dark:bg-[#0D1117] border-gray-300 dark:border-[#2D333B] rounded focus:ring-[#2563EB] focus:ring-1"
-                />
-                <span className="text-sm font-medium text-gray-900 dark:text-[#E6EDF3]">
-                  Use Dummy Response
-                </span>
-              </label>
-
               {/* Run Button */}
               <button
                 onClick={handleRun}
