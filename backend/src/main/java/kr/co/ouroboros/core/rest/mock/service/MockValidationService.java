@@ -128,6 +128,15 @@ public class MockValidationService {
         // ===== Attribute에서 미리 파싱된 body 가져오기 =====
         Object requestBody = request.getAttribute("parsedRequestBody");
 
+        // ===== multipart는 Content-Type만 확인하고 검증 스킵 =====
+        if (requestBody instanceof Map) {
+            Map<String, Object> bodyMap = (Map<String, Object>) requestBody;
+            if (Boolean.TRUE.equals(bodyMap.get("_multipart"))) {
+                log.debug("Multipart request validation skipped (mock mode)");
+                return ValidationResult.success();  // 검증 통과
+            }
+        }
+
         if (requestBody == null) {
             // InputStream이 비어있거나 파싱 실패
             if (meta.isRequestBodyRequired()) {
