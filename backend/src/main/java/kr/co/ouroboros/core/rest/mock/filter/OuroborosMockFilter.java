@@ -51,20 +51,18 @@ public class OuroborosMockFilter implements Filter {
     private final XmlMapper xmlMapper;
 
     /**
-     * Intercepts HTTP requests to route mock endpoints, validate incoming requests, and produce mock responses.
-     *
-     * <p>If the request does not match a registered mock endpoint the method delegates to the filter chain.
-     * For POST/PUT/PATCH requests the request body is parsed (JSON, array, object, or primitive) and stored
-     * as the request attribute "parsedRequestBody" for later use. The request is validated via the validation
-     * service; on validation failure an error response is sent using the validation result's status and message.
-     * On successful validation a mock response is generated and written to the response, and the filter chain is not continued.</p>
-     *
-     * @param req   the incoming servlet request (expected to be an HttpServletRequest)
-     * @param res   the servlet response (expected to be an HttpServletResponse)
-     * @param chain the filter chain to delegate to when the request is not handled as a mock
-     * @throws IOException      if an I/O error occurs while reading the request or writing the response
-     * @throws ServletException if a servlet error occurs during filtering
-     */
+         * Handle HTTP requests for registered mock endpoints by validating the request and producing a mock response;
+         * if the request does not match a registered mock endpoint, delegate to the provided filter chain.
+         *
+         * <p>When the incoming request is a POST, PUT, or PATCH and an expected request content type is defined for the
+         * endpoint, the request body is parsed (JSON, XML, form data, or multipart indicator) and stored as the request
+         * attribute "parsedRequestBody". If validation fails, an error response is sent using the validation result's
+         * status and message and processing stops; on successful validation a mock response is generated and written to
+         * the response, and the filter chain is not continued.</p>
+         *
+         * @throws IOException      if an I/O error occurs while reading the request or writing the response
+         * @throws ServletException if a servlet error occurs during filtering
+         */
     @Override
     public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
             throws IOException, ServletException {
