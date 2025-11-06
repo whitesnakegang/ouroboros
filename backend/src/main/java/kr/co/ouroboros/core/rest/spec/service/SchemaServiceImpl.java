@@ -36,6 +36,8 @@ public class SchemaServiceImpl implements SchemaService {
     public SchemaResponse createSchema(CreateSchemaRequest request) throws Exception {
         lock.writeLock().lock();
         try {
+            log.info("🔍 Creating schema: {}", request.getSchemaName());
+            
             // Read existing document or create new one
             Map<String, Object> openApiDoc = yamlParser.readOrCreateDocument();
 
@@ -46,6 +48,7 @@ public class SchemaServiceImpl implements SchemaService {
 
             // Build schema definition
             Map<String, Object> schemaDefinition = buildSchemaDefinition(request);
+            log.info("🔍 Built schema definition: {}", schemaDefinition);
 
             // Add schema to document
             yamlParser.putSchema(openApiDoc, request.getSchemaName(), schemaDefinition);
@@ -53,9 +56,12 @@ public class SchemaServiceImpl implements SchemaService {
             // Process and cache: writes to file + validates with scanned state + updates cache
             specManager.processAndCacheSpec(Protocol.REST, openApiDoc);
 
-            log.info("Created schema: {}", request.getSchemaName());
+            log.info("✅ Created schema: {}", request.getSchemaName());
 
             return convertToResponse(request.getSchemaName(), schemaDefinition);
+        } catch (Exception e) {
+            log.error("❌ Failed to create schema: {}", request.getSchemaName(), e);
+            throw e;
         } finally {
             lock.writeLock().unlock();
         }
@@ -150,6 +156,9 @@ public class SchemaServiceImpl implements SchemaService {
                 xml.put("name", request.getXmlName());
                 existingSchema.put("xml", xml);
             }
+            if (request.getItems() != null) {
+                existingSchema.put("items", request.getItems());
+            }
 
             // Process and cache: writes to file + validates with scanned state + updates cache
             specManager.processAndCacheSpec(Protocol.REST, openApiDoc);
@@ -219,6 +228,11 @@ public class SchemaServiceImpl implements SchemaService {
             xml.put("name", request.getXmlName());
             schema.put("xml", xml);
         }
+        
+        // Array items 처리 (Array 타입일 때 items 필드 처리)
+        if (request.getItems() != null) {
+            schema.put("items", request.getItems());
+        }
 
         return schema;
     }
@@ -255,7 +269,16 @@ public class SchemaServiceImpl implements SchemaService {
             propertyMap.put("x-ouroboros-mock", property.getMockExpression());
         }
 
-        // For array types
+        // For object types - nested properties (재귀!)
+        if (property.getProperties() != null && !property.getProperties().isEmpty()) {
+            propertyMap.put("properties", buildProperties(property.getProperties()));
+        }
+        
+        if (property.getRequired() != null && !property.getRequired().isEmpty()) {
+            propertyMap.put("required", property.getRequired());
+        }
+
+        // For array types - items (재귀!)
         if (property.getItems() != null) {
             propertyMap.put("items", buildProperty(property.getItems()));
         }
@@ -266,6 +289,35 @@ public class SchemaServiceImpl implements SchemaService {
 
         if (property.getMaxItems() != null) {
             propertyMap.put("maxItems", property.getMaxItems());
+        }
+        
+        // Additional constraints
+        if (property.getFormat() != null) {
+            propertyMap.put("format", property.getFormat());
+        }
+        
+        if (property.getEnumValues() != null && !property.getEnumValues().isEmpty()) {
+            propertyMap.put("enum", property.getEnumValues());
+        }
+        
+        if (property.getPattern() != null) {
+            propertyMap.put("pattern", property.getPattern());
+        }
+        
+        if (property.getMinLength() != null) {
+            propertyMap.put("minLength", property.getMinLength());
+        }
+        
+        if (property.getMaxLength() != null) {
+            propertyMap.put("maxLength", property.getMaxLength());
+        }
+        
+        if (property.getMinimum() != null) {
+            propertyMap.put("minimum", property.getMinimum());
+        }
+        
+        if (property.getMaximum() != null) {
+            propertyMap.put("maximum", property.getMaximum());
         }
 
         return propertyMap;
@@ -333,12 +385,52 @@ public class SchemaServiceImpl implements SchemaService {
                 .minItems(safeGetInteger(propertyDefinition, "minItems"))
                 .maxItems(safeGetInteger(propertyDefinition, "maxItems"));
 
-        // Handle nested items for array type
+        // For object types - nested properties (재귀!)
+        Object propertiesObj = propertyDefinition.get("properties");
+        if (propertiesObj instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> propertiesMap = (Map<String, Object>) propertiesObj;
+            Map<String, Property> nestedProperties = new java.util.LinkedHashMap<>();
+            for (Map.Entry<String, Object> entry : propertiesMap.entrySet()) {
+                if (entry.getValue() instanceof Map) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> propDef = (Map<String, Object>) entry.getValue();
+                    nestedProperties.put(entry.getKey(), convertToProperty(propDef));
+                }
+            }
+            builder.properties(nestedProperties);
+        }
+        
+        // Required fields for object types
+        Object requiredObj = propertyDefinition.get("required");
+        if (requiredObj instanceof List) {
+            builder.required(safeGetStringList(propertyDefinition, "required"));
+        }
+
+        // Handle nested items for array type (재귀!)
         Object itemsObj = propertyDefinition.get("items");
         if (itemsObj instanceof Map) {
             @SuppressWarnings("unchecked")
             Map<String, Object> items = (Map<String, Object>) itemsObj;
             builder.items(convertToProperty(items));
+        }
+        
+        // Additional constraints
+        builder.format(safeGetString(propertyDefinition, "format"))
+               .pattern(safeGetString(propertyDefinition, "pattern"))
+               .minLength(safeGetInteger(propertyDefinition, "minLength"))
+               .maxLength(safeGetInteger(propertyDefinition, "maxLength"))
+               .minimum(safeGetNumber(propertyDefinition, "minimum"))
+               .maximum(safeGetNumber(propertyDefinition, "maximum"));
+        
+        // enum 값 파싱
+        Object enumObj = propertyDefinition.get("enum");
+        if (enumObj instanceof java.util.Collection<?> enumCollection) {
+            List<String> enumValues = new java.util.ArrayList<>();
+            for (Object item : enumCollection) {
+                enumValues.add(item != null ? item.toString() : "");
+            }
+            builder.enumValues(enumValues);
         }
 
         return builder.build();
@@ -379,6 +471,20 @@ public class SchemaServiceImpl implements SchemaService {
         }
         if (value != null) {
             log.warn("Expected Integer for key '{}' but got {}", key, value.getClass().getSimpleName());
+        }
+        return null;
+    }
+
+    /**
+     * Safely extracts a Number value from a Map.
+     */
+    private Number safeGetNumber(Map<String, Object> map, String key) {
+        Object value = map.get(key);
+        if (value instanceof Number) {
+            return (Number) value;
+        }
+        if (value != null) {
+            log.warn("Expected Number for key '{}' but got {}", key, value.getClass().getSimpleName());
         }
         return null;
     }
