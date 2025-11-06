@@ -65,6 +65,9 @@ dependencies {
     // Spring AOP (메서드 추적용)
     api 'org.springframework.boot:spring-boot-starter-aop'
 
+    // AspectJ 지원 (내부 호출 추적용 - 선택적, 사용자가 PCW 플러그인 추가 시 자동 활성화)
+    api 'org.aspectj:aspectjrt:1.9.22'
+
     // OpenTelemetry OTLP Exporter (Tempo로 trace 전송)
     api 'io.opentelemetry:opentelemetry-exporter-otlp'
 

@@ -1,5 +1,6 @@
 package kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.config;
 
+import kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.aspect.MethodTracingAspect;
 import kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.aspect.MethodTracingMethodInterceptor;
 
 import org.aopalliance.aop.Advice;
@@ -13,6 +14,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingClass;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 
@@ -21,10 +23,14 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Auto-configuration for method-level tracing using AOP.
+ * Auto-configuration for method-level tracing using Spring AOP.
  * <p>
  * This configuration sets up AOP-based method tracing for classes in allowed packages,
  * creating OpenTelemetry spans for method invocations automatically.
+ * <p>
+ * <b>Note:</b> Spring AOP has limitations - it doesn't track self-invocations (methods called
+ * within the same class). For complete method tracing including self-invocations, users should
+ * configure AspectJ in their own project.
  * <p>
  * <b>Configuration:</b>
  * <ul>
@@ -49,14 +55,17 @@ import java.util.Set;
  */
 @AutoConfiguration
 @EnableConfigurationProperties(MethodTracingProperties.class)
-@ConditionalOnClass(Advisor.class)
+@ConditionalOnClass({Advisor.class, org.aspectj.lang.ProceedingJoinPoint.class})
 public class MethodTracingConfig {
 
     /**
-     * Creates an AOP advisor that applies method-level tracing to application classes.
-     *
+     * Creates an AOP advisor that applies method-level tracing to application classes using Spring AOP.
+     * <p>
      * The returned advisor applies MethodTracingMethodInterceptor to methods of classes whose packages are allowed by
      * MethodTracingProperties; if no allowed packages are configured the advisor matches no classes (tracing disabled).
+     * <p>
+     * <b>Note:</b> This advisor is only created when AspectJ is NOT available. When AspectJ is available,
+     * the AspectJ aspect takes precedence.
      *
      * @param observationRegistryProvider optional provider for ObservationRegistry used by the interceptor
      * @param props configuration properties containing allowed packages for tracing
@@ -65,11 +74,15 @@ public class MethodTracingConfig {
      */
     @Bean
     @ConditionalOnMissingBean(name = "ouroborosMethodTracingAdvisor")
+    @ConditionalOnMissingClass("org.aspectj.lang.ProceedingJoinPoint")
     public Advisor ouroborosMethodTracingAdvisor(
             ObjectProvider<io.micrometer.observation.ObservationRegistry> observationRegistryProvider,
             MethodTracingProperties props,
             BeanFactory beanFactory
     ) {
+        org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MethodTracingConfig.class);
+        log.info("🚀 Creating Spring AOP advisor - AspectJ NOT detected, using Spring AOP");
+        log.info("   Note: Spring AOP cannot track self-invocations");
         // allowlist 루트 패키지 수집: properties.allowedPackages가 우선
         final Set<String> roots = new HashSet<>();
         if (props.getAllowedPackages() != null && !props.getAllowedPackages().isEmpty()) {
@@ -81,6 +94,11 @@ public class MethodTracingConfig {
             if (!props.isEnabled()) return false;
             // 허용 목록이 비어있으면 관찰 비활성화
             if (roots.isEmpty()) return false;
+
+            // final 클래스는 프록시 생성 불가능하므로 제외
+            if (java.lang.reflect.Modifier.isFinal(clazz.getModifiers())) {
+                return false;
+            }
 
             // SDK 자체는 제외
             if (clazz.getName().startsWith("kr.co.ouroboros.")) return false;
@@ -141,5 +159,48 @@ public class MethodTracingConfig {
 
         Advice advice = new MethodTracingMethodInterceptor(observationRegistryProvider, props);
         return new DefaultPointcutAdvisor(pointcut, advice);
+    }
+
+    /**
+     * Creates an AspectJ Aspect that applies method-level tracing to application classes.
+     * <p>
+     * <b>IMPORTANT:</b> This bean is created for Load-Time Weaving (LTW) support.
+     * For compile-time weaving, AspectJ will find the aspect via aop.xml, not via Spring Bean.
+     * <p>
+     * This bean is only created when AspectJ classes are available on the classpath.
+     * When AspectJ is available, this aspect takes precedence over Spring AOP advisor
+     * because AspectJ can track self-invocations.
+     * <p>
+     * <b>Note:</b> For compile-time weaving, users must:
+     * <ul>
+     *   <li>Add the AspectJ Gradle/Maven plugin</li>
+     *   <li>Create aop.xml file in src/main/resources/META-INF/</li>
+     *   <li>Do NOT rely on this Spring Bean (AspectJ will find the aspect via aop.xml)</li>
+     * </ul>
+     * <p>
+     * For Load-Time Weaving (LTW), users must:
+     * <ul>
+     *   <li>Add -javaagent:aspectjweaver.jar to JVM arguments</li>
+     *   <li>Create aop.xml file in src/main/resources/META-INF/</li>
+     *   <li>This Spring Bean will be used to initialize the aspect with properties</li>
+     * </ul>
+     *
+     * @param observationRegistryProvider optional provider for ObservationRegistry used by the aspect
+     * @param props configuration properties containing allowed packages for tracing
+     * @return a MethodTracingAspect that instruments methods in configured allowed packages
+     */
+    @Bean
+    @ConditionalOnMissingBean(name = "ouroborosMethodTracingAspect")
+    @ConditionalOnClass(org.aspectj.lang.ProceedingJoinPoint.class)
+    public MethodTracingAspect ouroborosMethodTracingAspect(
+            ObjectProvider<io.micrometer.observation.ObservationRegistry> observationRegistryProvider,
+            MethodTracingProperties props
+    ) {
+        org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MethodTracingConfig.class);
+        log.info("🚀 Creating MethodTracingAspect bean - AspectJ Post-Compile Weaving (PCW) mode");
+        log.info("   Note: PCW uses AspectJ instance from aop.xml, not Spring Bean instance");
+        log.info("   This bean is created for dependency injection, but AspectJ will use its own instance");
+        
+        return new MethodTracingAspect(observationRegistryProvider, props);
     }
 }

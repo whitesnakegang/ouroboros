@@ -14,6 +14,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *   <li>{@code ouroboros.method-tracing.allowed-packages} - List of package prefixes to trace (default: empty)</li>
  * </ul>
  * <p>
+ * <b>Note:</b> This SDK uses Spring AOP by default, which doesn't track self-invocations.
+ * For complete method tracing including self-invocations, configure AspectJ in your project.
+ * <p>
  * <b>Usage:</b>
  * <pre>{@code
  * ouroboros.method-tracing.enabled=true
@@ -68,7 +71,7 @@ public class MethodTracingProperties {
     }
 
     /**
-         * Package prefixes that determine which classes are eligible for method-level tracing.
+     * Package prefixes that determine which classes are eligible for method-level tracing.
          * <p>
          * Only classes whose package starts with one of these prefixes, and their related interfaces or subclasses, will be traced.
          *
