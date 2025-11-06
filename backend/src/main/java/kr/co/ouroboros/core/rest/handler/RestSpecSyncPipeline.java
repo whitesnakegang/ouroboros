@@ -1,7 +1,9 @@
 package kr.co.ouroboros.core.rest.handler;
 
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 import kr.co.ouroboros.core.global.handler.SpecSyncPipeline;
 import kr.co.ouroboros.core.global.spec.OuroApiSpec;
 import kr.co.ouroboros.core.rest.common.dto.Operation;
@@ -86,16 +88,18 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
             restFileSpec.setPaths(pathsFile);
         }
 
-        for (String url : pathsFile.keySet()){
-            // 모든 엔드포인트 검사해서 diff가 endpoint이면 제거
-            // diff가 아닌 것들은 none으로 설정
-            PathItem fileItem = pathsFile.get(url);
-            int cnt = 0;
+        Iterator<Entry<String, PathItem>> it = pathsFile.entrySet().iterator();
 
-            for(HttpMethod httpMethod : HttpMethod.values()) {
+        while (it.hasNext()) {
+            Map.Entry<String, PathItem> e = it.next();
+            PathItem fileItem = e.getValue();
+
+            int cnt = 0;
+            for (HttpMethod httpMethod : HttpMethod.values()) {
                 Operation fileOp = getOperationByMethod(fileItem, httpMethod);
-                if(fileOp == null) continue;
-                if(fileOp.getXOuroborosDiff().equals("endpoint")){
+                if (fileOp == null) continue;
+
+                if ("endpoint".equals(fileOp.getXOuroborosDiff())) {
                     setOperationByMethodToNull(fileItem, httpMethod);
                 } else {
                     cnt++;
@@ -104,10 +108,12 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
                     fileOp.setXOuroborosTag("none");
                 }
             }
-            if(cnt == 0){
-                pathsFile.remove(url);
+
+            if (cnt == 0) {
+                it.remove();
             }
         }
+
         for (String url : pathsScanned.keySet()) {
 
             // url이 다른가 먼저 봄
