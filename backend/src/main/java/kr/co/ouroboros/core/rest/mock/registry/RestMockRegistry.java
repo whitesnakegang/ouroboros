@@ -97,7 +97,9 @@ public class RestMockRegistry implements MockRegistryBase<EndpointMeta> {
     }
 
     /**
-     * Clears all registered mock endpoints and pattern cache.
+     * Reset the registry state by removing all registered endpoints and cached patterns.
+     *
+     * After invocation the registry contains no endpoints and the pattern cache is empty.
      */
     @Override
     public void clear() {
@@ -105,6 +107,12 @@ public class RestMockRegistry implements MockRegistryBase<EndpointMeta> {
         patternCache.clear();
     }
 
+    /**
+     * Normalize a request path by removing a trailing '/' except when the path is a single "/".
+     *
+     * @param path the original request path
+     * @return the normalized path with a trailing slash removed if the path length is greater than 1
+     */
     private String normalizePath(String path) {
         // 끝의 슬래시 제거
         if (path.endsWith("/") && path.length() > 1) {

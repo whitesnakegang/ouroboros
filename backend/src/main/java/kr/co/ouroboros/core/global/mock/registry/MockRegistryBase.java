@@ -36,5 +36,10 @@ public interface MockRegistryBase<T> {
      */
     Optional<T> find(String key1, String key2);
 
-    void clear();
+    /**
+ * Removes all registered mock metadata from the registry.
+ *
+ * After invocation, the registry will contain no entries.
+ */
+void clear();
 }
