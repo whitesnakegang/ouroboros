@@ -104,7 +104,7 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
                 } else {
                     cnt++;
                     fileOp.setXOuroborosDiff("none");
-                    fileOp.setXOuroborosProgress("none");
+                    fileOp.setXOuroborosProgress("mock");
                     fileOp.setXOuroborosTag("none");
                 }
             }
