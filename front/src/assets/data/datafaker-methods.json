@@ -94,13 +94,11 @@
       ]
     },
     {
-      "name": "Date And Time",
+      "name": "Date",
       "category": "Base",
       "icon": "📅",
       "methods": [
-        { "name": "future", "expression": "dateAndTime.future", "description": "Future date", "example": "2025-12-31" },
-        { "name": "past", "expression": "dateAndTime.past", "description": "Past date", "example": "2020-01-15" },
-        { "name": "birthday", "expression": "dateAndTime.birthday", "description": "Birthday date", "example": "1990-05-20" }
+        { "name": "date", "expression": "date.birthday", "description": "Random date", "example": "1990-05-20" }
       ]
     },
     {
