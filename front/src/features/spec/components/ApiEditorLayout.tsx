@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { ApiRequestCard } from "./ApiRequestCard";
 import { ApiResponseCard } from "./ApiResponseCard";
+import { SchemaCard } from "./SchemaCard";
 import { ProtocolTabs } from "./ProtocolTabs";
 import { CodeSnippetPanel } from "./CodeSnippetPanel";
 import { ImportResultModal } from "./ImportResultModal";
@@ -32,6 +33,9 @@ import {
 interface KeyValuePair {
   key: string;
   value: string;
+  required?: boolean;
+  description?: string;
+  type?: string;
 }
 
 // Import RequestBody type from ApiRequestCard
@@ -44,17 +48,19 @@ type RequestBody = {
     type: string;
     description?: string;
     required?: boolean;
-    ref?: string;  // 스키마 참조 시 사용 (예: "User")
+    ref?: string; // 스키마 참조 시 사용 (예: "User")
   }>;
+  schemaRef?: string; // 전체 스키마 참조 (예: "User")
 };
 
 interface StatusCode {
   code: string;
   type: "Success" | "Error";
   message: string;
+  headers?: Array<{ key: string; value: string }>; // Response headers
   schema?: {
-    ref?: string;  // 스키마 참조 (예: "User")
-    properties?: Record<string, any>;  // 인라인 스키마
+    ref?: string; // 스키마 참조 (예: "User")
+    properties?: Record<string, any>; // 인라인 스키마
   };
 }
 
@@ -75,11 +81,13 @@ export function ApiEditorLayout() {
     protocol: testProtocol,
     setProtocol: setTestProtocol,
     request,
+    setRequest,
     setResponse,
     isLoading,
     setIsLoading,
     useDummyResponse,
     setUseDummyResponse,
+    setTryId,
   } = useTestingStore();
   const [activeTab, setActiveTab] = useState<"form" | "test">("form");
   const [isCodeSnippetOpen, setIsCodeSnippetOpen] = useState(false);
@@ -98,23 +106,116 @@ export function ApiEditorLayout() {
   );
 
   // Completed 상태인지 확인
-  const isCompleted = selectedEndpoint?.progress === "completed";
+  const isCompleted = selectedEndpoint?.progress?.toLowerCase() === "completed";
 
   // 수정/삭제 불가능한 상태인지 확인 (completed이거나 diff가 있는 경우)
   const isReadOnly = isCompleted || hasDiff;
 
+  // 에러 메시지에서 localhost 주소 제거 및 사용자 친화적인 메시지로 변환
+  const getErrorMessage = (error: unknown): string => {
+    if (error instanceof Error) {
+      let message = error.message || String(error);
+      // localhost 주소 및 관련 텍스트 제거 (다양한 형식 대응)
+      message = message.replace(/localhost:\d+/gi, "");
+      message = message.replace(/127\.0\.0\.1:\d+/gi, "");
+      message = message.replace(/https?:\/\/localhost:\d+/gi, "");
+      message = message.replace(/https?:\/\/127\.0\.0\.1:\d+/gi, "");
+      message = message.replace(/localhost:\d+\s*내용:/gi, "");
+      message = message.replace(/localhost:\d+\s*Content:/gi, "");
+      // "내용:" 또는 "Content:" 뒤의 내용만 남기기
+      message = message.replace(/.*내용:\s*/i, "");
+      message = message.replace(/.*Content:\s*/i, "");
+      // 불필요한 공백 및 줄바꿈 정리
+      message = message.replace(/\s+/g, " ").trim();
+      // 빈 메시지인 경우 기본 메시지 반환
+      if (!message) {
+        return "";
+      }
+      return message;
+    }
+    // Error 객체가 아닌 경우 문자열로 변환 후 처리
+    const errorStr = String(error);
+    const message = errorStr
+      .replace(/localhost:\d+/gi, "")
+      .replace(/127\.0\.0\.1:\d+/gi, "")
+      .replace(/.*내용:\s*/i, "")
+      .replace(/.*Content:\s*/i, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    return message || "";
+  };
+
+  // endpoints가 업데이트된 후 selectedEndpoint 유효성 검증
+  useEffect(() => {
+    if (selectedEndpoint && endpoints) {
+      // 현재 selectedEndpoint가 실제로 존재하는지 확인
+      const exists = Object.values(endpoints).some((group) =>
+        group.some((ep) => ep.id === selectedEndpoint.id)
+      );
+
+      if (!exists) {
+        // 존재하지 않으면 초기화 (YML에서 삭제된 경우)
+        setSelectedEndpoint(null);
+      }
+    }
+  }, [endpoints, selectedEndpoint, setSelectedEndpoint]);
+
   // Load selected endpoint data when endpoint is clicked
   useEffect(() => {
-    if (selectedEndpoint) {
+    if (selectedEndpoint && selectedEndpoint.id) {
       setIsEditMode(false); // 항목 선택 시 읽기 전용 모드로 시작
       loadEndpointData(selectedEndpoint.id);
+
+      // 폼 부분으로 스크롤 (activeTab에 따라 다른 컨테이너로 스크롤)
+      setTimeout(() => {
+        if (activeTab === "test") {
+          const testContainer = document.getElementById("test-form-container");
+          if (testContainer) {
+            testContainer.scrollIntoView({
+              behavior: "smooth",
+              block: "start",
+            });
+          }
+        } else {
+          const formContainer = document.getElementById("api-form-container");
+          if (formContainer) {
+            formContainer.scrollIntoView({
+              behavior: "smooth",
+              block: "start",
+            });
+          }
+        }
+      }, 100);
     } else {
+      // selectedEndpoint가 없을 때 폼 초기화 (새로고침 시 하드코딩된 초기값 제거)
       setIsEditMode(false);
+      setMethod("POST");
+      setUrl("");
+      setTags("");
+      setDescription("");
+      setSummary("");
+      setQueryParams([]);
+      setRequestHeaders([]);
+      setRequestBody({
+        type: "none",
+        contentType: "application/json",
+        fields: [],
+      });
+      setAuth({ type: "none" });
+      setStatusCodes([]);
     }
-  }, [selectedEndpoint]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEndpoint, activeTab]);
 
   // Load endpoint data from backend
   const loadEndpointData = async (id: string) => {
+    // restId가 null이거나 유효하지 않은 경우 처리
+    if (!id || id.trim() === "") {
+      alert("명세에 없는 내용입니다. 선택된 엔드포인트가 존재하지 않습니다.");
+      setSelectedEndpoint(null);
+      return;
+    }
+
     try {
       const response = await getRestApiSpec(id);
       const spec = response.data;
@@ -123,10 +224,146 @@ export function ApiEditorLayout() {
       setDescription(spec.description || "");
       setSummary(spec.summary || "");
       setTags(spec.tags ? spec.tags.join(", ") : "");
-      // 추가 데이터 로드 필요시 여기에 구현
+
+      // Security를 auth state로 변환
+      if (
+        spec.security &&
+        Array.isArray(spec.security) &&
+        spec.security.length > 0
+      ) {
+        const firstSecurity = spec.security[0] as {
+          requirements?: Record<string, unknown>;
+        };
+        if (firstSecurity && firstSecurity.requirements) {
+          const schemeName = Object.keys(firstSecurity.requirements)[0];
+
+          switch (schemeName) {
+            case "BearerAuth":
+              setAuth({ type: "bearer", bearer: { token: "" } });
+              break;
+            case "BasicAuth":
+              setAuth({
+                type: "basicAuth",
+                basicAuth: { username: "", password: "" },
+              });
+              break;
+            case "ApiKeyAuth":
+              setAuth({
+                type: "apiKey",
+                apiKey: { key: "X-API-Key", value: "", addTo: "header" },
+              });
+              break;
+            default:
+              setAuth({ type: "none" });
+          }
+          console.log("✓ Loaded security from backend:", schemeName);
+        }
+      } else {
+        setAuth({ type: "none" });
+      }
+
+      // Parameters를 폼 state와 테스트 스토어로 분리
+      const formHeaders: KeyValuePair[] = [];
+      const formQueryParams: KeyValuePair[] = [];
+      const testHeaders: Array<{ key: string; value: string }> = [];
+      const testQueryParams: Array<{ key: string; value: string }> = [];
+      let testBody = "";
+
+      // Parameters를 헤더와 쿼리 파라미터로 분리
+      if (spec.parameters && Array.isArray(spec.parameters)) {
+        spec.parameters.forEach((param: any) => {
+          if (param.in === "header") {
+            // 폼 state (편집용)
+            formHeaders.push({
+              key: param.name || "",
+              value: param.schema?.default || "",
+              required: param.required || false,
+              description: param.description || "",
+              type: param.schema?.type || "string",
+            });
+            // 테스트 스토어 (Try It 용)
+            testHeaders.push({
+              key: param.name || "",
+              value: param.example || param.schema?.default || "",
+            });
+          } else if (param.in === "query") {
+            // 폼 state (편집용)
+            formQueryParams.push({
+              key: param.name || "",
+              value: param.schema?.default || "",
+              required: param.required || false,
+              description: param.description || "",
+              type: param.schema?.type || "string",
+            });
+            // 테스트 스토어 (Try It 용)
+            testQueryParams.push({
+              key: param.name || "",
+              value: param.example || param.schema?.default || "",
+            });
+          }
+        });
+      }
+
+      // 폼 state 업데이트
+      setQueryParams(formQueryParams);
+      setRequestHeaders(formHeaders);
+
+      // RequestBody 처리
+      if (spec.requestBody) {
+        const reqBody = spec.requestBody as any;
+        if (reqBody.content && reqBody.content["application/json"]) {
+          const schema = reqBody.content["application/json"].schema;
+          if (schema && schema.properties) {
+            // 스키마에서 기본 JSON 객체 생성
+            const bodyObj: Record<string, any> = {};
+            Object.keys(schema.properties).forEach((key) => {
+              const prop = schema.properties[key];
+              if (prop.example !== undefined) {
+                bodyObj[key] = prop.example;
+              } else if (prop.type === "string") {
+                bodyObj[key] = prop.default || "string";
+              } else if (prop.type === "number" || prop.type === "integer") {
+                bodyObj[key] = prop.default || 0;
+              } else if (prop.type === "boolean") {
+                bodyObj[key] = prop.default || false;
+              }
+            });
+            testBody = JSON.stringify(bodyObj, null, 2);
+          }
+        } else if (reqBody.content) {
+          // 다른 content-type 처리 (예: text/plain)
+          const contentType = Object.keys(reqBody.content)[0];
+          const content = reqBody.content[contentType];
+          if (content.example !== undefined) {
+            testBody =
+              typeof content.example === "string"
+                ? content.example
+                : JSON.stringify(content.example, null, 2);
+          }
+        }
+      }
+
+      // 테스트 스토어 업데이트
+      setRequest({
+        method: spec.method,
+        url: spec.path,
+        description: spec.description || spec.summary || "",
+        headers: testHeaders,
+        queryParams: testQueryParams,
+        body: testBody,
+      });
     } catch (error) {
       console.error("API 스펙 로드 실패:", error);
-      alert("API 스펙을 불러오는데 실패했습니다.");
+      const errorMessage = getErrorMessage(error);
+
+      // 명세에 없는 내용일 경우 selectedEndpoint 초기화
+      alert("명세에 없는 내용입니다. 선택된 엔드포인트가 존재하지 않습니다.");
+      setSelectedEndpoint(null);
+
+      // 기존 에러 메시지는 콘솔에만 출력
+      if (errorMessage) {
+        console.error("상세 에러:", errorMessage);
+      }
     }
   };
 
@@ -136,16 +373,31 @@ export function ApiEditorLayout() {
   const [tags, setTags] = useState("");
   const [description, setDescription] = useState("");
   const [summary, setSummary] = useState("");
-  const [owner, setOwner] = useState("");
+
+  // Auth state
+  const [auth, setAuth] = useState<{
+    type:
+      | "none"
+      | "apiKey"
+      | "bearer"
+      | "jwtBearer"
+      | "basicAuth"
+      | "digestAuth"
+      | "oauth2"
+      | "oauth1";
+    apiKey?: { key: string; value: string; addTo: "header" | "query" };
+    bearer?: { token: string };
+    basicAuth?: { username: string; password: string };
+    oauth2?: { accessToken: string; tokenType?: string };
+  }>({ type: "none" });
 
   // Request state
-  const [requestHeaders, setRequestHeaders] = useState<KeyValuePair[]>([
-    { key: "Content-Type", value: "application/json" },
-  ]);
+  const [queryParams, setQueryParams] = useState<KeyValuePair[]>([]);
+  const [requestHeaders, setRequestHeaders] = useState<KeyValuePair[]>([]);
   const [requestBody, setRequestBody] = useState<RequestBody>({
-    type: "json",
+    type: "none",
     contentType: "application/json",
-    fields: [{ key: "email", value: "string", type: "string" }],
+    fields: [],
   });
 
   // Response state
@@ -157,7 +409,7 @@ export function ApiEditorLayout() {
   const allEndpoints = Object.values(endpoints || {}).flat();
   const totalEndpoints = allEndpoints.length || 0;
   const completedEndpoints = allEndpoints.filter(
-    (ep) => ep.progress === "completed"
+    (ep) => ep.progress?.toLowerCase() === "completed"
   ).length;
   const progressPercentage = totalEndpoints
     ? Math.round((completedEndpoints / totalEndpoints) * 100)
@@ -174,7 +426,7 @@ export function ApiEditorLayout() {
     content: Record<string, any>;
   } | null => {
     // null이거나 type이 "none"이면 null 반환
-    if (!frontendBody || frontendBody.type === "none" || !frontendBody.fields || frontendBody.fields.length === 0) {
+    if (!frontendBody || frontendBody.type === "none") {
       return null;
     }
 
@@ -188,34 +440,44 @@ export function ApiEditorLayout() {
       contentType = "application/xml";
     }
 
-    // fields를 OpenAPI properties로 변환
+    // 전체 스키마 참조가 있으면 ref만 사용
+    if (frontendBody.schemaRef) {
+      return {
+        description: "Request body",
+        required: true,
+        content: {
+          [contentType]: {
+            schema: {
+              ref: frontendBody.schemaRef,
+            },
+          },
+        },
+      };
+    }
+
+    // 인라인 스키마: fields를 OpenAPI properties로 변환
+    if (!frontendBody.fields || frontendBody.fields.length === 0) {
+      return null;
+    }
+
     const properties: Record<string, any> = {};
     const required: string[] = [];
 
     frontendBody.fields.forEach((field) => {
       if (field.key) {
-        // ref가 있으면 Reference 모드, 없으면 Inline 모드
-        if ((field as any).ref) {
-          // Reference 모드: ref만 전송 (다른 필드 무시)
-          properties[field.key] = {
-            ref: (field as any).ref,  // 예: "User"
-          };
-        } else {
-          // Inline 모드: 모든 필드 정보 포함
-          const property: any = {
-            type: field.type || "string",
-          };
-          
-          if (field.description) {
-            property.description = field.description;
-          }
-          
-          if (field.value) {
-            property.mockExpression = field.value;  // DataFaker 표현식
-          }
+        const property: any = {
+          type: field.type || "string",
+        };
 
-          properties[field.key] = property;
+        if (field.description) {
+          property.description = field.description;
         }
+
+        if (field.value) {
+          property.mockExpression = field.value; // DataFaker 표현식
+        }
+
+        properties[field.key] = property;
 
         if (field.required) {
           required.push(field.key);
@@ -239,26 +501,95 @@ export function ApiEditorLayout() {
   };
 
   /**
+   * queryParams를 OpenAPI parameters 구조로 변환
+   */
+  const convertQueryParamsToParameters = (params: KeyValuePair[]): any[] => {
+    return params
+      .filter((param) => param.key)
+      .map((param) => ({
+        name: param.key,
+        in: "query",
+        description: param.description || `Query parameter: ${param.key}`,
+        required: param.required || false,
+        schema: {
+          type: param.type || "string",
+        },
+      }));
+  };
+
+  /**
    * requestHeaders를 OpenAPI parameters 구조로 변환
    * (Content-Type 같은 일반 헤더는 제외하고, API 스펙에 필요한 헤더만 parameters로 변환)
    */
-  const convertHeadersToParameters = (
-    headers: KeyValuePair[]
-  ): any[] => {
+  const convertHeadersToParameters = (headers: KeyValuePair[]): any[] => {
     // Content-Type은 requestBody의 content에 포함되므로 parameters에서 제외
     const standardHeaders = ["Content-Type", "Accept"];
-    
+
     return headers
       .filter((header) => header.key && !standardHeaders.includes(header.key))
       .map((header) => ({
         name: header.key,
         in: "header",
-        description: `Header: ${header.key}`,
-        required: false, // 기본값은 optional
+        description: header.description || `Header: ${header.key}`,
+        required: header.required || false,
         schema: {
           type: "string",
         },
       }));
+  };
+
+  /**
+   * Auth 상태를 OpenAPI security 구조로 변환
+   * 백엔드 형식: List<SecurityRequirement>
+   * SecurityRequirement = { requirements: Map<String, List<String>> }
+   */
+  const convertAuthToSecurity = (): any[] => {
+    console.log("🔐 convertAuthToSecurity called, auth.type:", auth.type);
+
+    if (auth.type === "none") {
+      return [];
+    }
+
+    let schemeName = "";
+
+    switch (auth.type) {
+      case "bearer":
+      case "jwtBearer":
+        schemeName = "BearerAuth";
+        break;
+      case "basicAuth":
+        schemeName = "BasicAuth";
+        break;
+      case "apiKey":
+        schemeName = "ApiKeyAuth";
+        break;
+      case "oauth2":
+        schemeName = "OAuth2";
+        break;
+      case "oauth1":
+        schemeName = "OAuth1";
+        break;
+      case "digestAuth":
+        schemeName = "DigestAuth";
+        break;
+    }
+
+    if (!schemeName) {
+      console.warn("No schemeName matched for auth.type:", auth.type);
+      return [];
+    }
+
+    // 백엔드 SecurityRequirement 형식으로 변환
+    const result = [
+      {
+        requirements: {
+          [schemeName]: [],
+        },
+      },
+    ];
+
+    console.log("✓ Converted security:", result);
+    return result;
   };
 
   /**
@@ -268,8 +599,12 @@ export function ApiEditorLayout() {
     statusCodes: StatusCode[]
   ): Record<string, any> => {
     return statusCodes.reduce((acc, code) => {
+      // 빈 status code는 무시 (YAML에 ? '' 같은 이상한 키 생성 방지)
+      if (!code.code || code.code.trim() === "") {
+        return acc;
+      }
       let schema: any;
-      
+
       // StatusCode에 schema 정보가 있으면 사용
       if (code.schema) {
         if (code.schema.ref) {
@@ -298,7 +633,7 @@ export function ApiEditorLayout() {
         };
       }
 
-      acc[code.code] = {
+      const response: any = {
         description: code.message,
         content: {
           "application/json": {
@@ -306,6 +641,26 @@ export function ApiEditorLayout() {
           },
         },
       };
+
+      // Response headers를 OpenAPI 형식으로 변환
+      // 프론트: [{ key: "Content-Type", value: "application/json" }]
+      // 백엔드: { "Content-Type": { description: "", schema: { type: "string" } } }
+      if (code.headers && code.headers.length > 0) {
+        const headers: Record<string, any> = {};
+        code.headers.forEach((header: { key: string; value: string }) => {
+          if (header.key) {
+            headers[header.key] = {
+              description: header.value || `${header.key} header`,
+              schema: {
+                type: "string",
+              },
+            };
+          }
+        });
+        response.headers = headers;
+      }
+
+      acc[code.code] = response;
       return acc;
     }, {} as Record<string, any>);
   };
@@ -325,10 +680,13 @@ export function ApiEditorLayout() {
           summary,
           description,
           tags: tags ? tags.split(",").map((tag) => tag.trim()) : [],
-          parameters: convertHeadersToParameters(requestHeaders),
+          parameters: [
+            ...convertQueryParamsToParameters(queryParams),
+            ...convertHeadersToParameters(requestHeaders),
+          ],
           requestBody: convertRequestBodyToOpenAPI(requestBody),
           responses: convertResponsesToOpenAPI(statusCodes),
-          security: [],
+          security: convertAuthToSecurity(),
         };
 
         await updateRestApiSpec(selectedEndpoint.id, updateRequest);
@@ -360,11 +718,18 @@ export function ApiEditorLayout() {
           summary,
           description,
           tags: tags ? tags.split(",").map((tag) => tag.trim()) : [],
-          parameters: convertHeadersToParameters(requestHeaders),
+          parameters: [
+            ...convertQueryParamsToParameters(queryParams),
+            ...convertHeadersToParameters(requestHeaders),
+          ],
           requestBody: convertRequestBodyToOpenAPI(requestBody),
           responses: convertResponsesToOpenAPI(statusCodes),
-          security: [],
+          security: convertAuthToSecurity(),
         };
+
+        console.log("🔍 API Request:", JSON.stringify(apiRequest, null, 2));
+        console.log("🔐 Auth state:", auth);
+        console.log("🔐 Security:", apiRequest.security);
 
         const response = await createRestApiSpec(apiRequest);
 
@@ -399,8 +764,7 @@ export function ApiEditorLayout() {
       }
     } catch (error: unknown) {
       console.error("API 저장 실패:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "알 수 없는 오류";
+      const errorMessage = getErrorMessage(error);
       alert(`API 저장에 실패했습니다: ${errorMessage}`);
     }
   };
@@ -432,13 +796,11 @@ export function ApiEditorLayout() {
         setUrl("/api/auth/login");
         setTags("AUTH");
         setDescription("사용자 로그인");
-        setOwner("SMART-TEAM");
         setIsEditMode(false);
         loadEndpoints();
       } catch (error: unknown) {
         console.error("API 삭제 실패:", error);
-        const errorMessage =
-          error instanceof Error ? error.message : "알 수 없는 오류";
+        const errorMessage = getErrorMessage(error);
         alert(`API 삭제에 실패했습니다: ${errorMessage}`);
       }
     }
@@ -473,7 +835,9 @@ export function ApiEditorLayout() {
       setTags("");
       setDescription("");
       setSummary("");
-      setOwner("");
+      setQueryParams([]);
+      setRequestHeaders([]);
+      setAuth({ type: "none" });
       setRequestBody({
         type: "json",
         contentType: "application/json",
@@ -492,7 +856,8 @@ export function ApiEditorLayout() {
     setTags("");
     setDescription("");
     setSummary("");
-    setOwner("");
+    setQueryParams([]);
+    setAuth({ type: "none" });
     setRequestHeaders([]);
     setRequestBody({
       type: "json",
@@ -539,8 +904,7 @@ export function ApiEditorLayout() {
         await loadEndpoints();
       } catch (error) {
         console.error("YAML Import 오류:", error);
-        const errorMsg =
-          error instanceof Error ? error.message : "알 수 없는 오류";
+        const errorMsg = getErrorMessage(error);
         alert(`YAML Import 실패\n\n${errorMsg}`);
       }
     };
@@ -571,8 +935,7 @@ export function ApiEditorLayout() {
         // alert("✅ 실제 구현이 명세에 성공적으로 반영되었습니다!");
       } catch (error: unknown) {
         console.error("명세 동기화 실패:", error);
-        const errorMessage =
-          error instanceof Error ? error.message : "알 수 없는 오류";
+        const errorMessage = getErrorMessage(error);
         alert(`명세 동기화에 실패했습니다: ${errorMessage}`);
       }
     }
@@ -624,6 +987,9 @@ export function ApiEditorLayout() {
           }
         });
 
+        // X-Ouroboros-Try:on 헤더 추가
+        headers["X-Ouroboros-Try"] = "on";
+
         // Query 파라미터 추가
         let url = request.url;
         if (request.queryParams.length > 0) {
@@ -639,38 +1005,80 @@ export function ApiEditorLayout() {
           }
         }
 
+        // URL이 상대 경로인 경우 그대로 사용 (Vite 프록시 사용)
+        // 절대 URL(http://로 시작)인 경우에만 그대로 사용
+        const fullUrl = url.startsWith("http") ? url : url;
+
+        // Request body 파싱 (GET 메서드가 아니고 body가 있을 때만)
+        let requestData = undefined;
+        if (request.method !== "GET" && request.body && request.body.trim()) {
+          try {
+            requestData = JSON.parse(request.body);
+          } catch (e) {
+            console.error("Request body 파싱 실패:", e);
+            throw new Error(
+              `Request body가 유효한 JSON 형식이 아닙니다: ${
+                e instanceof Error ? e.message : String(e)
+              }`
+            );
+          }
+        }
+
+        console.log("API 요청 전송:", {
+          method: request.method,
+          url: fullUrl,
+          headers,
+          data: requestData,
+        });
+
         const response = await axios({
           method: request.method,
-          url: url,
+          url: fullUrl,
           headers: headers,
-          data:
-            request.method !== "GET" && request.body
-              ? JSON.parse(request.body)
-              : undefined,
+          data: requestData,
         });
 
         const endTime = performance.now();
         const responseTime = Math.round(endTime - startTime);
 
+        // 응답 헤더에서 X-Ouroboros-Try-Id 추출
+        const responseHeaders = response.headers as Record<string, string>;
+        const tryIdValue =
+          responseHeaders["x-ouroboros-try-id"] ||
+          responseHeaders["X-Ouroboros-Try-Id"];
+        if (tryIdValue) {
+          setTryId(tryIdValue);
+        }
+
         setResponse({
           status: response.status,
           statusText: response.statusText,
-          headers: response.headers as Record<string, string>,
+          headers: responseHeaders,
           body: JSON.stringify(response.data, null, 2),
           responseTime,
         });
         setExecutionStatus("completed");
       }
     } catch (error) {
+      console.error("API 요청 실패:", error);
       const endTime = performance.now();
       const startTime = endTime - 100; // 에러 발생 시간 추정
       const responseTime = Math.round(endTime - startTime);
 
       if (axios.isAxiosError(error) && error.response) {
+        // 에러 응답에서도 X-Ouroboros-Try-Id 추출 시도
+        const errorHeaders = error.response.headers as Record<string, string>;
+        const tryIdValue =
+          errorHeaders["x-ouroboros-try-id"] ||
+          errorHeaders["X-Ouroboros-Try-Id"];
+        if (tryIdValue) {
+          setTryId(tryIdValue);
+        }
+
         setResponse({
           status: error.response.status,
           statusText: error.response.statusText,
-          headers: error.response.headers as Record<string, string>,
+          headers: errorHeaders,
           body: JSON.stringify(error.response.data, null, 2),
           responseTime,
         });
@@ -781,8 +1189,7 @@ export function ApiEditorLayout() {
                       alert("Markdown 파일이 다운로드되었습니다.");
                     } catch (e) {
                       console.error("Markdown 내보내기 오류:", e);
-                      const errorMsg =
-                        e instanceof Error ? e.message : "알 수 없는 오류";
+                      const errorMsg = getErrorMessage(e);
                       alert(
                         `전체 Markdown 내보내기에 실패했습니다.\n오류: ${errorMsg}`
                       );
@@ -834,8 +1241,7 @@ export function ApiEditorLayout() {
                       alert("YAML 파일이 다운로드되었습니다.");
                     } catch (e) {
                       console.error("YAML 내보내기 오류:", e);
-                      const errorMsg =
-                        e instanceof Error ? e.message : "알 수 없는 오류";
+                      const errorMsg = getErrorMessage(e);
                       alert(
                         `전체 YAML 내보내기에 실패했습니다.\n오류: ${errorMsg}`
                       );
@@ -1001,7 +1407,10 @@ export function ApiEditorLayout() {
             <TestLayout />
           </>
         ) : (
-          <div className="w-full max-w-6xl mx-auto px-6 py-8">
+          <div
+            id="api-form-container"
+            className="w-full max-w-6xl mx-auto px-6 py-8"
+          >
             {/* Protocol not supported message */}
             {protocol !== "REST" && (
               <div className="h-full flex items-center justify-center py-12">
@@ -1034,10 +1443,11 @@ export function ApiEditorLayout() {
               </div>
             )}
 
-            {/* Diff Notification - 불일치가 있을 때만 표시 */}
+            {/* Diff Notification - 불일치가 있을 때만 표시 (completed 또는 mock 상태 모두) */}
             {protocol === "REST" && selectedEndpoint && hasDiff && (
               <DiffNotification
                 diff={selectedEndpoint.diff || "none"}
+                progress={selectedEndpoint.progress}
                 onSyncToSpec={handleSyncDiffToSpec}
               />
             )}
@@ -1100,18 +1510,43 @@ export function ApiEditorLayout() {
                         </svg>
                       </div>
                     </div>
-                    <input
-                      type="text"
-                      value={url}
-                      onChange={(e) => setUrl(e.target.value)}
-                      placeholder="예: /api/users, /api/auth/login"
-                      disabled={!!(selectedEndpoint && !isEditMode)}
-                      className={`flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm font-mono ${
-                        selectedEndpoint && !isEditMode
-                          ? "opacity-60 cursor-not-allowed"
-                          : ""
-                      }`}
-                    />
+                    <div className="relative flex-1">
+                      <input
+                        type="text"
+                        value={url}
+                        onChange={(e) => setUrl(e.target.value)}
+                        placeholder="예: /api/users, /api/auth/login"
+                        disabled={!!(selectedEndpoint && !isEditMode)}
+                        className={`w-full px-3 py-2 ${
+                          hasDiff ? "pr-10" : ""
+                        } rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm font-mono ${
+                          selectedEndpoint && !isEditMode
+                            ? "opacity-60 cursor-not-allowed"
+                            : ""
+                        }`}
+                      />
+                      {/* Diff 주의 표시 아이콘 (URL 우측) */}
+                      {hasDiff && (
+                        <div
+                          className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"
+                          title="명세와 실제 구현이 일치하지 않습니다"
+                        >
+                          <svg
+                            className="w-4 h-4 text-amber-500"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                            />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Method Badge */}
@@ -1171,26 +1606,9 @@ export function ApiEditorLayout() {
                         }`}
                       />
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                        Owner
-                      </label>
-                      <input
-                        type="text"
-                        value={owner}
-                        onChange={(e) => setOwner(e.target.value)}
-                        placeholder="예: SMART-TEAM, 김개발, 백엔드팀"
-                        disabled={!!(selectedEndpoint && !isEditMode)}
-                        className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
-                          selectedEndpoint && !isEditMode
-                            ? "opacity-60 cursor-not-allowed"
-                            : ""
-                        }`}
-                      />
-                    </div>
                   </div>
 
-                  {/* Description - place below Tags/Summary/Owner */}
+                  {/* Description */}
                   <div>
                     <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
                       Description
@@ -1215,10 +1633,14 @@ export function ApiEditorLayout() {
             {/* Request Card */}
             {protocol === "REST" && (
               <ApiRequestCard
+                queryParams={queryParams}
+                setQueryParams={setQueryParams}
                 requestHeaders={requestHeaders}
                 setRequestHeaders={setRequestHeaders}
                 requestBody={requestBody}
                 setRequestBody={setRequestBody}
+                auth={auth}
+                setAuth={setAuth}
                 isReadOnly={!!(selectedEndpoint && !isEditMode)}
               />
             )}
@@ -1231,6 +1653,13 @@ export function ApiEditorLayout() {
                   setStatusCodes={setStatusCodes}
                   isReadOnly={!!(selectedEndpoint && !isEditMode)}
                 />
+              </div>
+            )}
+
+            {/* Schema Card */}
+            {protocol === "REST" && (
+              <div className="mt-6">
+                <SchemaCard isReadOnly={!!(selectedEndpoint && !isEditMode)} />
               </div>
             )}
 

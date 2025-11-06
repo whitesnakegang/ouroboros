@@ -6,7 +6,7 @@
  * API specifications in OpenAPI 3.1.0 YAML format.
  * <ul>
  *   <li>{@link kr.co.ouroboros.core.rest.spec.service.RestApiSpecService} - Service interface</li>
- *   <li>{@link kr.co.ouroboros.core.rest.spec.service.RestApiSpecServiceImpl} - Service implementation</li>
+ *   <li>{@link kr.co.ouroboros.core.rest.spec.service.RestApiSpecServiceimpl} - Service implementation</li>
  * </ul>
  *
  * @since 0.0.1

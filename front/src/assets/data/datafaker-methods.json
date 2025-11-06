@@ -1,0 +1,199 @@
+{
+  "providers": [
+    {
+      "name": "Name",
+      "category": "Base",
+      "icon": "👤",
+      "methods": [
+        { "name": "fullName", "expression": "name.fullName", "description": "Full name (John Doe)", "example": "John Smith" },
+        { "name": "firstName", "expression": "name.firstName", "description": "First name only", "example": "John" },
+        { "name": "lastName", "expression": "name.lastName", "description": "Last name only", "example": "Smith" },
+        { "name": "prefix", "expression": "name.prefix", "description": "Name prefix (Mr., Mrs., Dr.)", "example": "Mr." },
+        { "name": "suffix", "expression": "name.suffix", "description": "Name suffix (Jr., Sr., III)", "example": "Jr." },
+        { "name": "title", "expression": "name.title", "description": "Job title", "example": "Chief Marketing Officer" },
+        { "name": "username", "expression": "name.username", "description": "Username", "example": "john.smith" }
+      ]
+    },
+    {
+      "name": "Address",
+      "category": "Base",
+      "icon": "🏠",
+      "methods": [
+        { "name": "streetName", "expression": "address.streetName", "description": "Street name", "example": "Main Street" },
+        { "name": "streetAddress", "expression": "address.streetAddress", "description": "Street address with number", "example": "123 Main Street" },
+        { "name": "city", "expression": "address.city", "description": "City name", "example": "New York" },
+        { "name": "state", "expression": "address.state", "description": "State name", "example": "California" },
+        { "name": "zipCode", "expression": "address.zipCode", "description": "Zip code", "example": "90210" },
+        { "name": "country", "expression": "address.country", "description": "Country name", "example": "United States" },
+        { "name": "fullAddress", "expression": "address.fullAddress", "description": "Complete address", "example": "123 Main St, New York, NY 10001" },
+        { "name": "latitude", "expression": "address.latitude", "description": "Latitude coordinate", "example": "40.7128" },
+        { "name": "longitude", "expression": "address.longitude", "description": "Longitude coordinate", "example": "-74.0060" }
+      ]
+    },
+    {
+      "name": "Internet",
+      "category": "Base",
+      "icon": "🌐",
+      "methods": [
+        { "name": "emailAddress", "expression": "internet.emailAddress", "description": "Email address", "example": "john.smith@example.com" },
+        { "name": "safeEmailAddress", "expression": "internet.safeEmailAddress", "description": "Safe email (example.com domain)", "example": "john@example.com" },
+        { "name": "username", "expression": "internet.username", "description": "Username", "example": "john_smith" },
+        { "name": "password", "expression": "internet.password", "description": "Random password", "example": "aB3$kL9mN" },
+        { "name": "domainName", "expression": "internet.domainName", "description": "Domain name", "example": "example.com" },
+        { "name": "url", "expression": "internet.url", "description": "Full URL", "example": "https://www.example.com" },
+        { "name": "avatar", "expression": "internet.avatar", "description": "Avatar image URL", "example": "https://robohash.org/..." },
+        { "name": "uuid", "expression": "internet.uuid", "description": "UUID v4", "example": "550e8400-e29b-41d4-a716-446655440000" },
+        { "name": "macAddress", "expression": "internet.macAddress", "description": "MAC address", "example": "00:1B:44:11:3A:B7" },
+        { "name": "ipV4Address", "expression": "internet.ipV4Address", "description": "IPv4 address", "example": "192.168.1.1" },
+        { "name": "ipV6Address", "expression": "internet.ipV6Address", "description": "IPv6 address", "example": "2001:0db8:85a3::8a2e:0370:7334" }
+      ]
+    },
+    {
+      "name": "Phone Number",
+      "category": "Base",
+      "icon": "📱",
+      "methods": [
+        { "name": "phoneNumber", "expression": "phoneNumber.phoneNumber", "description": "Phone number", "example": "+1-202-555-0173" },
+        { "name": "cellPhone", "expression": "phoneNumber.cellPhone", "description": "Cell phone number", "example": "+1-555-123-4567" },
+        { "name": "extension", "expression": "phoneNumber.extension", "description": "Phone extension", "example": "1234" }
+      ]
+    },
+    {
+      "name": "Company",
+      "category": "Base",
+      "icon": "🏢",
+      "methods": [
+        { "name": "name", "expression": "company.name", "description": "Company name", "example": "Tech Solutions Inc." },
+        { "name": "industry", "expression": "company.industry", "description": "Industry type", "example": "Information Technology" },
+        { "name": "profession", "expression": "company.profession", "description": "Profession", "example": "Software Engineer" },
+        { "name": "buzzword", "expression": "company.buzzword", "description": "Business buzzword", "example": "synergy" },
+        { "name": "bs", "expression": "company.bs", "description": "Business speak", "example": "revolutionize next-generation platforms" },
+        { "name": "url", "expression": "company.url", "description": "Company website URL", "example": "https://techsolutions.com" }
+      ]
+    },
+    {
+      "name": "Lorem",
+      "category": "Base",
+      "icon": "📝",
+      "methods": [
+        { "name": "word", "expression": "lorem.word", "description": "Single word", "example": "lorem" },
+        { "name": "sentence", "expression": "lorem.sentence", "description": "Sentence", "example": "Lorem ipsum dolor sit amet." },
+        { "name": "paragraph", "expression": "lorem.paragraph", "description": "Paragraph", "example": "Lorem ipsum dolor sit amet, consectetur..." },
+        { "name": "fixedString", "expression": "lorem.fixedString", "description": "Fixed length string", "example": "loremipsum", "hasParams": true }
+      ]
+    },
+    {
+      "name": "Number",
+      "category": "Base",
+      "icon": "🔢",
+      "methods": [
+        { "name": "randomDigit", "expression": "number.randomDigit", "description": "Single digit (0-9)", "example": "7" },
+        { "name": "randomNumber", "expression": "number.randomNumber", "description": "Random number", "example": "42" },
+        { "name": "numberBetween", "expression": "number.numberBetween", "description": "Number in range", "example": "55", "hasParams": true },
+        { "name": "digits", "expression": "number.digits", "description": "N digits as string", "example": "1234", "hasParams": true }
+      ]
+    },
+    {
+      "name": "Date And Time",
+      "category": "Base",
+      "icon": "📅",
+      "methods": [
+        { "name": "future", "expression": "dateAndTime.future", "description": "Future date", "example": "2025-12-31" },
+        { "name": "past", "expression": "dateAndTime.past", "description": "Past date", "example": "2020-01-15" },
+        { "name": "birthday", "expression": "dateAndTime.birthday", "description": "Birthday date", "example": "1990-05-20" }
+      ]
+    },
+    {
+      "name": "Finance",
+      "category": "Base",
+      "icon": "💰",
+      "methods": [
+        { "name": "creditCard", "expression": "finance.creditCard", "description": "Credit card number", "example": "4532-1234-5678-9010" },
+        { "name": "bic", "expression": "finance.bic", "description": "BIC/SWIFT code", "example": "DEUTDEFF" },
+        { "name": "iban", "expression": "finance.iban", "description": "IBAN", "example": "DE89370400440532013000" }
+      ]
+    },
+    {
+      "name": "Commerce",
+      "category": "Base",
+      "icon": "🛒",
+      "methods": [
+        { "name": "productName", "expression": "commerce.productName", "description": "Product name", "example": "Awesome Wooden Keyboard" },
+        { "name": "price", "expression": "commerce.price", "description": "Price", "example": "49.99" },
+        { "name": "department", "expression": "commerce.department", "description": "Department", "example": "Electronics" },
+        { "name": "material", "expression": "commerce.material", "description": "Material", "example": "Wooden" },
+        { "name": "brand", "expression": "commerce.brand", "description": "Brand name", "example": "Nike" }
+      ]
+    },
+    {
+      "name": "Color",
+      "category": "Base",
+      "icon": "🎨",
+      "methods": [
+        { "name": "name", "expression": "color.name", "description": "Color name", "example": "blue" },
+        { "name": "hex", "expression": "color.hex", "description": "Hex color code", "example": "#FF5733" }
+      ]
+    },
+    {
+      "name": "Book",
+      "category": "Base",
+      "icon": "📚",
+      "methods": [
+        { "name": "title", "expression": "book.title", "description": "Book title", "example": "The Great Gatsby" },
+        { "name": "author", "expression": "book.author", "description": "Author name", "example": "F. Scott Fitzgerald" },
+        { "name": "publisher", "expression": "book.publisher", "description": "Publisher", "example": "Penguin Books" },
+        { "name": "genre", "expression": "book.genre", "description": "Book genre", "example": "Fiction" }
+      ]
+    },
+    {
+      "name": "Code",
+      "category": "Base",
+      "icon": "💻",
+      "methods": [
+        { "name": "isbn10", "expression": "code.isbn10", "description": "ISBN-10", "example": "0-596-52068-9" },
+        { "name": "isbn13", "expression": "code.isbn13", "description": "ISBN-13", "example": "978-0-596-52068-7" },
+        { "name": "ean8", "expression": "code.ean8", "description": "EAN-8", "example": "73513537" },
+        { "name": "ean13", "expression": "code.ean13", "description": "EAN-13", "example": "5901234123457" }
+      ]
+    },
+    {
+      "name": "Food",
+      "category": "Food",
+      "icon": "🍕",
+      "methods": [
+        { "name": "ingredient", "expression": "food.ingredient", "description": "Food ingredient", "example": "Tomato" },
+        { "name": "spice", "expression": "food.spice", "description": "Spice", "example": "Oregano" },
+        { "name": "dish", "expression": "food.dish", "description": "Dish name", "example": "Pizza Margherita" }
+      ]
+    },
+    {
+      "name": "Job",
+      "category": "Base",
+      "icon": "💼",
+      "methods": [
+        { "name": "title", "expression": "job.title", "description": "Job title", "example": "Software Engineer" },
+        { "name": "field", "expression": "job.field", "description": "Job field", "example": "Information Technology" },
+        { "name": "keySkills", "expression": "job.keySkills", "description": "Key skills", "example": "Java, Python, AWS" },
+        { "name": "position", "expression": "job.position", "description": "Job position", "example": "Senior Developer" }
+      ]
+    },
+    {
+      "name": "Animal",
+      "category": "Base",
+      "icon": "🐾",
+      "methods": [
+        { "name": "name", "expression": "animal.name", "description": "Animal name", "example": "Dog" },
+        { "name": "scientificName", "expression": "animal.scientificName", "description": "Scientific name", "example": "Canis lupus familiaris" }
+      ]
+    }
+  ],
+  "categories": [
+    { "name": "Base", "icon": "🔧", "color": "#3B82F6" },
+    { "name": "Food", "icon": "🍔", "color": "#10B981" },
+    { "name": "Entertainment", "icon": "🎬", "color": "#8B5CF6" },
+    { "name": "Sport", "icon": "⚽", "color": "#F59E0B" },
+    { "name": "Videogame", "icon": "🎮", "color": "#EC4899" }
+  ],
+  "expressionFormat": "{{$%s}}"
+}
+

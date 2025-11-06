@@ -26,6 +26,7 @@ public class Operation {
     private List<Parameter> parameters;
     private RequestBody requestBody;
     private Map<String, Response> responses;
+    private List<Map<String, List<String>>> security;
 
     // (★핵심★) Ouroboros custom fields
     @JsonProperty("x-ouroboros-id")

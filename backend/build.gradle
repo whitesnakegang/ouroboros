@@ -9,7 +9,7 @@ plugins {
 }
 
 group = 'io.github.whitesnakegang'   // ← 실제 groupId 반영
-version = '0.1.0-SNAPSHOT'                    // ← 스냅샷이면 0.1.1-SNAPSHOT 등으로
+version = '1.0.1-SNAPSHOT'                    // ← 스냅샷이면 0.1.1-SNAPSHOT 등으로
 
 description = 'Open Source Project'
 
@@ -42,6 +42,7 @@ dependencies {
 
 	// 사용자 앱 쪽 Boot 버전에 '기생'하고 싶다면 compileOnly 유지 (라이브러리 자체는 Boot에 종속 X)
 	compileOnly "org.springframework.boot:spring-boot-starter-web"
+    compileOnly 'org.springframework.boot:spring-boot-autoconfigure'
 
 	// YAML
 	implementation "org.yaml:snakeyaml:2.2"
@@ -58,16 +59,32 @@ dependencies {
 	testCompileOnly "org.projectlombok:lombok:1.18.34"
 	testAnnotationProcessor "org.projectlombok:lombok:1.18.34"
 
+    // Spring Boot Actuator (OpenTelemetry 자동 설정 포함)
+    api 'org.springframework.boot:spring-boot-starter-actuator'
+
+    // Spring AOP (메서드 추적용)
+    api 'org.springframework.boot:spring-boot-starter-aop'
+
+    // OpenTelemetry OTLP Exporter (Tempo로 trace 전송)
+    api 'io.opentelemetry:opentelemetry-exporter-otlp'
+
+    // Micrometer - Tracing Bridge (Spring Boot가 관리하는 버전 사용)
+    api 'io.micrometer:micrometer-tracing-bridge-otel'
+
 	// Test
 	testImplementation "org.springframework.boot:spring-boot-starter-test"
 	testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+    testImplementation 'org.springframework.boot:spring-boot-starter-web'
 }
 
 tasks.named('test') {
 	useJUnitPlatform()
 }
 
-tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+tasks.withType(JavaCompile).configureEach {
+	options.encoding = 'UTF-8'
+    options.compilerArgs += '-parameters'
+}
 tasks.withType(Javadoc).configureEach {
 	options.encoding = 'UTF-8'
 	options.charSet = 'UTF-8'
@@ -80,10 +97,10 @@ tasks.withType(Javadoc).configureEach {
  * - 모든 아티팩트는 GPG 서명(플러그인이 처리)
  */
 mavenPublishing {
-	// Central Portal 사용 (인자 없이 호출하면 Central 경로로 처리됨)
-	publishToMavenCentral()
-	// GPG 서명 (중앙 필수)
-	signAllPublications()
+    // Central Portal 사용 (인자 없이 호출하면 Central 경로로 처리됨)
+    publishToMavenCentral()
+    // GPG 서명 (중앙 필수)
+    signAllPublications()
 
 	// GAV 좌표 — 위의 group/version과 동일. (여기만 써도 되지만 둘 다 맞춰둠)
 	coordinates(
