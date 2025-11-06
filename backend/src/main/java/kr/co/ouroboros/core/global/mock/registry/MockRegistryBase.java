@@ -36,8 +36,4 @@ public interface MockRegistryBase<T> {
      */
     Optional<T> find(String key1, String key2);
 
-    /**
-     * Clears all registered mock endpoints from the registry.
-     */
-    void clear();
 }

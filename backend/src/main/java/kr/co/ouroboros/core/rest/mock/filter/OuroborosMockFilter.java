@@ -5,7 +5,7 @@ import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import kr.co.ouroboros.core.global.mock.model.ResponseMeta;
+import kr.co.ouroboros.core.rest.mock.model.RestResponseMeta;
 import kr.co.ouroboros.core.global.mock.service.SchemaMockBuilder;
 import kr.co.ouroboros.core.rest.mock.model.EndpointMeta;
 import kr.co.ouroboros.core.rest.mock.registry.RestMockRegistry;
@@ -138,7 +138,7 @@ public class OuroborosMockFilter implements Filter {
             throws IOException {
 
         int statusCode = 200;
-        ResponseMeta responseMeta = meta.getResponses().get(statusCode);
+        RestResponseMeta responseMeta = meta.getResponses().get(statusCode);
 
         if (responseMeta == null) {
             log.error("No 200 response defined for endpoint: {} {}", meta.getMethod(), meta.getPath());

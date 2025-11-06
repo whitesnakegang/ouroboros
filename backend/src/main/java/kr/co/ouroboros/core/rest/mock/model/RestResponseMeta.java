@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.global.mock.model;
+package kr.co.ouroboros.core.rest.mock.model;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -21,7 +21,7 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ResponseMeta {
+public class RestResponseMeta {
     /** HTTP status code for this response (e.g., 200, 400, 404) */
     private int statusCode;
 
