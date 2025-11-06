@@ -29,28 +29,40 @@ export function convertSchemaTypeToOpenAPI(schemaType: SchemaType): any {
       schema.format = schemaType.format;
     }
 
-    if (schemaType.enum && schemaType.enum.length > 0) {
-      schema.enumValues = schemaType.enum;
+    // String 타입 전용 constraints
+    if (schemaType.type === "string" || schemaType.type === "file") {
+      if (schemaType.enum && schemaType.enum.length > 0) {
+        schema.enumValues = schemaType.enum;
+      }
+      if (schemaType.pattern) {
+        schema.pattern = schemaType.pattern;
+      }
+      if (schemaType.minLength !== undefined) {
+        schema.minLength = schemaType.minLength;
+      }
+      if (schemaType.maxLength !== undefined) {
+        schema.maxLength = schemaType.maxLength;
+      }
     }
 
-    if (schemaType.pattern) {
-      schema.pattern = schemaType.pattern;
+    // Number/Integer 타입 전용 constraints
+    if (schemaType.type === "number" || schemaType.type === "integer") {
+      if (schemaType.enum && schemaType.enum.length > 0) {
+        schema.enumValues = schemaType.enum;
+      }
+      if (schemaType.minimum !== undefined) {
+        schema.minimum = schemaType.minimum;
+      }
+      if (schemaType.maximum !== undefined) {
+        schema.maximum = schemaType.maximum;
+      }
     }
 
-    if (schemaType.minLength !== undefined) {
-      schema.minLength = schemaType.minLength;
-    }
-
-    if (schemaType.maxLength !== undefined) {
-      schema.maxLength = schemaType.maxLength;
-    }
-
-    if (schemaType.minimum !== undefined) {
-      schema.minimum = schemaType.minimum;
-    }
-
-    if (schemaType.maximum !== undefined) {
-      schema.maximum = schemaType.maximum;
+    // Boolean은 enum만 가능 (true/false 외 제약 없음)
+    if (schemaType.type === "boolean") {
+      if (schemaType.enum && schemaType.enum.length > 0) {
+        schema.enumValues = schemaType.enum;
+      }
     }
 
     return schema;

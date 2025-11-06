@@ -59,15 +59,6 @@ export function ApiRequestCard({
     "json",
     "xml",
   ];
-  const fieldTypes = [
-    "string",
-    "integer",
-    "number",
-    "boolean",
-    "object",
-    "array",
-    "file",
-  ];
 
   const addHeader = () => {
     if (isReadOnly) return;
@@ -122,29 +113,13 @@ export function ApiRequestCard({
   // Schema 선택 핸들러
   const handleSchemaSelect = (schema: {
     name: string;
-    fields: Array<{
-      name: string;
-      type: string;
-      description?: string;
-      mockExpression?: string;
-    }>;
+    fields: SchemaField[];
   }) => {
-    // 전체 스키마 참조로 설정 (모든 타입에서 사용 가능)
+    // SchemaModal에서 이미 재귀적으로 변환된 필드를 그대로 사용
     setRequestBody({
       ...requestBody,
       schemaRef: schema.name,
-      fields: schema.fields.map((field): SchemaField => ({
-        key: field.name,
-        description: field.description,
-        required: false,
-        mockExpression: field.mockExpression,
-        schemaType: {
-          kind: "primitive",
-          type: field.type === "integer" || field.type === "number" || field.type === "boolean"
-            ? field.type
-            : "string",
-        },
-      })),
+      fields: schema.fields,
     });
   };
 

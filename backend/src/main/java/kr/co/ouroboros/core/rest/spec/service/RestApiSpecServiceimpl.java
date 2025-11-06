@@ -791,8 +791,13 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
                .minimum((Number) propMap.get("minimum"))
                .maximum((Number) propMap.get("maximum"));
         
-        List<String> enumValues = (List<String>) propMap.get("enum");
-        if (enumValues != null) {
+        // enum 값 파싱 - SnakeYAML이 숫자를 List<Integer>로 파싱할 수 있음
+        Object enumObj = propMap.get("enum");
+        if (enumObj instanceof java.util.Collection<?> enumCollection) {
+            List<String> enumValues = new java.util.ArrayList<>();
+            for (Object item : enumCollection) {
+                enumValues.add(item != null ? item.toString() : "");
+            }
             builder.enumValues(enumValues);
         }
 

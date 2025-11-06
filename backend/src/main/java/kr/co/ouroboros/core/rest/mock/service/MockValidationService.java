@@ -373,7 +373,6 @@ public class MockValidationService {
      * @param ref $ref 값 (예: "#/components/schemas/User")
      * @return resolve된 스키마 Map, 실패 시 null
      */
-    @SuppressWarnings("unchecked")
     private Map<String, Object> resolveSchemaRef(String ref) {
         try {
             // #/components/schemas/SchemaName -> SchemaName 추출
@@ -385,23 +384,93 @@ public class MockValidationService {
                 return null;
             }
             
-            // SchemaResponse를 Map으로 변환
-            Map<String, Object> result = new HashMap<>();
-            result.put("type", schema.getType());
-            
-            if (schema.getProperties() != null && !schema.getProperties().isEmpty()) {
-                result.put("properties", schema.getProperties());
-            }
-            
-            if (schema.getRequired() != null && !schema.getRequired().isEmpty()) {
-                result.put("required", schema.getRequired());
-            }
-            
-            return result;
+            // SchemaResponse를 Map으로 재귀 변환
+            return convertSchemaResponseToMap(schema);
         } catch (Exception e) {
             log.error("Failed to resolve schema ref: {}", ref, e);
             return null;
         }
+    }
+    
+    /**
+     * SchemaResponse DTO를 Map<String, Object>로 재귀 변환
+     * Property DTO도 재귀적으로 변환하여 ClassCastException 방지
+     */
+    private Map<String, Object> convertSchemaResponseToMap(kr.co.ouroboros.ui.rest.spec.dto.SchemaResponse schema) {
+        Map<String, Object> result = new HashMap<>();
+        
+        if (schema.getType() != null) {
+            result.put("type", schema.getType());
+        }
+        
+        // Properties 재귀 변환 (Property DTO → Map)
+        if (schema.getProperties() != null && !schema.getProperties().isEmpty()) {
+            Map<String, Object> propertiesMap = new HashMap<>();
+            for (Map.Entry<String, kr.co.ouroboros.core.rest.spec.model.Property> entry : schema.getProperties().entrySet()) {
+                propertiesMap.put(entry.getKey(), convertPropertyToMap(entry.getValue()));
+            }
+            result.put("properties", propertiesMap);
+        }
+        
+        if (schema.getRequired() != null && !schema.getRequired().isEmpty()) {
+            result.put("required", schema.getRequired());
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Property DTO를 Map<String, Object>로 재귀 변환
+     */
+    private Map<String, Object> convertPropertyToMap(kr.co.ouroboros.core.rest.spec.model.Property property) {
+        Map<String, Object> result = new HashMap<>();
+        
+        // $ref 처리
+        if (property.getRef() != null && !property.getRef().isBlank()) {
+            String fullRef = property.getRef().startsWith("#/components/schemas/")
+                    ? property.getRef()
+                    : "#/components/schemas/" + property.getRef();
+            result.put("$ref", fullRef);
+            return result;
+        }
+        
+        // Type
+        if (property.getType() != null) {
+            result.put("type", property.getType());
+        }
+        
+        // Description
+        if (property.getDescription() != null) {
+            result.put("description", property.getDescription());
+        }
+        
+        // Object - nested properties (재귀!)
+        if (property.getProperties() != null && !property.getProperties().isEmpty()) {
+            Map<String, Object> nestedProps = new HashMap<>();
+            for (Map.Entry<String, kr.co.ouroboros.core.rest.spec.model.Property> entry : property.getProperties().entrySet()) {
+                nestedProps.put(entry.getKey(), convertPropertyToMap(entry.getValue()));
+            }
+            result.put("properties", nestedProps);
+        }
+        
+        if (property.getRequired() != null && !property.getRequired().isEmpty()) {
+            result.put("required", property.getRequired());
+        }
+        
+        // Array - items (재귀!)
+        if (property.getItems() != null) {
+            result.put("items", convertPropertyToMap(property.getItems()));
+        }
+        
+        if (property.getMinItems() != null) {
+            result.put("minItems", property.getMinItems());
+        }
+        
+        if (property.getMaxItems() != null) {
+            result.put("maxItems", property.getMaxItems());
+        }
+        
+        return result;
     }
 
     /**
