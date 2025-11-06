@@ -13,11 +13,14 @@ export function RootLayout() {
     }
   };
 
+  // 다크 모드 설정 적용 (초기 로드 및 변경 시)
   useEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add("dark");
+      document.documentElement.style.colorScheme = "dark";
     } else {
       document.documentElement.classList.remove("dark");
+      document.documentElement.style.colorScheme = "light";
     }
   }, [isDarkMode]);
 
