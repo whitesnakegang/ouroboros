@@ -2,10 +2,12 @@ package kr.co.ouroboros.core.rest.mock.service;
 
 import jakarta.servlet.http.HttpServletRequest;
 import kr.co.ouroboros.core.rest.mock.model.EndpointMeta;
+import kr.co.ouroboros.core.rest.spec.service.SchemaService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -34,6 +36,7 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class MockValidationService {
+    private final SchemaService schemaService;
     /**
      * Validate an incoming HttpServletRequest against the endpoint requirements defined in EndpointMeta for a mock endpoint.
      *
@@ -229,6 +232,16 @@ public class MockValidationService {
                 continue;
             }
 
+            // $ref 처리 - 스키마 resolve
+            if (propSchema.containsKey("$ref")) {
+                String ref = (String) propSchema.get("$ref");
+                propSchema = resolveSchemaRef(ref);
+                if (propSchema == null) {
+                    log.warn("Failed to resolve schema ref: {}", ref);
+                    continue;
+                }
+            }
+
             String expectedType = (String) propSchema.get("type");
             if (expectedType == null) {
                 // 타입 정의 없으면 검증 스킵
@@ -315,6 +328,16 @@ public class MockValidationService {
     private ValidationResult validateArrayItems(List<Object> array,
                                                 Map<String, Object> itemSchema,
                                                 String fieldPath) {
+        // $ref 처리 - items에서도 스키마 참조 가능
+        if (itemSchema.containsKey("$ref")) {
+            String ref = (String) itemSchema.get("$ref");
+            itemSchema = resolveSchemaRef(ref);
+            if (itemSchema == null) {
+                log.warn("Failed to resolve array item schema ref: {}", ref);
+                return ValidationResult.success();
+            }
+        }
+        
         String itemType = (String) itemSchema.get("type");
         if (itemType == null) {
             return ValidationResult.success();
@@ -342,6 +365,43 @@ public class MockValidationService {
         }
 
         return ValidationResult.success();
+    }
+
+    /**
+     * $ref를 실제 스키마로 resolve
+     *
+     * @param ref $ref 값 (예: "#/components/schemas/User")
+     * @return resolve된 스키마 Map, 실패 시 null
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> resolveSchemaRef(String ref) {
+        try {
+            // #/components/schemas/SchemaName -> SchemaName 추출
+            String schemaName = ref.replace("#/components/schemas/", "");
+            
+            // SchemaService에서 스키마 조회
+            var schema = schemaService.getSchema(schemaName);
+            if (schema == null) {
+                return null;
+            }
+            
+            // SchemaResponse를 Map으로 변환
+            Map<String, Object> result = new HashMap<>();
+            result.put("type", schema.getType());
+            
+            if (schema.getProperties() != null && !schema.getProperties().isEmpty()) {
+                result.put("properties", schema.getProperties());
+            }
+            
+            if (schema.getRequired() != null && !schema.getRequired().isEmpty()) {
+                result.put("required", schema.getRequired());
+            }
+            
+            return result;
+        } catch (Exception e) {
+            log.error("Failed to resolve schema ref: {}", ref, e);
+            return null;
+        }
     }
 
     /**

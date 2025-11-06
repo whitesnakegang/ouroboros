@@ -529,6 +529,16 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         if (property.getMockExpression() != null) {
             result.put("x-ouroboros-mock", property.getMockExpression());
         }
+        
+        // Object type - nested properties (재귀!)
+        if (property.getProperties() != null && !property.getProperties().isEmpty()) {
+            result.put("properties", convertProperties(property.getProperties()));
+        }
+        if (property.getRequired() != null && !property.getRequired().isEmpty()) {
+            result.put("required", property.getRequired());
+        }
+        
+        // Array type - items (재귀!)
         if (property.getItems() != null) {
             result.put("items", convertProperty(property.getItems()));
         }
@@ -538,6 +548,30 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         if (property.getMaxItems() != null) {
             result.put("maxItems", property.getMaxItems());
         }
+        
+        // Additional constraints
+        if (property.getFormat() != null) {
+            result.put("format", property.getFormat());
+        }
+        if (property.getEnumValues() != null && !property.getEnumValues().isEmpty()) {
+            result.put("enum", property.getEnumValues());
+        }
+        if (property.getPattern() != null) {
+            result.put("pattern", property.getPattern());
+        }
+        if (property.getMinLength() != null) {
+            result.put("minLength", property.getMinLength());
+        }
+        if (property.getMaxLength() != null) {
+            result.put("maxLength", property.getMaxLength());
+        }
+        if (property.getMinimum() != null) {
+            result.put("minimum", property.getMinimum());
+        }
+        if (property.getMaximum() != null) {
+            result.put("maximum", property.getMaximum());
+        }
+        
         return result;
     }
 
@@ -724,13 +758,42 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         // Inline mode
         builder.type((String) propMap.get("type"))
                 .description((String) propMap.get("description"))
-                .mockExpression((String) propMap.get("x-ouroboros-mock"))
-                .minItems((Integer) propMap.get("minItems"))
-                .maxItems((Integer) propMap.get("maxItems"));
+                .mockExpression((String) propMap.get("x-ouroboros-mock"));
+        
+        // Object type - nested properties (재귀!)
+        Map<String, Object> properties = (Map<String, Object>) propMap.get("properties");
+        if (properties != null) {
+            Map<String, Property> parsedProperties = new LinkedHashMap<>();
+            for (Map.Entry<String, Object> entry : properties.entrySet()) {
+                parsedProperties.put(entry.getKey(), parseProperty((Map<String, Object>) entry.getValue()));
+            }
+            builder.properties(parsedProperties);
+        }
+        
+        List<String> required = (List<String>) propMap.get("required");
+        if (required != null) {
+            builder.required(required);
+        }
 
+        // Array type - items (재귀!)
         Map<String, Object> items = (Map<String, Object>) propMap.get("items");
         if (items != null) {
             builder.items(parseProperty(items));
+        }
+        builder.minItems((Integer) propMap.get("minItems"))
+               .maxItems((Integer) propMap.get("maxItems"));
+        
+        // Additional constraints
+        builder.format((String) propMap.get("format"))
+               .pattern((String) propMap.get("pattern"))
+               .minLength((Integer) propMap.get("minLength"))
+               .maxLength((Integer) propMap.get("maxLength"))
+               .minimum((Number) propMap.get("minimum"))
+               .maximum((Number) propMap.get("maximum"));
+        
+        List<String> enumValues = (List<String>) propMap.get("enum");
+        if (enumValues != null) {
+            builder.enumValues(enumValues);
         }
 
         return builder.build();

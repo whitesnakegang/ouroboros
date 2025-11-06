@@ -30,6 +30,9 @@ import {
   getRestApiSpec,
   getSchema,
 } from "../services/api";
+import { convertRequestBodyToOpenAPI, parseOpenAPIRequestBody } from "../utils/schemaConverter";
+import type { RequestBody, SchemaField } from "../types/schema.types";
+import { createDefaultField } from "../types/schema.types";
 
 interface KeyValuePair {
   key: string;
@@ -38,21 +41,6 @@ interface KeyValuePair {
   description?: string;
   type?: string;
 }
-
-// Import RequestBody type from ApiRequestCard
-type RequestBody = {
-  type: "none" | "form-data" | "x-www-form-urlencoded" | "json" | "xml";
-  contentType: string;
-  fields: Array<{
-    key: string;
-    value: string;
-    type: string;
-    description?: string;
-    required?: boolean;
-    ref?: string; // 스키마 참조 시 사용 (예: "User")
-  }>;
-  schemaRef?: string; // 전체 스키마 참조 (예: "User")
-};
 
 interface StatusCode {
   code: string;
@@ -268,7 +256,6 @@ export function ApiEditorLayout() {
       const formQueryParams: KeyValuePair[] = [];
       const testHeaders: Array<{ key: string; value: string }> = [];
       const testQueryParams: Array<{ key: string; value: string }> = [];
-      let testBody = "";
 
       // Parameters를 헤더와 쿼리 파라미터로 분리
       if (spec.parameters && Array.isArray(spec.parameters)) {
@@ -309,208 +296,19 @@ export function ApiEditorLayout() {
       setQueryParams(formQueryParams);
       setRequestHeaders(formHeaders);
 
-      // RequestBody 처리
-      let loadedRequestBody: RequestBody = {
-        type: "none",
-        contentType: "application/json",
-        fields: [],
-      };
+      // RequestBody 처리 (새로운 schemaConverter 사용)
+      let loadedRequestBody: RequestBody = { type: "none", fields: [] };
 
-      // RequestBody 처리 - null이나 undefined 체크
       if (spec.requestBody != null) {
         const reqBody = spec.requestBody as any;
 
-        // content가 없거나 빈 객체인 경우 처리
-        if (!reqBody.content || Object.keys(reqBody.content).length === 0) {
-          // content 없음
-        } else {
+        if (reqBody.content && Object.keys(reqBody.content).length > 0) {
           const contentType = Object.keys(reqBody.content)[0];
 
-          // Content-Type에 따라 body type 결정
-          let bodyType:
-            | "none"
-            | "form-data"
-            | "x-www-form-urlencoded"
-            | "json"
-            | "xml" = "json";
-          if (contentType.includes("multipart/form-data")) {
-            bodyType = "form-data";
-          } else if (contentType.includes("x-www-form-urlencoded")) {
-            bodyType = "x-www-form-urlencoded";
-          } else if (contentType.includes("xml")) {
-            bodyType = "xml";
-          } else if (contentType.includes("json")) {
-            bodyType = "json";
-          }
-
-          const content = reqBody.content[contentType];
-
-          if (content) {
-            const schema = content.schema;
-
-            // 스키마 참조 처리 ($ref 또는 ref)
-            const schemaRef = schema?.$ref || schema?.ref;
-            if (schemaRef) {
-              // $ref 형식: "#/components/schemas/OrderCreateRequest"
-              // ref 형식: "OrderCreateRequest"
-              let schemaName: string;
-              if (
-                typeof schemaRef === "string" &&
-                schemaRef.includes("#/components/schemas/")
-              ) {
-                const refMatch = schemaRef.match(
-                  /#\/components\/schemas\/(.+)/
-                );
-                schemaName = refMatch ? refMatch[1] : schemaRef;
-              } else {
-                schemaName =
-                  typeof schemaRef === "string" ? schemaRef : String(schemaRef);
-              }
-
-              try {
-                // 스키마 조회하여 properties 가져오기
-                const schemaResponse = await getSchema(schemaName);
-                const resolvedSchema = schemaResponse.data;
-
-                if (resolvedSchema.properties) {
-                  // 스키마의 properties를 fields로 변환
-                  const fields: Array<{
-                    key: string;
-                    value: string;
-                    type: string;
-                    description?: string;
-                    required?: boolean;
-                    ref?: string;
-                  }> = [];
-
-                  Object.keys(resolvedSchema.properties).forEach((key) => {
-                    const prop = resolvedSchema.properties![key];
-
-                    // 프로퍼티가 ref를 참조하는 경우
-                    if (prop.ref) {
-                      fields.push({
-                        key,
-                        value: "",
-                        type: prop.type || "object",
-                        description: prop.description,
-                        required: resolvedSchema.required?.includes(key),
-                        ref: prop.ref,
-                      });
-                    } else {
-                      // 일반 프로퍼티
-                      fields.push({
-                        key,
-                        value: prop.mockExpression || "",
-                        type: prop.type || "string",
-                        description: prop.description,
-                        required: resolvedSchema.required?.includes(key),
-                      });
-                    }
-                  });
-
-                  loadedRequestBody = {
-                    type: bodyType,
-                    contentType: contentType,
-                    fields: fields,
-                    schemaRef: schemaName, // 참조 정보도 유지
-                  };
-                } else {
-                  // properties가 없는 경우
-                  loadedRequestBody = {
-                    type: bodyType,
-                    contentType: contentType,
-                    fields: [],
-                    schemaRef: schemaName,
-                  };
-                }
-              } catch (error) {
-                console.error("⚠️ 스키마 조회 실패:", error);
-                // 스키마 조회 실패 시에도 schemaRef는 설정
-                loadedRequestBody = {
-                  type: bodyType,
-                  contentType: contentType,
-                  fields: [],
-                  schemaRef: schemaName,
-                };
-              }
-            } else if (schema?.properties) {
-              // 인라인 스키마 처리
-              const fields: Array<{
-                key: string;
-                value: string;
-                type: string;
-                description?: string;
-                required?: boolean;
-                ref?: string;
-              }> = [];
-
-              Object.keys(schema.properties).forEach((key) => {
-                const prop = schema.properties[key];
-
-                // 프로퍼티가 ref를 참조하는 경우
-                if (prop.$ref) {
-                  const refMatch = prop.$ref.match(
-                    /#\/components\/schemas\/(.+)/
-                  );
-                  if (refMatch) {
-                    fields.push({
-                      key,
-                      value: "",
-                      type: "object",
-                      description: prop.description,
-                      required: schema.required?.includes(key),
-                      ref: refMatch[1],
-                    });
-                  }
-                } else {
-                  // 일반 프로퍼티
-                  fields.push({
-                    key,
-                    value: prop.mockExpression || prop.default || "",
-                    type: prop.type || "string",
-                    description: prop.description,
-                    required: schema.required?.includes(key),
-                  });
-                }
-              });
-
-              loadedRequestBody = {
-                type: bodyType,
-                contentType: contentType,
-                fields: fields,
-              };
-            } else if (schema) {
-              // schema는 있지만 $ref나 properties가 없는 경우 (예: type만 있는 경우)
-              // 빈 body이지만 type은 설정
-              loadedRequestBody = {
-                type: bodyType,
-                contentType: contentType,
-                fields: [],
-              };
-            }
-
-            // 테스트용 body 생성
-            if (schema && schema.properties) {
-              const bodyObj: Record<string, any> = {};
-              Object.keys(schema.properties).forEach((key) => {
-                const prop = schema.properties[key];
-                if (prop.example !== undefined) {
-                  bodyObj[key] = prop.example;
-                } else if (prop.type === "string") {
-                  bodyObj[key] = prop.default || "string";
-                } else if (prop.type === "number" || prop.type === "integer") {
-                  bodyObj[key] = prop.default || 0;
-                } else if (prop.type === "boolean") {
-                  bodyObj[key] = prop.default || false;
-                }
-              });
-              testBody = JSON.stringify(bodyObj, null, 2);
-            } else if (content.example !== undefined) {
-              testBody =
-                typeof content.example === "string"
-                  ? content.example
-                  : JSON.stringify(content.example, null, 2);
-            }
+          // 새로운 parseOpenAPIRequestBody 사용
+          const parsed = parseOpenAPIRequestBody(reqBody, contentType);
+          if (parsed) {
+            loadedRequestBody = parsed;
           }
         }
       }
@@ -631,7 +429,7 @@ export function ApiEditorLayout() {
         description: spec.description || spec.summary || "",
         headers: testHeaders,
         queryParams: testQueryParams,
-        body: testBody,
+        body: "",
       });
     } catch (error) {
       console.error("API 스펙 로드 실패:", error);
@@ -677,7 +475,6 @@ export function ApiEditorLayout() {
   const [requestHeaders, setRequestHeaders] = useState<KeyValuePair[]>([]);
   const [requestBody, setRequestBody] = useState<RequestBody>({
     type: "none",
-    contentType: "application/json",
     fields: [],
   });
 
@@ -695,91 +492,6 @@ export function ApiEditorLayout() {
   const progressPercentage = totalEndpoints
     ? Math.round((completedEndpoints / totalEndpoints) * 100)
     : 0;
-
-  /**
-   * 프론트엔드 RequestBody를 OpenAPI RequestBody 구조로 변환
-   */
-  const convertRequestBodyToOpenAPI = (
-    frontendBody: RequestBody | null
-  ): {
-    description: string;
-    required: boolean;
-    content: Record<string, any>;
-  } | null => {
-    // null이거나 type이 "none"이면 null 반환
-    if (!frontendBody || frontendBody.type === "none") {
-      return null;
-    }
-
-    // Content-Type 결정
-    let contentType = "application/json";
-    if (frontendBody.type === "form-data") {
-      contentType = "multipart/form-data";
-    } else if (frontendBody.type === "x-www-form-urlencoded") {
-      contentType = "application/x-www-form-urlencoded";
-    } else if (frontendBody.type === "xml") {
-      contentType = "application/xml";
-    }
-
-    // 전체 스키마 참조가 있으면 ref만 사용
-    if (frontendBody.schemaRef) {
-      return {
-        description: "Request body",
-        required: true,
-        content: {
-          [contentType]: {
-            schema: {
-              ref: frontendBody.schemaRef,
-            },
-          },
-        },
-      };
-    }
-
-    // 인라인 스키마: fields를 OpenAPI properties로 변환
-    if (!frontendBody.fields || frontendBody.fields.length === 0) {
-      return null;
-    }
-
-    const properties: Record<string, any> = {};
-    const required: string[] = [];
-
-    frontendBody.fields.forEach((field) => {
-      if (field.key) {
-        const property: any = {
-          type: field.type || "string",
-        };
-
-        if (field.description) {
-          property.description = field.description;
-        }
-
-        if (field.value) {
-          property.mockExpression = field.value; // DataFaker 표현식
-        }
-
-        properties[field.key] = property;
-
-        if (field.required) {
-          required.push(field.key);
-        }
-      }
-    });
-
-    return {
-      description: "Request body",
-      required: required.length > 0,
-      content: {
-        [contentType]: {
-          schema: {
-            type: "object",
-            properties: properties,
-            required: required.length > 0 ? required : undefined,
-          },
-        },
-      },
-    };
-  };
 
   /**
    * queryParams를 OpenAPI parameters 구조로 변환

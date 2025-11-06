@@ -1,12 +1,6 @@
 import type { SchemaResponse } from "../services/api";
-
-interface SchemaField {
-  name: string;
-  type: string;
-  description?: string;
-  mockExpression?: string;
-  ref?: string;
-}
+import type { SchemaField } from "../types/schema.types";
+import { parseOpenAPISchemaToSchemaField } from "../utils/schemaConverter";
 
 interface Schema {
   id: string;
@@ -37,19 +31,20 @@ export function SchemaModal({
   };
 
   const handleSelectSchema = (schema: SchemaResponse) => {
-    // SchemaResponse를 Schema 형식으로 변환
+    // SchemaResponse를 Schema 형식으로 변환 (재귀적 구조 지원)
     const convertedSchema: Schema = {
       id: schema.schemaName,
       name: schema.schemaName,
       description: schema.description,
       fields: schema.properties
-        ? Object.entries(schema.properties).map(([name, prop]) => ({
-            name,
-            type: prop.type || "string",
-            description: prop.description,
-            mockExpression: prop.mockExpression,
-            ref: prop.ref,
-          }))
+        ? Object.entries(schema.properties).map(([key, propSchema]) => {
+            const field = parseOpenAPISchemaToSchemaField(key, propSchema);
+            // required 정보 추가
+            if (schema.required && schema.required.includes(key)) {
+              field.required = true;
+            }
+            return field;
+          })
         : [],
     };
     onSelect(convertedSchema);

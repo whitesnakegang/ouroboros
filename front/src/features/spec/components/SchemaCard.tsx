@@ -1,20 +1,15 @@
 import { useState, useEffect } from "react";
 import { SchemaModal } from "./SchemaModal";
-import { MockExpressionModal } from "./MockExpressionModal";
+import { SchemaFieldEditor } from "./SchemaFieldEditor";
 import { getAllSchemas, createSchema, updateSchema } from "../services/api";
 import type {
   SchemaResponse,
   CreateSchemaRequest,
   UpdateSchemaRequest,
 } from "../services/api";
-
-interface SchemaField {
-  name: string;
-  type: string;
-  description?: string;
-  mockExpression?: string;
-  ref?: string;
-}
+import type { SchemaField } from "../types/schema.types";
+import { createDefaultField } from "../types/schema.types";
+import { convertSchemaFieldToOpenAPI } from "../utils/schemaConverter";
 
 interface SchemaCardProps {
   isReadOnly?: boolean;
@@ -28,13 +23,6 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
   const [currentSchemaDescription, setCurrentSchemaDescription] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Mock Expression Modal 상태
-  const [isMockModalOpen, setIsMockModalOpen] = useState(false);
-  const [currentMockFieldIndex, setCurrentMockFieldIndex] = useState<
-    number | null
-  >(null);
-  const [currentMockValue, setCurrentMockValue] = useState("");
 
   // Schema Type 상태
   const [schemaType, setSchemaType] = useState<
@@ -110,19 +98,16 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
       if (schemaType === "array") {
         // Array 타입 처리
         if (arrayItemType === "object") {
-          // Array of objects: properties 필요
+          // Array of objects: properties 필요 (재귀 지원)
           const properties: Record<string, any> = {};
           const required: string[] = [];
 
           schemaFields.forEach((field) => {
-            if (field.name.trim()) {
-              properties[field.name] = {
-                type: field.type,
-                description: field.description,
-                mockExpression: field.mockExpression,
-                ref: field.ref,
-              };
-              required.push(field.name);
+            if (field.key.trim()) {
+              properties[field.key] = convertSchemaFieldToOpenAPI(field);
+              if (field.required) {
+                required.push(field.key);
+              }
             }
           });
 
@@ -140,7 +125,7 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
             },
             properties: {}, // array 타입은 properties가 빈 객체
             required: [],
-            orders: schemaFields.map((f) => f.name),
+            orders: schemaFields.map((f) => f.key),
           };
         } else {
           // Array of primitives: items만 필요
@@ -177,19 +162,16 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
           orders: [],
         };
       } else {
-        // Object 타입: properties 필요
+        // Object 타입: properties 필요 (재귀 지원)
         const properties: Record<string, any> = {};
         const required: string[] = [];
 
         schemaFields.forEach((field) => {
-          if (field.name.trim()) {
-            properties[field.name] = {
-              type: field.type,
-              description: field.description,
-              mockExpression: field.mockExpression,
-              ref: field.ref,
-            };
-            required.push(field.name);
+          if (field.key.trim()) {
+            properties[field.key] = convertSchemaFieldToOpenAPI(field);
+            if (field.required) {
+              required.push(field.key);
+            }
           }
         });
 
@@ -202,7 +184,7 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
             `${currentSchemaName} 스키마 정의`,
           properties,
           required: required.length > 0 ? required : undefined,
-          orders: schemaFields.map((f) => f.name),
+          orders: schemaFields.map((f) => f.key),
         };
       }
 
@@ -210,6 +192,8 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
       const existingSchema = schemas.find(
         (s) => s.schemaName === currentSchemaName
       );
+
+      console.log("🔍 Schema Request:", JSON.stringify(schemaRequest, null, 2));
 
       if (existingSchema) {
         // 수정
@@ -223,10 +207,12 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
           // items 필드가 있으면 포함 (array 타입인 경우)
           ...(schemaRequest.items && { items: schemaRequest.items }),
         };
+        console.log("🔍 Update Request:", JSON.stringify(updateRequest, null, 2));
         await updateSchema(currentSchemaName, updateRequest);
         alert(`"${currentSchemaName}" 스키마가 수정되었습니다.`);
       } else {
         // 생성
+        console.log("🔍 Create Request:", JSON.stringify(schemaRequest, null, 2));
         await createSchema(schemaRequest as CreateSchemaRequest & { items?: any });
         alert(`"${currentSchemaName}" 스키마가 생성되었습니다.`);
       }
@@ -380,11 +366,50 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
           {(schemaType === "string" ||
             schemaType === "number" ||
             schemaType === "boolean") && (
-            <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
-              <p className="text-sm text-blue-700 dark:text-blue-300">
-                <strong>{schemaType}</strong> 타입은 단일 값을 반환합니다.
-                필드를 추가할 필요가 없습니다.
-              </p>
+            <div className="mb-4">
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md mb-3">
+                <p className="text-sm text-blue-700 dark:text-blue-300">
+                  <strong>{schemaType}</strong> 타입은 단일 값을 반환합니다.
+                  필드를 추가할 필요가 없습니다.
+                </p>
+              </div>
+              {currentSchemaName && (
+                <div className="flex justify-end">
+                  <button
+                    onClick={saveSchema}
+                    disabled={isLoading || isReadOnly}
+                    className={`px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50 ${
+                      isReadOnly ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
+                  >
+                    {isLoading ? "저장 중..." : "Save Schema"}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {schemaType === "array" && arrayItemType !== "object" && (
+            <div className="mb-4">
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md mb-3">
+                <p className="text-sm text-blue-700 dark:text-blue-300">
+                  <strong>Array of {arrayItemType}</strong> 타입입니다.
+                  필드를 추가할 필요가 없습니다.
+                </p>
+              </div>
+              {currentSchemaName && (
+                <div className="flex justify-end">
+                  <button
+                    onClick={saveSchema}
+                    disabled={isLoading || isReadOnly}
+                    className={`px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50 ${
+                      isReadOnly ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
+                  >
+                    {isLoading ? "저장 중..." : "Save Schema"}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -393,15 +418,7 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
             <div className="mb-3 flex items-center justify-between">
               <button
                 onClick={() => {
-                  setSchemaFields([
-                    ...schemaFields,
-                    {
-                      name: "",
-                      type: "string",
-                      description: "",
-                      mockExpression: "",
-                    },
-                  ]);
+                  setSchemaFields([...schemaFields, createDefaultField()]);
                 }}
                 disabled={isReadOnly}
                 className={`px-3 py-1 text-sm text-[#2563EB] hover:text-[#1E40AF] font-medium ${
@@ -410,17 +427,15 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
               >
                 + Add Field
               </button>
-              {currentSchemaName && schemaFields.length > 0 && (
-                <button
-                  onClick={saveSchema}
-                  disabled={isLoading || isReadOnly}
-                  className={`px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50 ${
-                    isReadOnly ? "opacity-50 cursor-not-allowed" : ""
-                  }`}
-                >
-                  {isLoading ? "저장 중..." : "Save Schema"}
-                </button>
-              )}
+              <button
+                onClick={saveSchema}
+                disabled={isLoading || isReadOnly || !currentSchemaName}
+                className={`px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50 ${
+                  isReadOnly ? "opacity-50 cursor-not-allowed" : ""
+                }`}
+              >
+                {isLoading ? "저장 중..." : "Save Schema"}
+              </button>
             </div>
           )}
 
@@ -431,156 +446,37 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
                 Schema Fields {schemaType === "array" && "(Array Items)"}
               </h4>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                각 필드의 이름, 타입, mock 값, 설명을 입력하세요
+                재귀적 스키마 구조 지원 (Object, Array, Reference)
               </p>
             </div>
           )}
 
           {(schemaType === "object" ||
             (schemaType === "array" && arrayItemType === "object")) && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-md">
-                <thead>
-                  <tr className="bg-gray-50 dark:bg-[#161B22]">
-                    <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 w-1/4">
-                      Field Name <span className="text-red-500">*</span>
-                    </th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 w-1/5">
-                      Type <span className="text-red-500">*</span>
-                    </th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 w-1/4">
-                      Mock Expression
-                    </th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 w-1/3">
-                      Description
-                    </th>
-                    <th className="px-4 py-3 text-center font-medium text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 w-16"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {schemaFields.map((field, index) => (
-                    <tr
-                      key={index}
-                      className="border-b border-gray-100 dark:border-gray-800"
-                    >
-                      <td className="px-4 py-3">
-                        <input
-                          type="text"
-                          value={field.name}
-                          onChange={(e) => {
-                            const updated = [...schemaFields];
-                            updated[index] = {
-                              ...updated[index],
-                              name: e.target.value,
-                            };
-                            setSchemaFields(updated);
-                          }}
-                          placeholder="예: userId, userName, status"
-                          disabled={isReadOnly}
-                          className={`w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] ${
-                            isReadOnly ? "opacity-60 cursor-not-allowed" : ""
-                          }`}
-                        />
-                      </td>
-                      <td className="px-4 py-3">
-                        <select
-                          value={field.type}
-                          onChange={(e) => {
-                            const updated = [...schemaFields];
-                            updated[index] = {
-                              ...updated[index],
-                              type: e.target.value,
-                            };
-                            setSchemaFields(updated);
-                          }}
-                          disabled={isReadOnly}
-                          className={`w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] ${
-                            isReadOnly ? "opacity-60 cursor-not-allowed" : ""
-                          }`}
-                        >
-                          <option value="string">string</option>
-                          <option value="integer">integer</option>
-                          <option value="number">number</option>
-                          <option value="boolean">boolean</option>
-                          <option value="object">object</option>
-                          <option value="array">array</option>
-                        </select>
-                      </td>
-                      <td className="px-4 py-3">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCurrentMockFieldIndex(index);
-                            setCurrentMockValue(field.mockExpression || "");
-                            setIsMockModalOpen(true);
-                          }}
-                          disabled={isReadOnly}
-                          className={`w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-left hover:bg-gray-50 dark:hover:bg-[#161B22] transition-colors group ${
-                            isReadOnly ? "opacity-60 cursor-not-allowed" : ""
-                          }`}
-                        >
-                          {field.mockExpression ? (
-                            <span className="font-mono text-sm text-green-600 dark:text-green-400">
-                              {field.mockExpression}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400 dark:text-[#8B949E] text-sm">
-                              클릭하여 Mock 표현식 선택
-                            </span>
-                          )}
-                        </button>
-                      </td>
-                      <td className="px-4 py-3">
-                        <input
-                          type="text"
-                          value={field.description}
-                          onChange={(e) => {
-                            const updated = [...schemaFields];
-                            updated[index] = {
-                              ...updated[index],
-                              description: e.target.value,
-                            };
-                            setSchemaFields(updated);
-                          }}
-                          placeholder="필드에 대한 설명을 입력하세요"
-                          disabled={isReadOnly}
-                          className={`w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] ${
-                            isReadOnly ? "opacity-60 cursor-not-allowed" : ""
-                          }`}
-                        />
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <button
-                          onClick={() => {
-                            const updated = schemaFields.filter(
-                              (_, i) => i !== index
-                            );
-                            setSchemaFields(updated);
-                          }}
-                          disabled={isReadOnly}
-                          className={`text-red-500 hover:text-red-600 ${
-                            isReadOnly ? "opacity-50 cursor-not-allowed" : ""
-                          }`}
-                        >
-                          <svg
-                            className="w-5 h-5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                            />
-                          </svg>
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="space-y-2">
+              {schemaFields.map((field, index) => (
+                <SchemaFieldEditor
+                  key={index}
+                  field={field}
+                  onChange={(newField) => {
+                    const updated = [...schemaFields];
+                    updated[index] = newField;
+                    setSchemaFields(updated);
+                  }}
+                  onRemove={() => {
+                    const updated = schemaFields.filter((_, i) => i !== index);
+                    setSchemaFields(updated);
+                  }}
+                  isReadOnly={isReadOnly}
+                  allowFileType={false}
+                  allowMockExpression={true}
+                />
+              ))}
+              {schemaFields.length === 0 && (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
+                  <p>No fields yet. Click "+ Add Field" to add one.</p>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -591,6 +487,7 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
         isOpen={isSchemaModalOpen}
         onClose={() => setIsSchemaModalOpen(false)}
         onSelect={(schema) => {
+          // SchemaModal에서 재귀적 변환 완료된 필드 사용
           setCurrentSchemaName(schema.name);
           setCurrentSchemaDescription(schema.description || "");
           setSchemaFields(schema.fields);
@@ -599,29 +496,6 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
         setSchemas={setSchemas}
       />
 
-      {/* Mock Expression Modal */}
-      <MockExpressionModal
-        isOpen={isMockModalOpen}
-        onClose={() => {
-          setIsMockModalOpen(false);
-          setCurrentMockFieldIndex(null);
-          setCurrentMockValue("");
-        }}
-        onSelect={(expression) => {
-          if (currentMockFieldIndex !== null) {
-            const updated = [...schemaFields];
-            updated[currentMockFieldIndex] = {
-              ...updated[currentMockFieldIndex],
-              mockExpression: expression,
-            };
-            setSchemaFields(updated);
-          }
-          setIsMockModalOpen(false);
-          setCurrentMockFieldIndex(null);
-          setCurrentMockValue("");
-        }}
-        initialValue={currentMockValue}
-      />
     </div>
   );
 }
