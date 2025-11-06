@@ -58,4 +58,9 @@ public class UpdateSchemaRequest {
      * XML root element name (used when content-type is application/xml)
      */
     private String xmlName;
+    
+    /**
+     * Array item schema (for type="array")
+     */
+    private Object items;
 }

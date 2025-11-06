@@ -1,6 +1,7 @@
 package kr.co.ouroboros.core.rest.spec.model;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -44,8 +45,19 @@ public class Property {
 
     private String type;
     private String description;
+    
+    @JsonProperty("x-ouroboros-mock")
     private String mockExpression;
-    private Property items;  // For array types - recursive structure
-    private Integer minItems;  // Minimum number of items in array
-    private Integer maxItems;  // Maximum number of items in array
+    
+    // For object types - nested properties (재귀 구조)
+    private java.util.Map<String, Property> properties;
+    private java.util.List<String> required;
+    
+    // For array types - recursive structure
+    private Property items;
+    private Integer minItems;  // Mock 생성 시 최소 배열 개수 (기본: 1)
+    private Integer maxItems;  // Mock 생성 시 최대 배열 개수 (기본: 3)
+    
+    // Format (file 타입 구분용: "binary")
+    private String format;
 }

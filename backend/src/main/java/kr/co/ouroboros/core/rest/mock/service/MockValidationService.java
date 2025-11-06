@@ -2,10 +2,12 @@ package kr.co.ouroboros.core.rest.mock.service;
 
 import jakarta.servlet.http.HttpServletRequest;
 import kr.co.ouroboros.core.rest.mock.model.EndpointMeta;
+import kr.co.ouroboros.core.rest.spec.service.SchemaService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -34,6 +36,7 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class MockValidationService {
+    private final SchemaService schemaService;
     /**
      * Validate an incoming HttpServletRequest against the endpoint requirements defined in EndpointMeta for a mock endpoint.
      *
@@ -238,6 +241,16 @@ public class MockValidationService {
                 continue;
             }
 
+            // $ref 처리 - 스키마 resolve
+            if (propSchema.containsKey("$ref")) {
+                String ref = (String) propSchema.get("$ref");
+                propSchema = resolveSchemaRef(ref);
+                if (propSchema == null) {
+                    log.warn("Failed to resolve schema ref: {}", ref);
+                    continue;
+                }
+            }
+
             String expectedType = (String) propSchema.get("type");
             if (expectedType == null) {
                 // 타입 정의 없으면 검증 스킵
@@ -324,6 +337,16 @@ public class MockValidationService {
     private ValidationResult validateArrayItems(List<Object> array,
                                                 Map<String, Object> itemSchema,
                                                 String fieldPath) {
+        // $ref 처리 - items에서도 스키마 참조 가능
+        if (itemSchema.containsKey("$ref")) {
+            String ref = (String) itemSchema.get("$ref");
+            itemSchema = resolveSchemaRef(ref);
+            if (itemSchema == null) {
+                log.warn("Failed to resolve array item schema ref: {}", ref);
+                return ValidationResult.success();
+            }
+        }
+        
         String itemType = (String) itemSchema.get("type");
         if (itemType == null) {
             return ValidationResult.success();
@@ -351,6 +374,110 @@ public class MockValidationService {
         }
 
         return ValidationResult.success();
+    }
+
+    /**
+     * $ref를 실제 스키마로 resolve
+     *
+     * @param ref $ref 값 (예: "#/components/schemas/User")
+     * @return resolve된 스키마 Map, 실패 시 null
+     */
+    private Map<String, Object> resolveSchemaRef(String ref) {
+        try {
+            // #/components/schemas/SchemaName -> SchemaName 추출
+            String schemaName = ref.replace("#/components/schemas/", "");
+            
+            // SchemaService에서 스키마 조회
+            var schema = schemaService.getSchema(schemaName);
+            if (schema == null) {
+                return null;
+            }
+            
+            // SchemaResponse를 Map으로 재귀 변환
+            return convertSchemaResponseToMap(schema);
+        } catch (Exception e) {
+            log.error("Failed to resolve schema ref: {}", ref, e);
+            return null;
+        }
+    }
+    
+    /**
+     * SchemaResponse DTO를 Map<String, Object>로 재귀 변환
+     * Property DTO도 재귀적으로 변환하여 ClassCastException 방지
+     */
+    private Map<String, Object> convertSchemaResponseToMap(kr.co.ouroboros.ui.rest.spec.dto.SchemaResponse schema) {
+        Map<String, Object> result = new HashMap<>();
+        
+        if (schema.getType() != null) {
+            result.put("type", schema.getType());
+        }
+        
+        // Properties 재귀 변환 (Property DTO → Map)
+        if (schema.getProperties() != null && !schema.getProperties().isEmpty()) {
+            Map<String, Object> propertiesMap = new HashMap<>();
+            for (Map.Entry<String, kr.co.ouroboros.core.rest.spec.model.Property> entry : schema.getProperties().entrySet()) {
+                propertiesMap.put(entry.getKey(), convertPropertyToMap(entry.getValue()));
+            }
+            result.put("properties", propertiesMap);
+        }
+        
+        if (schema.getRequired() != null && !schema.getRequired().isEmpty()) {
+            result.put("required", schema.getRequired());
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Property DTO를 Map<String, Object>로 재귀 변환
+     */
+    private Map<String, Object> convertPropertyToMap(kr.co.ouroboros.core.rest.spec.model.Property property) {
+        Map<String, Object> result = new HashMap<>();
+        
+        // $ref 처리
+        if (property.getRef() != null && !property.getRef().isBlank()) {
+            String fullRef = property.getRef().startsWith("#/components/schemas/")
+                    ? property.getRef()
+                    : "#/components/schemas/" + property.getRef();
+            result.put("$ref", fullRef);
+            return result;
+        }
+        
+        // Type
+        if (property.getType() != null) {
+            result.put("type", property.getType());
+        }
+        
+        // Description
+        if (property.getDescription() != null) {
+            result.put("description", property.getDescription());
+        }
+        
+        // Object - nested properties (재귀!)
+        if (property.getProperties() != null && !property.getProperties().isEmpty()) {
+            Map<String, Object> nestedProps = new HashMap<>();
+            for (Map.Entry<String, kr.co.ouroboros.core.rest.spec.model.Property> entry : property.getProperties().entrySet()) {
+                nestedProps.put(entry.getKey(), convertPropertyToMap(entry.getValue()));
+            }
+            result.put("properties", nestedProps);
+        }
+        
+        if (property.getRequired() != null && !property.getRequired().isEmpty()) {
+            result.put("required", property.getRequired());
+        }
+        
+        // Array - items (재귀!)
+        if (property.getItems() != null) {
+            result.put("items", convertPropertyToMap(property.getItems()));
+        }
+        if (property.getMinItems() != null) {
+            result.put("minItems", property.getMinItems());
+        }
+        if (property.getMaxItems() != null) {
+            result.put("maxItems", property.getMaxItems());
+        }
+        
+        return result;
     }
 
     /**

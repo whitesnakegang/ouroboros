@@ -69,4 +69,11 @@ public class CreateSchemaRequest {
      * XML root element name (used when content-type is application/xml)
      */
     private String xmlName;
+    
+    /**
+     * Array item schema (for type="array")
+     * <p>
+     * Defines the structure of each element in the array
+     */
+    private Object items;
 }

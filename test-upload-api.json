@@ -1,0 +1,54 @@
+{
+  "path": "/api/upload",
+  "method": "POST",
+  "summary": "파일 업로드",
+  "description": "multipart/form-data로 파일을 업로드합니다",
+  "tags": ["upload"],
+  "requestBody": {
+    "description": "업로드할 파일 정보",
+    "required": true,
+    "content": {
+      "multipart/form-data": {
+        "schema": {
+          "type": "object",
+          "properties": {
+            "file": {
+              "type": "string",
+              "description": "파일"
+            },
+            "title": {
+              "type": "string",
+              "description": "제목"
+            },
+            "description": {
+              "type": "string",
+              "description": "설명"
+            }
+          },
+          "required": ["file", "title"]
+        }
+      }
+    }
+  },
+  "responses": {
+    "200": {
+      "description": "업로드 성공",
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "fileId": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+

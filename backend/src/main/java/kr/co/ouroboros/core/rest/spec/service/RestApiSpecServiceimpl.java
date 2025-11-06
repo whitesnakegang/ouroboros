@@ -47,6 +47,18 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
             "get", "post", "put", "delete", "patch", "options", "head", "trace"
     );
 
+    /**
+     * Create and persist a new REST API operation in the OpenAPI document.
+     *
+     * The operation is added under the given path and HTTP method, missing security schemes
+     * and schemas are auto-created as needed, the spec cache is updated, and registered mocks
+     * are reloaded from the persisted YAML.
+     *
+     * @param request the request describing the API operation to create (path, method, metadata, security, etc.)
+     * @return a RestApiSpecResponse describing the newly created operation (id, path, method, summary, etc.)
+     * @throws IllegalArgumentException if an operation for the same path and method already exists
+     * @throws Exception for failures reading/writing or processing the OpenAPI document
+     */
     @Override
     public RestApiSpecResponse createRestApiSpec(CreateRestApiRequest request) throws Exception {
         lock.writeLock().lock();
@@ -179,6 +191,16 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         }
     }
 
+    /**
+     * Updates an existing REST API specification identified by its Ouroboros ID, optionally changing its path, method, and other operation fields.
+     *
+     * Updates are persisted into the OpenAPI document, missing security schemes and schemas are auto-created as needed, the spec cache is refreshed, and the mock registry is reloaded.
+     *
+     * @param id      the x-ouroboros-id value of the operation to update
+     * @param request the update request containing fields to change (path, method, summary, description, parameters, requestBody, responses, security, etc.)
+     * @return the updated RestApiSpecResponse for the operation at its final path and method
+     * @throws IllegalArgumentException if the specification file does not exist, if no operation with the given id is found, or if moving the operation would conflict with an existing operation at the target path/method
+     */
     @Override
     public RestApiSpecResponse updateRestApiSpec(String id, UpdateRestApiRequest request) throws Exception {
         lock.writeLock().lock();
@@ -278,6 +300,14 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         }
     }
 
+    /**
+     * Deletes the REST API specification identified by the given ID from the stored OpenAPI document.
+     *
+     * Updates the persisted document, refreshes the in-memory spec cache, and reloads the mock registry after removal.
+     *
+     * @param id the `x-ouroboros-id` value of the REST API operation to remove
+     * @throws IllegalArgumentException if the specification file does not exist or no operation with the given ID is found
+     */
     @Override
     public void deleteRestApiSpec(String id) throws Exception {
         lock.writeLock().lock();
@@ -510,6 +540,17 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
             result.put("xml", xml);
         }
 
+        // Array type - items and constraints
+        if ("array".equals(schema.getType()) && schema.getItems() != null) {
+            result.put("items", convertSchema(schema.getItems()));
+        }
+        if (schema.getMinItems() != null) {
+            result.put("minItems", schema.getMinItems());
+        }
+        if (schema.getMaxItems() != null) {
+            result.put("maxItems", schema.getMaxItems());
+        }
+
         return result;
     }
 
@@ -544,6 +585,16 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         if (property.getMockExpression() != null) {
             result.put("x-ouroboros-mock", property.getMockExpression());
         }
+        
+        // Object type - nested properties (재귀!)
+        if (property.getProperties() != null && !property.getProperties().isEmpty()) {
+            result.put("properties", convertProperties(property.getProperties()));
+        }
+        if (property.getRequired() != null && !property.getRequired().isEmpty()) {
+            result.put("required", property.getRequired());
+        }
+        
+        // Array type - items (재귀!)
         if (property.getItems() != null) {
             result.put("items", convertProperty(property.getItems()));
         }
@@ -553,6 +604,12 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         if (property.getMaxItems() != null) {
             result.put("maxItems", property.getMaxItems());
         }
+        
+        // Format (file 타입 구분용)
+        if (property.getFormat() != null) {
+            result.put("format", property.getFormat());
+        }
+        
         return result;
     }
 
@@ -674,16 +731,19 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
 
         Schema.SchemaBuilder builder = Schema.builder();
 
-        // Check for $ref (reference mode) in YAML
-        if (schemaMap.containsKey("$ref")) {
-            String dollarRef = (String) schemaMap.get("$ref");
+        // Check for $ref or ref (reference mode) in YAML
+        String dollarRef = (String) schemaMap.get("$ref");
+        String ref = (String) schemaMap.get("ref");
+        
+        if (dollarRef != null || ref != null) {
+            String refValue = dollarRef != null ? dollarRef : ref;
             
-            // Convert $ref to simplified ref for client
-            if (dollarRef != null && dollarRef.startsWith("#/components/schemas/")) {
-                String simplifiedRef = dollarRef.substring("#/components/schemas/".length());
+            // Convert $ref or ref to simplified ref for client
+            if (refValue != null && refValue.startsWith("#/components/schemas/")) {
+                String simplifiedRef = refValue.substring("#/components/schemas/".length());
                 builder.ref(simplifiedRef);
-            } else if (dollarRef != null) {
-                builder.ref(dollarRef);
+            } else if (refValue != null) {
+                builder.ref(refValue);
             }
             
             return builder.build();
@@ -712,6 +772,14 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
             builder.xmlName((String) xml.get("name"));
         }
 
+        // Parse array items and constraints
+        Map<String, Object> itemsMap = (Map<String, Object>) schemaMap.get("items");
+        if (itemsMap != null) {
+            builder.items(parseSchema(itemsMap));
+        }
+        builder.minItems((Integer) schemaMap.get("minItems"))
+               .maxItems((Integer) schemaMap.get("maxItems"));
+
         return builder.build();
     }
 
@@ -739,14 +807,33 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         // Inline mode
         builder.type((String) propMap.get("type"))
                 .description((String) propMap.get("description"))
-                .mockExpression((String) propMap.get("x-ouroboros-mock"))
-                .minItems((Integer) propMap.get("minItems"))
-                .maxItems((Integer) propMap.get("maxItems"));
+                .mockExpression((String) propMap.get("x-ouroboros-mock"));
+        
+        // Object type - nested properties (재귀!)
+        Map<String, Object> properties = (Map<String, Object>) propMap.get("properties");
+        if (properties != null) {
+            Map<String, Property> parsedProperties = new LinkedHashMap<>();
+            for (Map.Entry<String, Object> entry : properties.entrySet()) {
+                parsedProperties.put(entry.getKey(), parseProperty((Map<String, Object>) entry.getValue()));
+            }
+            builder.properties(parsedProperties);
+        }
+        
+        List<String> required = (List<String>) propMap.get("required");
+        if (required != null) {
+            builder.required(required);
+        }
 
+        // Array type - items (재귀!)
         Map<String, Object> items = (Map<String, Object>) propMap.get("items");
         if (items != null) {
             builder.items(parseProperty(items));
         }
+        builder.minItems((Integer) propMap.get("minItems"))
+               .maxItems((Integer) propMap.get("maxItems"));
+        
+        // Format (file 타입 구분용)
+        builder.format((String) propMap.get("format"));
 
         return builder.build();
     }

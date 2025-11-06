@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { TryTraceSpan } from "@/features/spec/services/api";
 
 interface TraceModalProps {
@@ -10,10 +10,37 @@ interface TraceModalProps {
     totalDurationMs: number;
     spans: TryTraceSpan[];
   };
+  initialExpandedSpanId?: string | null;
 }
 
-export function TraceModal({ isOpen, onClose, traceData }: TraceModalProps) {
+export function TraceModal({ isOpen, onClose, traceData, initialExpandedSpanId }: TraceModalProps) {
   const [expandedSpans, setExpandedSpans] = useState<Set<string>>(new Set());
+
+  // spanId로 span을 찾고, 해당 span까지의 부모 path를 반환하는 함수
+  const findSpanPath = (spans: TryTraceSpan[], targetSpanId: string, path: string[] = []): string[] | null => {
+    for (const span of spans) {
+      const currentPath = [...path, span.spanId];
+      if (span.spanId === targetSpanId) {
+        return currentPath;
+      }
+      if (span.children && span.children.length > 0) {
+        const found = findSpanPath(span.children, targetSpanId, currentPath);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+
+  // initialExpandedSpanId가 변경되면 해당 span과 부모들을 확장
+  useEffect(() => {
+    if (initialExpandedSpanId && traceData.spans.length > 0) {
+      const path = findSpanPath(traceData.spans, initialExpandedSpanId);
+      if (path) {
+        // 해당 span까지의 모든 부모를 확장
+        setExpandedSpans(new Set(path));
+      }
+    }
+  }, [initialExpandedSpanId, traceData.spans]);
 
   if (!isOpen) return null;
 
@@ -38,13 +65,17 @@ export function TraceModal({ isOpen, onClose, traceData }: TraceModalProps) {
             depth === 0
               ? "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
               : "bg-gray-50 dark:bg-[#0D1117] border-gray-200 dark:border-[#2D333B]"
-          }`}
+          } ${hasChildren ? "cursor-pointer hover:bg-gray-100 dark:hover:bg-[#161B22] transition-colors" : ""}`}
           style={{ marginLeft: `${depth * 24}px` }}
+          onClick={hasChildren ? () => toggleSpan(span.spanId) : undefined}
         >
           {/* Expand/Collapse Button */}
           {hasChildren && (
             <button
-              onClick={() => toggleSpan(span.spanId)}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleSpan(span.spanId);
+              }}
               className="mt-1 p-1 hover:bg-gray-200 dark:hover:bg-[#161B22] rounded transition-colors"
             >
               <svg

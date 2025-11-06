@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import { SchemaModal } from "./SchemaModal";
+import { SchemaFieldEditor } from "./SchemaFieldEditor";
 import { getAllSchemas, type SchemaResponse } from "../services/api";
+import type { RequestBody, SchemaField } from "../types/schema.types";
+import { createDefaultField } from "../types/schema.types";
 
 interface KeyValuePair {
   key: string;
@@ -8,22 +11,6 @@ interface KeyValuePair {
   required?: boolean;
   description?: string;
   type?: string;
-}
-
-interface BodyField {
-  key: string;
-  value: string;
-  type: string; // "string" | "integer" | "number" | "boolean" | "object" | "array" | "file"
-  description?: string;
-  required?: boolean;
-  ref?: string; // 스키마 참조 시 사용 (예: "User")
-}
-
-interface RequestBody {
-  type: "none" | "form-data" | "x-www-form-urlencoded" | "json" | "xml";
-  contentType: string; // json, xml일 때 사용
-  fields: BodyField[]; // 표 형식 데이터
-  schemaRef?: string; // 전체 스키마 참조 (예: "User")
 }
 
 interface AuthConfig {
@@ -72,15 +59,6 @@ export function ApiRequestCard({
     "json",
     "xml",
   ];
-  const fieldTypes = [
-    "string",
-    "integer",
-    "number",
-    "boolean",
-    "object",
-    "array",
-    "file",
-  ];
 
   const addHeader = () => {
     if (isReadOnly) return;
@@ -111,42 +89,38 @@ export function ApiRequestCard({
   const [isSchemaModalOpen, setIsSchemaModalOpen] = useState(false);
 
   // 스키마 목록 로드
+  const loadSchemas = async () => {
+    try {
+      const response = await getAllSchemas();
+      setSchemas(response.data);
+    } catch (err) {
+      console.error("스키마 로드 실패:", err);
+    }
+  };
+
+  // 컴포넌트 마운트 시 스키마 목록 로드
   useEffect(() => {
-    const loadSchemas = async () => {
-      try {
-        const response = await getAllSchemas();
-        setSchemas(response.data);
-      } catch (err) {
-        console.error("스키마 로드 실패:", err);
-      }
-    };
     loadSchemas();
   }, []);
+
+  // 모달이 열릴 때마다 스키마 목록 다시 로드
+  useEffect(() => {
+    if (isSchemaModalOpen) {
+      loadSchemas();
+    }
+  }, [isSchemaModalOpen]);
 
   // Schema 선택 핸들러
   const handleSchemaSelect = (schema: {
     name: string;
-    fields: Array<{
-      name: string;
-      type: string;
-      description?: string;
-      mockExpression?: string;
-    }>;
+    fields: SchemaField[];
   }) => {
-    if (requestBody.type === "json") {
-      // 전체 스키마 참조로 설정 (fields는 읽기 전용 미리보기로만 표시)
-      setRequestBody({
-        ...requestBody,
-        schemaRef: schema.name, // 전체 스키마 참조
-        fields: schema.fields.map((field) => ({
-          key: field.name,
-          value: field.mockExpression || "",
-          type: field.type,
-          description: field.description,
-          required: false,
-        })),
-      });
-    }
+    // SchemaModal에서 이미 재귀적으로 변환된 필드를 그대로 사용
+    setRequestBody({
+      ...requestBody,
+      schemaRef: schema.name,
+      fields: schema.fields,
+    });
   };
 
   return (
@@ -279,16 +253,7 @@ export function ApiRequestCard({
                   onClick={() => {
                     const newBody: RequestBody = {
                       type: type,
-                      contentType:
-                        type === "json"
-                          ? "application/json"
-                          : type === "xml"
-                          ? "application/xml"
-                          : "",
-                      fields:
-                        type === "none"
-                          ? []
-                          : [{ key: "", value: "", type: "string" }],
+                      fields: type === "none" ? [] : [createDefaultField()],
                     };
                     setRequestBody(newBody);
                   }}
@@ -339,7 +304,7 @@ export function ApiRequestCard({
                         ...requestBody,
                         fields: [
                           ...(requestBody.fields || []),
-                          { key: "", value: "", type: "string" },
+                          createDefaultField(),
                         ],
                       });
                     }}
@@ -350,141 +315,47 @@ export function ApiRequestCard({
                   >
                     + Add Field
                   </button>
-                  {requestBody.type === "json" && (
-                    <button
-                      onClick={() => setIsSchemaModalOpen(true)}
-                      disabled={isReadOnly}
-                      className={`px-3 py-1 text-sm text-emerald-600 hover:text-emerald-700 font-medium ${
-                        isReadOnly ? "opacity-50 cursor-not-allowed" : ""
-                      }`}
-                    >
-                      {requestBody.schemaRef ? "Change Schema" : "+ Add Schema"}
-                    </button>
-                  )}
+                  <button
+                    onClick={() => setIsSchemaModalOpen(true)}
+                    disabled={isReadOnly}
+                    className={`px-3 py-1 text-sm text-emerald-600 hover:text-emerald-700 font-medium ${
+                      isReadOnly ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
+                  >
+                    {requestBody.schemaRef ? "Change Schema" : "+ Add Schema"}
+                  </button>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-md">
-                    <thead>
-                      <tr className="bg-gray-50 dark:bg-[#161B22]">
-                        <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
-                          Key
-                        </th>
-                        <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
-                          Value
-                        </th>
-                        <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 w-24">
-                          Type
-                        </th>
-                        <th className="px-4 py-3 text-center font-medium text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 w-16"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {requestBody.fields.map((item, index) => (
-                        <tr
-                          key={index}
-                          className="border-b border-gray-100 dark:border-gray-800"
-                        >
-                          <td className="px-4 py-3">
-                            <input
-                              type="text"
-                              value={item.key}
-                              onChange={(e) => {
-                                const updated = [...requestBody.fields!];
-                                updated[index] = {
-                                  ...updated[index],
-                                  key: e.target.value,
-                                };
-                                setRequestBody({
-                                  ...requestBody,
-                                  fields: updated,
-                                });
-                              }}
-                              placeholder="예: username, password"
-                              disabled={isReadOnly || !!requestBody.schemaRef}
-                              className="w-full px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] disabled:opacity-60 disabled:cursor-not-allowed"
-                            />
-                          </td>
-                          <td className="px-4 py-3">
-                            <input
-                              type="text"
-                              value={item.value}
-                              onChange={(e) => {
-                                const updated = [...requestBody.fields!];
-                                updated[index] = {
-                                  ...updated[index],
-                                  value: e.target.value,
-                                };
-                                setRequestBody({
-                                  ...requestBody,
-                                  fields: updated,
-                                });
-                              }}
-                              placeholder="예: John Doe, 123"
-                              disabled={isReadOnly || !!requestBody.schemaRef}
-                              className="w-full px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] disabled:opacity-60 disabled:cursor-not-allowed"
-                            />
-                          </td>
-                          <td className="px-4 py-3">
-                            <select
-                              value={item.type || "text"}
-                              onChange={(e) => {
-                                const updated = [...requestBody.fields!];
-                                updated[index] = {
-                                  ...updated[index],
-                                  type: e.target.value,
-                                };
-                                setRequestBody({
-                                  ...requestBody,
-                                  fields: updated,
-                                });
-                              }}
-                              disabled={isReadOnly || !!requestBody.schemaRef}
-                              className="w-full px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] disabled:opacity-60 disabled:cursor-not-allowed"
-                            >
-                              {fieldTypes.map((type) => (
-                                <option key={type} value={type}>
-                                  {type}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <button
-                              onClick={() => {
-                                const updated = requestBody.fields!.filter(
-                                  (_, i) => i !== index
-                                );
-                                setRequestBody({
-                                  ...requestBody,
-                                  fields: updated,
-                                });
-                              }}
-                              disabled={isReadOnly || !!requestBody.schemaRef}
-                              className="text-red-500 hover:text-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              <svg
-                                className="w-5 h-5"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                />
-                              </svg>
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                
+                {/* 새로운 재귀적 SchemaField Editor */}
+                <div className="space-y-2">
+                  {requestBody.fields && requestBody.fields.map((field, index) => (
+                    <SchemaFieldEditor
+                      key={index}
+                      field={field}
+                      onChange={(newField) => {
+                        const updated = [...(requestBody.fields || [])];
+                        updated[index] = newField;
+                        setRequestBody({
+                          ...requestBody,
+                          fields: updated,
+                        });
+                      }}
+                      onRemove={() => {
+                        const updated = requestBody.fields!.filter((_, i) => i !== index);
+                        setRequestBody({
+                          ...requestBody,
+                          fields: updated,
+                        });
+                      }}
+                      isReadOnly={isReadOnly || !!requestBody.schemaRef}
+                      allowFileType={requestBody.type === "form-data"}
+                    />
+                  ))}
                 </div>
-                {requestBody.fields.length === 0 && (
-                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                    <p>No fields yet. Click "Add Field" to add one.</p>
+                
+                {(!requestBody.fields || requestBody.fields.length === 0) && !requestBody.schemaRef && (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
+                    <p>No fields yet. Click "+ Add Field" to add one.</p>
                   </div>
                 )}
               </div>
