@@ -78,22 +78,22 @@ public final class RequestDiffHelper {
     }
 
     /**
-     * Determine whether path or query parameters differ between the file and scanned parameter lists.
-     *
-     * @param fileParams parameters from the file specification
-     * @param scanParams parameters from the scanned specification
-     * @return `true` if either path or query parameters differ, `false` otherwise
-     */
+         * Checks whether query parameters differ between a file specification and a scanned specification.
+         *
+         * Null parameter lists are treated as empty lists.
+         *
+         * @param fileParams parameters from the file specification
+         * @param scanParams parameters from the scanned specification
+         * @return `true` if query parameters differ, `false` otherwise
+         */
     private static boolean compareParameters(List<Parameter> fileParams, List<Parameter> scanParams) {
         List<Parameter> fileList = safeList(fileParams);
         List<Parameter> scanList = safeList(scanParams);
 
-        // Path parameter와 Query parameter를 분리하여 비교
-        // 1. Path parameter 비교
-        boolean pathDiff = comparePathParams(fileList, scanList);
-        if (pathDiff) {
-            return true;
-        }
+//        boolean pathDiff = comparePathParams(fileList, scanList);
+//        if (pathDiff) {
+//            return true;
+//        }
 
         // 2. Query parameter 비교
         boolean queryDiff = compareQueryParams(fileList, scanList);
@@ -175,6 +175,10 @@ public final class RequestDiffHelper {
             return false;
         }
 
+        if (isFormData(scanQueryParams)) {
+            return false;
+        }
+
         // Query parameter 개수 비교
         if (fileQueryParams.size() != scanQueryParams.size()) {
             return true;
@@ -186,6 +190,22 @@ public final class RequestDiffHelper {
 
         // 타입별 개수가 다르면 차이 있음
         return !fileTypeCounts.equals(scanTypeCounts);
+    }
+
+    /**
+     * Determines whether the provided scanned query parameters represent form-data.
+     *
+     * @param scanQueryParams the scanned query parameters to inspect
+     * @return `true` if any parameter's schema contains a non-null `$ref`, `false` otherwise
+     */
+    private static boolean isFormData(List<Parameter> scanQueryParams) {
+        for(Parameter scanParam : scanQueryParams) {
+            Schema schema = scanParam.getSchema();
+            if (schema != null && schema.getRef() != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
