@@ -36,6 +36,12 @@ public class SchemaServiceImpl implements SchemaService {
     private final RestMockRegistry mockRegistry;
     private final RestMockLoaderService mockLoaderService;
 
+    /**
+     * Creates a new schema in the OpenAPI document, updates the processed spec cache, and reloads the mock registry.
+     *
+     * @param request contains the schema name and definition fields used to build and insert the new schema
+     * @return the SchemaResponse representing the created schema
+     */
     @Override
     public SchemaResponse createSchema(CreateSchemaRequest request) throws Exception {
         lock.writeLock().lock();
@@ -118,6 +124,18 @@ public class SchemaServiceImpl implements SchemaService {
         }
     }
 
+    /**
+     * Update an existing OpenAPI schema using only the non-null fields from the request.
+     *
+     * Applies provided values (type, title, description, properties, required, orders, xmlName)
+     * to the named schema, persists and validates the updated specification, and reloads the mock registry.
+     *
+     * @param schemaName the name of the schema to update
+     * @param request container of fields to apply; only fields that are non-null on the request are updated
+     * @return a SchemaResponse representing the updated schema
+     * @throws IllegalArgumentException if the specification file does not exist or the named schema is not found
+     * @throws Exception if processing, validation, or caching of the updated specification fails
+     */
     @Override
     public SchemaResponse updateSchema(String schemaName, UpdateSchemaRequest request) throws Exception {
         lock.writeLock().lock();
@@ -172,6 +190,13 @@ public class SchemaServiceImpl implements SchemaService {
         }
     }
 
+    /**
+     * Deletes a schema from the REST OpenAPI document, updates the processed spec cache, and reloads mock endpoints.
+     *
+     * @param schemaName the name of the schema to remove
+     * @throws IllegalArgumentException if the specification file does not exist or the named schema is not found
+     * @throws Exception if processing, caching, or mock registry reloading fails
+     */
     @Override
     public void deleteSchema(String schemaName) throws Exception {
         lock.writeLock().lock();
@@ -397,11 +422,11 @@ public class SchemaServiceImpl implements SchemaService {
     }
 
     /**
-     * Safely extracts a List of Strings from a Map.
-     * 
+     * Retrieve a List of Strings stored under the given key, validating that every element is a String.
+     *
      * @param map the source map
      * @param key the key to look up
-     * @return the List of Strings, or null if not found or not a valid list
+     * @return the list of strings if present and all elements are strings; `null` if the key is absent, the value is not a list, or any element is not a string
      */
     @SuppressWarnings("unchecked")
     private List<String> safeGetStringList(Map<String, Object> map, String key) {
@@ -430,8 +455,9 @@ public class SchemaServiceImpl implements SchemaService {
     }
 
     /**
-     * Reloads the mock registry from YAML file.
-     * Clears existing endpoints and re-registers all mock endpoints.
+     * Reloads mock endpoints in the registry from YAML mock definitions.
+     *
+     * Clears the current registry, loads endpoint metadata from the YAML source, registers each endpoint, and logs the number of endpoints reloaded.
      */
     private void reloadMockRegistry() {
         mockRegistry.clear();
