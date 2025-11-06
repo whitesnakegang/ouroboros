@@ -78,12 +78,14 @@ public final class RequestDiffHelper {
     }
 
     /**
-     * Determine whether path or query parameters differ between the file and scanned parameter lists.
-     *
-     * @param fileParams parameters from the file specification
-     * @param scanParams parameters from the scanned specification
-     * @return `true` if either path or query parameters differ, `false` otherwise
-     */
+         * Checks whether query parameters differ between a file specification and a scanned specification.
+         *
+         * Null parameter lists are treated as empty lists.
+         *
+         * @param fileParams parameters from the file specification
+         * @param scanParams parameters from the scanned specification
+         * @return `true` if query parameters differ, `false` otherwise
+         */
     private static boolean compareParameters(List<Parameter> fileParams, List<Parameter> scanParams) {
         List<Parameter> fileList = safeList(fileParams);
         List<Parameter> scanList = safeList(scanParams);
@@ -190,6 +192,12 @@ public final class RequestDiffHelper {
         return !fileTypeCounts.equals(scanTypeCounts);
     }
 
+    /**
+     * Determines whether the provided scanned query parameters represent form-data.
+     *
+     * @param scanQueryParams the scanned query parameters to inspect
+     * @return `true` if any parameter's schema contains a non-null `$ref`, `false` otherwise
+     */
     private static boolean isFormData(List<Parameter> scanQueryParams) {
         for(Parameter scanParam : scanQueryParams) {
             if (scanParam.getSchema().getRef() != null) {
