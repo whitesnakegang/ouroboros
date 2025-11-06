@@ -3,6 +3,9 @@ package kr.co.ouroboros.core.rest.spec.service;
 import kr.co.ouroboros.core.global.Protocol;
 import kr.co.ouroboros.core.global.manager.OuroApiSpecManager;
 import kr.co.ouroboros.core.rest.common.yaml.RestApiYamlParser;
+import kr.co.ouroboros.core.rest.mock.model.EndpointMeta;
+import kr.co.ouroboros.core.rest.mock.registry.RestMockRegistry;
+import kr.co.ouroboros.core.rest.mock.service.RestMockLoaderService;
 import kr.co.ouroboros.core.rest.spec.model.*;
 import kr.co.ouroboros.core.rest.spec.validator.SchemaValidator;
 import kr.co.ouroboros.ui.rest.spec.dto.CreateRestApiRequest;
@@ -37,11 +40,25 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
     private final SchemaValidator schemaValidator;
     private final OuroApiSpecManager specManager;
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
+    private final RestMockRegistry mockRegistry;
+    private final RestMockLoaderService mockLoaderService;
 
     private static final List<String> HTTP_METHODS = Arrays.asList(
             "get", "post", "put", "delete", "patch", "options", "head", "trace"
     );
 
+    /**
+     * Create and persist a new REST API operation in the OpenAPI document.
+     *
+     * The operation is added under the given path and HTTP method, missing security schemes
+     * and schemas are auto-created as needed, the spec cache is updated, and registered mocks
+     * are reloaded from the persisted YAML.
+     *
+     * @param request the request describing the API operation to create (path, method, metadata, security, etc.)
+     * @return a RestApiSpecResponse describing the newly created operation (id, path, method, summary, etc.)
+     * @throws IllegalArgumentException if an operation for the same path and method already exists
+     * @throws Exception for failures reading/writing or processing the OpenAPI document
+     */
     @Override
     public RestApiSpecResponse createRestApiSpec(CreateRestApiRequest request) throws Exception {
         lock.writeLock().lock();
@@ -91,6 +108,9 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
 
             // Process and cache: writes to file + validates with scanned state + updates cache
             specManager.processAndCacheSpec(Protocol.REST, openApiDoc);
+
+            // registry 초기화 후 재등록 (전체 읽기)
+            reloadMockRegistry();
 
             log.info("Created REST API spec: {} {} (ID: {})", request.getMethod().toUpperCase(), request.getPath(), id);
 
@@ -171,6 +191,16 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         }
     }
 
+    /**
+     * Updates an existing REST API specification identified by its Ouroboros ID, optionally changing its path, method, and other operation fields.
+     *
+     * Updates are persisted into the OpenAPI document, missing security schemes and schemas are auto-created as needed, the spec cache is refreshed, and the mock registry is reloaded.
+     *
+     * @param id      the x-ouroboros-id value of the operation to update
+     * @param request the update request containing fields to change (path, method, summary, description, parameters, requestBody, responses, security, etc.)
+     * @return the updated RestApiSpecResponse for the operation at its final path and method
+     * @throws IllegalArgumentException if the specification file does not exist, if no operation with the given id is found, or if moving the operation would conflict with an existing operation at the target path/method
+     */
     @Override
     public RestApiSpecResponse updateRestApiSpec(String id, UpdateRestApiRequest request) throws Exception {
         lock.writeLock().lock();
@@ -261,12 +291,23 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
             // Process and cache: writes to file + validates with scanned state + updates cache
             specManager.processAndCacheSpec(Protocol.REST, openApiDoc);
 
+            // registry 초기화 후 재등록 (전체 읽기)
+            reloadMockRegistry();
+
             return convertToResponse(id, finalPath, finalMethod, operation);
         } finally {
             lock.writeLock().unlock();
         }
     }
 
+    /**
+     * Deletes the REST API specification identified by the given ID from the stored OpenAPI document.
+     *
+     * Updates the persisted document, refreshes the in-memory spec cache, and reloads the mock registry after removal.
+     *
+     * @param id the `x-ouroboros-id` value of the REST API operation to remove
+     * @throws IllegalArgumentException if the specification file does not exist or no operation with the given ID is found
+     */
     @Override
     public void deleteRestApiSpec(String id) throws Exception {
         lock.writeLock().lock();
@@ -307,6 +348,10 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
 
             // Process and cache: writes to file + validates with scanned state + updates cache
             specManager.processAndCacheSpec(Protocol.REST, openApiDoc);
+
+            // registry 초기화 후 재등록 (전체 읽기)
+            reloadMockRegistry();
+
         } finally {
             lock.writeLock().unlock();
         }
@@ -1200,5 +1245,16 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
                 log.info("Auto-created security scheme: {}", schemeName);
             }
         }
+    }
+
+    /**
+     * Reloads the mock registry from YAML file.
+     * Clears existing endpoints and re-registers all mock endpoints.
+     */
+    private void reloadMockRegistry() {
+        mockRegistry.clear();
+        Map<String, EndpointMeta> endpoints = mockLoaderService.loadFromYaml();
+        endpoints.values().forEach(mockRegistry::register);
+        log.info("Reloaded {} mock endpoints into registry", endpoints.size());
     }
 }
