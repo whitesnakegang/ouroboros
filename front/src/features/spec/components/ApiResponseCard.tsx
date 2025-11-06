@@ -80,18 +80,27 @@ export function ApiResponseCard({
     null
   );
 
+  // 스키마 목록 로드
+  const loadSchemas = async () => {
+    try {
+      const response = await getAllSchemas();
+      setSchemas(response.data);
+    } catch (err) {
+      console.error("스키마 로드 실패:", err);
+    }
+  };
+
   // 컴포넌트 마운트 시 스키마 목록 로드
   useEffect(() => {
-    const loadSchemas = async () => {
-      try {
-        const response = await getAllSchemas();
-        setSchemas(response.data);
-      } catch (err) {
-        console.error("스키마 로드 실패:", err);
-      }
-    };
     loadSchemas();
   }, []);
+
+  // 모달이 열릴 때마다 스키마 목록 다시 로드
+  useEffect(() => {
+    if (isResponseSchemaModalOpen) {
+      loadSchemas();
+    }
+  }, [isResponseSchemaModalOpen]);
 
   return (
     <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm">

@@ -111,17 +111,26 @@ export function ApiRequestCard({
   const [isSchemaModalOpen, setIsSchemaModalOpen] = useState(false);
 
   // 스키마 목록 로드
+  const loadSchemas = async () => {
+    try {
+      const response = await getAllSchemas();
+      setSchemas(response.data);
+    } catch (err) {
+      console.error("스키마 로드 실패:", err);
+    }
+  };
+
+  // 컴포넌트 마운트 시 스키마 목록 로드
   useEffect(() => {
-    const loadSchemas = async () => {
-      try {
-        const response = await getAllSchemas();
-        setSchemas(response.data);
-      } catch (err) {
-        console.error("스키마 로드 실패:", err);
-      }
-    };
     loadSchemas();
   }, []);
+
+  // 모달이 열릴 때마다 스키마 목록 다시 로드
+  useEffect(() => {
+    if (isSchemaModalOpen) {
+      loadSchemas();
+    }
+  }, [isSchemaModalOpen]);
 
   // Schema 선택 핸들러
   const handleSchemaSelect = (schema: {
