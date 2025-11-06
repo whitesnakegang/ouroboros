@@ -71,22 +71,22 @@ export function Sidebar({ onAddNew }: SidebarProps) {
   }, [searchQuery, activeFilter, endpoints]);
 
   return (
-    <div className="h-full flex flex-col bg-white dark:bg-gray-800 transition-colors">
-      <div className="p-4 border-b dark:border-gray-700">
+    <div className="h-full flex flex-col bg-white dark:bg-[#0D1117] transition-colors">
+      <div className="p-4 border-b border-gray-200 dark:border-[#2D333B]">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-[#E6EDF3]">
               API 엔드포인트
             </h2>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={toggle}
-              className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#161B22] transition-colors"
               aria-label="사이드바 닫기"
             >
               <svg
-                className="w-5 h-5 text-gray-600 dark:text-gray-300"
+                className="w-5 h-5 text-gray-600 dark:text-[#8B949E]"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -101,7 +101,7 @@ export function Sidebar({ onAddNew }: SidebarProps) {
             </button>
             <button
               onClick={toggleDarkMode}
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#161B22] transition-colors"
               title={isDarkMode ? "라이트 모드로 전환" : "다크 모드로 전환"}
             >
               {isDarkMode ? (
@@ -118,7 +118,7 @@ export function Sidebar({ onAddNew }: SidebarProps) {
                 </svg>
               ) : (
                 <svg
-                  className="w-5 h-5 text-gray-600"
+                  className="w-5 h-5 text-gray-600 dark:text-[#8B949E]"
                   fill="currentColor"
                   viewBox="0 0 20 20"
                 >
@@ -131,7 +131,7 @@ export function Sidebar({ onAddNew }: SidebarProps) {
 
         <div className="relative mb-3">
           <svg
-            className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400"
+            className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#8B949E]"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -148,12 +148,12 @@ export function Sidebar({ onAddNew }: SidebarProps) {
             placeholder="Search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-8 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400"
+            className="w-full pl-10 pr-8 py-2 border border-gray-300 dark:border-[#2D333B] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder-gray-400 dark:placeholder-[#8B949E]"
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery("")}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-[#8B949E] dark:text-[#8B949E]"
             >
               <svg
                 className="w-4 h-4"
@@ -180,7 +180,7 @@ export function Sidebar({ onAddNew }: SidebarProps) {
 
       <div className="flex-1 overflow-y-auto">
         {isLoading ? (
-          <div className="p-4 text-center text-gray-500 dark:text-gray-400 text-sm">
+          <div className="p-4 text-center text-gray-500 dark:text-[#8B949E] text-sm">
             로딩 중...
           </div>
         ) : Object.keys(filteredEndpoints).length > 0 ? (
@@ -196,16 +196,16 @@ export function Sidebar({ onAddNew }: SidebarProps) {
             </EndpointGroup>
           ))
         ) : (
-          <div className="p-4 text-center text-gray-500 dark:text-gray-400 text-sm">
+          <div className="p-4 text-center text-gray-500 dark:text-[#8B949E] text-sm">
             엔드포인트가 없습니다
           </div>
         )}
       </div>
 
-      <div className="p-4 border-t dark:border-gray-700">
+      <div className="p-4 border-t border-gray-200 dark:border-[#2D333B]">
         <button
           onClick={onAddNew}
-          className="w-full bg-black dark:bg-gray-700 text-white py-2 px-4 rounded-lg hover:bg-gray-800 dark:hover:bg-gray-600 transition-colors"
+          className="w-full bg-black dark:bg-[#161B22] text-white dark:text-[#E6EDF3] py-2 px-4 rounded-lg hover:bg-gray-800 dark:hover:bg-[#21262D] transition-colors"
         >
           + Add
         </button>

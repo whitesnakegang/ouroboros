@@ -25,7 +25,7 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
   const [error, setError] = useState<string | null>(null);
 
   // Schema Type 상태 (object만 허용)
-  const [schemaType, setSchemaType] = useState<"object">("object");
+  const schemaType: "object" = "object";
 
   // 에러 메시지에서 localhost 주소 제거 및 사용자 친화적인 메시지로 변환
   const getErrorMessage = (error: unknown): string => {

@@ -32,6 +32,7 @@ import {
 } from "../services/api";
 import { convertRequestBodyToOpenAPI, parseOpenAPIRequestBody } from "../utils/schemaConverter";
 import type { RequestBody } from "../types/schema.types";
+import { createPrimitiveField } from "../types/schema.types";
 
 interface KeyValuePair {
   key: string;
@@ -188,7 +189,6 @@ export function ApiEditorLayout() {
       setRequestHeaders([]);
       setRequestBody({
         type: "none",
-        contentType: "application/json",
         fields: [],
       });
       setAuth({ type: "none" });
@@ -901,8 +901,7 @@ export function ApiEditorLayout() {
       setAuth({ type: "none" });
       setRequestBody({
         type: "json",
-        contentType: "application/json",
-        fields: [{ key: "email", value: "string", type: "string" }],
+        fields: [createPrimitiveField("email", "string")],
       });
       setStatusCodes([]);
     }
@@ -922,7 +921,6 @@ export function ApiEditorLayout() {
     setRequestHeaders([]);
     setRequestBody({
       type: "json",
-      contentType: "application/json",
       fields: [],
     });
     setStatusCodes([]);
