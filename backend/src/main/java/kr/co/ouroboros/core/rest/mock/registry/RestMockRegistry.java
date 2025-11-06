@@ -96,6 +96,15 @@ public class RestMockRegistry implements MockRegistryBase<EndpointMeta> {
                 .findFirst();
     }
 
+    /**
+     * Clears all registered mock endpoints and pattern cache.
+     */
+    @Override
+    public void clear() {
+        registry.clear();
+        patternCache.clear();
+    }
+
     private String normalizePath(String path) {
         // 끝의 슬래시 제거
         if (path.endsWith("/") && path.length() > 1) {

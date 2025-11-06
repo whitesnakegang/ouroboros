@@ -3,6 +3,8 @@ package kr.co.ouroboros.core.rest.spec.service;
 import kr.co.ouroboros.core.global.Protocol;
 import kr.co.ouroboros.core.global.manager.OuroApiSpecManager;
 import kr.co.ouroboros.core.rest.common.yaml.RestApiYamlParser;
+import kr.co.ouroboros.core.rest.mock.registry.RestMockRegistry;
+import kr.co.ouroboros.core.rest.mock.service.RestMockLoaderService;
 import kr.co.ouroboros.ui.rest.spec.dto.CreateSchemaRequest;
 import kr.co.ouroboros.ui.rest.spec.dto.SchemaResponse;
 import kr.co.ouroboros.ui.rest.spec.dto.UpdateSchemaRequest;
@@ -31,6 +33,8 @@ public class SchemaServiceImpl implements SchemaService {
     private final RestApiYamlParser yamlParser;
     private final OuroApiSpecManager specManager;
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
+    private final RestMockRegistry mockRegistry;
+    private final RestMockLoaderService mockLoaderService;
 
     @Override
     public SchemaResponse createSchema(CreateSchemaRequest request) throws Exception {
@@ -52,6 +56,9 @@ public class SchemaServiceImpl implements SchemaService {
 
             // Process and cache: writes to file + validates with scanned state + updates cache
             specManager.processAndCacheSpec(Protocol.REST, openApiDoc);
+
+            // registry 초기화 후 재등록 (전체 읽기)
+            reloadMockRegistry();
 
             log.info("Created schema: {}", request.getSchemaName());
 
@@ -154,6 +161,9 @@ public class SchemaServiceImpl implements SchemaService {
             // Process and cache: writes to file + validates with scanned state + updates cache
             specManager.processAndCacheSpec(Protocol.REST, openApiDoc);
 
+            // registry 초기화 후 재등록 (전체 읽기)
+            reloadMockRegistry();
+
             log.info("Updated schema: {}", schemaName);
 
             return convertToResponse(schemaName, existingSchema);
@@ -180,6 +190,9 @@ public class SchemaServiceImpl implements SchemaService {
 
             // Process and cache: writes to file + validates with scanned state + updates cache
             specManager.processAndCacheSpec(Protocol.REST, openApiDoc);
+
+            // registry 초기화 후 재등록 (전체 읽기)
+            reloadMockRegistry();
 
             log.info("Deleted schema: {}", schemaName);
         } finally {
@@ -415,4 +428,16 @@ public class SchemaServiceImpl implements SchemaService {
         }
         return null;
     }
+
+    /**
+     * Reloads the mock registry from YAML file.
+     * Clears existing endpoints and re-registers all mock endpoints.
+     */
+    private void reloadMockRegistry() {
+        mockRegistry.clear();
+        Map<String, kr.co.ouroboros.core.rest.mock.model.EndpointMeta> endpoints = mockLoaderService.loadFromYaml();
+        endpoints.values().forEach(mockRegistry::register);
+        log.info("Reloaded {} mock endpoints into registry", endpoints.size());
+    }
+
 }

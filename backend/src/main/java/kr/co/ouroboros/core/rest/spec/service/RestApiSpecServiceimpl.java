@@ -3,6 +3,9 @@ package kr.co.ouroboros.core.rest.spec.service;
 import kr.co.ouroboros.core.global.Protocol;
 import kr.co.ouroboros.core.global.manager.OuroApiSpecManager;
 import kr.co.ouroboros.core.rest.common.yaml.RestApiYamlParser;
+import kr.co.ouroboros.core.rest.mock.model.EndpointMeta;
+import kr.co.ouroboros.core.rest.mock.registry.RestMockRegistry;
+import kr.co.ouroboros.core.rest.mock.service.RestMockLoaderService;
 import kr.co.ouroboros.core.rest.spec.model.*;
 import kr.co.ouroboros.core.rest.spec.validator.SchemaValidator;
 import kr.co.ouroboros.ui.rest.spec.dto.CreateRestApiRequest;
@@ -37,6 +40,8 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
     private final SchemaValidator schemaValidator;
     private final OuroApiSpecManager specManager;
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
+    private final RestMockRegistry mockRegistry;
+    private final RestMockLoaderService mockLoaderService;
 
     private static final List<String> HTTP_METHODS = Arrays.asList(
             "get", "post", "put", "delete", "patch", "options", "head", "trace"
@@ -91,6 +96,9 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
 
             // Process and cache: writes to file + validates with scanned state + updates cache
             specManager.processAndCacheSpec(Protocol.REST, openApiDoc);
+
+            // registry 초기화 후 재등록 (전체 읽기)
+            reloadMockRegistry();
 
             log.info("Created REST API spec: {} {} (ID: {})", request.getMethod().toUpperCase(), request.getPath(), id);
 
@@ -261,6 +269,9 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
             // Process and cache: writes to file + validates with scanned state + updates cache
             specManager.processAndCacheSpec(Protocol.REST, openApiDoc);
 
+            // registry 초기화 후 재등록 (전체 읽기)
+            reloadMockRegistry();
+
             return convertToResponse(id, finalPath, finalMethod, operation);
         } finally {
             lock.writeLock().unlock();
@@ -307,6 +318,10 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
 
             // Process and cache: writes to file + validates with scanned state + updates cache
             specManager.processAndCacheSpec(Protocol.REST, openApiDoc);
+
+            // registry 초기화 후 재등록 (전체 읽기)
+            reloadMockRegistry();
+
         } finally {
             lock.writeLock().unlock();
         }
@@ -1200,5 +1215,16 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
                 log.info("Auto-created security scheme: {}", schemeName);
             }
         }
+    }
+
+    /**
+     * Reloads the mock registry from YAML file.
+     * Clears existing endpoints and re-registers all mock endpoints.
+     */
+    private void reloadMockRegistry() {
+        mockRegistry.clear();
+        Map<String, EndpointMeta> endpoints = mockLoaderService.loadFromYaml();
+        endpoints.values().forEach(mockRegistry::register);
+        log.info("Reloaded {} mock endpoints into registry", endpoints.size());
     }
 }

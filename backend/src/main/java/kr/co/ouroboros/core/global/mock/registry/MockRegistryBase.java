@@ -36,4 +36,5 @@ public interface MockRegistryBase<T> {
      */
     Optional<T> find(String key1, String key2);
 
+    void clear();
 }
