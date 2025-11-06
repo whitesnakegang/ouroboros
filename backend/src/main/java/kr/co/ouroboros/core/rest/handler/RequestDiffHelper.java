@@ -192,7 +192,8 @@ public final class RequestDiffHelper {
 
     private static boolean isFormData(List<Parameter> scanQueryParams) {
         for(Parameter scanParam : scanQueryParams) {
-            if (scanParam.getSchema().getRef() != null) {
+            Schema schema = scanParam.getSchema();
+            if (schema != null && schema.getRef() != null) {
                 return true;
             }
         }
