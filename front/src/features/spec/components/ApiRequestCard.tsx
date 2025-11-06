@@ -372,9 +372,11 @@ export function ApiRequestCard({
                         <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
                           Value
                         </th>
-                        <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 w-24">
-                          Type
-                        </th>
+                        {requestBody.type !== "x-www-form-urlencoded" && (
+                          <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 w-24">
+                            Type
+                          </th>
+                        )}
                         <th className="px-4 py-3 text-center font-medium text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 w-16"></th>
                       </tr>
                     </thead>
@@ -424,30 +426,32 @@ export function ApiRequestCard({
                               className="w-full px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] disabled:opacity-60 disabled:cursor-not-allowed"
                             />
                           </td>
-                          <td className="px-4 py-3">
-                            <select
-                              value={item.type || "text"}
-                              onChange={(e) => {
-                                const updated = [...requestBody.fields!];
-                                updated[index] = {
-                                  ...updated[index],
-                                  type: e.target.value,
-                                };
-                                setRequestBody({
-                                  ...requestBody,
-                                  fields: updated,
-                                });
-                              }}
-                              disabled={isReadOnly || !!requestBody.schemaRef}
-                              className="w-full px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] disabled:opacity-60 disabled:cursor-not-allowed"
-                            >
-                              {fieldTypes.map((type) => (
-                                <option key={type} value={type}>
-                                  {type}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
+                          {requestBody.type !== "x-www-form-urlencoded" && (
+                            <td className="px-4 py-3">
+                              <select
+                                value={item.type || "text"}
+                                onChange={(e) => {
+                                  const updated = [...requestBody.fields!];
+                                  updated[index] = {
+                                    ...updated[index],
+                                    type: e.target.value,
+                                  };
+                                  setRequestBody({
+                                    ...requestBody,
+                                    fields: updated,
+                                  });
+                                }}
+                                disabled={isReadOnly || !!requestBody.schemaRef}
+                                className="w-full px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] disabled:opacity-60 disabled:cursor-not-allowed"
+                              >
+                                {fieldTypes.map((type) => (
+                                  <option key={type} value={type}>
+                                    {type}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                          )}
                           <td className="px-4 py-3 text-center">
                             <button
                               onClick={() => {
