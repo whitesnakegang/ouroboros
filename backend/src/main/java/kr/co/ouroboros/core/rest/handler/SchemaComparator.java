@@ -1,8 +1,10 @@
 package kr.co.ouroboros.core.rest.handler;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import kr.co.ouroboros.core.rest.common.dto.Components;
 import kr.co.ouroboros.core.rest.common.dto.Schema;
 import lombok.extern.slf4j.Slf4j;
@@ -191,5 +193,144 @@ public class SchemaComparator {
         }
 
         return true;
+    }
+
+    /**
+     * 스키마 주소(ref)를 받아 해당 스키마를 재귀 탐색하면서 기본 타입 개수를 구하는 기능.
+     * <p>
+     * 스키마를 재귀적으로 탐색하여 모든 기본 타입(string, integer, number, boolean 등)의 개수를 집계합니다.
+     * $ref를 통해 참조된 스키마도 재귀적으로 탐색하며, 순환 참조를 방지하기 위해 방문한 스키마를 추적합니다.
+     *
+     * @param ref 스키마 참조 주소 (예: "#/components/schemas/User")
+     * @param components Components 객체 (스키마 정의를 포함)
+     * @param typeMap 기본 타입별 개수를 저장할 Map (key: 타입명, value: 개수)
+     * @return 기본 타입별 개수가 집계된 Map
+     */
+    public Map<String, Integer> getSchemaDefaults(String ref, Components components, Map<String, Integer> typeMap) {
+        if (ref == null || components == null || typeMap == null) {
+            log.debug("[SCHEMA DEFAULTS] ref, components, 또는 typeMap이 null입니다.");
+            return typeMap;
+        }
+
+        // ref에서 스키마 이름 추출 (예: "#/components/schemas/User" -> "User")
+        String schemaName = extractSchemaNameFromRef(ref);
+        if (schemaName == null) {
+            log.debug("[SCHEMA DEFAULTS] 유효하지 않은 ref 형식: {}", ref);
+            return typeMap;
+        }
+
+        // 순환 참조 방지를 위한 visited Set
+        Set<String> visited = new HashSet<>();
+        collectSchemaTypes(schemaName, components, typeMap, visited);
+
+        return typeMap;
+    }
+
+    /**
+     * 스키마 이름에서 실제 스키마 이름을 추출합니다.
+     *
+     * @param ref 스키마 참조 주소 (예: "#/components/schemas/User")
+     * @return 스키마 이름 (예: "User"), 또는 null if ref가 유효하지 않은 형식
+     */
+    private String extractSchemaNameFromRef(String ref) {
+        if (ref == null || !ref.startsWith("#/components/schemas/")) {
+            return null;
+        }
+        return ref.substring("#/components/schemas/".length());
+    }
+
+    /**
+     * 스키마를 재귀적으로 탐색하여 기본 타입 개수를 집계하는 내부 메서드.
+     *
+     * @param schemaName 현재 탐색 중인 스키마 이름
+     * @param components Components 객체
+     * @param typeMap 기본 타입별 개수를 저장할 Map
+     * @param visited 이미 방문한 스키마 이름 Set (순환 참조 방지)
+     */
+    private void collectSchemaTypes(String schemaName, Components components, Map<String, Integer> typeMap, Set<String> visited) {
+        // 순환 참조 방지
+        if (visited.contains(schemaName)) {
+            log.debug("[SCHEMA DEFAULTS] 순환 참조 감지: {}", schemaName);
+            return;
+        }
+
+        // 스키마 조회
+        Map<String, Schema> schemas = components.getSchemas();
+        if (schemas == null) {
+            return;
+        }
+
+        Schema schema = schemas.get(schemaName);
+        if (schema == null) {
+            log.debug("[SCHEMA DEFAULTS] 스키마를 찾을 수 없습니다: {}", schemaName);
+            return;
+        }
+
+        // 방문 표시
+        visited.add(schemaName);
+
+        // 스키마 타입 수집
+        collectTypesFromSchema(schema, components, typeMap, visited);
+
+        // 방문 해제 (다른 경로에서 접근 가능하도록)
+        visited.remove(schemaName);
+    }
+
+    /**
+     * Schema 객체에서 기본 타입을 수집합니다.
+     *
+     * @param schema 탐색할 Schema 객체
+     * @param components Components 객체 (스키마 참조 해결용)
+     * @param typeMap 기본 타입별 개수를 저장할 Map
+     * @param visited 이미 방문한 스키마 이름 Set
+     */
+    private void collectTypesFromSchema(Schema schema, Components components, Map<String, Integer> typeMap, Set<String> visited) {
+        if (schema == null) {
+            return;
+        }
+
+        // $ref가 있는 경우: 참조된 스키마로 이동
+        if (schema.getRef() != null) {
+            String referencedSchemaName = extractSchemaNameFromRef(schema.getRef());
+            if (referencedSchemaName != null) {
+                collectSchemaTypes(referencedSchemaName, components, typeMap, visited);
+            }
+            return;
+        }
+
+        // 기본 타입인 경우: 카운트 증가
+        String type = schema.getType();
+        if (type != null && isPrimitiveType(type)) {
+            typeMap.put(type, typeMap.getOrDefault(type, 0) + 1);
+            log.debug("[SCHEMA DEFAULTS] 기본 타입 발견: {} (현재 개수: {})", type, typeMap.get(type));
+        }
+
+        // object 타입인 경우: properties 재귀 탐색
+        if ("object".equals(type) && schema.getProperties() != null) {
+            for (Map.Entry<String, Schema> propertyEntry : schema.getProperties().entrySet()) {
+                Schema propertySchema = propertyEntry.getValue();
+                collectTypesFromSchema(propertySchema, components, typeMap, visited);
+            }
+        }
+
+        // array 타입인 경우: items 재귀 탐색
+        if ("array".equals(type) && schema.getItems() != null) {
+            collectTypesFromSchema(schema.getItems(), components, typeMap, visited);
+        }
+    }
+
+    /**
+     * 주어진 타입이 기본 타입(primitive type)인지 확인합니다.
+     *
+     * @param type 확인할 타입
+     * @return 기본 타입이면 true, 그렇지 않으면 false
+     */
+    private boolean isPrimitiveType(String type) {
+        if (type == null) {
+            return false;
+        }
+        // OpenAPI 3.1 기본 타입들
+        return type.equals("string") || type.equals("integer") || type.equals("number") 
+                || type.equals("boolean") || type.equals("array") || type.equals("object");
     }
 }
