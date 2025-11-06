@@ -29,42 +29,6 @@ export function convertSchemaTypeToOpenAPI(schemaType: SchemaType): any {
       schema.format = schemaType.format;
     }
 
-    // String 타입 전용 constraints
-    if (schemaType.type === "string" || schemaType.type === "file") {
-      if (schemaType.enum && schemaType.enum.length > 0) {
-        schema.enumValues = schemaType.enum;
-      }
-      if (schemaType.pattern) {
-        schema.pattern = schemaType.pattern;
-      }
-      if (schemaType.minLength !== undefined) {
-        schema.minLength = schemaType.minLength;
-      }
-      if (schemaType.maxLength !== undefined) {
-        schema.maxLength = schemaType.maxLength;
-      }
-    }
-
-    // Number/Integer 타입 전용 constraints
-    if (schemaType.type === "number" || schemaType.type === "integer") {
-      if (schemaType.enum && schemaType.enum.length > 0) {
-        schema.enumValues = schemaType.enum;
-      }
-      if (schemaType.minimum !== undefined) {
-        schema.minimum = schemaType.minimum;
-      }
-      if (schemaType.maximum !== undefined) {
-        schema.maximum = schemaType.maximum;
-      }
-    }
-
-    // Boolean은 enum만 가능 (true/false 외 제약 없음)
-    if (schemaType.type === "boolean") {
-      if (schemaType.enum && schemaType.enum.length > 0) {
-        schema.enumValues = schemaType.enum;
-      }
-    }
-
     return schema;
   }
 
@@ -102,15 +66,14 @@ export function convertSchemaTypeToOpenAPI(schemaType: SchemaType): any {
       type: "array",
       items: convertSchemaTypeToOpenAPI(schemaType.items),
     };
-
+    
     if (schemaType.minItems !== undefined) {
       schema.minItems = schemaType.minItems;
     }
-
     if (schemaType.maxItems !== undefined) {
       schema.maxItems = schemaType.maxItems;
     }
-
+    
     return schema;
   }
 
@@ -144,8 +107,8 @@ export function convertSchemaFieldToOpenAPI(field: SchemaField): any {
     schema.description = field.description;
   }
 
-  // Mock Expression 추가
-  if (field.mockExpression && !isObjectSchema(field.schemaType)) {
+  // Mock Expression 추가 (Primitive 타입만)
+  if (field.mockExpression && isPrimitiveSchema(field.schemaType)) {
     schema["x-ouroboros-mock"] = field.mockExpression;
   }
 
@@ -283,12 +246,6 @@ export function parseOpenAPISchemaToSchemaType(schema: any): SchemaType {
     kind: "primitive",
     type: primitiveType,
     format: schema.format,
-    enum: schema.enumValues || schema.enum,  // 백엔드는 enumValues, OpenAPI는 enum
-    pattern: schema.pattern,
-    minLength: schema.minLength,
-    maxLength: schema.maxLength,
-    minimum: schema.minimum,
-    maximum: schema.maximum,
   };
 }
 

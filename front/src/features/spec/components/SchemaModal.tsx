@@ -6,7 +6,9 @@ interface Schema {
   id: string;
   name: string;
   description?: string;
+  type: string;
   fields: SchemaField[];
+  items?: any;  // array 타입일 경우
 }
 
 interface SchemaModalProps {
@@ -36,6 +38,7 @@ export function SchemaModal({
       id: schema.schemaName,
       name: schema.schemaName,
       description: schema.description,
+      type: schema.type,
       fields: schema.properties
         ? Object.entries(schema.properties).map(([key, propSchema]) => {
             const field = parseOpenAPISchemaToSchemaField(key, propSchema);
@@ -46,6 +49,7 @@ export function SchemaModal({
             return field;
           })
         : [],
+      items: schema.items,  // array 타입일 경우
     };
     onSelect(convertedSchema);
     onClose();

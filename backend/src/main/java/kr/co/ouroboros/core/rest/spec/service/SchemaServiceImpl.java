@@ -3,6 +3,8 @@ package kr.co.ouroboros.core.rest.spec.service;
 import kr.co.ouroboros.core.global.Protocol;
 import kr.co.ouroboros.core.global.manager.OuroApiSpecManager;
 import kr.co.ouroboros.core.rest.common.yaml.RestApiYamlParser;
+import kr.co.ouroboros.core.rest.mock.registry.RestMockRegistry;
+import kr.co.ouroboros.core.rest.mock.service.RestMockLoaderService;
 import kr.co.ouroboros.ui.rest.spec.dto.CreateSchemaRequest;
 import kr.co.ouroboros.ui.rest.spec.dto.SchemaResponse;
 import kr.co.ouroboros.ui.rest.spec.dto.UpdateSchemaRequest;
@@ -31,13 +33,19 @@ public class SchemaServiceImpl implements SchemaService {
     private final RestApiYamlParser yamlParser;
     private final OuroApiSpecManager specManager;
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
+    private final RestMockRegistry mockRegistry;
+    private final RestMockLoaderService mockLoaderService;
 
+    /**
+     * Creates a new schema in the OpenAPI document, updates the processed spec cache, and reloads the mock registry.
+     *
+     * @param request contains the schema name and definition fields used to build and insert the new schema
+     * @return the SchemaResponse representing the created schema
+     */
     @Override
     public SchemaResponse createSchema(CreateSchemaRequest request) throws Exception {
         lock.writeLock().lock();
         try {
-            log.info("🔍 Creating schema: {}", request.getSchemaName());
-            
             // Read existing document or create new one
             Map<String, Object> openApiDoc = yamlParser.readOrCreateDocument();
 
@@ -48,7 +56,6 @@ public class SchemaServiceImpl implements SchemaService {
 
             // Build schema definition
             Map<String, Object> schemaDefinition = buildSchemaDefinition(request);
-            log.info("🔍 Built schema definition: {}", schemaDefinition);
 
             // Add schema to document
             yamlParser.putSchema(openApiDoc, request.getSchemaName(), schemaDefinition);
@@ -56,12 +63,12 @@ public class SchemaServiceImpl implements SchemaService {
             // Process and cache: writes to file + validates with scanned state + updates cache
             specManager.processAndCacheSpec(Protocol.REST, openApiDoc);
 
-            log.info("✅ Created schema: {}", request.getSchemaName());
+            // registry 초기화 후 재등록 (전체 읽기)
+            reloadMockRegistry();
+
+            log.info("Created schema: {}", request.getSchemaName());
 
             return convertToResponse(request.getSchemaName(), schemaDefinition);
-        } catch (Exception e) {
-            log.error("❌ Failed to create schema: {}", request.getSchemaName(), e);
-            throw e;
         } finally {
             lock.writeLock().unlock();
         }
@@ -117,6 +124,18 @@ public class SchemaServiceImpl implements SchemaService {
         }
     }
 
+    /**
+     * Update an existing OpenAPI schema using only the non-null fields from the request.
+     *
+     * Applies provided values (type, title, description, properties, required, orders, xmlName)
+     * to the named schema, persists and validates the updated specification, and reloads the mock registry.
+     *
+     * @param schemaName the name of the schema to update
+     * @param request container of fields to apply; only fields that are non-null on the request are updated
+     * @return a SchemaResponse representing the updated schema
+     * @throws IllegalArgumentException if the specification file does not exist or the named schema is not found
+     * @throws Exception if processing, validation, or caching of the updated specification fails
+     */
     @Override
     public SchemaResponse updateSchema(String schemaName, UpdateSchemaRequest request) throws Exception {
         lock.writeLock().lock();
@@ -163,6 +182,9 @@ public class SchemaServiceImpl implements SchemaService {
             // Process and cache: writes to file + validates with scanned state + updates cache
             specManager.processAndCacheSpec(Protocol.REST, openApiDoc);
 
+            // registry 초기화 후 재등록 (전체 읽기)
+            reloadMockRegistry();
+
             log.info("Updated schema: {}", schemaName);
 
             return convertToResponse(schemaName, existingSchema);
@@ -171,6 +193,13 @@ public class SchemaServiceImpl implements SchemaService {
         }
     }
 
+    /**
+     * Deletes a schema from the REST OpenAPI document, updates the processed spec cache, and reloads mock endpoints.
+     *
+     * @param schemaName the name of the schema to remove
+     * @throws IllegalArgumentException if the specification file does not exist or the named schema is not found
+     * @throws Exception if processing, caching, or mock registry reloading fails
+     */
     @Override
     public void deleteSchema(String schemaName) throws Exception {
         lock.writeLock().lock();
@@ -189,6 +218,9 @@ public class SchemaServiceImpl implements SchemaService {
 
             // Process and cache: writes to file + validates with scanned state + updates cache
             specManager.processAndCacheSpec(Protocol.REST, openApiDoc);
+
+            // registry 초기화 후 재등록 (전체 읽기)
+            reloadMockRegistry();
 
             log.info("Deleted schema: {}", schemaName);
         } finally {
@@ -228,7 +260,7 @@ public class SchemaServiceImpl implements SchemaService {
             xml.put("name", request.getXmlName());
             schema.put("xml", xml);
         }
-        
+
         // Array items 처리 (Array 타입일 때 items 필드 처리)
         if (request.getItems() != null) {
             schema.put("items", request.getItems());
@@ -273,7 +305,7 @@ public class SchemaServiceImpl implements SchemaService {
         if (property.getProperties() != null && !property.getProperties().isEmpty()) {
             propertyMap.put("properties", buildProperties(property.getProperties()));
         }
-        
+
         if (property.getRequired() != null && !property.getRequired().isEmpty()) {
             propertyMap.put("required", property.getRequired());
         }
@@ -282,42 +314,16 @@ public class SchemaServiceImpl implements SchemaService {
         if (property.getItems() != null) {
             propertyMap.put("items", buildProperty(property.getItems()));
         }
-
         if (property.getMinItems() != null) {
             propertyMap.put("minItems", property.getMinItems());
         }
-
         if (property.getMaxItems() != null) {
             propertyMap.put("maxItems", property.getMaxItems());
         }
-        
-        // Additional constraints
+
+        // Format (file 타입 구분용)
         if (property.getFormat() != null) {
             propertyMap.put("format", property.getFormat());
-        }
-        
-        if (property.getEnumValues() != null && !property.getEnumValues().isEmpty()) {
-            propertyMap.put("enum", property.getEnumValues());
-        }
-        
-        if (property.getPattern() != null) {
-            propertyMap.put("pattern", property.getPattern());
-        }
-        
-        if (property.getMinLength() != null) {
-            propertyMap.put("minLength", property.getMinLength());
-        }
-        
-        if (property.getMaxLength() != null) {
-            propertyMap.put("maxLength", property.getMaxLength());
-        }
-        
-        if (property.getMinimum() != null) {
-            propertyMap.put("minimum", property.getMinimum());
-        }
-        
-        if (property.getMaximum() != null) {
-            propertyMap.put("maximum", property.getMaximum());
         }
 
         return propertyMap;
@@ -400,7 +406,7 @@ public class SchemaServiceImpl implements SchemaService {
             }
             builder.properties(nestedProperties);
         }
-        
+
         // Required fields for object types
         Object requiredObj = propertyDefinition.get("required");
         if (requiredObj instanceof List) {
@@ -414,24 +420,9 @@ public class SchemaServiceImpl implements SchemaService {
             Map<String, Object> items = (Map<String, Object>) itemsObj;
             builder.items(convertToProperty(items));
         }
-        
-        // Additional constraints
-        builder.format(safeGetString(propertyDefinition, "format"))
-               .pattern(safeGetString(propertyDefinition, "pattern"))
-               .minLength(safeGetInteger(propertyDefinition, "minLength"))
-               .maxLength(safeGetInteger(propertyDefinition, "maxLength"))
-               .minimum(safeGetNumber(propertyDefinition, "minimum"))
-               .maximum(safeGetNumber(propertyDefinition, "maximum"));
-        
-        // enum 값 파싱
-        Object enumObj = propertyDefinition.get("enum");
-        if (enumObj instanceof java.util.Collection<?> enumCollection) {
-            List<String> enumValues = new java.util.ArrayList<>();
-            for (Object item : enumCollection) {
-                enumValues.add(item != null ? item.toString() : "");
-            }
-            builder.enumValues(enumValues);
-        }
+
+        // Format (file 타입 구분용)
+        builder.format(safeGetString(propertyDefinition, "format"));
 
         return builder.build();
     }
@@ -490,11 +481,11 @@ public class SchemaServiceImpl implements SchemaService {
     }
 
     /**
-     * Safely extracts a List of Strings from a Map.
-     * 
+     * Retrieve a List of Strings stored under the given key, validating that every element is a String.
+     *
      * @param map the source map
      * @param key the key to look up
-     * @return the List of Strings, or null if not found or not a valid list
+     * @return the list of strings if present and all elements are strings; `null` if the key is absent, the value is not a list, or any element is not a string
      */
     @SuppressWarnings("unchecked")
     private List<String> safeGetStringList(Map<String, Object> map, String key) {
@@ -521,4 +512,17 @@ public class SchemaServiceImpl implements SchemaService {
         }
         return null;
     }
+
+    /**
+     * Reloads mock endpoints in the registry from YAML mock definitions.
+     *
+     * Clears the current registry, loads endpoint metadata from the YAML source, registers each endpoint, and logs the number of endpoints reloaded.
+     */
+    private void reloadMockRegistry() {
+        mockRegistry.clear();
+        Map<String, kr.co.ouroboros.core.rest.mock.model.EndpointMeta> endpoints = mockLoaderService.loadFromYaml();
+        endpoints.values().forEach(mockRegistry::register);
+        log.info("Reloaded {} mock endpoints into registry", endpoints.size());
+    }
+
 }

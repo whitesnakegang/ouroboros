@@ -461,11 +461,9 @@ public class MockValidationService {
         if (property.getItems() != null) {
             result.put("items", convertPropertyToMap(property.getItems()));
         }
-        
         if (property.getMinItems() != null) {
             result.put("minItems", property.getMinItems());
         }
-        
         if (property.getMaxItems() != null) {
             result.put("maxItems", property.getMaxItems());
         }

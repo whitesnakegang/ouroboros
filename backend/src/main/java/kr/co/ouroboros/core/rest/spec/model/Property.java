@@ -55,15 +55,9 @@ public class Property {
     
     // For array types - recursive structure
     private Property items;
-    private Integer minItems;  // Minimum number of items in array
-    private Integer maxItems;  // Maximum number of items in array
+    private Integer minItems;  // Mock 생성 시 최소 배열 개수 (기본: 1)
+    private Integer maxItems;  // Mock 생성 시 최대 배열 개수 (기본: 3)
     
-    // Additional constraints
-    private String format;     // "date-time", "email", "uri", "binary", etc.
-    private java.util.List<String> enumValues;  // enum 값들
-    private String pattern;    // regex pattern
-    private Integer minLength;
-    private Integer maxLength;
-    private Number minimum;
-    private Number maximum;
+    // Format (file 타입 구분용: "binary")
+    private String format;
 }

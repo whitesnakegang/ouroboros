@@ -14,13 +14,7 @@ export type SchemaKind = "primitive" | "object" | "array" | "ref";
 export interface PrimitiveSchema {
   kind: "primitive";
   type: PrimitiveTypeName;
-  format?: string;
-  enum?: string[];
-  pattern?: string;
-  minLength?: number;
-  maxLength?: number;
-  minimum?: number;
-  maximum?: number;
+  format?: string;  // "binary" for file type
 }
 
 export interface ObjectSchema {
@@ -31,8 +25,8 @@ export interface ObjectSchema {
 export interface ArraySchema {
   kind: "array";
   items: SchemaType;
-  minItems?: number;
-  maxItems?: number;
+  minItems?: number;  // Mock 생성 시 최소 개수 (기본: 1)
+  maxItems?: number;  // Mock 생성 시 최대 개수 (기본: 3)
 }
 
 export interface RefSchema {

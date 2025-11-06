@@ -24,13 +24,8 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Schema Type 상태
-  const [schemaType, setSchemaType] = useState<
-    "object" | "array" | "string" | "number" | "boolean"
-  >("object");
-  const [arrayItemType, setArrayItemType] = useState<
-    "object" | "string" | "number" | "boolean"
-  >("object");
+  // Schema Type 상태 (object만 허용)
+  const [schemaType, setSchemaType] = useState<"object">("object");
 
   // 에러 메시지에서 localhost 주소 제거 및 사용자 친화적인 메시지로 변환
   const getErrorMessage = (error: unknown): string => {
@@ -79,12 +74,8 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
       return;
     }
 
-    // object나 array(object) 타입일 때만 필드 검증
-    if (
-      (schemaType === "object" ||
-        (schemaType === "array" && arrayItemType === "object")) &&
-      schemaFields.length === 0
-    ) {
+    // object 타입은 필드 검증
+    if (schemaFields.length === 0) {
       alert("최소 하나의 필드를 추가해주세요.");
       return;
     }
@@ -93,100 +84,30 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
       setIsLoading(true);
       setError(null);
 
-      let schemaRequest: CreateSchemaRequest & { items?: any };
+      // Object 타입만 처리 (재귀 지원)
+      const properties: Record<string, any> = {};
+      const required: string[] = [];
 
-      if (schemaType === "array") {
-        // Array 타입 처리
-        if (arrayItemType === "object") {
-          // Array of objects: properties 필요 (재귀 지원)
-          const properties: Record<string, any> = {};
-          const required: string[] = [];
-
-          schemaFields.forEach((field) => {
-            if (field.key.trim()) {
-              properties[field.key] = convertSchemaFieldToOpenAPI(field);
-              if (field.required) {
-                required.push(field.key);
-              }
-            }
-          });
-
-          schemaRequest = {
-            schemaName: currentSchemaName.trim(),
-            type: "array",
-            title: `${currentSchemaName} Schema`,
-            description:
-              currentSchemaDescription.trim() ||
-              `${currentSchemaName} 스키마 정의`,
-            items: {
-              type: "object",
-              properties,
-              required: required.length > 0 ? required : undefined,
-            },
-            properties: {}, // array 타입은 properties가 빈 객체
-            required: [],
-            orders: schemaFields.map((f) => f.key),
-          };
-        } else {
-          // Array of primitives: items만 필요
-          schemaRequest = {
-            schemaName: currentSchemaName.trim(),
-            type: "array",
-            title: `${currentSchemaName} Schema`,
-            description:
-              currentSchemaDescription.trim() ||
-              `${currentSchemaName} 스키마 정의`,
-            items: {
-              type: arrayItemType,
-            },
-            properties: {},
-            required: [],
-            orders: [],
-          };
-        }
-      } else if (
-        schemaType === "string" ||
-        schemaType === "number" ||
-        schemaType === "boolean"
-      ) {
-        // Primitive 타입: properties 불필요
-        schemaRequest = {
-          schemaName: currentSchemaName.trim(),
-          type: schemaType,
-          title: `${currentSchemaName} Schema`,
-          description:
-            currentSchemaDescription.trim() ||
-            `${currentSchemaName} 스키마 정의`,
-          properties: {},
-          required: [],
-          orders: [],
-        };
-      } else {
-        // Object 타입: properties 필요 (재귀 지원)
-        const properties: Record<string, any> = {};
-        const required: string[] = [];
-
-        schemaFields.forEach((field) => {
-          if (field.key.trim()) {
-            properties[field.key] = convertSchemaFieldToOpenAPI(field);
-            if (field.required) {
-              required.push(field.key);
-            }
+      schemaFields.forEach((field) => {
+        if (field.key.trim()) {
+          properties[field.key] = convertSchemaFieldToOpenAPI(field);
+          if (field.required) {
+            required.push(field.key);
           }
-        });
+        }
+      });
 
-        schemaRequest = {
-          schemaName: currentSchemaName.trim(),
-          type: "object",
-          title: `${currentSchemaName} Schema`,
-          description:
-            currentSchemaDescription.trim() ||
-            `${currentSchemaName} 스키마 정의`,
-          properties,
-          required: required.length > 0 ? required : undefined,
-          orders: schemaFields.map((f) => f.key),
-        };
-      }
+      const schemaRequest: CreateSchemaRequest = {
+        schemaName: currentSchemaName.trim(),
+        type: "object",
+        title: `${currentSchemaName} Schema`,
+        description:
+          currentSchemaDescription.trim() ||
+          `${currentSchemaName} 스키마 정의`,
+        properties,
+        required: required.length > 0 ? required : undefined,
+        orders: schemaFields.map((f) => f.key),
+      };
 
       // 기존 스키마가 있는지 확인
       const existingSchema = schemas.find(
@@ -197,15 +118,13 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
 
       if (existingSchema) {
         // 수정
-        const updateRequest: UpdateSchemaRequest & { items?: any } = {
+        const updateRequest: UpdateSchemaRequest = {
           type: schemaRequest.type,
           title: schemaRequest.title,
           description: schemaRequest.description,
           properties: schemaRequest.properties,
           required: schemaRequest.required,
           orders: schemaRequest.orders,
-          // items 필드가 있으면 포함 (array 타입인 경우)
-          ...(schemaRequest.items && { items: schemaRequest.items }),
         };
         console.log("🔍 Update Request:", JSON.stringify(updateRequest, null, 2));
         await updateSchema(currentSchemaName, updateRequest);
@@ -213,7 +132,7 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
       } else {
         // 생성
         console.log("🔍 Create Request:", JSON.stringify(schemaRequest, null, 2));
-        await createSchema(schemaRequest as CreateSchemaRequest & { items?: any });
+        await createSchema(schemaRequest);
         alert(`"${currentSchemaName}" 스키마가 생성되었습니다.`);
       }
 
@@ -319,102 +238,7 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
             />
           </div>
 
-          {/* Schema Type 선택 */}
-          <div className="mb-4 grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Schema Type
-              </label>
-              <select
-                value={schemaType}
-                onChange={(e) => setSchemaType(e.target.value as any)}
-                disabled={isReadOnly}
-                className={`w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] ${
-                  isReadOnly ? "opacity-60 cursor-not-allowed" : ""
-                }`}
-              >
-                <option value="object">Object (객체)</option>
-                <option value="array">Array (배열)</option>
-                <option value="string">String (문자열)</option>
-                <option value="number">Number (숫자)</option>
-                <option value="boolean">Boolean (참/거짓)</option>
-              </select>
-            </div>
-
-            {schemaType === "array" && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Array Item Type
-                </label>
-                <select
-                  value={arrayItemType}
-                  onChange={(e) => setArrayItemType(e.target.value as any)}
-                  disabled={isReadOnly}
-                  className={`w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] ${
-                    isReadOnly ? "opacity-60 cursor-not-allowed" : ""
-                  }`}
-                >
-                  <option value="object">Object</option>
-                  <option value="string">String</option>
-                  <option value="number">Number</option>
-                  <option value="boolean">Boolean</option>
-                </select>
-              </div>
-            )}
-          </div>
-
-          {(schemaType === "string" ||
-            schemaType === "number" ||
-            schemaType === "boolean") && (
-            <div className="mb-4">
-              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md mb-3">
-                <p className="text-sm text-blue-700 dark:text-blue-300">
-                  <strong>{schemaType}</strong> 타입은 단일 값을 반환합니다.
-                  필드를 추가할 필요가 없습니다.
-                </p>
-              </div>
-              {currentSchemaName && (
-                <div className="flex justify-end">
-                  <button
-                    onClick={saveSchema}
-                    disabled={isLoading || isReadOnly}
-                    className={`px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50 ${
-                      isReadOnly ? "opacity-50 cursor-not-allowed" : ""
-                    }`}
-                  >
-                    {isLoading ? "저장 중..." : "Save Schema"}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {schemaType === "array" && arrayItemType !== "object" && (
-            <div className="mb-4">
-              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md mb-3">
-                <p className="text-sm text-blue-700 dark:text-blue-300">
-                  <strong>Array of {arrayItemType}</strong> 타입입니다.
-                  필드를 추가할 필요가 없습니다.
-                </p>
-              </div>
-              {currentSchemaName && (
-                <div className="flex justify-end">
-                  <button
-                    onClick={saveSchema}
-                    disabled={isLoading || isReadOnly}
-                    className={`px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50 ${
-                      isReadOnly ? "opacity-50 cursor-not-allowed" : ""
-                    }`}
-                  >
-                    {isLoading ? "저장 중..." : "Save Schema"}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {(schemaType === "object" ||
-            (schemaType === "array" && arrayItemType === "object")) && (
+          {schemaType === "object" && (
             <div className="mb-3 flex items-center justify-between">
               <button
                 onClick={() => {
@@ -439,11 +263,10 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
             </div>
           )}
 
-          {(schemaType === "object" ||
-            (schemaType === "array" && arrayItemType === "object")) && (
+          {schemaType === "object" && (
             <div className="mb-2">
               <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Schema Fields {schemaType === "array" && "(Array Items)"}
+                Schema Fields
               </h4>
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 재귀적 스키마 구조 지원 (Object, Array, Reference)
@@ -451,8 +274,7 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
             </div>
           )}
 
-          {(schemaType === "object" ||
-            (schemaType === "array" && arrayItemType === "object")) && (
+          {schemaType === "object" && (
             <div className="space-y-2">
               {schemaFields.map((field, index) => (
                 <SchemaFieldEditor
@@ -487,10 +309,14 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
         isOpen={isSchemaModalOpen}
         onClose={() => setIsSchemaModalOpen(false)}
         onSelect={(schema) => {
-          // SchemaModal에서 재귀적 변환 완료된 필드 사용
-          setCurrentSchemaName(schema.name);
-          setCurrentSchemaDescription(schema.description || "");
-          setSchemaFields(schema.fields);
+          // SchemaModal에서 재귀적 변환 완료된 필드 사용 (object 타입만)
+          if (schema.type === "object") {
+            setCurrentSchemaName(schema.name);
+            setCurrentSchemaDescription(schema.description || "");
+            setSchemaFields(schema.fields);
+          } else {
+            alert("스키마는 object 타입만 지원됩니다.");
+          }
         }}
         schemas={schemas}
         setSchemas={setSchemas}

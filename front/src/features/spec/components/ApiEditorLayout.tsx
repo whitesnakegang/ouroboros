@@ -31,8 +31,7 @@ import {
   getSchema,
 } from "../services/api";
 import { convertRequestBodyToOpenAPI, parseOpenAPIRequestBody } from "../utils/schemaConverter";
-import type { RequestBody, SchemaField } from "../types/schema.types";
-import { createDefaultField } from "../types/schema.types";
+import type { RequestBody } from "../types/schema.types";
 
 interface KeyValuePair {
   key: string;
@@ -50,6 +49,10 @@ interface StatusCode {
   schema?: {
     ref?: string; // 스키마 참조 (예: "User")
     properties?: Record<string, any>; // 인라인 스키마
+    type?: string; // Primitive 타입 (string, integer, number, boolean)
+    isArray?: boolean; // Array of Schema 여부
+    minItems?: number; // Array 최소 개수
+    maxItems?: number; // Array 최대 개수
   };
 }
 
@@ -362,54 +365,110 @@ export function ApiEditorLayout() {
               const schema = content?.schema;
 
               if (schema) {
-                // 스키마 참조 처리 ($ref 또는 ref)
-                const schemaRef = schema.$ref || schema.ref;
-                if (schemaRef) {
-                  // $ref 형식: "#/components/schemas/OrderCreateRequest"
-                  // ref 형식: "OrderCreateRequest"
-                  let schemaName: string;
-                  if (
-                    typeof schemaRef === "string" &&
-                    schemaRef.includes("#/components/schemas/")
-                  ) {
-                    const refMatch = schemaRef.match(
-                      /#\/components\/schemas\/(.+)/
-                    );
-                    schemaName = refMatch ? refMatch[1] : schemaRef;
-                  } else {
-                    schemaName =
-                      typeof schemaRef === "string"
-                        ? schemaRef
-                        : String(schemaRef);
-                  }
-
-                  try {
-                    // 스키마 조회하여 properties 가져오기
-                    const schemaResponse = await getSchema(schemaName);
-                    const resolvedSchema = schemaResponse.data;
-
-                    if (resolvedSchema.properties) {
-                      statusCode.schema = {
-                        ref: schemaName,
-                        properties: resolvedSchema.properties,
-                      };
+                // Array 타입 감지
+                if (schema.type === "array" && schema.items) {
+                  const itemsSchema = schema.items;
+                  const itemsRef = itemsSchema.$ref || itemsSchema.ref;
+                  
+                  const schemaData: any = {
+                    isArray: true,
+                    minItems: schema.minItems,
+                    maxItems: schema.maxItems,
+                  };
+                  
+                  if (itemsRef) {
+                    // Array of Schema Reference
+                    let schemaName: string;
+                    if (
+                      typeof itemsRef === "string" &&
+                      itemsRef.includes("#/components/schemas/")
+                    ) {
+                      const refMatch = itemsRef.match(
+                        /#\/components\/schemas\/(.+)/
+                      );
+                      schemaName = refMatch ? refMatch[1] : itemsRef;
                     } else {
+                      schemaName =
+                        typeof itemsRef === "string"
+                          ? itemsRef
+                          : String(itemsRef);
+                    }
+
+                    try {
+                      // 스키마 조회하여 properties 가져오기
+                      const schemaResponse = await getSchema(schemaName);
+                      const resolvedSchema = schemaResponse.data;
+
+                      schemaData.ref = schemaName;
+                      if (resolvedSchema.properties) {
+                        schemaData.properties = resolvedSchema.properties;
+                      }
+                    } catch (error) {
+                      console.error("⚠️ Response 스키마 조회 실패:", error);
+                      schemaData.ref = schemaName;
+                    }
+                  } else if (itemsSchema.properties) {
+                    // Array of Inline Schema
+                    schemaData.properties = itemsSchema.properties;
+                  } else if (itemsSchema.type) {
+                    // Array of Primitive Type
+                    schemaData.type = itemsSchema.type;
+                  }
+                  
+                  statusCode.schema = schemaData;
+                } else {
+                  // Non-array 타입
+                  const schemaRef = schema.$ref || schema.ref;
+                  if (schemaRef) {
+                    // Schema Reference
+                    let schemaName: string;
+                    if (
+                      typeof schemaRef === "string" &&
+                      schemaRef.includes("#/components/schemas/")
+                    ) {
+                      const refMatch = schemaRef.match(
+                        /#\/components\/schemas\/(.+)/
+                      );
+                      schemaName = refMatch ? refMatch[1] : schemaRef;
+                    } else {
+                      schemaName =
+                        typeof schemaRef === "string"
+                          ? schemaRef
+                          : String(schemaRef);
+                    }
+
+                    try {
+                      // 스키마 조회하여 properties 가져오기
+                      const schemaResponse = await getSchema(schemaName);
+                      const resolvedSchema = schemaResponse.data;
+
+                      if (resolvedSchema.properties) {
+                        statusCode.schema = {
+                          ref: schemaName,
+                          properties: resolvedSchema.properties,
+                        };
+                      } else {
+                        statusCode.schema = {
+                          ref: schemaName,
+                        };
+                      }
+                    } catch (error) {
+                      console.error("⚠️ Response 스키마 조회 실패:", error);
                       statusCode.schema = {
                         ref: schemaName,
                       };
                     }
-                  } catch (error) {
-                    console.error("⚠️ Response 스키마 조회 실패:", error);
-                    // 스키마 조회 실패 시에도 ref는 설정
+                  } else if (schema.properties) {
+                    // Inline Schema
                     statusCode.schema = {
-                      ref: schemaName,
+                      properties: schema.properties,
+                    };
+                  } else if (schema.type) {
+                    // Primitive Type
+                    statusCode.schema = {
+                      type: schema.type,
                     };
                   }
-                } else if (schema.properties) {
-                  // 인라인 스키마
-                  statusCode.schema = {
-                    properties: schema.properties,
-                  };
                 }
               }
             }
@@ -595,31 +654,54 @@ export function ApiEditorLayout() {
       let schema: any;
 
       // StatusCode에 schema 정보가 있으면 사용
+      let baseSchema: any;
       if (code.schema) {
         if (code.schema.ref) {
-          // Reference 모드: ref만 전송
-          schema = {
+          // Reference 모드: ref로 전송 (백엔드에서 $ref로 변환)
+          baseSchema = {
             ref: code.schema.ref,
           };
         } else if (code.schema.properties) {
           // Inline 모드: properties 포함
-          schema = {
+          baseSchema = {
             type: "object",
             properties: code.schema.properties,
           };
+        } else if (code.schema.type) {
+          // Primitive 타입 (string, integer, number, boolean)
+          baseSchema = {
+            type: code.schema.type,
+          };
         } else {
           // 기본 schema
-          schema = {
+          baseSchema = {
             type: "object",
             properties: {},
           };
         }
       } else {
         // schema 정보가 없으면 기본 schema
-        schema = {
+        baseSchema = {
           type: "object",
           properties: {},
         };
+      }
+
+      // isArray가 true이면 array로 감싸기
+      if (code.schema?.isArray) {
+        schema = {
+          type: "array",
+          items: baseSchema,
+        };
+        // minItems/maxItems 추가
+        if (code.schema.minItems !== undefined) {
+          schema.minItems = code.schema.minItems;
+        }
+        if (code.schema.maxItems !== undefined) {
+          schema.maxItems = code.schema.maxItems;
+        }
+      } else {
+        schema = baseSchema;
       }
 
       const response: any = {

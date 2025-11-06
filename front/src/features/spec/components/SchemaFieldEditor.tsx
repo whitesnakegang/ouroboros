@@ -5,7 +5,6 @@ import {
   createObjectField,
   createArrayField,
   createRefField,
-  createFileField,
   isPrimitiveSchema,
   isObjectSchema,
   isArraySchema,
@@ -13,6 +12,7 @@ import {
 } from "../types/schema.types";
 import { getAllSchemas, type SchemaResponse } from "../services/api";
 import { MockExpressionModal } from "./MockExpressionModal";
+import { SchemaModal } from "./SchemaModal";
 
 interface SchemaFieldEditorProps {
   field: SchemaField;
@@ -35,6 +35,7 @@ export function SchemaFieldEditor({
 }: SchemaFieldEditorProps) {
   const [schemas, setSchemas] = useState<SchemaResponse[]>([]);
   const [isMockModalOpen, setIsMockModalOpen] = useState(false);
+  const [isSchemaModalOpen, setIsSchemaModalOpen] = useState(false);
 
   // 스키마 목록 로드
   useEffect(() => {
@@ -192,7 +193,7 @@ export function SchemaFieldEditor({
           <option value="primitive">Primitive</option>
           <option value="object">Object</option>
           <option value="array">Array</option>
-          <option value="ref">Reference</option>
+          <option value="ref">Schema</option>
         </select>
 
         {/* Type-specific controls */}
@@ -212,27 +213,13 @@ export function SchemaFieldEditor({
         )}
 
         {isRefSchema(field.schemaType) && (
-          <select
-            value={field.schemaType.schemaName}
-            onChange={(e) =>
-              onChange({
-                ...field,
-                schemaType: {
-                  kind: "ref",
-                  schemaName: e.target.value,
-                },
-              })
-            }
+          <button
+            onClick={() => setIsSchemaModalOpen(true)}
             disabled={isReadOnly}
-            className="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-sm min-w-[200px]"
+            className="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-sm min-w-[200px] text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
           >
-            <option value="">Select Schema...</option>
-            {schemas.map((schema) => (
-              <option key={schema.schemaName} value={schema.schemaName}>
-                {schema.schemaName}
-              </option>
-            ))}
-          </select>
+            {field.schemaType.schemaName || "Select Schema..."}
+          </button>
         )}
 
         {/* Remove Button */}
@@ -259,7 +246,7 @@ export function SchemaFieldEditor({
           disabled={isReadOnly}
           className="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900"
         />
-        {allowMockExpression && !isObjectSchema(field.schemaType) && (
+        {allowMockExpression && isPrimitiveSchema(field.schemaType) && (
           <button
             type="button"
             onClick={() => setIsMockModalOpen(true)}
@@ -374,6 +361,24 @@ export function SchemaFieldEditor({
           initialValue={field.mockExpression || ""}
         />
       )}
+
+      {/* Schema Modal */}
+      <SchemaModal
+        isOpen={isSchemaModalOpen}
+        onClose={() => setIsSchemaModalOpen(false)}
+        onSelect={(schema) => {
+          onChange({
+            ...field,
+            schemaType: {
+              kind: "ref",
+              schemaName: schema.name,
+            },
+          });
+          setIsSchemaModalOpen(false);
+        }}
+        schemas={schemas}
+        setSchemas={setSchemas}
+      />
     </div>
   );
 }

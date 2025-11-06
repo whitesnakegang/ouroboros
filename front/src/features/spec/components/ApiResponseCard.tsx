@@ -11,6 +11,10 @@ interface StatusCode {
   schema?: {
     ref?: string; // 스키마 참조 (예: "User")
     properties?: Record<string, any>; // 인라인 스키마
+    type?: string; // Primitive 타입 (string, integer, number, boolean)
+    isArray?: boolean; // Array of Schema 여부
+    minItems?: number; // Array 최소 개수
+    maxItems?: number; // Array 최대 개수
   };
 }
 
@@ -238,47 +242,200 @@ export function ApiResponseCard({
                         />
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => {
-                              setSelectedStatusCodeIndex(index);
-                              setIsResponseSchemaModalOpen(true);
-                            }}
-                            className="px-3 py-1.5 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] transition-colors"
-                          >
-                            {statusCode.schema?.ref
-                              ? `Schema: ${statusCode.schema.ref}`
-                              : statusCode.schema?.properties
-                              ? "Inline Schema"
-                              : "Schema 선택"}
-                          </button>
-                          {statusCode.schema && (
-                            <button
-                              onClick={() => {
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center gap-2">
+                            {/* Kind 선택 (Schema / Primitive / None) */}
+                            <select
+                              value={
+                                statusCode.schema?.ref || statusCode.schema?.properties
+                                  ? "schema"
+                                  : statusCode.schema?.type
+                                  ? "primitive"
+                                  : "none"
+                              }
+                              onChange={(e) => {
                                 const updated = [...statusCodes];
-                                updated[index] = {
-                                  ...updated[index],
-                                  schema: undefined,
-                                };
+                                const kind = e.target.value;
+                                if (kind === "none") {
+                                  updated[index] = {
+                                    ...updated[index],
+                                    schema: undefined,
+                                  };
+                                } else if (kind === "primitive") {
+                                  updated[index] = {
+                                    ...updated[index],
+                                    schema: {
+                                      type: "string",
+                                      isArray: false,
+                                    },
+                                  };
+                                } else if (kind === "schema") {
+                                  // Schema 선택 시 모달 열기
+                                  setSelectedStatusCodeIndex(index);
+                                  setIsResponseSchemaModalOpen(true);
+                                  return; // 모달에서 처리하므로 여기서는 return
+                                }
                                 setStatusCodes(updated);
                               }}
-                              className="p-1 text-red-500 hover:text-red-600"
-                              title="Schema 제거"
+                              className="px-3 py-1.5 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
                             >
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
+                              <option value="none">None</option>
+                              <option value="schema">Schema</option>
+                              <option value="primitive">Primitive</option>
+                            </select>
+
+                            {/* Schema 선택 드롭다운 */}
+                            {(statusCode.schema?.ref || statusCode.schema?.properties) && (
+                              <select
+                                value={statusCode.schema?.ref || ""}
+                                onChange={(e) => {
+                                  const updated = [...statusCodes];
+                                  const schemaName = e.target.value;
+                                  if (schemaName) {
+                                    // Schema 선택 시 모달 열기
+                                    setSelectedStatusCodeIndex(index);
+                                    setIsResponseSchemaModalOpen(true);
+                                  } else {
+                                    updated[index] = {
+                                      ...updated[index],
+                                      schema: undefined,
+                                    };
+                                    setStatusCodes(updated);
+                                  }
+                                }}
+                                className="px-3 py-1.5 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] min-w-[150px]"
                               >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M6 18L18 6M6 6l12 12"
+                                <option value="">Select Schema...</option>
+                                {schemas.map((schema) => (
+                                  <option key={schema.schemaName} value={schema.schemaName}>
+                                    {schema.schemaName}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+
+                            {/* Primitive 타입 선택 */}
+                            {statusCode.schema?.type && !statusCode.schema?.ref && !statusCode.schema?.properties && (
+                              <select
+                                value={statusCode.schema.type}
+                                onChange={(e) => {
+                                  const updated = [...statusCodes];
+                                  updated[index] = {
+                                    ...updated[index],
+                                    schema: {
+                                      ...updated[index].schema!,
+                                      type: e.target.value,
+                                    },
+                                  };
+                                  setStatusCodes(updated);
+                                }}
+                                className="px-3 py-1.5 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
+                              >
+                                <option value="string">string</option>
+                                <option value="integer">integer</option>
+                                <option value="number">number</option>
+                                <option value="boolean">boolean</option>
+                              </select>
+                            )}
+
+                            {/* Array 체크박스 */}
+                            {statusCode.schema && (
+                              <>
+                                <label className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                                  <input
+                                    type="checkbox"
+                                    checked={statusCode.schema.isArray || false}
+                                    onChange={(e) => {
+                                      const updated = [...statusCodes];
+                                      updated[index] = {
+                                        ...updated[index],
+                                        schema: {
+                                          ...updated[index].schema!,
+                                          isArray: e.target.checked,
+                                        },
+                                      };
+                                      setStatusCodes(updated);
+                                    }}
+                                    className="w-3 h-3"
+                                    title="Array"
+                                  />
+                                  <span>Array</span>
+                                </label>
+                                <button
+                                  onClick={() => {
+                                    const updated = [...statusCodes];
+                                    updated[index] = {
+                                      ...updated[index],
+                                      schema: undefined,
+                                    };
+                                    setStatusCodes(updated);
+                                  }}
+                                  className="p-1 text-red-500 hover:text-red-600"
+                                  title="Clear"
+                                >
+                                  <svg
+                                    className="w-4 h-4"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M6 18L18 6M6 6l12 12"
+                                    />
+                                  </svg>
+                                </button>
+                              </>
+                            )}
+                          </div>
+                          {/* Array Items 개수 */}
+                          {statusCode.schema?.isArray && (
+                            <div className="flex items-center gap-2 text-xs">
+                              <label className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
+                                <span>Min:</span>
+                                <input
+                                  type="number"
+                                  value={statusCode.schema.minItems || ""}
+                                  onChange={(e) => {
+                                    const updated = [...statusCodes];
+                                    updated[index] = {
+                                      ...updated[index],
+                                      schema: {
+                                        ...updated[index].schema!,
+                                        minItems: e.target.value ? parseInt(e.target.value) : undefined,
+                                      },
+                                    };
+                                    setStatusCodes(updated);
+                                  }}
+                                  className="w-16 px-2 py-1 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3]"
+                                  placeholder="1"
+                                  min="0"
                                 />
-                              </svg>
-                            </button>
+                              </label>
+                              <label className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
+                                <span>Max:</span>
+                                <input
+                                  type="number"
+                                  value={statusCode.schema.maxItems || ""}
+                                  onChange={(e) => {
+                                    const updated = [...statusCodes];
+                                    updated[index] = {
+                                      ...updated[index],
+                                      schema: {
+                                        ...updated[index].schema!,
+                                        maxItems: e.target.value ? parseInt(e.target.value) : undefined,
+                                      },
+                                    };
+                                    setStatusCodes(updated);
+                                  }}
+                                  className="w-16 px-2 py-1 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3]"
+                                  placeholder="3"
+                                  min="1"
+                                />
+                              </label>
+                            </div>
                           )}
                         </div>
                       </td>

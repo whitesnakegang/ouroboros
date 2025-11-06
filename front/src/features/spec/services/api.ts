@@ -110,6 +110,7 @@ export interface SchemaResponse {
   properties?: Record<string, SchemaField>;
   required?: string[];
   orders?: string[];
+  items?: any;  // array 타입일 경우
   xmlName?: string;
 }
 
