@@ -88,12 +88,10 @@ public final class RequestDiffHelper {
         List<Parameter> fileList = safeList(fileParams);
         List<Parameter> scanList = safeList(scanParams);
 
-        // Path parameter와 Query parameter를 분리하여 비교
-        // 1. Path parameter 비교
-        boolean pathDiff = comparePathParams(fileList, scanList);
-        if (pathDiff) {
-            return true;
-        }
+//        boolean pathDiff = comparePathParams(fileList, scanList);
+//        if (pathDiff) {
+//            return true;
+//        }
 
         // 2. Query parameter 비교
         boolean queryDiff = compareQueryParams(fileList, scanList);
@@ -175,6 +173,10 @@ public final class RequestDiffHelper {
             return false;
         }
 
+        if (isFormData(scanQueryParams)) {
+            return false;
+        }
+
         // Query parameter 개수 비교
         if (fileQueryParams.size() != scanQueryParams.size()) {
             return true;
@@ -186,6 +188,15 @@ public final class RequestDiffHelper {
 
         // 타입별 개수가 다르면 차이 있음
         return !fileTypeCounts.equals(scanTypeCounts);
+    }
+
+    private static boolean isFormData(List<Parameter> scanQueryParams) {
+        for(Parameter scanParam : scanQueryParams) {
+            if (scanParam.getSchema().getRef() != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
