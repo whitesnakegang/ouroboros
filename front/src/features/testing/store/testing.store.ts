@@ -41,8 +41,6 @@ interface TestingState {
   // Test Execution State
   isLoading: boolean;
   setIsLoading: (isLoading: boolean) => void;
-  useDummyResponse: boolean;
-  setUseDummyResponse: (useDummy: boolean) => void;
 
   // Method List State (for Test tab)
   methodList: TryMethod[] | null;
@@ -123,9 +121,6 @@ export const useTestingStore = create<TestingState>((set) => ({
 
   isLoading: false,
   setIsLoading: (isLoading) => set({ isLoading }),
-
-  useDummyResponse: false,
-  setUseDummyResponse: (useDummy) => set({ useDummyResponse: useDummy }),
 
   methodList: null,
   setMethodList: (methods) => set({ methodList: methods }),

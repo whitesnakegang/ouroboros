@@ -28,6 +28,7 @@ import {
   updateRestApiSpec,
   deleteRestApiSpec,
   getRestApiSpec,
+  getSchema,
 } from "../services/api";
 
 interface KeyValuePair {
@@ -85,8 +86,6 @@ export function ApiEditorLayout() {
     setResponse,
     isLoading,
     setIsLoading,
-    useDummyResponse,
-    setUseDummyResponse,
     setTryId,
   } = useTestingStore();
   const [activeTab, setActiveTab] = useState<"form" | "test">("form");
@@ -108,8 +107,8 @@ export function ApiEditorLayout() {
   // Completed 상태인지 확인
   const isCompleted = selectedEndpoint?.progress?.toLowerCase() === "completed";
 
-  // 수정/삭제 불가능한 상태인지 확인 (completed이거나 diff가 있는 경우)
-  const isReadOnly = isCompleted || hasDiff;
+  // 수정/삭제 불가능한 상태인지 확인 (completed인 경우만, mock 상태는 diff가 있어도 수정/삭제 가능)
+  const isReadOnly = isCompleted;
 
   // 에러 메시지에서 localhost 주소 제거 및 사용자 친화적인 메시지로 변환
   const getErrorMessage = (error: unknown): string => {
@@ -219,6 +218,7 @@ export function ApiEditorLayout() {
     try {
       const response = await getRestApiSpec(id);
       const spec = response.data;
+
       setMethod(spec.method);
       setUrl(spec.path);
       setDescription(spec.description || "");
@@ -256,7 +256,8 @@ export function ApiEditorLayout() {
             default:
               setAuth({ type: "none" });
           }
-          console.log("✓ Loaded security from backend:", schemeName);
+        } else {
+          setAuth({ type: "none" });
         }
       } else {
         setAuth({ type: "none" });
@@ -276,7 +277,7 @@ export function ApiEditorLayout() {
             // 폼 state (편집용)
             formHeaders.push({
               key: param.name || "",
-              value: param.schema?.default || "",
+              value: param.schema?.default || param.example || "",
               required: param.required || false,
               description: param.description || "",
               type: param.schema?.type || "string",
@@ -290,7 +291,7 @@ export function ApiEditorLayout() {
             // 폼 state (편집용)
             formQueryParams.push({
               key: param.name || "",
-              value: param.schema?.default || "",
+              value: param.schema?.default || param.example || "",
               required: param.required || false,
               description: param.description || "",
               type: param.schema?.type || "string",
@@ -309,39 +310,319 @@ export function ApiEditorLayout() {
       setRequestHeaders(formHeaders);
 
       // RequestBody 처리
-      if (spec.requestBody) {
+      let loadedRequestBody: RequestBody = {
+        type: "none",
+        contentType: "application/json",
+        fields: [],
+      };
+
+      // RequestBody 처리 - null이나 undefined 체크
+      if (spec.requestBody != null) {
         const reqBody = spec.requestBody as any;
-        if (reqBody.content && reqBody.content["application/json"]) {
-          const schema = reqBody.content["application/json"].schema;
-          if (schema && schema.properties) {
-            // 스키마에서 기본 JSON 객체 생성
-            const bodyObj: Record<string, any> = {};
-            Object.keys(schema.properties).forEach((key) => {
-              const prop = schema.properties[key];
-              if (prop.example !== undefined) {
-                bodyObj[key] = prop.example;
-              } else if (prop.type === "string") {
-                bodyObj[key] = prop.default || "string";
-              } else if (prop.type === "number" || prop.type === "integer") {
-                bodyObj[key] = prop.default || 0;
-              } else if (prop.type === "boolean") {
-                bodyObj[key] = prop.default || false;
-              }
-            });
-            testBody = JSON.stringify(bodyObj, null, 2);
-          }
-        } else if (reqBody.content) {
-          // 다른 content-type 처리 (예: text/plain)
+
+        // content가 없거나 빈 객체인 경우 처리
+        if (!reqBody.content || Object.keys(reqBody.content).length === 0) {
+          // content 없음
+        } else {
           const contentType = Object.keys(reqBody.content)[0];
+
+          // Content-Type에 따라 body type 결정
+          let bodyType:
+            | "none"
+            | "form-data"
+            | "x-www-form-urlencoded"
+            | "json"
+            | "xml" = "json";
+          if (contentType.includes("multipart/form-data")) {
+            bodyType = "form-data";
+          } else if (contentType.includes("x-www-form-urlencoded")) {
+            bodyType = "x-www-form-urlencoded";
+          } else if (contentType.includes("xml")) {
+            bodyType = "xml";
+          } else if (contentType.includes("json")) {
+            bodyType = "json";
+          }
+
           const content = reqBody.content[contentType];
-          if (content.example !== undefined) {
-            testBody =
-              typeof content.example === "string"
-                ? content.example
-                : JSON.stringify(content.example, null, 2);
+
+          if (content) {
+            const schema = content.schema;
+
+            // 스키마 참조 처리 ($ref 또는 ref)
+            const schemaRef = schema?.$ref || schema?.ref;
+            if (schemaRef) {
+              // $ref 형식: "#/components/schemas/OrderCreateRequest"
+              // ref 형식: "OrderCreateRequest"
+              let schemaName: string;
+              if (
+                typeof schemaRef === "string" &&
+                schemaRef.includes("#/components/schemas/")
+              ) {
+                const refMatch = schemaRef.match(
+                  /#\/components\/schemas\/(.+)/
+                );
+                schemaName = refMatch ? refMatch[1] : schemaRef;
+              } else {
+                schemaName =
+                  typeof schemaRef === "string" ? schemaRef : String(schemaRef);
+              }
+
+              try {
+                // 스키마 조회하여 properties 가져오기
+                const schemaResponse = await getSchema(schemaName);
+                const resolvedSchema = schemaResponse.data;
+
+                if (resolvedSchema.properties) {
+                  // 스키마의 properties를 fields로 변환
+                  const fields: Array<{
+                    key: string;
+                    value: string;
+                    type: string;
+                    description?: string;
+                    required?: boolean;
+                    ref?: string;
+                  }> = [];
+
+                  Object.keys(resolvedSchema.properties).forEach((key) => {
+                    const prop = resolvedSchema.properties![key];
+
+                    // 프로퍼티가 ref를 참조하는 경우
+                    if (prop.ref) {
+                      fields.push({
+                        key,
+                        value: "",
+                        type: prop.type || "object",
+                        description: prop.description,
+                        required: resolvedSchema.required?.includes(key),
+                        ref: prop.ref,
+                      });
+                    } else {
+                      // 일반 프로퍼티
+                      fields.push({
+                        key,
+                        value: prop.mockExpression || "",
+                        type: prop.type || "string",
+                        description: prop.description,
+                        required: resolvedSchema.required?.includes(key),
+                      });
+                    }
+                  });
+
+                  loadedRequestBody = {
+                    type: bodyType,
+                    contentType: contentType,
+                    fields: fields,
+                    schemaRef: schemaName, // 참조 정보도 유지
+                  };
+                } else {
+                  // properties가 없는 경우
+                  loadedRequestBody = {
+                    type: bodyType,
+                    contentType: contentType,
+                    fields: [],
+                    schemaRef: schemaName,
+                  };
+                }
+              } catch (error) {
+                console.error("⚠️ 스키마 조회 실패:", error);
+                // 스키마 조회 실패 시에도 schemaRef는 설정
+                loadedRequestBody = {
+                  type: bodyType,
+                  contentType: contentType,
+                  fields: [],
+                  schemaRef: schemaName,
+                };
+              }
+            } else if (schema?.properties) {
+              // 인라인 스키마 처리
+              const fields: Array<{
+                key: string;
+                value: string;
+                type: string;
+                description?: string;
+                required?: boolean;
+                ref?: string;
+              }> = [];
+
+              Object.keys(schema.properties).forEach((key) => {
+                const prop = schema.properties[key];
+
+                // 프로퍼티가 ref를 참조하는 경우
+                if (prop.$ref) {
+                  const refMatch = prop.$ref.match(
+                    /#\/components\/schemas\/(.+)/
+                  );
+                  if (refMatch) {
+                    fields.push({
+                      key,
+                      value: "",
+                      type: "object",
+                      description: prop.description,
+                      required: schema.required?.includes(key),
+                      ref: refMatch[1],
+                    });
+                  }
+                } else {
+                  // 일반 프로퍼티
+                  fields.push({
+                    key,
+                    value: prop.mockExpression || prop.default || "",
+                    type: prop.type || "string",
+                    description: prop.description,
+                    required: schema.required?.includes(key),
+                  });
+                }
+              });
+
+              loadedRequestBody = {
+                type: bodyType,
+                contentType: contentType,
+                fields: fields,
+              };
+            } else if (schema) {
+              // schema는 있지만 $ref나 properties가 없는 경우 (예: type만 있는 경우)
+              // 빈 body이지만 type은 설정
+              loadedRequestBody = {
+                type: bodyType,
+                contentType: contentType,
+                fields: [],
+              };
+            }
+
+            // 테스트용 body 생성
+            if (schema && schema.properties) {
+              const bodyObj: Record<string, any> = {};
+              Object.keys(schema.properties).forEach((key) => {
+                const prop = schema.properties[key];
+                if (prop.example !== undefined) {
+                  bodyObj[key] = prop.example;
+                } else if (prop.type === "string") {
+                  bodyObj[key] = prop.default || "string";
+                } else if (prop.type === "number" || prop.type === "integer") {
+                  bodyObj[key] = prop.default || 0;
+                } else if (prop.type === "boolean") {
+                  bodyObj[key] = prop.default || false;
+                }
+              });
+              testBody = JSON.stringify(bodyObj, null, 2);
+            } else if (content.example !== undefined) {
+              testBody =
+                typeof content.example === "string"
+                  ? content.example
+                  : JSON.stringify(content.example, null, 2);
+            }
           }
         }
       }
+
+      // RequestBody state 업데이트
+      setRequestBody(loadedRequestBody);
+
+      // Responses 처리
+      const loadedStatusCodes: StatusCode[] = [];
+      if (spec.responses && typeof spec.responses === "object") {
+        // for...of 루프로 변경하여 비동기 처리 가능하게 함
+        for (const [code, response] of Object.entries(spec.responses)) {
+          if (!code || code.trim() === "") continue;
+
+          const responseData = response as any;
+
+          const statusCode: StatusCode = {
+            code: code,
+            type:
+              parseInt(code) >= 200 && parseInt(code) < 300
+                ? "Success"
+                : "Error",
+            message: responseData.description || "",
+          };
+
+          // Response headers 처리
+          if (
+            responseData.headers &&
+            typeof responseData.headers === "object"
+          ) {
+            statusCode.headers = Object.entries(responseData.headers).map(
+              ([key, header]: [string, any]) => ({
+                key: key,
+                value:
+                  (header as any).description ||
+                  (header as any).schema?.type ||
+                  "",
+              })
+            );
+          }
+
+          // Response schema 처리 - 모든 content type 확인
+          if (
+            responseData.content &&
+            typeof responseData.content === "object"
+          ) {
+            // 첫 번째 content type 사용 (보통 application/json)
+            const contentType = Object.keys(responseData.content)[0];
+            if (contentType) {
+              const content = responseData.content[contentType];
+              const schema = content?.schema;
+
+              if (schema) {
+                // 스키마 참조 처리 ($ref 또는 ref)
+                const schemaRef = schema.$ref || schema.ref;
+                if (schemaRef) {
+                  // $ref 형식: "#/components/schemas/OrderCreateRequest"
+                  // ref 형식: "OrderCreateRequest"
+                  let schemaName: string;
+                  if (
+                    typeof schemaRef === "string" &&
+                    schemaRef.includes("#/components/schemas/")
+                  ) {
+                    const refMatch = schemaRef.match(
+                      /#\/components\/schemas\/(.+)/
+                    );
+                    schemaName = refMatch ? refMatch[1] : schemaRef;
+                  } else {
+                    schemaName =
+                      typeof schemaRef === "string"
+                        ? schemaRef
+                        : String(schemaRef);
+                  }
+
+                  try {
+                    // 스키마 조회하여 properties 가져오기
+                    const schemaResponse = await getSchema(schemaName);
+                    const resolvedSchema = schemaResponse.data;
+
+                    if (resolvedSchema.properties) {
+                      statusCode.schema = {
+                        ref: schemaName,
+                        properties: resolvedSchema.properties,
+                      };
+                    } else {
+                      statusCode.schema = {
+                        ref: schemaName,
+                      };
+                    }
+                  } catch (error) {
+                    console.error("⚠️ Response 스키마 조회 실패:", error);
+                    // 스키마 조회 실패 시에도 ref는 설정
+                    statusCode.schema = {
+                      ref: schemaName,
+                    };
+                  }
+                } else if (schema.properties) {
+                  // 인라인 스키마
+                  statusCode.schema = {
+                    properties: schema.properties,
+                  };
+                }
+              }
+            }
+          }
+
+          loadedStatusCodes.push(statusCode);
+        }
+      }
+
+      // StatusCodes state 업데이트
+      setStatusCodes(loadedStatusCodes);
 
       // 테스트 스토어 업데이트
       setRequest({
@@ -544,8 +825,6 @@ export function ApiEditorLayout() {
    * SecurityRequirement = { requirements: Map<String, List<String>> }
    */
   const convertAuthToSecurity = (): any[] => {
-    console.log("🔐 convertAuthToSecurity called, auth.type:", auth.type);
-
     if (auth.type === "none") {
       return [];
     }
@@ -575,7 +854,6 @@ export function ApiEditorLayout() {
     }
 
     if (!schemeName) {
-      console.warn("No schemeName matched for auth.type:", auth.type);
       return [];
     }
 
@@ -588,7 +866,6 @@ export function ApiEditorLayout() {
       },
     ];
 
-    console.log("✓ Converted security:", result);
     return result;
   };
 
@@ -710,6 +987,9 @@ export function ApiEditorLayout() {
 
         // 사이드바 목록 다시 로드 (백그라운드에서)
         loadEndpoints();
+
+        // 저장 후 다시 로드하여 백엔드에서 최신 데이터 가져오기
+        await loadEndpointData(selectedEndpoint.id);
       } else {
         // 새 엔드포인트 생성
         const apiRequest = {
@@ -726,10 +1006,6 @@ export function ApiEditorLayout() {
           responses: convertResponsesToOpenAPI(statusCodes),
           security: convertAuthToSecurity(),
         };
-
-        console.log("🔍 API Request:", JSON.stringify(apiRequest, null, 2));
-        console.log("🔐 Auth state:", auth);
-        console.log("🔐 Security:", apiRequest.security);
 
         const response = await createRestApiSpec(apiRequest);
 
@@ -750,7 +1026,7 @@ export function ApiEditorLayout() {
         // 사이드바 목록 다시 로드
         await loadEndpoints();
 
-        // 수정된 엔드포인트를 다시 선택
+        // 생성된 엔드포인트를 선택하고 저장된 데이터 다시 로드
         const updatedEndpoint = {
           id: response.data.id,
           method,
@@ -761,6 +1037,9 @@ export function ApiEditorLayout() {
           progress: "mock",
         };
         setSelectedEndpoint(updatedEndpoint);
+
+        // 생성 후 다시 로드하여 백엔드에서 최신 데이터 가져오기
+        await loadEndpointData(response.data.id);
       }
     } catch (error: unknown) {
       console.error("API 저장 실패:", error);
@@ -772,15 +1051,9 @@ export function ApiEditorLayout() {
   const handleDelete = async () => {
     if (!selectedEndpoint) return;
 
-    // completed 상태이거나 diff가 있으면 삭제 불가
+    // completed 상태만 삭제 불가 (mock 상태는 diff가 있어도 삭제 가능)
     if (isCompleted) {
       alert("이미 완료(completed)된 API는 삭제할 수 없습니다.");
-      return;
-    }
-    if (hasDiff) {
-      alert(
-        "명세와 실제 구현이 불일치하는 API는 삭제할 수 없습니다.\n\n먼저 백엔드에서 실제 구현을 제거하거나, 불일치를 해결해주세요."
-      );
       return;
     }
 
@@ -807,15 +1080,9 @@ export function ApiEditorLayout() {
   };
 
   const handleEdit = () => {
-    // completed 상태이거나 diff가 있으면 수정 불가
+    // completed 상태만 수정 불가 (mock 상태는 diff가 있어도 수정 가능)
     if (isCompleted) {
       alert("이미 완료(completed)된 API는 수정할 수 없습니다.");
-      return;
-    }
-    if (hasDiff) {
-      alert(
-        "명세와 실제 구현이 불일치하는 API는 수정할 수 없습니다.\n\n실제 구현에 맞춰 명세를 업데이트하려면 '실제 구현 → 명세에 자동 반영' 버튼을 사용하세요."
-      );
       return;
     }
     setIsEditMode(true);
@@ -947,118 +1214,80 @@ export function ApiEditorLayout() {
     setResponse(null);
 
     try {
-      if (useDummyResponse) {
-        // Dummy Response 사용
-        setTimeout(() => {
-          const dummyResponse = {
-            status: 200,
-            statusText: "OK",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Request-ID": "req-123456",
-            },
-            body: JSON.stringify(
-              {
-                token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.mock.token",
-                user: {
-                  id: "123",
-                  email: "test@example.com",
-                  name: "Test User",
-                },
-              },
-              null,
-              2
-            ),
-            responseTime: Math.floor(Math.random() * 200) + 50, // 50-250ms
-          };
-          setResponse(dummyResponse);
-          setExecutionStatus("completed");
-          setIsLoading(false);
-        }, 500);
-      } else {
-        // 실제 API 호출
-        const startTime = performance.now();
+      // 실제 API 호출 (Mock 엔드포인트는 백엔드에서 faker data 기반 응답 생성, Completed 엔드포인트는 실제 응답)
+      const startTime = performance.now();
 
-        // 헤더 변환
-        const headers: Record<string, string> = {};
-        request.headers.forEach((h) => {
-          if (h.key && h.value) {
-            headers[h.key] = h.value;
-          }
-        });
-
-        // X-Ouroboros-Try:on 헤더 추가
-        headers["X-Ouroboros-Try"] = "on";
-
-        // Query 파라미터 추가
-        let url = request.url;
-        if (request.queryParams.length > 0) {
-          const queryString = request.queryParams
-            .filter((p) => p.key && p.value)
-            .map(
-              (p) =>
-                `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`
-            )
-            .join("&");
-          if (queryString) {
-            url += `?${queryString}`;
-          }
+      // 헤더 변환
+      const headers: Record<string, string> = {};
+      request.headers.forEach((h) => {
+        if (h.key && h.value) {
+          headers[h.key] = h.value;
         }
+      });
 
-        // URL이 상대 경로인 경우 그대로 사용 (Vite 프록시 사용)
-        // 절대 URL(http://로 시작)인 경우에만 그대로 사용
-        const fullUrl = url.startsWith("http") ? url : url;
+      // X-Ouroboros-Try:on 헤더 추가
+      headers["X-Ouroboros-Try"] = "on";
 
-        // Request body 파싱 (GET 메서드가 아니고 body가 있을 때만)
-        let requestData = undefined;
-        if (request.method !== "GET" && request.body && request.body.trim()) {
-          try {
-            requestData = JSON.parse(request.body);
-          } catch (e) {
-            console.error("Request body 파싱 실패:", e);
-            throw new Error(
-              `Request body가 유효한 JSON 형식이 아닙니다: ${
-                e instanceof Error ? e.message : String(e)
-              }`
-            );
-          }
+      // Query 파라미터 추가
+      let url = request.url;
+      if (request.queryParams.length > 0) {
+        const queryString = request.queryParams
+          .filter((p) => p.key && p.value)
+          .map(
+            (p) => `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`
+          )
+          .join("&");
+        if (queryString) {
+          url += `?${queryString}`;
         }
-
-        console.log("API 요청 전송:", {
-          method: request.method,
-          url: fullUrl,
-          headers,
-          data: requestData,
-        });
-
-        const response = await axios({
-          method: request.method,
-          url: fullUrl,
-          headers: headers,
-          data: requestData,
-        });
-
-        const endTime = performance.now();
-        const responseTime = Math.round(endTime - startTime);
-
-        // 응답 헤더에서 X-Ouroboros-Try-Id 추출
-        const responseHeaders = response.headers as Record<string, string>;
-        const tryIdValue =
-          responseHeaders["x-ouroboros-try-id"] ||
-          responseHeaders["X-Ouroboros-Try-Id"];
-        if (tryIdValue) {
-          setTryId(tryIdValue);
-        }
-
-        setResponse({
-          status: response.status,
-          statusText: response.statusText,
-          headers: responseHeaders,
-          body: JSON.stringify(response.data, null, 2),
-          responseTime,
-        });
-        setExecutionStatus("completed");
       }
+
+      // URL이 상대 경로인 경우 그대로 사용 (Vite 프록시 사용)
+      // 절대 URL(http://로 시작)인 경우에만 그대로 사용
+      const fullUrl = url.startsWith("http") ? url : url;
+
+      // Request body 파싱 (GET 메서드가 아니고 body가 있을 때만)
+      let requestData = undefined;
+      if (request.method !== "GET" && request.body && request.body.trim()) {
+        try {
+          requestData = JSON.parse(request.body);
+        } catch (e) {
+          console.error("Request body 파싱 실패:", e);
+          throw new Error(
+            `Request body가 유효한 JSON 형식이 아닙니다: ${
+              e instanceof Error ? e.message : String(e)
+            }`
+          );
+        }
+      }
+
+      const response = await axios({
+        method: request.method,
+        url: fullUrl,
+        headers: headers,
+        data: requestData,
+      });
+
+      const endTime = performance.now();
+      const responseTime = Math.round(endTime - startTime);
+
+      // 응답 헤더에서 X-Ouroboros-Try-Id 추출
+      const responseHeaders = response.headers as Record<string, string>;
+      const tryIdValue =
+        responseHeaders["x-ouroboros-try-id"] ||
+        responseHeaders["X-Ouroboros-Try-Id"];
+      if (tryIdValue) {
+        setTryId(tryIdValue);
+      }
+
+      setResponse({
+        status: response.status,
+        statusText: response.statusText,
+        headers: responseHeaders,
+        body: JSON.stringify(response.data, null, 2),
+        responseTime,
+      });
+      setExecutionStatus("completed");
     } catch (error) {
       console.error("API 요청 실패:", error);
       const endTime = performance.now();
@@ -1296,19 +1525,6 @@ export function ApiEditorLayout() {
           ) : (
             // 테스트 폼일 때 버튼들
             <div className="flex flex-wrap items-center gap-2">
-              {/* Use Dummy Response Checkbox */}
-              <label className="flex items-center gap-2 cursor-pointer px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-transparent hover:bg-gray-50 dark:hover:bg-[#161B22] transition-colors">
-                <input
-                  type="checkbox"
-                  checked={useDummyResponse}
-                  onChange={(e) => setUseDummyResponse(e.target.checked)}
-                  className="w-4 h-4 text-[#2563EB] bg-white dark:bg-[#0D1117] border-gray-300 dark:border-[#2D333B] rounded focus:ring-[#2563EB] focus:ring-1"
-                />
-                <span className="text-sm font-medium text-gray-900 dark:text-[#E6EDF3]">
-                  Use Dummy Response
-                </span>
-              </label>
-
               {/* Run Button */}
               <button
                 onClick={handleRun}
@@ -1697,13 +1913,7 @@ export function ApiEditorLayout() {
                       ? "bg-gray-200 dark:bg-[#161B22] text-gray-400 dark:text-[#8B949E] cursor-not-allowed"
                       : "bg-[#2563EB] hover:bg-[#1E40AF] text-white"
                   }`}
-                  title={
-                    isCompleted
-                      ? "완료된 API는 수정할 수 없습니다"
-                      : hasDiff
-                      ? "불일치가 있는 API는 수정할 수 없습니다"
-                      : ""
-                  }
+                  title={isCompleted ? "완료된 API는 수정할 수 없습니다" : ""}
                 >
                   수정
                 </button>
@@ -1715,13 +1925,7 @@ export function ApiEditorLayout() {
                       ? "bg-gray-200 dark:bg-[#161B22] text-gray-400 dark:text-[#8B949E] cursor-not-allowed"
                       : "bg-red-500 hover:bg-red-600 text-white"
                   }`}
-                  title={
-                    isCompleted
-                      ? "완료된 API는 삭제할 수 없습니다"
-                      : hasDiff
-                      ? "불일치가 있는 API는 삭제할 수 없습니다"
-                      : ""
-                  }
+                  title={isCompleted ? "완료된 API는 삭제할 수 없습니다" : ""}
                 >
                   삭제
                 </button>

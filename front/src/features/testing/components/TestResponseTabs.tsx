@@ -15,7 +15,6 @@ export function TestResponseTabs() {
     response,
     methodList,
     totalDurationMs,
-    useDummyResponse,
     tryId,
     setMethodList,
     setTotalDurationMs,
@@ -27,9 +26,8 @@ export function TestResponseTabs() {
   const [traceData, setTraceData] = useState<TryTraceData | null>(null);
   const [isLoadingTrace, setIsLoadingTrace] = useState(false);
 
-  // Mock 엔드포인트인지 확인 (progress가 "mock"이거나 useDummyResponse가 true인 경우)
+  // Mock 엔드포인트인지 확인 (progress가 "completed"가 아닌 경우)
   const isMockEndpoint =
-    useDummyResponse ||
     selectedEndpoint?.progress?.toLowerCase() !== "completed";
 
   // test 탭이 활성화되고 tryId가 있을 때 메서드 리스트 로드

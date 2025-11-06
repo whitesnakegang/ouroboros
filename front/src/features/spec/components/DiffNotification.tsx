@@ -60,7 +60,6 @@ export function DiffNotification({
   // progress 상태 확인 (기본값: "mock")
   const progressLower = progress?.toLowerCase() || "mock";
   const isCompleted = progressLower === "completed";
-  const isMock = !isCompleted;
 
   const getTypeLabel = () => {
     switch (diffDetails.type) {
@@ -178,25 +177,25 @@ export function DiffNotification({
               <span>명세서의 수정 및 삭제가 제한됩니다.</span>
             </li>
             {diffDetails.type === "endpoint" && (
-              <li className="flex items-start gap-2">
-                <svg
-                  className="w-3 h-3 text-gray-500 dark:text-[#8B949E] mt-0.5 flex-shrink-0"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                <span>
-                  실제 구현에 존재하지만 명세에 없는 필드가 있다면, 아래 버튼을
-                  클릭하여 명세에 자동으로 추가할 수 있습니다.
-                </span>
-              </li>
+            <li className="flex items-start gap-2">
+              <svg
+                className="w-3 h-3 text-gray-500 dark:text-[#8B949E] mt-0.5 flex-shrink-0"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <span>
+                실제 구현에 존재하지만 명세에 없는 필드가 있다면, 아래 버튼을
+                클릭하여 명세에 자동으로 추가할 수 있습니다.
+              </span>
+            </li>
             )}
           </ul>
         </div>
