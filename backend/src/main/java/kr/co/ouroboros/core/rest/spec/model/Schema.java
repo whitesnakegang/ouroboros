@@ -90,4 +90,25 @@ public class Schema {
      * Used in inline mode only for XML content types.
      */
     private String xmlName;
+
+    /**
+     * Items schema for array type
+     * <p>
+     * Used when type is "array" to define the schema of array elements.
+     */
+    private Schema items;
+
+    /**
+     * Minimum number of items in array
+     * <p>
+     * Used when type is "array" for validation and mock generation.
+     */
+    private Integer minItems;
+
+    /**
+     * Maximum number of items in array
+     * <p>
+     * Used when type is "array" for validation and mock generation.
+     */
+    private Integer maxItems;
 }

@@ -13,14 +13,13 @@ export function RootLayout() {
     }
   };
 
+  // 다크 모드 설정 적용 (초기 로드 및 변경 시)
   useEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add("dark");
-      // Chrome의 시스템 설정을 무시하고 앱의 다크모드 강제 적용
       document.documentElement.style.colorScheme = "dark";
     } else {
       document.documentElement.classList.remove("dark");
-      // Chrome의 시스템 설정을 무시하고 앱의 라이트모드 강제 적용
       document.documentElement.style.colorScheme = "light";
     }
   }, [isDarkMode]);
