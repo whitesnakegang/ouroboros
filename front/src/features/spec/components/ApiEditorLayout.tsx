@@ -11,15 +11,9 @@ import { useSpecStore } from "../store/spec.store";
 import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
 import { useTestingStore } from "@/features/testing/store/testing.store";
 import axios from "axios";
+import { downloadMarkdown } from "../utils/markdownExporter";
+import { downloadYaml } from "../utils/yamlExporter";
 import {
-  downloadMarkdown,
-  exportAllToMarkdown,
-} from "../utils/markdownExporter";
-import { buildOpenApiYamlFromSpecs, downloadYaml } from "../utils/yamlExporter";
-import {
-  getAllRestApiSpecs,
-  getAllSchemas,
-  type GetAllSchemasResponse,
   importYaml,
   type ImportYamlResponse,
   exportYaml,
@@ -1320,7 +1314,9 @@ export function ApiEditorLayout() {
                   onClick={async () => {
                     try {
                       const yaml = await exportYaml();
-                      const { convertYamlToMarkdown } = await import("../utils/markdownExporter");
+                      const { convertYamlToMarkdown } = await import(
+                        "../utils/markdownExporter"
+                      );
                       const md = convertYamlToMarkdown(yaml);
                       downloadMarkdown(
                         md,
@@ -1364,9 +1360,7 @@ export function ApiEditorLayout() {
                     } catch (e) {
                       console.error("YAML 내보내기 오류:", e);
                       const errorMsg = getErrorMessage(e);
-                      alert(
-                        `YAML 내보내기에 실패했습니다.\n오류: ${errorMsg}`
-                      );
+                      alert(`YAML 내보내기에 실패했습니다.\n오류: ${errorMsg}`);
                     }
                   }}
                   className="px-3 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-colors text-sm font-medium flex items-center gap-2"
