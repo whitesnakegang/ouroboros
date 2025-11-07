@@ -1320,6 +1320,11 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
 
     @Override
     public String exportYaml() throws Exception {
-        return yamlParser.readYamlContent();
+        lock.readLock().lock();
+        try {
+            return yamlParser.readYamlContent();
+        } finally {
+            lock.readLock().unlock();
+        }
     }
 }
