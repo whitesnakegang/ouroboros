@@ -1317,4 +1317,9 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         endpoints.values().forEach(mockRegistry::register);
         log.info("Reloaded {} mock endpoints into registry", endpoints.size());
     }
+
+    @Override
+    public String exportYaml() throws Exception {
+        return yamlParser.readYamlContent();
+    }
 }

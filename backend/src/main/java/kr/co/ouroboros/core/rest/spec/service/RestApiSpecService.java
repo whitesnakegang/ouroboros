@@ -86,4 +86,15 @@ public interface RestApiSpecService {
      * @throws Exception if validation fails or import operation fails
      */
     ImportYamlResponse importYaml(String yamlContent) throws Exception;
+
+    /**
+     * Exports the YAML file content as a string.
+     * <p>
+     * Reads the current saved content from the ourorest.yml file directly.
+     * Used for export operations where the actual file content is needed.
+     *
+     * @return YAML file content as a string
+     * @throws Exception if file reading fails or file does not exist
+     */
+    String exportYaml() throws Exception;
 }
