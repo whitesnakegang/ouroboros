@@ -1,16 +1,19 @@
 package kr.co.ouroboros.core.rest.tryit.config;
 
+import io.opentelemetry.sdk.trace.SpanProcessor;
 import kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.config.MethodTracingProperties;
+import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.memory.processor.InMemoryTrySpanProcessor;
+import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.tempo.processor.TempoTrySpanProcessor;
+import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.TraceStorage;
 import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.tempo.config.TempoProperties;
-import kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.processor.TrySpanProcessor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.scheduling.annotation.EnableScheduling;
-import io.opentelemetry.sdk.trace.SpanProcessor;
-import lombok.extern.slf4j.Slf4j;
 
 /**
  * Try feature configuration.
@@ -26,7 +29,7 @@ import lombok.extern.slf4j.Slf4j;
  * <p>
  * <b>Beans:</b>
  * <ul>
- *   <li>{@link SpanProcessor} - TrySpanProcessor for adding tryId to spans</li>
+ *   <li>{@link SpanProcessor} - TempoTrySpanProcessor or InMemoryTrySpanProcessor based on Tempo enabled status</li>
  * </ul>
  *
  * @author Ouroboros Team
@@ -43,20 +46,39 @@ import lombok.extern.slf4j.Slf4j;
 public class TryConfig {
     
     /**
-     * Register a TrySpanProcessor bean that enriches OpenTelemetry spans with a `tryId` attribute.
+     * Register a TempoTrySpanProcessor bean that enriches OpenTelemetry spans with a `tryId` attribute.
+     * <p>
+     * This bean is used when Tempo is enabled. It only adds tryId attributes to spans
+     * but does not collect them in memory. Spans are automatically exported to Tempo.
      *
-     * The bean is created only if no other bean named `trySpanProcessor` is present. Spring Boot's
-     * Micrometer Tracing auto-configuration will discover SpanProcessor beans and register them with
-     * the OpenTelemetry SDK so spans receive the `tryId` from the `X-Ouroboros-Try` header or Try context.
-     *
-     * @return the created TrySpanProcessor instance as a `SpanProcessor`
+     * @return the created TempoTrySpanProcessor instance as a `SpanProcessor`
      */
     @Bean
     @ConditionalOnMissingBean(name = "trySpanProcessor")
+    @ConditionalOnProperty(name = "ouroboros.tempo.enabled", havingValue = "true", matchIfMissing = false)
     public SpanProcessor trySpanProcessor() {
-        log.info("Creating TrySpanProcessor bean");
-        TrySpanProcessor processor = new TrySpanProcessor();
-        log.info("TrySpanProcessor bean created successfully");
+        log.info("Creating TempoTrySpanProcessor bean (Tempo enabled)");
+        TempoTrySpanProcessor processor = new TempoTrySpanProcessor();
+        log.info("TempoTrySpanProcessor bean created successfully");
+        return processor;
+    }
+    
+    /**
+     * Register an InMemoryTrySpanProcessor bean that collects spans in memory.
+     * <p>
+     * This bean is used when Tempo is disabled. It adds tryId attributes to spans
+     * and collects them in InMemoryTraceStorage for later retrieval.
+     *
+     * @param traceStorage The trace storage (in-memory when Tempo is disabled)
+     * @return the created InMemoryTrySpanProcessor instance as a `SpanProcessor`
+     */
+    @Bean
+    @ConditionalOnMissingBean(name = "trySpanProcessor")
+    @ConditionalOnProperty(name = "ouroboros.tempo.enabled", havingValue = "false", matchIfMissing = true)
+    public SpanProcessor inMemoryTrySpanProcessor(TraceStorage traceStorage) {
+        log.info("Creating InMemoryTrySpanProcessor bean (Tempo disabled)");
+        InMemoryTrySpanProcessor processor = new InMemoryTrySpanProcessor(traceStorage);
+        log.info("InMemoryTrySpanProcessor bean created successfully");
         return processor;
     }
     
