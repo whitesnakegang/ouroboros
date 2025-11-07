@@ -13,8 +13,8 @@
   "dependencies": {
     "@types/js-yaml": "^4.0.9",
     "axios": "^1.7.9",
-    "openapi-snippet": "^0.14.0",
     "js-yaml": "^4.1.0",
+    "openapi-snippet": "^0.12.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-router-dom": "^7.1.0",
@@ -38,5 +38,8 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.45.0",
     "vite": "^7.1.7"
+  },
+  "overrides": {
+    "form-data": "^4.0.0"
   }
 }

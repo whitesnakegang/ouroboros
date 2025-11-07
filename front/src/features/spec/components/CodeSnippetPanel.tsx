@@ -51,12 +51,21 @@ function buildOpenAPISpec(
   headers: KeyValuePair[],
   requestBody?: RequestBody
 ): any {
+  // 환경변수에서 base URL 가져오기 (없으면 기본값 사용)
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
+
   const openApiSpec: any = {
     openapi: "3.1.0",
     info: {
       title: "API Documentation",
       version: "1.0.0",
     },
+    servers: [
+      {
+        url: baseUrl,
+        description: "API Server",
+      },
+    ],
     paths: {},
   };
 
