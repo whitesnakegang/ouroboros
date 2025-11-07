@@ -79,11 +79,12 @@ export function ApiEditorLayout() {
     protocol: testProtocol,
     setProtocol: setTestProtocol,
     request,
-    setRequest,
     setResponse,
     isLoading,
     setIsLoading,
     setTryId,
+    authorization,
+    setAuthorization,
   } = useTestingStore();
   const [activeTab, setActiveTab] = useState<"form" | "test">("form");
   const [isCodeSnippetOpen, setIsCodeSnippetOpen] = useState(false);
@@ -95,6 +96,8 @@ export function ApiEditorLayout() {
   const [executionStatus, setExecutionStatus] = useState<
     "idle" | "running" | "completed" | "error"
   >("idle");
+  const [isAuthorizationInputOpen, setIsAuthorizationInputOpen] =
+    useState(false);
 
   // Diff가 있는지 확인 (boolean으로 명시적 변환)
   const hasDiff = !!(
@@ -309,29 +312,18 @@ export function ApiEditorLayout() {
 
       if (spec.requestBody != null) {
         const reqBody = spec.requestBody as any;
-        console.log("🔍 RequestBody 로드 시작:", reqBody);
 
         if (reqBody.content && Object.keys(reqBody.content).length > 0) {
           const contentType = Object.keys(reqBody.content)[0];
-          console.log("🔍 Content-Type:", contentType);
 
           // 새로운 parseOpenAPIRequestBody 사용
           const parsed = parseOpenAPIRequestBody(reqBody, contentType);
-          console.log("🔍 파싱된 RequestBody:", parsed);
 
           if (parsed) {
             loadedRequestBody = parsed;
-          } else {
-            console.warn("⚠️ RequestBody 파싱 실패 - parsed가 null입니다");
           }
-        } else {
-          console.warn("⚠️ RequestBody에 content가 없습니다");
         }
-      } else {
-        console.log("ℹ️ RequestBody가 없습니다");
       }
-
-      console.log("✅ 최종 loadedRequestBody:", loadedRequestBody);
 
       // schemaRef가 있으면 스키마를 조회해서 fields 채우기
       if (
@@ -339,10 +331,8 @@ export function ApiEditorLayout() {
         (!loadedRequestBody.fields || loadedRequestBody.fields.length === 0)
       ) {
         try {
-          console.log("🔍 스키마 조회 시작:", loadedRequestBody.schemaRef);
           const schemaResponse = await getSchema(loadedRequestBody.schemaRef);
           const schemaData = schemaResponse.data;
-          console.log("🔍 조회된 스키마:", schemaData);
 
           if (schemaData.properties) {
             const fields = Object.entries(schemaData.properties).map(
@@ -361,10 +351,9 @@ export function ApiEditorLayout() {
             }
 
             loadedRequestBody.fields = fields;
-            console.log("✅ 스키마에서 fields 로드 완료:", fields);
           }
-        } catch (error) {
-          console.error("⚠️ 스키마 조회 실패:", error);
+        } catch {
+          // 스키마 조회 실패 시 무시
         }
       }
 
@@ -1026,17 +1015,33 @@ export function ApiEditorLayout() {
       )
     ) {
       try {
-        // TODO: 백엔드 API 엔드포인트 구현 필요
-        // 백엔드에서 실제 구현된 스펙을 가져와서 명세를 업데이트하는 API 호출
-        alert(
-          "기능 개발 중입니다.\n\n백엔드에서 실제 구현 → 명세 동기화 API가 필요합니다."
-        );
+        // 현재 엔드포인트의 정보를 백엔드에서 가져옴
+        const response = await getRestApiSpec(selectedEndpoint.id);
+        const spec = response.data;
 
-        // 예시: 향후 구현될 API 호출
-        // const response = await syncImplementationToSpec(selectedEndpoint.id);
-        // await loadEndpointData(selectedEndpoint.id);
-        // await loadEndpoints();
-        // alert("✅ 실제 구현이 명세에 성공적으로 반영되었습니다!");
+        // 현재 명세 정보를 그대로 업데이트 요청으로 전달
+        // 백엔드의 updateRestApiSpec 메서드에서 자동으로 x-ouroboros-diff를 "none"으로 설정함
+        const updateRequest = {
+          path: spec.path,
+          method: spec.method,
+          summary: spec.summary,
+          description: spec.description,
+          tags: spec.tags || [],
+          parameters: spec.parameters || [],
+          requestBody: spec.requestBody || undefined,
+          responses: spec.responses || {},
+          security: spec.security || [],
+        };
+
+        await updateRestApiSpec(selectedEndpoint.id, updateRequest);
+
+        // 엔드포인트 데이터 다시 로드하여 최신 상태 반영
+        await loadEndpointData(selectedEndpoint.id);
+
+        // 사이드바 목록도 다시 로드하여 diff 상태 업데이트
+        await loadEndpoints();
+
+        alert(" 실제 구현이 명세에 성공적으로 반영되었습니다!");
       } catch (error: unknown) {
         console.error("명세 동기화 실패:", error);
         const errorMessage = getErrorMessage(error);
@@ -1061,6 +1066,11 @@ export function ApiEditorLayout() {
           headers[h.key] = h.value;
         }
       });
+
+      // Authorization 헤더 추가 (입력된 경우)
+      if (authorization && authorization.trim()) {
+        headers["Authorization"] = authorization.trim();
+      }
 
       // X-Ouroboros-Try:on 헤더 추가
       headers["X-Ouroboros-Try"] = "on";
@@ -1305,7 +1315,6 @@ export function ApiEditorLayout() {
                       d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
                     />
                   </svg>
-                  <span className="hidden sm:inline">Import</span>
                 </button>
                 <button
                   onClick={async () => {
@@ -1342,7 +1351,6 @@ export function ApiEditorLayout() {
                       d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                     />
                   </svg>
-                  <span className="hidden sm:inline">Export</span>
                 </button>
                 <button
                   onClick={async () => {
@@ -1383,33 +1391,104 @@ export function ApiEditorLayout() {
                       d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
                     />
                   </svg>
-                  <span className="hidden sm:inline">Generate</span>
-                </button>
-                <button
-                  onClick={() => setIsCodeSnippetOpen(true)}
-                  className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2"
-                  title="Code Snippet 보기"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
-                    />
-                  </svg>
-                  Code Snippet
                 </button>
               </div>
             </div>
           ) : (
             // 테스트 폼일 때 버튼들
             <div className="flex flex-wrap items-center gap-2">
+              {/* Authorization Button & Input */}
+              <div className="relative flex items-center gap-2">
+                {!isAuthorizationInputOpen ? (
+                  <button
+                    onClick={() => setIsAuthorizationInputOpen(true)}
+                    className={`px-3 py-2 rounded-md border transition-colors text-sm font-medium flex items-center gap-2 ${
+                      authorization && authorization.trim()
+                        ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300"
+                        : "bg-white dark:bg-[#0D1117] border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22]"
+                    }`}
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                      />
+                    </svg>
+                    {authorization && authorization.trim() ? (
+                      <span className="flex items-center gap-1">
+                        <svg
+                          className="w-4 h-4 text-green-500"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                        Auth
+                      </span>
+                    ) : (
+                      <span>Auth</span>
+                    )}
+                  </button>
+                ) : (
+                  <div className="relative flex items-center">
+                    <input
+                      type="text"
+                      value={authorization}
+                      onChange={(e) => setAuthorization(e.target.value)}
+                      onBlur={() => {
+                        // 입력이 완료되면 입력창 숨김
+                        if (authorization && authorization.trim()) {
+                          setIsAuthorizationInputOpen(false);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          // Enter 키를 누르면 입력창 숨김
+                          if (authorization && authorization.trim()) {
+                            setIsAuthorizationInputOpen(false);
+                          }
+                        } else if (e.key === "Escape") {
+                          // Escape 키를 누르면 입력창 숨김
+                          setIsAuthorizationInputOpen(false);
+                        }
+                      }}
+                      placeholder="Authorization"
+                      autoFocus
+                      className="px-3 py-2 pr-10 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm w-64"
+                    />
+                    {authorization && authorization.trim() && (
+                      <div className="absolute right-3 flex items-center">
+                        <svg
+                          className="w-5 h-5 text-green-500"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
               {/* Run Button */}
               <button
                 onClick={handleRun}
@@ -1556,21 +1635,46 @@ export function ApiEditorLayout() {
             {/* Method + URL Card */}
             {protocol === "REST" && (
               <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm mb-6">
-                <div className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3] mb-2 flex items-center gap-2">
-                  <svg
-                    className="h-4 w-4 text-gray-500 dark:text-[#8B949E]"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                    />
-                  </svg>
-                  <span>Method & URL</span>
+                <div className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3] mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <svg
+                      className="h-4 w-4 text-gray-500 dark:text-[#8B949E]"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
+                    </svg>
+                    <span>Method & URL</span>
+                  </div>
+                  {/* Code Snippet 버튼 - 생성 완료된 명세서에서만 활성화 (수정 중일 때는 숨김) */}
+                  {selectedEndpoint && !isEditMode && (
+                    <button
+                      onClick={() => setIsCodeSnippetOpen(true)}
+                      className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2"
+                      title="Code Snippet 보기"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
+                        />
+                      </svg>
+                      <span className="hidden sm:inline">Code Snippet</span>
+                    </button>
+                  )}
                 </div>
                 <p className="text-xs text-gray-600 dark:text-[#8B949E] mb-4">
                   HTTP 메서드와 엔드포인트 URL을 입력하세요

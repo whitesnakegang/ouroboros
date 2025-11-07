@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
+import { nodePolyfills } from "vite-plugin-node-polyfills";
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -8,7 +9,14 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
 
   return {
-    plugins: [react()],
+    plugins: [
+      react(),
+      nodePolyfills(), // Node.js 폴리필 추가
+    ],
+    define: {
+      global: "window",
+      "process.env": {},
+    },
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
