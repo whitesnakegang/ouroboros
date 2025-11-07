@@ -1,5 +1,6 @@
 package kr.co.ouroboros.core.rest.handler;
 
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -65,7 +66,9 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
             return restFileSpec;
         }
 
-        Map<String, Boolean> schemaMatchResults = compareSchemas(restFileSpec, restScannedSpec);
+        SchemaComparisonResults schemaComparisonResults = compareSchemas(restFileSpec, restScannedSpec);
+        Map<String, SchemaComparisonResult> fileSchemaResults = schemaComparisonResults.getFileResults();
+        Map<String, SchemaComparisonResult> scanSchemaResults = schemaComparisonResults.getScanResults();
 
         // Preserve components.securitySchemes from fileSpec (scannedSpec doesn't have securitySchemes from annotation)
         if (restFileSpec != null && restFileSpec.getComponents() != null && 
@@ -147,11 +150,12 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
                 if(isMockApi(fileOp, scanOp)) continue;
 
                 // 3. endpoint diff가 있으면 reqCompare, resCompare는 스킵
-                reqCompare(url, fileOp, scanOp, schemaMatchResults, httpMethod);
+                // 파일 스펙과 스캔 스펙 모두 전달 (각각의 스키마 참조에 따라 사용)
+                reqCompare(url, fileOp, scanOp, fileSchemaResults, scanSchemaResults, httpMethod);
 
                 // 시영지기 @ApiResponse를 사용해서 명세를 정확히 작성했을 때만 response 검증
                 if(scanOp.getXOuroborosResponse() != null && scanOp.getXOuroborosResponse().equals("use")) {
-                    resCompare(url, httpMethod, fileOp, scanOp, schemaMatchResults);
+                    resCompare(url, httpMethod, fileOp, scanOp, fileSchemaResults, scanSchemaResults);
                 }
             }
         }
@@ -193,9 +197,9 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
      *
      * @param restFileSpec    the file-based REST API specification to update
      * @param restScannedSpec the runtime-scanned REST API specification to compare against
-     * @return a map keyed by schema name where `true` indicates the scanned schema matches the file schema, `false` otherwise
+     * @return SchemaComparisonResults containing file-based and scan-based comparison results
      */
-    private Map<String, Boolean> compareSchemas(OuroRestApiSpec restFileSpec, OuroRestApiSpec restScannedSpec) {
+    private SchemaComparisonResults compareSchemas(OuroRestApiSpec restFileSpec, OuroRestApiSpec restScannedSpec) {
         return schemaComparator.compareSchemas(restScannedSpec.getComponents(), restFileSpec.getComponents());
     }
 
@@ -205,11 +209,18 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
      * @param url the request path being compared
      * @param fileOp the operation from the file specification
      * @param scanOp the operation from the scanned specification
-     * @param schemaMatchResults map of component schema names to a boolean indicating whether each schema matches between scan and file
+     * @param fileSchemaResults file-based schema comparison results
+     * @param scanSchemaResults scan-based schema comparison results
      * @param method the HTTP method for which parameters are compared
      */
-    private void reqCompare(String url, Operation fileOp, Operation scanOp, Map<String, Boolean> schemaMatchResults, HttpMethod method) {
-        compareAndMarkRequest(url, fileOp, scanOp, method, schemaMatchResults);
+    private void reqCompare(String url, Operation fileOp, Operation scanOp, 
+                           Map<String, SchemaComparisonResult> fileSchemaResults, 
+                           Map<String, SchemaComparisonResult> scanSchemaResults, 
+                           HttpMethod method) {
+        // 파일 스펙과 스캔 스펙 결과를 병합 (스키마 이름이 중복되면 스캔 결과 우선)
+        Map<String, SchemaComparisonResult> mergedResults = mergeSchemaResults(fileSchemaResults, scanSchemaResults);
+        Map<String, Boolean> booleanResults = convertToBooleanMap(mergedResults);
+        compareAndMarkRequest(url, fileOp, scanOp, method, booleanResults);
     }
 
     /**
@@ -219,11 +230,60 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
      * @param method              the HTTP method for the comparison
      * @param fileOp              the Operation from the file-based specification
      * @param scanOp              the Operation from the runtime-scanned specification
-     * @param schemaMatchResults  map of schema names to match status: `true` if the scanned schema matches the file schema, `false` otherwise
+     * @param fileSchemaResults   file-based schema comparison results
+     * @param scanSchemaResults   scan-based schema comparison results
      */
-    private void resCompare(String url, HttpMethod method, Operation fileOp, Operation scanOp, Map<String, Boolean> schemaMatchResults) {
+    private void resCompare(String url, HttpMethod method, Operation fileOp, Operation scanOp,
+                           Map<String, SchemaComparisonResult> fileSchemaResults,
+                           Map<String, SchemaComparisonResult> scanSchemaResults) {
         // 이전 로직에 의해 fileOp과 scanOp은 endpoint랑 http-method가 똑같은 삳태가 보장됨.
         // scan은 무조건 null이 아님
-        responseComparator.compareResponsesForMethod(url, method, scanOp, fileOp, schemaMatchResults);
+        // 파일 스펙과 스캔 스펙 결과를 병합 (스키마 이름이 중복되면 스캔 결과 우선)
+        Map<String, SchemaComparisonResult> mergedResults = mergeSchemaResults(fileSchemaResults, scanSchemaResults);
+        Map<String, Boolean> booleanResults = convertToBooleanMap(mergedResults);
+        responseComparator.compareResponsesForMethod(url, method, scanOp, fileOp, booleanResults);
+    }
+
+    /**
+     * 파일 스펙과 스캔 스펙의 스키마 비교 결과를 병합합니다.
+     * <p>
+     * 같은 스키마 이름이 양쪽에 있으면 스캔 스펙 결과를 우선 사용합니다.
+     *
+     * @param fileResults file-based schema comparison results
+     * @param scanResults scan-based schema comparison results
+     * @return 병합된 스키마 비교 결과
+     */
+    private Map<String, SchemaComparisonResult> mergeSchemaResults(
+            Map<String, SchemaComparisonResult> fileResults,
+            Map<String, SchemaComparisonResult> scanResults) {
+        Map<String, SchemaComparisonResult> merged = new HashMap<>();
+        
+        // 파일 결과 먼저 추가
+        if (fileResults != null) {
+            merged.putAll(fileResults);
+        }
+        
+        // 스캔 결과 추가 (같은 키가 있으면 덮어씀)
+        if (scanResults != null) {
+            merged.putAll(scanResults);
+        }
+        
+        return merged;
+    }
+
+    /**
+     * SchemaComparisonResult Map을 Boolean Map으로 변환합니다.
+     *
+     * @param schemaMatchResults SchemaComparisonResult Map
+     * @return Boolean Map (isSame 필드 값)
+     */
+    private Map<String, Boolean> convertToBooleanMap(Map<String, SchemaComparisonResult> schemaMatchResults) {
+        Map<String, Boolean> booleanResults = new HashMap<>();
+        if (schemaMatchResults != null) {
+            for (Map.Entry<String, SchemaComparisonResult> entry : schemaMatchResults.entrySet()) {
+                booleanResults.put(entry.getKey(), entry.getValue().isSame());
+            }
+        }
+        return booleanResults;
     }
 }
