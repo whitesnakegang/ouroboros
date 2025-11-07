@@ -76,9 +76,6 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
         // Scan 스펙을 기준으로 일치 여부 판단
         Map<String, Boolean> scanSchemaResults = schemaComparator.compareFlattenedSchemas(scanFlattenedSchemas, fileFlattenedSchemas);
 
-        // File 스펙을 기준으로 일치 여부 판단 (File에만 있는 스키마도 처리)
-        Map<String, Boolean> fileSchemaResults = schemaComparator.compareFlattenedSchemas(fileFlattenedSchemas, scanFlattenedSchemas);
-
         // Preserve components.securitySchemes from fileSpec (scannedSpec doesn't have securitySchemes from annotation)
         if (restFileSpec != null && restFileSpec.getComponents() != null && 
             restFileSpec.getComponents().getSecuritySchemes() != null) {
@@ -162,7 +159,7 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
                 if(isMockApi(fileOp, scanOp)) continue;
 
                 // 3. endpoint diff가 있으면 reqCompare, resCompare는 스킵
-                reqCompare(url, fileOp, scanOp, httpMethod);
+                reqCompare(url, fileOp, scanOp, httpMethod, fileFlattenedSchemas, scanFlattenedSchemas);
 
                 // 시영지기 @ApiResponse를 사용해서 명세를 정확히 작성했을 때만 response 검증
                 if (scanOp.getXOuroborosResponse() != null && scanOp.getXOuroborosResponse()
@@ -212,8 +209,11 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
      * @param scanOp the operation from the scanned specification
      * @param method the HTTP method for which parameters are compared
      */
-    private void reqCompare(String url, Operation fileOp, Operation scanOp, HttpMethod method) {
-        compareAndMarkRequest(url, fileOp, scanOp, method);
+    private void reqCompare(String url, Operation fileOp, Operation scanOp, HttpMethod method,
+            Map<String, SchemaComparator.TypeCnts> fileFlattenedSchemas,
+            Map<String, SchemaComparator.TypeCnts> scanFlattenedSchemas
+    ) {
+        compareAndMarkRequest(url, fileOp, scanOp, method, fileFlattenedSchemas, scanFlattenedSchemas);
     }
 
     /**

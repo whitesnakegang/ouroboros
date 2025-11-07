@@ -35,15 +35,19 @@ public final class RequestDiffHelper {
      * @param scanOp the operation from the scanned specification to compare against
      * @param method the HTTP method for the operation
      */
-    public static void compareAndMarkRequest(String url, Operation fileOp, Operation scanOp, HttpMethod method) {
+    public static void compareAndMarkRequest(String url, Operation fileOp, Operation scanOp, HttpMethod method,
+            Map<String, SchemaComparator.TypeCnts> fileFlattenedSchemas,
+            Map<String, SchemaComparator.TypeCnts> scanFlattenedSchemas
+    ) {
+
 
         // 1. fileOp의 타입별 개수 수집
         Map<String, Integer> fileTypeCounts = new HashMap<>();
-        collectTypeCounts(fileOp, fileTypeCounts);
+        collectTypeCounts(fileOp, fileTypeCounts, fileFlattenedSchemas);
 
         // 2. scanOp의 타입별 개수 수집
         Map<String, Integer> scanTypeCounts = new HashMap<>();
-        collectTypeCounts(scanOp, scanTypeCounts);
+        collectTypeCounts(scanOp, scanTypeCounts, scanFlattenedSchemas);
 
         // 3. 타입별 개수 비교
         boolean typeDiff = !fileTypeCounts.equals(scanTypeCounts);
@@ -64,17 +68,19 @@ public final class RequestDiffHelper {
      *
      * @param operation the operation to analyze
      * @param typeCounts map to store type counts (will be modified)
+     * @param flattenedSchemas map of schema name to flattened type counts
      */
-    private static void collectTypeCounts(Operation operation, Map<String, Integer> typeCounts) {
+    private static void collectTypeCounts(Operation operation, Map<String, Integer> typeCounts, 
+                                          Map<String, SchemaComparator.TypeCnts> flattenedSchemas) {
         if (operation == null) {
             return;
         }
 
         // 1. parameters 에서 타입 수집
-        collectTypeCountsFromParameters(operation.getParameters(), typeCounts);
+        collectTypeCountsFromParameters(operation.getParameters(), typeCounts, flattenedSchemas);
 
         // 2. requestBody 에서 타입 수집
-        collectTypeCountsFromRequestBody(operation.getRequestBody(), typeCounts);
+        collectTypeCountsFromRequestBody(operation.getRequestBody(), typeCounts, flattenedSchemas);
     }
 
     /**
@@ -82,8 +88,10 @@ public final class RequestDiffHelper {
      *
      * @param parameters list of parameters to analyze
      * @param typeCounts map to store type counts (will be modified)
+     * @param flattenedSchemas map of schema name to flattened type counts
      */
-    private static void collectTypeCountsFromParameters(List<Parameter> parameters, Map<String, Integer> typeCounts) {
+    private static void collectTypeCountsFromParameters(List<Parameter> parameters, Map<String, Integer> typeCounts,
+                                                       Map<String, SchemaComparator.TypeCnts> flattenedSchemas) {
         if (parameters == null || parameters.isEmpty()) {
             return;
         }
@@ -109,7 +117,7 @@ public final class RequestDiffHelper {
                 continue;
             }
 
-            countSchemaType(schema, paramName, typeCounts);
+            countSchemaType(schema, paramName, typeCounts, flattenedSchemas);
         }
     }
 
@@ -118,8 +126,10 @@ public final class RequestDiffHelper {
      *
      * @param requestBody the request body to analyze
      * @param typeCounts map to store type counts (will be modified)
+     * @param flattenedSchemas map of schema name to flattened type counts
      */
-    private static void collectTypeCountsFromRequestBody(RequestBody requestBody, Map<String, Integer> typeCounts) {
+    private static void collectTypeCountsFromRequestBody(RequestBody requestBody, Map<String, Integer> typeCounts,
+                                                        Map<String, SchemaComparator.TypeCnts> flattenedSchemas) {
         if (requestBody == null) {
             return;
         }
@@ -146,12 +156,12 @@ public final class RequestDiffHelper {
                     String propertyName = entry.getKey();
                     Schema propSchema = entry.getValue();
                     if (propertyName != null && !propertyName.isEmpty() && propSchema != null) {
-                        countSchemaType(propSchema, propertyName, typeCounts);
+                        countSchemaType(propSchema, propertyName, typeCounts, flattenedSchemas);
                     }
                 }
             } else {
                 // schema에 직접 타입이나 $ref가 있는 경우 - 이름이 없으므로 "body"를 기본 이름으로 사용
-                countSchemaType(schema, "body", typeCounts);
+                countSchemaType(schema, "body", typeCounts, flattenedSchemas);
             }
         }
     }
@@ -165,20 +175,29 @@ public final class RequestDiffHelper {
      * @param schema the schema to analyze
      * @param name the name of the field/parameter
      * @param typeCounts map to store type counts (will be modified)
+     * @param flattenedSchemas map of schema name to flattened type counts
      */
-    private static void countSchemaType(Schema schema, String name, Map<String, Integer> typeCounts) {
+    private static void countSchemaType(Schema schema, String name, Map<String, Integer> typeCounts,
+                                       Map<String, SchemaComparator.TypeCnts> flattenedSchemas) {
         if (schema == null || name == null || name.isEmpty()) {
             return;
         }
 
-        // $ref가 있는 경우 - 나중에 구현될 스키마 비교 함수에서 처리
+        // $ref가 있는 경우 - flattenedSchemas에서 조회하여 타입 카운트 추가
         String ref = schema.getRef();
         if (ref != null && !ref.isEmpty()) {
-            // TODO: 나중에 구현될 스키마 비교 함수 호출
-            // 현재는 ref 이름을 추출하여 "name:ref:schemaName" 형태로 카운트
             String refName = extractRefName(ref);
-            String key = name + ":ref:" + refName;
-            typeCounts.merge(key, 1, Integer::sum);
+            
+            // flattenedSchemas에서 해당 스키마의 타입 카운트 조회
+            if (flattenedSchemas != null && flattenedSchemas.containsKey(refName)) {
+                SchemaComparator.TypeCnts refTypeCnts = flattenedSchemas.get(refName);
+                if (refTypeCnts != null && refTypeCnts.getTypeCounts() != null) {
+                    // 참조된 스키마의 모든 타입 카운트를 현재 typeCounts에 추가
+                    for (Map.Entry<String, Integer> entry : refTypeCnts.getTypeCounts().entrySet()) {
+                        typeCounts.merge(entry.getKey(), entry.getValue(), Integer::sum);
+                    }
+                }
+            }
             return;
         }
 
