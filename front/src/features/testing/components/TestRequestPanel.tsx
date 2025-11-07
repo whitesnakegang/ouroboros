@@ -1,8 +1,11 @@
 import { useState, useEffect } from "react";
 import { useTestingStore } from "../store/testing.store";
 import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
-import { getRestApiSpec } from "@/features/spec/services/api";
-import { parseOpenAPIRequestBody } from "@/features/spec/utils/schemaConverter";
+import { getRestApiSpec, getSchema } from "@/features/spec/services/api";
+import {
+  parseOpenAPIRequestBody,
+  parseOpenAPISchemaToSchemaField,
+} from "@/features/spec/utils/schemaConverter";
 import type { RequestBody } from "@/features/spec/types/schema.types";
 import { RequestBodyForm } from "./RequestBodyForm";
 
@@ -29,6 +32,7 @@ export function TestRequestPanel() {
       if (!selectedEndpoint?.id) {
         setRequestBody(null);
         setContentType("application/json");
+        setRequest({ body: "" });
         return;
       }
 
@@ -41,6 +45,7 @@ export function TestRequestPanel() {
           method: spec.method || "GET",
           url: spec.path || "",
           description: spec.description || spec.summary || "",
+          body: "", // 새로운 API 선택 시 body 초기화
         });
 
         // Load parameters (query params and headers)
@@ -76,8 +81,45 @@ export function TestRequestPanel() {
             detectedContentType = Object.keys(reqBody.content)[0];
             setContentType(detectedContentType);
 
-            const parsed = parseOpenAPIRequestBody(reqBody, detectedContentType);
+            const parsed = parseOpenAPIRequestBody(
+              reqBody,
+              detectedContentType
+            );
             if (parsed) {
+              // schemaRef가 있으면 스키마를 조회해서 fields 채우기 (모든 contentType에 대해 동일하게 처리)
+              if (
+                parsed.schemaRef &&
+                (!parsed.fields || parsed.fields.length === 0)
+              ) {
+                try {
+                  const schemaResponse = await getSchema(parsed.schemaRef);
+                  const schemaData = schemaResponse.data;
+
+                  if (schemaData.properties) {
+                    const fields = Object.entries(schemaData.properties).map(
+                      ([key, propSchema]: [string, any]) => {
+                        return parseOpenAPISchemaToSchemaField(key, propSchema);
+                      }
+                    );
+
+                    // required 필드 설정
+                    if (
+                      schemaData.required &&
+                      Array.isArray(schemaData.required)
+                    ) {
+                      fields.forEach((field) => {
+                        if (schemaData.required!.includes(field.key)) {
+                          field.required = true;
+                        }
+                      });
+                    }
+
+                    parsed.fields = fields;
+                  }
+                } catch (error) {
+                  // 스키마 조회 실패 시 무시
+                }
+              }
               setRequestBody(parsed);
             } else {
               setRequestBody(null);
@@ -90,17 +132,21 @@ export function TestRequestPanel() {
         }
 
         // Update Content-Type header
-        const contentTypeHeader = testHeaders.find((h) => h.key.toLowerCase() === "content-type");
+        const contentTypeHeader = testHeaders.find(
+          (h) => h.key.toLowerCase() === "content-type"
+        );
         if (contentTypeHeader) {
           contentTypeHeader.value = detectedContentType;
         } else {
           // Content-Type 헤더가 없으면 추가
           setRequest({
-            headers: [...testHeaders, { key: "Content-Type", value: detectedContentType }],
+            headers: [
+              ...testHeaders,
+              { key: "Content-Type", value: detectedContentType },
+            ],
           });
         }
       } catch (error) {
-        console.error("API 스펙 로드 실패:", error);
         setRequestBody(null);
       }
     };
@@ -111,20 +157,6 @@ export function TestRequestPanel() {
 
   const handleBodyChange = (newBody: string) => {
     setRequest({ body: newBody });
-  };
-
-  const handleContentTypeChange = (newContentType: string) => {
-    setContentType(newContentType);
-    // Update Content-Type header
-    const headers = request.headers.map((h) =>
-      h.key.toLowerCase() === "content-type"
-        ? { ...h, value: newContentType }
-        : h
-    );
-    if (!headers.some((h) => h.key.toLowerCase() === "content-type")) {
-      headers.push({ key: "Content-Type", value: newContentType });
-    }
-    setRequest({ headers });
   };
 
   return (
@@ -188,7 +220,7 @@ export function TestRequestPanel() {
             value={request.description}
             onChange={(e) => setRequest({ description: e.target.value })}
             placeholder="API 설명"
-              className="w-full px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm"
+            className="w-full px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm"
           />
         </div>
       </div>
@@ -196,9 +228,7 @@ export function TestRequestPanel() {
       {/* Headers */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-3">
-          <label className="text-xs font-medium text-[#8B949E]">
-            Headers
-          </label>
+          <label className="text-xs font-medium text-[#8B949E]">Headers</label>
           <button
             onClick={addRequestHeader}
             className="text-xs px-2 py-1 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-colors"
@@ -310,49 +340,40 @@ export function TestRequestPanel() {
       )}
 
       {/* Request Body */}
-      {requestBody && requestBody.type !== "none" && (
+      {request.method !== "GET" && (
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="block text-xs font-medium text-[#8B949E]">
               Request body
-              {requestBody.required && (
+              {requestBody?.required && (
                 <span className="text-red-500 ml-1">required</span>
               )}
             </label>
-            {requestBody.type === "json" ||
-            requestBody.type === "form-data" ||
-            requestBody.type === "x-www-form-urlencoded" ||
-            requestBody.type === "xml" ? (
-              <select
-                value={contentType}
-                onChange={(e) => handleContentTypeChange(e.target.value)}
-                className="px-2 py-1 text-xs rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
-              >
-                {requestBody.type === "json" && (
-                  <option value="application/json">application/json</option>
-                )}
-                {requestBody.type === "form-data" && (
-                  <option value="multipart/form-data">multipart/form-data</option>
-                )}
-                {requestBody.type === "x-www-form-urlencoded" && (
-                  <option value="application/x-www-form-urlencoded">
-                    application/x-www-form-urlencoded
-                  </option>
-                )}
-                {requestBody.type === "xml" && (
-                  <>
-                    <option value="application/xml">application/xml</option>
-                    <option value="text/xml">text/xml</option>
-                  </>
-                )}
-              </select>
-            ) : null}
+            {requestBody && requestBody.type !== "none" && (
+              <span className="text-xs text-[#8B949E]">
+                {requestBody.type === "json" && "application/json"}
+                {requestBody.type === "form-data" && "multipart/form-data"}
+                {requestBody.type === "x-www-form-urlencoded" &&
+                  "application/x-www-form-urlencoded"}
+                {requestBody.type === "xml" &&
+                  (contentType.includes("text/xml")
+                    ? "text/xml"
+                    : "application/xml")}
+              </span>
+            )}
+            {(!requestBody || requestBody.type === "none") && (
+              <span className="text-xs text-[#8B949E]">application/json</span>
+            )}
           </div>
-          {requestBody.description && (
-            <p className="text-xs text-[#8B949E] mb-2">{requestBody.description}</p>
+          {requestBody?.description && (
+            <p className="text-xs text-[#8B949E] mb-2">
+              {requestBody.description}
+            </p>
           )}
           <RequestBodyForm
-            requestBody={requestBody}
+            requestBody={
+              requestBody || { type: "json", required: false, fields: [] }
+            }
             contentType={contentType}
             value={request.body}
             onChange={handleBodyChange}
@@ -362,4 +383,3 @@ export function TestRequestPanel() {
     </div>
   );
 }
-
