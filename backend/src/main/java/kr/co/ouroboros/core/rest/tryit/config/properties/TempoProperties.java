@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.tryit.infrastructure.storage.tempo.config;
+package kr.co.ouroboros.core.rest.tryit.config.properties;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;

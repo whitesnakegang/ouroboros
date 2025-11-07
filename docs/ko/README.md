@@ -74,6 +74,8 @@
 - ✅ **자동 Enrichment**: 누락된 Ouroboros 확장 필드 자동 추가
 - ✅ **에러 리포팅**: 상세한 검증 에러 메시지
 - ✅ **Try 기능**: API 실행 추적 및 분석 (📖 [설정 가이드](./OUROBOROS_TRY_SETUP.md))
+  - **기본값**: In-memory trace 저장소 (설정 불필요)
+  - **선택 사항**: 영구 저장을 위한 Grafana Tempo 연동
 
 ---
 
@@ -163,6 +165,12 @@ dependencies {
 
 ### 설정 (선택 사항)
 
+> **참고**: 
+> - **Trace 저장소**: 기본적으로 Ouroboros는 **in-memory trace 저장소**를 사용합니다 (설정 불필요). 트레이스는 즉시 사용 가능하지만 애플리케이션 재시작 시 손실됩니다. 영구 저장이 필요하면 [Try 기능 설정 가이드](./OUROBOROS_TRY_SETUP.md#42-tempo-연동-선택-사항)를 참고하세요.
+> - **Method Tracing**: 기본적으로 내부 메소드 추적은 **비활성화**되어 있습니다. Try 기능에서 내부 메소드 추적이 필요하다면 `method-tracing` 설정을 추가해야 합니다.
+
+> **⚠️ Method Tracing 필수 설정**: Method Tracing을 사용할 경우, 모든 메소드 트레이스를 수집하기 위해 `management.tracing.sampling.probability=1.0` 설정도 반드시 필요합니다.
+
 `application.yml`:
 ```yaml
 ouroboros:
@@ -170,6 +178,21 @@ ouroboros:
   server:
     url: http://localhost:8080
     description: Local Development Server
+  # Trace 저장소 (기본값: in-memory, 설정 불필요)
+  # tempo:
+  #   enabled: false  # 기본값: false (in-memory 저장소 사용)
+  # Method Tracing 설정 (Try 기능에서 내부 메소드 추적 시 필요)
+  # 기본적으로 내부 메소드 추적은 비활성화되어 있습니다
+  method-tracing:
+    enabled: true
+    allowed-packages: your.package.name  # 추적할 패키지 경로 지정
+
+# Micrometer Tracing (Method Tracing 필수 설정)
+# 모든 트레이스를 수집하기 위해 sampling probability를 1.0으로 설정
+management:
+  tracing:
+    sampling:
+      probability: 1.0
 ```
 
 ### 사용 시작

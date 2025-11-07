@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.tryit.infrastructure.storage.tempo.model;
+package kr.co.ouroboros.core.rest.tryit.infrastructure.storage.model;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
@@ -6,11 +6,11 @@ import lombok.Data;
 import java.util.List;
 
 /**
- * Trace data transfer object (DTO) for Tempo trace data.
+ * Trace data transfer object (DTO) for trace data.
  * <p>
- * This class represents the parsed trace structure returned from Tempo API.
- * It follows the OpenTelemetry trace data model structure with batches,
- * resource spans, and individual spans.
+ * This class represents the trace structure following the OpenTelemetry trace data model
+ * with batches, resource spans, and individual spans. It is used as a common format
+ * for trace data across different storage backends (Tempo, in-memory, database, etc.).
  * <p>
  * <b>Structure:</b>
  * <ul>
@@ -21,7 +21,7 @@ import java.util.List;
  * </ul>
  * <p>
  * This DTO is used by {@link kr.co.ouroboros.core.rest.tryit.trace.converter.TraceSpanConverter}
- * to convert Tempo trace data to internal {@link kr.co.ouroboros.core.rest.tryit.trace.dto.TraceSpanInfo} format.
+ * to convert trace data to internal {@link kr.co.ouroboros.core.rest.tryit.trace.dto.TraceSpanInfo} format.
  *
  * @author Ouroboros Team
  * @since 0.0.1
@@ -33,7 +33,7 @@ public class TraceDTO {
     private List<BatchDTO> batches;
     
     /**
-     * Batch of trace data from Tempo.
+     * Batch of trace data.
      * <p>
      * Represents a batch of spans with resource information.
      * Contains resource attributes and list of scope spans.
@@ -102,7 +102,7 @@ public class TraceDTO {
     }
     
     /**
-     * Individual span data from Tempo.
+     * Individual span data.
      * <p>
      * Represents a single span in the trace with:
      * <ul>

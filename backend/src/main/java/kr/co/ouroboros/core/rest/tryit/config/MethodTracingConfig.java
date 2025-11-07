@@ -1,5 +1,6 @@
-package kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.config;
+package kr.co.ouroboros.core.rest.tryit.config;
 
+import kr.co.ouroboros.core.rest.tryit.config.properties.MethodTracingProperties;
 import kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.aspect.MethodTracingMethodInterceptor;
 
 import org.aopalliance.aop.Advice;
@@ -42,7 +43,8 @@ import java.util.Set;
  *   <li>Always excludes kr.co.ouroboros.* SDK classes</li>
  * </ul>
  * <p>
- * If no allowed packages are configured, method tracing is disabled.
+ * Method tracing is disabled by default. To enable it, set {@code ouroboros.method-tracing.enabled=true}
+ * and configure at least one allowed package. If no allowed packages are configured, method tracing is disabled.
  *
  * @author Ouroboros Team
  * @since 0.0.1
@@ -143,3 +145,4 @@ public class MethodTracingConfig {
         return new DefaultPointcutAdvisor(pointcut, advice);
     }
 }
+

@@ -2,7 +2,8 @@ package kr.co.ouroboros.core.rest.tryit.infrastructure.storage.tempo.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.tempo.config.TempoProperties;
+import kr.co.ouroboros.core.rest.tryit.config.properties.TempoProperties;
+import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.TraceClient;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.*;
@@ -18,7 +19,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * RestTemplate-based implementation of TempoClient.
+ * RestTemplate-based implementation of TraceClient for Tempo backend.
  * <p>
  * This component provides HTTP client implementation for interacting with Tempo
  * (distributed tracing backend) using Spring's RestTemplate.
@@ -37,14 +38,19 @@ import java.util.List;
  *   <li>JSON response parsing</li>
  * </ul>
  * <p>
- * Configuration is provided via {@link kr.co.ouroboros.core.rest.tryit.infrastructure.storage.tempo.config.TempoProperties}.
+ * Configuration is provided via {@link kr.co.ouroboros.core.rest.tryit.config.properties.TempoProperties}.
  *
  * @author Ouroboros Team
  * @since 0.0.1
  */
 @Slf4j
 @Component
-public class RestTemplateTempoClient implements TempoClient {
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+        name = "ouroboros.tempo.enabled", 
+        havingValue = "true", 
+        matchIfMissing = false
+)
+public class RestTemplateTempoClient implements TraceClient {
     
     private final TempoProperties properties;
     private final RestTemplate restTemplate;

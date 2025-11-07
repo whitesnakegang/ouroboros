@@ -7,6 +7,7 @@
  * <b>Components:</b>
  * <ul>
  *   <li>{@link kr.co.ouroboros.core.rest.tryit.trace.util.SpanFlattener} - Flattens hierarchical span tree into flat list</li>
+ *   <li>{@link kr.co.ouroboros.core.rest.tryit.trace.util.TraceDurationCalculator} - Calculates total duration from span timestamps</li>
  * </ul>
  *
  * @since 0.0.1
