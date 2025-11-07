@@ -59,6 +59,9 @@ public class MockValidationService {
             try {
                 int errorCode = Integer.parseInt(forcedError);
                 String message = getErrorDescription(meta, errorCode);
+                if (message == null || message.isBlank()) {
+                    message = "Forced mock error " + errorCode;
+                }
                 return ValidationResult.error(errorCode, message);
             } catch (NumberFormatException e) {
                 log.warn("Invalid X-Ouroboros-Error header value: {}", forcedError);
