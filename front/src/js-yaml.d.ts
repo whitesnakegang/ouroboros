@@ -1,4 +1,4 @@
-declare module 'js-yaml' {
+declare module "js-yaml" {
   export function load(str: string, options?: any): any;
   export function dump(obj: any, options?: any): string;
   export function safeLoad(str: string, options?: any): any;
@@ -10,4 +10,3 @@ declare module 'js-yaml' {
     safeDump,
   };
 }
-
