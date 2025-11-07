@@ -42,7 +42,7 @@ Try 기능은 요청에 헤더를 추가하는 것만으로 API 실행 트레이
 
 ```gradle
 dependencies {
-    implementation 'io.github.whitesnakegang:ouroboros:0.1.0-SNAPSHOT'
+    implementation 'io.github.whitesnakegang:ouroboros:1.0.0'
 }
 ```
 
