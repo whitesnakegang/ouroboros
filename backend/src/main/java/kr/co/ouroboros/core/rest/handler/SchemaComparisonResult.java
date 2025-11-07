@@ -18,11 +18,6 @@ import lombok.NoArgsConstructor;
 public class SchemaComparisonResult {
     
     /**
-     * 스키마가 일치하는지 여부
-     */
-    private boolean isSame;
-    
-    /**
      * 스키마 내 기본형 타입별 개수
      * <p>
      * Key: 타입명 (string, integer, number, boolean 등)
