@@ -272,12 +272,17 @@ public class RestMockLoaderService {
     }
 
     /**
-     * Parse an OpenAPI response object and produce a ResponseMeta describing its status, body schema, and content type.
+     * Convert an OpenAPI response object into a RestResponseMeta describing the HTTP status, optional description,
+     * resolved response body schema, and chosen content type (preferring JSON then XML).
+     *
+     * If the response has no `content` but provides a `description`, a RestResponseMeta containing only the
+     * status and description is returned. If the response has no resolvable schema for supported content types,
+     * this method returns `null`.
      *
      * @param statusCode the HTTP status code for the response
-     * @param response   the OpenAPI response object (may contain a `content` map)
+     * @param response   the OpenAPI response object (may contain `description` and a `content` map keyed by media type)
      * @param schemas    the components/schemas map used to resolve `$ref` references
-     * @return the parsed ResponseMeta, or `null` if the response has no content or no resolvable schema
+     * @return the parsed RestResponseMeta, or `null` when no supported/resolvable schema is present (unless only a description is available)
      */
     @SuppressWarnings("unchecked")
     private RestResponseMeta parseResponse(int statusCode, Map<String, Object> response, Map<String, Object> schemas) {
