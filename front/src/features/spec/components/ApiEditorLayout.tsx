@@ -78,7 +78,6 @@ export function ApiEditorLayout() {
     protocol: testProtocol,
     setProtocol: setTestProtocol,
     request,
-    setRequest,
     setResponse,
     isLoading,
     setIsLoading,
