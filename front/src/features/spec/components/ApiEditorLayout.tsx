@@ -24,6 +24,7 @@ import {
   deleteRestApiSpec,
   getRestApiSpec,
   getSchema,
+  type RestApiSpecResponse,
 } from "../services/api";
 import {
   convertRequestBodyToOpenAPI,
@@ -31,7 +32,7 @@ import {
   parseOpenAPISchemaToSchemaField,
 } from "../utils/schemaConverter";
 import type { RequestBody } from "../types/schema.types";
-import { createPrimitiveField } from "../types/schema.types";
+import { createPrimitiveField, isArraySchema, isRefSchema } from "../types/schema.types";
 
 interface KeyValuePair {
   key: string;
@@ -212,6 +213,9 @@ export function ApiEditorLayout() {
       const response = await getRestApiSpec(id);
       const spec = response.data;
 
+      // 스펙 정보 저장 (CodeSnippetPanel에서 사용)
+      setCurrentSpec(spec);
+
       setMethod(spec.method);
       setUrl(spec.path);
       setDescription(spec.description || "");
@@ -348,6 +352,45 @@ export function ApiEditorLayout() {
           }
         } catch {
           // 스키마 조회 실패 시 무시
+        }
+      }
+
+      // rootSchemaType이 array이고 items가 ref인 경우 스키마 조회
+      if (loadedRequestBody.rootSchemaType && isArraySchema(loadedRequestBody.rootSchemaType)) {
+        if (isRefSchema(loadedRequestBody.rootSchemaType.items)) {
+          try {
+            const schemaResponse = await getSchema(loadedRequestBody.rootSchemaType.items.schemaName);
+            const schemaData = schemaResponse.data;
+
+            // 스키마의 properties를 items의 object schema로 변환
+            if (schemaData.properties) {
+              const properties = Object.entries(schemaData.properties).map(
+                ([key, propSchema]: [string, any]) => {
+                  return parseOpenAPISchemaToSchemaField(key, propSchema);
+                }
+              );
+
+              // required 필드 설정
+              if (schemaData.required && Array.isArray(schemaData.required)) {
+                properties.forEach((field) => {
+                  if (schemaData.required!.includes(field.key)) {
+                    field.required = true;
+                  }
+                });
+              }
+
+              // items를 object schema로 변환
+              loadedRequestBody.rootSchemaType = {
+                ...loadedRequestBody.rootSchemaType,
+                items: {
+                  kind: "object",
+                  properties,
+                },
+              };
+            }
+          } catch {
+            // 스키마 조회 실패 시 무시
+          }
         }
       }
 
@@ -537,6 +580,7 @@ export function ApiEditorLayout() {
   const [method, setMethod] = useState("POST");
   const [url, setUrl] = useState("");
   const [tags, setTags] = useState("");
+  const [currentSpec, setCurrentSpec] = useState<RestApiSpecResponse | null>(null);
   const [description, setDescription] = useState("");
   const [summary, setSummary] = useState("");
 
@@ -1941,10 +1985,7 @@ export function ApiEditorLayout() {
       <CodeSnippetPanel
         isOpen={isCodeSnippetOpen}
         onClose={() => setIsCodeSnippetOpen(false)}
-        method={method}
-        url={url}
-        headers={requestHeaders}
-        requestBody={requestBody}
+        spec={currentSpec}
       />
 
       {/* Import Result Modal */}

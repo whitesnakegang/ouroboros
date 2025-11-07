@@ -21,6 +21,7 @@ import org.yaml.snakeyaml.Yaml;
 import java.util.*;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.stream.Collectors;
 
 /**
  * Implementation of {@link RestApiSpecService}.
@@ -371,7 +372,11 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         }
 
         if (request.getTags() != null && !request.getTags().isEmpty()) {
-            operation.put("tags", request.getTags());
+            // tags를 대문자로 변환
+            List<String> upperCaseTags = request.getTags().stream()
+                    .map(String::toUpperCase)
+                    .collect(Collectors.toList());
+            operation.put("tags", upperCaseTags);
         }
 
         if (request.getParameters() != null && !request.getParameters().isEmpty()) {
@@ -429,7 +434,11 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
                 operation.remove("tags");
                 log.info("✓ Tags removed from operation");
             } else {
-                operation.put("tags", request.getTags());
+                // tags를 대문자로 변환
+                List<String> upperCaseTags = request.getTags().stream()
+                        .map(String::toUpperCase)
+                        .collect(Collectors.toList());
+                operation.put("tags", upperCaseTags);
             }
         }
 
@@ -1105,6 +1114,18 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
 
                 // Update $ref references in the operation
                 updateSchemaReferences(operation, schemaRenameMap);
+
+                // tags를 대문자로 변환
+                if (operation.containsKey("tags") && operation.get("tags") instanceof List) {
+                    @SuppressWarnings("unchecked")
+                    List<Object> tagsObj = (List<Object>) operation.get("tags");
+                    if (tagsObj != null && !tagsObj.isEmpty()) {
+                        List<String> upperCaseTags = tagsObj.stream()
+                                .map(obj -> obj.toString().toUpperCase())
+                                .collect(Collectors.toList());
+                        operation.put("tags", upperCaseTags);
+                    }
+                }
 
                 // Enrich operation with Ouroboros fields
                 enrichOperationWithOuroborosFields(operation);

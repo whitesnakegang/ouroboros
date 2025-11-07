@@ -58,6 +58,9 @@ export interface RequestBody {
   fields?: SchemaField[];
   description?: string;
   required?: boolean;
+  // Root schema type for json/xml (object, array, primitive)
+  // If not specified, defaults to object (for backward compatibility)
+  rootSchemaType?: SchemaType;
 }
 
 // ========== Response Body ==========

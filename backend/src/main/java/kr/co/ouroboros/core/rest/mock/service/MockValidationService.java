@@ -357,9 +357,9 @@ public class MockValidationService {
     private ValidationResult validateArrayItems(List<Object> array,
                                                 Map<String, Object> itemSchema,
                                                 String fieldPath) {
-        // $ref 처리 - items에서도 스키마 참조 가능
-        if (itemSchema.containsKey("$ref")) {
-            String ref = (String) itemSchema.get("$ref");
+        // $ref 또는 ref 처리 - items에서도 스키마 참조 가능
+        if (itemSchema.containsKey("$ref") || itemSchema.containsKey("ref")) {
+            String ref = (String) (itemSchema.get("$ref") != null ? itemSchema.get("$ref") : itemSchema.get("ref"));
             itemSchema = resolveSchemaRef(ref);
             if (itemSchema == null) {
                 log.warn("Failed to resolve array item schema ref: {}", ref);

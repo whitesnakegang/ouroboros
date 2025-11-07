@@ -7,6 +7,7 @@ import {
   parseOpenAPISchemaToSchemaField,
 } from "@/features/spec/utils/schemaConverter";
 import type { RequestBody } from "@/features/spec/types/schema.types";
+import { isArraySchema, isRefSchema } from "@/features/spec/types/schema.types";
 import { RequestBodyForm } from "./RequestBodyForm";
 
 export function TestRequestPanel() {
@@ -120,6 +121,46 @@ export function TestRequestPanel() {
                   // 스키마 조회 실패 시 무시
                 }
               }
+
+              // rootSchemaType이 array이고 items가 ref인 경우 스키마 조회
+              if (parsed.rootSchemaType && isArraySchema(parsed.rootSchemaType)) {
+                if (isRefSchema(parsed.rootSchemaType.items)) {
+                  try {
+                    const schemaResponse = await getSchema(parsed.rootSchemaType.items.schemaName);
+                    const schemaData = schemaResponse.data;
+
+                    // 스키마의 properties를 items의 object schema로 변환
+                    if (schemaData.properties) {
+                      const properties = Object.entries(schemaData.properties).map(
+                        ([key, propSchema]: [string, any]) => {
+                          return parseOpenAPISchemaToSchemaField(key, propSchema);
+                        }
+                      );
+
+                      // required 필드 설정
+                      if (schemaData.required && Array.isArray(schemaData.required)) {
+                        properties.forEach((field) => {
+                          if (schemaData.required!.includes(field.key)) {
+                            field.required = true;
+                          }
+                        });
+                      }
+
+                      // items를 object schema로 변환
+                      parsed.rootSchemaType = {
+                        ...parsed.rootSchemaType,
+                        items: {
+                          kind: "object",
+                          properties,
+                        },
+                      };
+                    }
+                  } catch (error) {
+                    // 스키마 조회 실패 시 무시
+                  }
+                }
+              }
+
               setRequestBody(parsed);
             } else {
               setRequestBody(null);
