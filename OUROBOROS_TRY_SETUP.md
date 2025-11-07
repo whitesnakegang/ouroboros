@@ -1,21 +1,42 @@
 # Ouroboros SDK Try Feature Setup Guide
 
-This guide explains how to set up the Try feature of the Ouroboros SDK.
+This guide explains how to use the Try feature of the Ouroboros SDK. The Try feature tracks and analyzes API execution traces.
 
 ## Table of Contents
 
-1. [Dependency Configuration](#1-dependency-configuration)
-2. [Application Configuration](#2-application-configuration)
-3. [Tempo Integration Configuration](#3-tempo-integration-configuration)
-4. [Using the Try Feature](#4-using-the-try-feature)
-5. [Gitignore Configuration](#5-gitignore-configuration)
+1. [Quick Start](#1-quick-start)
+2. [Basic Configuration](#2-basic-configuration)
+3. [Using the Try Feature](#3-using-the-try-feature)
+4. [Advanced Configuration](#4-advanced-configuration)
+5. [Troubleshooting](#5-troubleshooting)
 6. [Frequently Asked Questions (QnA)](#6-frequently-asked-questions-qna)
 
 ---
 
-## 1. Dependency Configuration
+## 1. Quick Start
 
-### build.gradle
+### Try Feature Overview
+
+The Try feature allows you to track and analyze API execution traces by simply adding a header to your requests. **By default, traces are stored in memory**, so you can start using it immediately without any additional setup.
+
+### Minimum Setup (In-Memory Storage)
+
+1. **Add Dependency**: Add Ouroboros SDK to `build.gradle`
+2. **Basic Configuration**: Add basic Ouroboros settings to `application.properties`
+3. **Run**: Start your application
+4. **Use**: Add `X-Ouroboros-Try: on` header to your API requests
+
+That's it! The Try feature works immediately with in-memory storage.
+
+> **Note**: Traces stored in memory are lost when the application restarts. For persistent storage, see [Tempo Integration](#tempo-integration-optional) in the Advanced Configuration section.
+
+---
+
+## 2. Basic Configuration
+
+### 2.1. Dependency Configuration
+
+#### build.gradle
 
 Add the Ouroboros SDK dependency to your project's `build.gradle` file.
 
@@ -27,15 +48,11 @@ dependencies {
 
 > **Note**: Please verify and update the Ouroboros SDK version to the latest version.
 
----
+### 2.2. Application Configuration
 
-## 2. Application Configuration
-
-### application.properties
+#### application.properties
 
 Add the following configuration to the `src/main/resources/application.properties` file.
-
-#### Basic Ouroboros Configuration
 
 ```properties
 # Enable Ouroboros SDK
@@ -46,25 +63,139 @@ ouroboros.server.description=Your API Server Description
 
 > **Note**: Change `ouroboros.server.url` and `ouroboros.server.description` to your actual project's API server information.
 
-#### Tempo Integration Configuration
+#### Trace Storage (Default: In-Memory)
+
+> **💡 Default Behavior**: By default, Ouroboros uses **in-memory trace storage**. You don't need any additional configuration. Traces are stored in memory and are immediately available, but will be lost when the application restarts.
+
+No configuration needed! The Try feature works immediately with in-memory storage.
+
+#### Logging Configuration (Optional)
 
 ```properties
-# Enable Tempo integration (Ouroboros SDK uses QueryQL)
-ouroboros.tempo.enabled=true
-ouroboros.tempo.base-url=http://${TEMPO_HOST:localhost}:${TEMPO_UI_PORT:3200}
+# Output Ouroboros SDK debug logs to console
+logging.level.kr.co.ouroboros=DEBUG
 ```
 
-#### Method Tracing Configuration
+---
+
+## 3. Using the Try Feature
+
+### 3.1. Making Try Requests
+
+To use the Try feature, add the `X-Ouroboros-Try: on` header to your API requests.
+
+#### Example: cURL
+
+```bash
+curl -X GET "http://localhost:8080/api/your-endpoint" \
+  -H "X-Ouroboros-Try: on"
+```
+
+> **Note**: Change `localhost:8080` to your actual application server address and port.
+
+#### Example: JavaScript (Fetch API)
+
+```javascript
+fetch('http://localhost:8080/api/your-endpoint', {
+  headers: {
+    'X-Ouroboros-Try': 'on'
+  }
+})
+.then(response => response.json())
+.then(data => {
+  console.log('Try ID:', data._ouroborosTryId);
+});
+```
+
+> **Note**: Change to your actual API endpoint URL.
+
+### 3.2. Querying Try Results
+
+After making a Try request, you can query the results using the generated `tryId`.
+
+```bash
+GET /ouro/tries/{tryId}
+```
+
+#### Response Example
+
+```json
+{
+  "tryId": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "completed",
+  "createdAt": "2024-01-01T00:00:00Z",
+  "analyzedAt": "2024-01-01T00:00:01Z",
+  "spans": [...],
+  "issues": [...],
+  "spanCount": 10
+}
+```
+
+### 3.3. Regular Requests (Without Try)
+
+Regular requests without the Try header will work normally, and no Try-related information will be included.
+
+```bash
+curl -X GET "http://localhost:8080/api/your-endpoint"
+```
+
+### 3.4. How the Try Feature Works
+
+1. **Request Detection**: Detects requests containing the `X-Ouroboros-Try: on` header
+2. **Try ID Generation**: Generates a unique Try ID (UUID)
+3. **Trace Collection**: Collects all traces during request execution through OpenTelemetry
+4. **Trace Storage**: 
+   - **Default (In-memory)**: Stores traces in memory (immediately available, lost on restart)
+   - **Tempo (Optional)**: Sends and stores collected trace data to Tempo (persistent storage)
+5. **Result Query**: Queries analysis results through the `/ouro/tries/{tryId}` endpoint
+
+---
+
+## 4. Advanced Configuration
+
+### 4.1. Method Tracing (Optional)
+
+> **Note**: Internal method tracing is **disabled by default**. If you need to trace internal method calls in the Try feature, you must enable this configuration.
+
+> **⚠️ Required Settings**: To use method tracing, you must configure both Ouroboros method tracing and Micrometer sampling settings.
 
 ```properties
 # Enable Method Tracing
 ouroboros.method-tracing.enabled=true
 ouroboros.method-tracing.allowed-packages=your.package.name
+
+# Micrometer Tracing (Required for Method Tracing)
+# Set sampling probability to 1.0 to capture all traces
+management.tracing.sampling.probability=1.0
 ```
 
-> **Note**: Specify the package paths to apply tracing. Examples: `com.example.yourproject`, `your.package.name`, etc.
+> **Note**: 
+> - Specify the package paths to apply tracing. Examples: `com.example.yourproject`, `your.package.name`, etc.
+> - `management.tracing.sampling.probability=1.0` is **required** to capture all method traces. Without this setting, method traces may not be captured.
+
+### 4.2. Tempo Integration (Optional)
+
+> **💡 When to Use Tempo**: Use Tempo if you need:
+> - Persistent trace storage (traces survive application restarts)
+> - Advanced trace analysis capabilities
+> - Sharing traces across multiple application instances
+> 
+> For most use cases, **in-memory storage is sufficient** and requires no setup.
+
+If you need persistent trace storage or want to use **Grafana Tempo** for advanced trace analysis, you can optionally configure Tempo integration.
+
+#### Enable Tempo in Application Configuration
+
+```properties
+# Enable Tempo integration (Ouroboros SDK uses TraceQL)
+# When not set or set to false, in-memory storage is used by default
+ouroboros.tempo.enabled=true
+ouroboros.tempo.base-url=http://${TEMPO_HOST:localhost}:${TEMPO_UI_PORT:3200}
+```
 
 #### OpenTelemetry Exporter Configuration
+
+> **Note**: This configuration is **only required** when using Tempo integration (`ouroboros.tempo.enabled=true`).
 
 ```properties
 # OpenTelemetry Exporter (App -> Tempo)
@@ -76,23 +207,11 @@ management.otlp.tracing.endpoint=http://${TEMPO_HOST:localhost}:${TEMPO_HTTP_POR
 management.tracing.sampling.probability=1.0
 ```
 
-> **Note**: `${TEMPO_HOST:localhost}` and `${TEMPO_HTTP_PORT:4318}` reference environment variables set in the `.env` file.  
-> The Try feature sends trace data to Tempo using the HTTP protocol.
+> **Note**: `${TEMPO_HOST:localhost}` and `${TEMPO_HTTP_PORT:4318}` reference environment variables set in the `.env` file.
 
-#### Logging Configuration
+#### Tempo Server Setup
 
-```properties
-# Output Ouroboros SDK debug logs to console
-logging.level.kr.co.ouroboros=DEBUG
-```
-
----
-
-## 3. Tempo Integration Configuration
-
-The Try feature works in conjunction with **Grafana Tempo**. Tempo is a backend server that collects and stores trace data.
-
-### File Structure
+##### File Structure
 
 ```
 .
@@ -103,7 +222,7 @@ The Try feature works in conjunction with **Grafana Tempo**. Tempo is a backend 
 └─ src/main/resources/application.properties  # Spring Boot app configuration
 ```
 
-### Create .env File
+##### Create .env File
 
 Create a `.env` file in the project root (where `docker-compose.yml` is located).
 
@@ -121,7 +240,7 @@ TEMPO_UI_PORT=3200    # Tempo UI / Query API
 > For local execution → `TEMPO_HOST=localhost`  
 > For execution within Docker network → `TEMPO_HOST=tempo`
 
-### Docker Compose Configuration
+##### Docker Compose Configuration
 
 Create a `docker-compose.yml` file in the project root.
 
@@ -153,7 +272,7 @@ networks:
 
 > **Note**: Only HTTP protocol is used, so gRPC port (4317) is not required.
 
-### Tempo Configuration File
+##### Tempo Configuration File
 
 Create a `tempo.yaml` file in the project root:
 
@@ -175,10 +294,9 @@ distributor:
           endpoint: 0.0.0.0:4318
 ```
 
-> **Note**: Only HTTP protocol is used, so gRPC protocol configuration has been removed.  
-> This file can be automatically managed by the Ouroboros SDK. You can create or modify the `tempo.yaml` file in the project root as needed.
+> **Note**: Only HTTP protocol is used, so gRPC protocol configuration has been removed.
 
-### Start Tempo
+##### Start Tempo
 
 ```bash
 # Start Tempo container
@@ -189,113 +307,11 @@ docker ps
 docker logs tempo -f
 ```
 
----
+#### Gitignore Configuration (For Tempo)
 
-## 4. Using the Try Feature
-
-### Making Try Requests
-
-To use the Try feature, add the `X-Ouroboros-Try: on` header to your API requests.
-
-#### Example: cURL
-
-```bash
-curl -X GET "http://localhost:8080/api/your-endpoint" \
-  -H "X-Ouroboros-Try: on"
-```
-
-> **Note**: Change `localhost:8080` to your actual application server address and port.
-
-#### Example: JavaScript (Fetch API)
-
-```javascript
-fetch('http://localhost:8080/api/your-endpoint', {
-  headers: {
-    'X-Ouroboros-Try': 'on'
-  }
-})
-.then(response => response.json())
-.then(data => {
-  console.log('Try ID:', data._ouroborosTryId);
-});
-```
-
-> **Note**: Change to your actual API endpoint URL.
-
-### Querying Try Results
-
-After making a Try request, you can query the results using the generated `tryId`.
-
-```bash
-GET /ouro/tries/{tryId}
-```
-
-#### Response Example
-
-```json
-{
-  "tryId": "550e8400-e29b-41d4-a716-446655440000",
-  "status": "completed",
-  "createdAt": "2024-01-01T00:00:00Z",
-  "analyzedAt": "2024-01-01T00:00:01Z",
-  "spans": [...],
-  "issues": [...],
-  "spanCount": 10
-}
-```
-
-### Regular Requests (Without Try)
-
-Regular requests without the Try header will work normally, and no Try-related information will be included.
-
-```bash
-curl -X GET "http://localhost:8080/api/your-endpoint"
-```
-
-### How the Try Feature Works
-
-1. **Request Detection**: Detects requests containing the `X-Ouroboros-Try: on` header
-2. **Try ID Generation**: Generates a unique Try ID (UUID)
-3. **Trace Collection**: Collects all traces during request execution through OpenTelemetry
-4. **Tempo Storage**: Sends and stores collected trace data to Tempo
-5. **Result Query**: Queries analysis results through the `/ouro/tries/{tryId}` endpoint
-
----
-
-## 5. Gitignore Configuration
-
-### .gitignore File Configuration
-
-Add the following items to your project's `.gitignore` file to prevent unnecessary files from being committed to Git.
-
-#### Tempo-related Files and Directories
+Add the following items to your project's `.gitignore` file:
 
 ```gitignore
-# Tempo data directory
-tempo-data/
-```
-
-> **Note**: The `tempo-data/` directory stores trace data generated by Tempo. It is large and varies by local environment, so it should not be committed to Git.
-
-#### Environment Variable Files
-
-```gitignore
-# Environment variable files
-.env
-.env.local
-.env.*.local
-```
-
-> **Note**: The `.env` file may contain sensitive information (API keys, passwords, etc.), so it should not be committed to Git.  
-> Instead, create a `.env.example` file to share only the list of required environment variables.
-
-#### Complete Example
-
-Add the following to your project root's `.gitignore` file:
-
-```gitignore
-# Existing Gitignore configuration...
-
 # ===== Ouroboros SDK Try Feature Related =====
 
 # Tempo data directory
@@ -308,48 +324,17 @@ tempo-data/
 
 # Docker Compose override
 docker-compose.override.yml
-
-# Log files
-*.log
-logs/
 ```
 
-### Important Notes
-
-- `tempo.yaml`: This file is a project configuration file and **should be included** in Git. (Settings that need to be shared with team members)
-- `docker-compose.yml`: This is a Docker Compose configuration file and **should be included** in Git.
-- `tempo-data/`: The Tempo data directory **should not be included** in Git. (Local data)
-- `.env`: Environment variable files **should not be included** in Git. (Sensitive information)
-
-> 💡 **If already committed**:
-> ```bash
-> git rm -r --cached tempo-data
-> echo "tempo-data/" >> .gitignore
-> git add .gitignore
-> git commit -m "ignore tempo trace data directory"
-> ```
+> **Important Notes**:
+> - `tempo.yaml`: This file is a project configuration file and **should be included** in Git.
+> - `docker-compose.yml`: This is a Docker Compose configuration file and **should be included** in Git.
+> - `tempo-data/`: The Tempo data directory **should not be included** in Git.
+> - `.env`: Environment variable files **should not be included** in Git.
 
 ---
 
-## Checklist
-
-A checklist to verify that configuration is complete:
-
-- [ ] Add Ouroboros SDK dependency to `build.gradle`
-- [ ] Create `.env` file and configure Tempo-related environment variables
-- [ ] Create `docker-compose.yml` file and configure Tempo service
-- [ ] Create `tempo.yaml` file and configure Tempo
-- [ ] Add basic Ouroboros configuration to `application.properties`
-- [ ] Add Tempo integration configuration to `application.properties`
-- [ ] Add Method Tracing configuration to `application.properties`
-- [ ] Add OpenTelemetry Exporter configuration to `application.properties`
-- [ ] Add `tempo-data/`, `.env` to `.gitignore`
-- [ ] Start Tempo server (`docker compose up -d`)
-- [ ] Run application and test Try requests
-
----
-
-## Troubleshooting
+## 5. Troubleshooting
 
 ### Try Feature Not Working
 
@@ -357,6 +342,14 @@ A checklist to verify that configuration is complete:
 2. **Check Configuration**: Verify `ouroboros.enabled=true` setting in `application.properties`
 3. **Check Header**: Verify that the request includes the `X-Ouroboros-Try: on` header exactly
 4. **Check Logging**: Check detailed logs with `logging.level.kr.co.ouroboros=DEBUG` setting
+
+### Method Tracing Not Working
+
+1. **Check Method Tracing Configuration**: Verify `ouroboros.method-tracing.enabled=true` is set
+2. **Check Allowed Packages**: Verify `ouroboros.method-tracing.allowed-packages` is correctly configured with your package paths
+3. **Check Micrometer Sampling**: Verify `management.tracing.sampling.probability=1.0` is set (required for method tracing)
+4. **Check Package Names**: Ensure the classes you want to trace are in the allowed packages
+5. **Check Logging**: Enable debug logging to see if method traces are being created
 
 ### Tempo Integration Not Working
 
@@ -381,6 +374,30 @@ A checklist to verify that configuration is complete:
 
 ## 6. Frequently Asked Questions (QnA)
 
+### In-Memory vs Tempo Storage
+
+**Q. What's the difference between in-memory and Tempo storage?**  
+A. 
+- **In-memory (default)**: No setup required, traces are immediately available, but lost on application restart
+- **Tempo (optional)**: Requires Docker setup, provides persistent storage, traces survive application restarts
+
+### When to Use Tempo
+
+**Q. When should I use Tempo?**  
+A. Use Tempo if you need:
+- Persistent trace storage (traces survive application restarts)
+- Advanced trace analysis across multiple requests
+- Sharing traces across multiple application instances
+- Long-term trace retention
+
+For most development and testing scenarios, **in-memory storage is sufficient**.
+
+### Trace Data Storage Location
+
+**Q. Where is trace data stored?**  
+A. By default, traces are stored in memory. When Tempo is enabled, traces are stored in the `./tempo-data/` folder.  
+   For production environments with Tempo, modify `tempo.yaml` to switch to object storage like S3 or MinIO.
+
 ### Changing OTLP Port
 
 **Q. Can I change the OTLP port?**  
@@ -391,11 +408,16 @@ A. It's possible but not recommended. 4317 (gRPC) and 4318 (HTTP) are OpenTeleme
 **Q. I want to change the Tempo UI port.**  
 A. Change `TEMPO_UI_PORT=3300` in the `.env` file, then restart with `docker compose down && docker compose up -d`.
 
-### Trace Data Storage Location
+### Method Tracing Configuration
 
-**Q. Where is trace data stored?**  
-A. It is stored locally in the `./tempo-data/` folder.  
-   For production environments, modify `tempo.yaml` to switch to object storage like S3 or MinIO.
+**Q. Method traces are not being captured. What should I check?**  
+A. Ensure the following settings are configured:
+1. `ouroboros.method-tracing.enabled=true`
+2. `ouroboros.method-tracing.allowed-packages=your.package.name` (with your actual package)
+3. `management.tracing.sampling.probability=1.0` (required - without this, method traces won't be captured)
+
+**Q. Do I need `management.tracing.sampling.probability=1.0` for basic Try feature?**  
+A. No. This setting is only required when using Method Tracing. The basic Try feature works without it.
 
 ---
 
@@ -409,12 +431,23 @@ A. It is stored locally in the `./tempo-data/` folder.
 
 ## 🚀 Quick Start Summary
 
+### Option 1: Quick Start with In-Memory Storage (Default)
+
+1. **Add Dependency**: Add Ouroboros SDK to `build.gradle`
+2. **Application Configuration**: Add basic Ouroboros settings to `application.properties`
+3. **Run**: Start your application
+4. **Try Request**: Make API requests with `X-Ouroboros-Try: on` header
+5. **Query Results**: Check analysis results via `/ouro/tries/{tryId}`
+
+> **Note**: Traces are stored in memory and will be lost when the application restarts.
+
+### Option 2: With Tempo Integration (For Persistent Storage)
+
 1. **Add Dependency**: Add Ouroboros SDK to `build.gradle`
 2. **Set Environment Variables**: Create `.env` file
 3. **Docker Configuration**: Create `docker-compose.yml`, `tempo.yaml`
-4. **Application Configuration**: Add Tempo integration settings to `application.properties`
+4. **Application Configuration**: Add Tempo integration settings to `application.properties` (set `ouroboros.tempo.enabled=true`)
 5. **Gitignore Configuration**: Add `tempo-data/`, `.env` to `.gitignore`
 6. **Run**: Start Tempo with `docker compose up -d`, then run the application
 7. **Try Request**: Make API requests with `X-Ouroboros-Try: on` header
 8. **Query Results**: Check analysis results via `/ouro/tries/{tryId}`
-
