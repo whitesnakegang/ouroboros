@@ -22,6 +22,7 @@ import {
   type GetAllSchemasResponse,
   importYaml,
   type ImportYamlResponse,
+  exportYaml,
 } from "../services/api";
 import {
   createRestApiSpec,
@@ -1203,18 +1204,19 @@ export function ApiEditorLayout() {
                 <button
                   onClick={async () => {
                     try {
-                      const res = await getAllRestApiSpecs();
-                      const md = exportAllToMarkdown(res.data);
+                      const yaml = await exportYaml();
+                      const { convertYamlToMarkdown } = await import("../utils/markdownExporter");
+                      const md = convertYamlToMarkdown(yaml);
                       downloadMarkdown(
                         md,
-                        `ALL_APIS_${new Date().getTime()}.md`
+                        `API_DOCUMENTATION_${new Date().getTime()}.md`
                       );
                       alert("Markdown 파일이 다운로드되었습니다.");
                     } catch (e) {
                       console.error("Markdown 내보내기 오류:", e);
                       const errorMsg = getErrorMessage(e);
                       alert(
-                        `전체 Markdown 내보내기에 실패했습니다.\n오류: ${errorMsg}`
+                        `Markdown 내보내기에 실패했습니다.\n오류: ${errorMsg}`
                       );
                     }
                   }}
@@ -1239,34 +1241,17 @@ export function ApiEditorLayout() {
                 <button
                   onClick={async () => {
                     try {
-                      const [specsRes, schemasRes] = await Promise.all([
-                        getAllRestApiSpecs(),
-                        getAllSchemas().catch((error) => {
-                          console.warn(
-                            "Schema 조회 실패, 빈 배열로 계속 진행:",
-                            error.message
-                          );
-                          return {
-                            status: 200,
-                            data: [],
-                            message: "Schema 조회 실패",
-                          } as GetAllSchemasResponse;
-                        }),
-                      ]);
-                      const yaml = buildOpenApiYamlFromSpecs(
-                        specsRes.data,
-                        (schemasRes as GetAllSchemasResponse).data
-                      );
+                      const yaml = await exportYaml();
                       downloadYaml(
                         yaml,
-                        `ALL_APIS_${new Date().getTime()}.yml`
+                        `ourorest_${new Date().getTime()}.yml`
                       );
                       alert("YAML 파일이 다운로드되었습니다.");
                     } catch (e) {
                       console.error("YAML 내보내기 오류:", e);
                       const errorMsg = getErrorMessage(e);
                       alert(
-                        `전체 YAML 내보내기에 실패했습니다.\n오류: ${errorMsg}`
+                        `YAML 내보내기에 실패했습니다.\n오류: ${errorMsg}`
                       );
                     }
                   }}
