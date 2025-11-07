@@ -80,7 +80,10 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
                 restFileSpec.getComponents().getSecuritySchemes().keySet());
         }
 
-        Map<String, PathItem> pathsScanned = safe(restScannedSpec.getPaths());
+        Map<String, PathItem> pathsScanned = restScannedSpec.getPaths();
+        if (pathsScanned == null) {
+            pathsScanned = new LinkedHashMap<>();
+        }
         Map<String, PathItem> pathsFile = restFileSpec.getPaths();
 
         if (pathsFile == null) {
@@ -147,7 +150,7 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
                 if(isMockApi(fileOp, scanOp)) continue;
 
                 // 3. endpoint diff가 있으면 reqCompare, resCompare는 스킵
-                reqCompare(url, fileOp, scanOp, schemaMatchResults, httpMethod);
+                reqCompare(url, fileOp, scanOp, httpMethod);
 
                 // 시영지기 @ApiResponse를 사용해서 명세를 정확히 작성했을 때만 response 검증
                 if(scanOp.getXOuroborosResponse() != null && scanOp.getXOuroborosResponse().equals("use")) {
@@ -205,11 +208,10 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
      * @param url the request path being compared
      * @param fileOp the operation from the file specification
      * @param scanOp the operation from the scanned specification
-     * @param schemaMatchResults map of component schema names to a boolean indicating whether each schema matches between scan and file
      * @param method the HTTP method for which parameters are compared
      */
-    private void reqCompare(String url, Operation fileOp, Operation scanOp, Map<String, Boolean> schemaMatchResults, HttpMethod method) {
-        compareAndMarkRequest(url, fileOp, scanOp, method, schemaMatchResults);
+    private void reqCompare(String url, Operation fileOp, Operation scanOp, HttpMethod method) {
+        compareAndMarkRequest(url, fileOp, scanOp, method);
     }
 
     /**
