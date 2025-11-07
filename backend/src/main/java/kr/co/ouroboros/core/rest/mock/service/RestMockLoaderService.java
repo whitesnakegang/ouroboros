@@ -206,19 +206,30 @@ public class RestMockLoaderService {
         // ===== Request Body 파싱 =====
         boolean requestBodyRequired = false;  // body가 필수인지
         Map<String, Object> requestBodySchema = null;  // body의 스키마 (타입/필드 검증용)
+        String requestBodyContentType = null;
+
         Map<String, Object> requestBody = (Map<String, Object>) operation.get("requestBody");
         if (requestBody != null) {
             requestBodyRequired = Boolean.TRUE.equals(requestBody.get("required"));
             // content.application/json.schema 추출
             Map<String, Object> content = (Map<String, Object>) requestBody.get("content");
             if (content != null) {
-                Map<String, Object> mediaType = (Map<String, Object>) content.get("application/json");
-                if (mediaType != null) {
-                    Map<String, Object> schema = (Map<String, Object>) mediaType.get("schema");
-                    if (schema != null) {
-                        // $ref가 있으면 실제 스키마로 치환
-                        // 예: {$ref: '#/components/schemas/User'} → {type: 'object', properties: {...}}
-                        requestBodySchema = resolveSchema(schema, schemas, new HashSet<>());
+                String[] supportedTypes = {
+                        "application/json",
+                        "application/xml",
+                        "application/x-www-form-urlencoded",
+                        "multipart/form-data"
+                };
+                Map<String, Object> mediaType = null;
+                for (String contentType : supportedTypes) {
+                    mediaType = (Map<String, Object>) content.get(contentType);
+                    if (mediaType != null) {
+                        requestBodyContentType = contentType;
+                        Map<String, Object> schema = (Map<String, Object>) mediaType.get("schema");
+                        if (schema != null) {
+                            requestBodySchema = resolveSchema(schema, schemas, new HashSet<>());
+                        }
+                        break;
                     }
                 }
             }
@@ -255,6 +266,7 @@ public class RestMockLoaderService {
                 .requiredParams(requiredParams)
                 .requestBodyRequired(requestBodyRequired)
                 .requestBodySchema(requestBodySchema)
+                .requestBodyContentType(requestBodyContentType)
                 .responses(responses)
                 .build();
     }

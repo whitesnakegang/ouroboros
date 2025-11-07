@@ -234,4 +234,24 @@ public class RestApiSpecController {
         );
         return ResponseEntity.ok(response);
     }
+
+    /**
+     * Exports the YAML file content.
+     * <p>
+     * Returns the current saved content from the ourorest.yml file directly.
+     * The response is plain text (YAML format) for easy download.
+     * <p>
+     * Exceptions are handled by {@link kr.co.ouroboros.core.rest.spec.exception.RestSpecExceptionHandler}.
+     *
+     * @return YAML file content as plain text
+     * @throws Exception if file reading fails or file does not exist
+     */
+    @GetMapping("/export/yaml")
+    public ResponseEntity<String> exportYaml() throws Exception {
+        String yamlContent = restApiSpecService.exportYaml();
+        return ResponseEntity.ok()
+                .header("Content-Type", "text/yaml; charset=UTF-8")
+                .header("Content-Disposition", "attachment; filename=\"ourorest.yml\"")
+                .body(yamlContent);
+    }
 }

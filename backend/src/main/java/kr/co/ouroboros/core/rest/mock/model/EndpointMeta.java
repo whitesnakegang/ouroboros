@@ -54,4 +54,5 @@ public class EndpointMeta {
     // Request body validation metadata
     private boolean requestBodyRequired;       // requestBody의 required 필드
     private Map<String, Object> requestBodySchema;  // resolved schema (타입, 필수 필드 검증용)
+    private String requestBodyContentType; //application/json, application/xml등
 }
