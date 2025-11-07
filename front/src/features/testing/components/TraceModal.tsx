@@ -95,7 +95,7 @@ export function TraceModal({ isOpen, onClose, traceData, initialExpandedSpanId }
           ref={isHighlighted ? (el) => { highlightedSpanRef.current = el; } : null}
           className={`flex items-start gap-2 p-3 rounded-md border transition-all ${
             isHighlighted
-              ? "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 shadow-lg"
+              ? "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 shadow-lg ring-2 ring-blue-400 dark:ring-blue-600 ring-opacity-50"
               : "bg-gray-50 dark:bg-[#0D1117] border-gray-200 dark:border-[#2D333B]"
           } ${hasChildren ? "cursor-pointer hover:bg-gray-100 dark:hover:bg-[#161B22] transition-colors" : ""}`}
           style={{ marginLeft: `${depth * 24}px` }}
