@@ -25,6 +25,8 @@ export interface ObjectSchema {
 export interface ArraySchema {
   kind: "array";
   items: SchemaType;
+  itemsDescription?: string;  // Array items의 description
+  itemsRequired?: boolean;  // Array items의 required 여부
   minItems?: number;  // Mock 생성 시 최소 개수 (기본: 1)
   maxItems?: number;  // Mock 생성 시 최대 개수 (기본: 3)
 }

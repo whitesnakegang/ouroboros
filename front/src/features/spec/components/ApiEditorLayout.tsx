@@ -22,6 +22,7 @@ import {
   type GetAllSchemasResponse,
   importYaml,
   type ImportYamlResponse,
+  exportYaml,
 } from "../services/api";
 import {
   createRestApiSpec,
@@ -30,8 +31,13 @@ import {
   getRestApiSpec,
   getSchema,
 } from "../services/api";
-import { convertRequestBodyToOpenAPI, parseOpenAPIRequestBody } from "../utils/schemaConverter";
+import {
+  convertRequestBodyToOpenAPI,
+  parseOpenAPIRequestBody,
+  parseOpenAPISchemaToSchemaField,
+} from "../utils/schemaConverter";
 import type { RequestBody } from "../types/schema.types";
+import { createPrimitiveField } from "../types/schema.types";
 
 interface KeyValuePair {
   key: string;
@@ -188,14 +194,13 @@ export function ApiEditorLayout() {
       setRequestHeaders([]);
       setRequestBody({
         type: "none",
-        contentType: "application/json",
         fields: [],
       });
       setAuth({ type: "none" });
       setStatusCodes([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedEndpoint, activeTab]);
+  }, [selectedEndpoint?.id]);
 
   // Load endpoint data from backend
   const loadEndpointData = async (id: string) => {
@@ -304,15 +309,62 @@ export function ApiEditorLayout() {
 
       if (spec.requestBody != null) {
         const reqBody = spec.requestBody as any;
+        console.log("🔍 RequestBody 로드 시작:", reqBody);
 
         if (reqBody.content && Object.keys(reqBody.content).length > 0) {
           const contentType = Object.keys(reqBody.content)[0];
+          console.log("🔍 Content-Type:", contentType);
 
           // 새로운 parseOpenAPIRequestBody 사용
           const parsed = parseOpenAPIRequestBody(reqBody, contentType);
+          console.log("🔍 파싱된 RequestBody:", parsed);
+
           if (parsed) {
             loadedRequestBody = parsed;
+          } else {
+            console.warn("⚠️ RequestBody 파싱 실패 - parsed가 null입니다");
           }
+        } else {
+          console.warn("⚠️ RequestBody에 content가 없습니다");
+        }
+      } else {
+        console.log("ℹ️ RequestBody가 없습니다");
+      }
+
+      console.log("✅ 최종 loadedRequestBody:", loadedRequestBody);
+
+      // schemaRef가 있으면 스키마를 조회해서 fields 채우기
+      if (
+        loadedRequestBody.schemaRef &&
+        (!loadedRequestBody.fields || loadedRequestBody.fields.length === 0)
+      ) {
+        try {
+          console.log("🔍 스키마 조회 시작:", loadedRequestBody.schemaRef);
+          const schemaResponse = await getSchema(loadedRequestBody.schemaRef);
+          const schemaData = schemaResponse.data;
+          console.log("🔍 조회된 스키마:", schemaData);
+
+          if (schemaData.properties) {
+            const fields = Object.entries(schemaData.properties).map(
+              ([key, propSchema]: [string, any]) => {
+                return parseOpenAPISchemaToSchemaField(key, propSchema);
+              }
+            );
+
+            // required 필드 설정
+            if (schemaData.required && Array.isArray(schemaData.required)) {
+              fields.forEach((field) => {
+                if (schemaData.required!.includes(field.key)) {
+                  field.required = true;
+                }
+              });
+            }
+
+            loadedRequestBody.fields = fields;
+            console.log("✅ 스키마에서 fields 로드 완료:", fields);
+          }
+        } catch (error) {
+          console.error("⚠️ 스키마 조회 실패:", error);
         }
       }
 
@@ -369,13 +421,13 @@ export function ApiEditorLayout() {
                 if (schema.type === "array" && schema.items) {
                   const itemsSchema = schema.items;
                   const itemsRef = itemsSchema.$ref || itemsSchema.ref;
-                  
+
                   const schemaData: any = {
                     isArray: true,
                     minItems: schema.minItems,
                     maxItems: schema.maxItems,
                   };
-                  
+
                   if (itemsRef) {
                     // Array of Schema Reference
                     let schemaName: string;
@@ -414,7 +466,7 @@ export function ApiEditorLayout() {
                     // Array of Primitive Type
                     schemaData.type = itemsSchema.type;
                   }
-                  
+
                   statusCode.schema = schemaData;
                 } else {
                   // Non-array 타입
@@ -481,15 +533,8 @@ export function ApiEditorLayout() {
       // StatusCodes state 업데이트
       setStatusCodes(loadedStatusCodes);
 
-      // 테스트 스토어 업데이트
-      setRequest({
-        method: spec.method,
-        url: spec.path,
-        description: spec.description || spec.summary || "",
-        headers: testHeaders,
-        queryParams: testQueryParams,
-        body: "",
-      });
+      // 테스트 스토어 업데이트는 TestRequestPanel에서 처리하므로 여기서는 제거
+      // (TestRequestPanel에서 selectedEndpoint 변경 시 자동으로 로드됨)
     } catch (error) {
       console.error("API 스펙 로드 실패:", error);
       const errorMessage = getErrorMessage(error);
@@ -901,8 +946,7 @@ export function ApiEditorLayout() {
       setAuth({ type: "none" });
       setRequestBody({
         type: "json",
-        contentType: "application/json",
-        fields: [{ key: "email", value: "string", type: "string" }],
+        fields: [createPrimitiveField("email", "string")],
       });
       setStatusCodes([]);
     }
@@ -922,7 +966,6 @@ export function ApiEditorLayout() {
     setRequestHeaders([]);
     setRequestBody({
       type: "json",
-      contentType: "application/json",
       fields: [],
     });
     setStatusCodes([]);
@@ -1041,17 +1084,81 @@ export function ApiEditorLayout() {
       const fullUrl = url.startsWith("http") ? url : url;
 
       // Request body 파싱 (GET 메서드가 아니고 body가 있을 때만)
-      let requestData = undefined;
+      let requestData: any = undefined;
       if (request.method !== "GET" && request.body && request.body.trim()) {
-        try {
-          requestData = JSON.parse(request.body);
-        } catch (e) {
-          console.error("Request body 파싱 실패:", e);
-          throw new Error(
-            `Request body가 유효한 JSON 형식이 아닙니다: ${
-              e instanceof Error ? e.message : String(e)
-            }`
-          );
+        const contentTypeHeader = request.headers.find(
+          (h) => h.key.toLowerCase() === "content-type"
+        );
+        const contentType = contentTypeHeader?.value || "application/json";
+
+        if (contentType.includes("multipart/form-data")) {
+          // FormData로 변환
+          const formData = new FormData();
+          try {
+            const bodyObj = JSON.parse(request.body);
+            Object.entries(bodyObj).forEach(([key, value]) => {
+              if (value !== undefined && value !== null) {
+                if (value instanceof File) {
+                  formData.append(key, value);
+                } else if (Array.isArray(value)) {
+                  value.forEach((item) => {
+                    if (item instanceof File) {
+                      formData.append(key, item);
+                    } else {
+                      formData.append(key, String(item));
+                    }
+                  });
+                } else {
+                  formData.append(key, String(value));
+                }
+              }
+            });
+            requestData = formData;
+            // FormData는 Content-Type을 자동으로 설정하므로 헤더에서 제거
+            delete headers["Content-Type"];
+          } catch (e) {
+            console.error("FormData 변환 실패:", e);
+            throw new Error("FormData 변환에 실패했습니다.");
+          }
+        } else if (contentType.includes("application/x-www-form-urlencoded")) {
+          // URLSearchParams로 변환
+          const params = new URLSearchParams();
+          try {
+            const bodyObj = JSON.parse(request.body);
+            Object.entries(bodyObj).forEach(([key, value]) => {
+              if (value !== undefined && value !== null) {
+                if (Array.isArray(value)) {
+                  value.forEach((item) => {
+                    params.append(key, String(item));
+                  });
+                } else {
+                  params.append(key, String(value));
+                }
+              }
+            });
+            requestData = params.toString();
+          } catch (e) {
+            console.error("URLSearchParams 변환 실패:", e);
+            throw new Error("URL-encoded 변환에 실패했습니다.");
+          }
+        } else if (
+          contentType.includes("application/xml") ||
+          contentType.includes("text/xml")
+        ) {
+          // XML은 문자열 그대로 전송
+          requestData = request.body;
+        } else {
+          // JSON (기본)
+          try {
+            requestData = JSON.parse(request.body);
+          } catch (e) {
+            console.error("Request body 파싱 실패:", e);
+            throw new Error(
+              `Request body가 유효한 JSON 형식이 아닙니다: ${
+                e instanceof Error ? e.message : String(e)
+              }`
+            );
+          }
         }
       }
 
@@ -1203,18 +1310,19 @@ export function ApiEditorLayout() {
                 <button
                   onClick={async () => {
                     try {
-                      const res = await getAllRestApiSpecs();
-                      const md = exportAllToMarkdown(res.data);
+                      const yaml = await exportYaml();
+                      const { convertYamlToMarkdown } = await import("../utils/markdownExporter");
+                      const md = convertYamlToMarkdown(yaml);
                       downloadMarkdown(
                         md,
-                        `ALL_APIS_${new Date().getTime()}.md`
+                        `API_DOCUMENTATION_${new Date().getTime()}.md`
                       );
                       alert("Markdown 파일이 다운로드되었습니다.");
                     } catch (e) {
                       console.error("Markdown 내보내기 오류:", e);
                       const errorMsg = getErrorMessage(e);
                       alert(
-                        `전체 Markdown 내보내기에 실패했습니다.\n오류: ${errorMsg}`
+                        `Markdown 내보내기에 실패했습니다.\n오류: ${errorMsg}`
                       );
                     }
                   }}
@@ -1239,34 +1347,17 @@ export function ApiEditorLayout() {
                 <button
                   onClick={async () => {
                     try {
-                      const [specsRes, schemasRes] = await Promise.all([
-                        getAllRestApiSpecs(),
-                        getAllSchemas().catch((error) => {
-                          console.warn(
-                            "Schema 조회 실패, 빈 배열로 계속 진행:",
-                            error.message
-                          );
-                          return {
-                            status: 200,
-                            data: [],
-                            message: "Schema 조회 실패",
-                          } as GetAllSchemasResponse;
-                        }),
-                      ]);
-                      const yaml = buildOpenApiYamlFromSpecs(
-                        specsRes.data,
-                        (schemasRes as GetAllSchemasResponse).data
-                      );
+                      const yaml = await exportYaml();
                       downloadYaml(
                         yaml,
-                        `ALL_APIS_${new Date().getTime()}.yml`
+                        `ourorest_${new Date().getTime()}.yml`
                       );
                       alert("YAML 파일이 다운로드되었습니다.");
                     } catch (e) {
                       console.error("YAML 내보내기 오류:", e);
                       const errorMsg = getErrorMessage(e);
                       alert(
-                        `전체 YAML 내보내기에 실패했습니다.\n오류: ${errorMsg}`
+                        `YAML 내보내기에 실패했습니다.\n오류: ${errorMsg}`
                       );
                     }
                   }}

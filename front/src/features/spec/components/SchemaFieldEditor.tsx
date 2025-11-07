@@ -140,13 +140,15 @@ export function SchemaFieldEditor({
   };
 
   // Array items 변경
-  const handleArrayItemsChange = (newItems: SchemaType) => {
+  const handleArrayItemsChange = (newField: SchemaField) => {
     if (isArraySchema(field.schemaType)) {
       onChange({
         ...field,
         schemaType: {
           ...field.schemaType,
-          items: newItems,
+          items: newField.schemaType,
+          itemsDescription: newField.description,
+          itemsRequired: newField.required,
         },
       });
     }
@@ -301,8 +303,10 @@ export function SchemaFieldEditor({
             field={{
               key: "items",
               schemaType: field.schemaType.items,
+              description: field.schemaType.itemsDescription,
+              required: field.schemaType.itemsRequired,
             }}
-            onChange={(newField) => handleArrayItemsChange(newField.schemaType)}
+            onChange={(newField) => handleArrayItemsChange(newField)}
             depth={depth + 1}
             isReadOnly={isReadOnly}
             allowFileType={allowFileType}

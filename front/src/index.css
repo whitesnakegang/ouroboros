@@ -21,7 +21,6 @@
   line-height: 1.5;
   font-weight: 400;
 
-  /* 기본값은 라이트 모드로 설정 */
   color-scheme: light;
   color: #213547;
   background-color: #ffffff;
@@ -32,8 +31,7 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* 다크 모드는 .dark 클래스가 있을 때만 적용되도록 수정 */
-:root.dark {
+.dark {
   color-scheme: dark;
   color: rgba(255, 255, 255, 0.87);
   background-color: #242424;
@@ -49,11 +47,22 @@ a:hover {
   color: #747bff;
 }
 
+.dark a:hover {
+  color: #747bff;
+}
+
 body {
   margin: 0;
   display: flex;
   min-width: 320px;
   min-height: 100vh;
+  color: #213547;
+  background-color: #ffffff;
+}
+
+.dark body {
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #242424;
 }
 
 #root {
@@ -73,8 +82,14 @@ button {
   font-weight: 500;
   font-family: inherit;
   background-color: #f9f9f9;
+  color: #213547;
   cursor: pointer;
   transition: border-color 0.25s;
+}
+
+.dark button {
+  background-color: #1a1a1a;
+  color: rgba(255, 255, 255, 0.87);
 }
 
 button:hover {
@@ -84,13 +99,4 @@ button:hover {
 button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
-}
-
-/* 다크 모드에서 버튼 스타일 */
-:root.dark button {
-  background-color: #1a1a1a;
-}
-
-:root.dark a:hover {
-  color: #535bf2;
 }
