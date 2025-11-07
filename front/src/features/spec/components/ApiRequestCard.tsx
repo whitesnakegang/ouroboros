@@ -143,13 +143,23 @@ export function ApiRequestCard({
           schemaName: schema.name,
         },
       });
+    } else if (requestBody.rootSchemaType && isObjectSchema(requestBody.rootSchemaType)) {
+      // object 타입일 때는 rootSchemaType의 properties를 스키마의 fields로 채움
+      setRequestBody({
+        ...requestBody,
+        rootSchemaType: {
+          ...requestBody.rootSchemaType,
+          properties: schema.fields,
+        },
+        schemaRef: schema.name,
+      });
     } else {
       // 기존 방식: SchemaModal에서 이미 재귀적으로 변환된 필드를 그대로 사용
-    setRequestBody({
-      ...requestBody,
-      schemaRef: schema.name,
-      fields: schema.fields,
-    });
+      setRequestBody({
+        ...requestBody,
+        schemaRef: schema.name,
+        fields: schema.fields,
+      });
     }
   };
 
@@ -352,8 +362,8 @@ export function ApiRequestCard({
                 )}
 
                 <div className="mb-3 flex gap-2 items-center">
-                  {/* Schema 참조 표시 */}
-                  {requestBody.schemaRef && (
+                  {/* Schema 참조 표시 (JSON/XML이 아닐 때만) */}
+                  {requestBody.schemaRef && requestBody.type !== "json" && requestBody.type !== "xml" && (
                     <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-md">
                       <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
                         Schema: {requestBody.schemaRef}
@@ -416,8 +426,46 @@ export function ApiRequestCard({
                     {/* Object 타입 */}
                     {isObjectSchema(requestBody.rootSchemaType) && (() => {
                       const objectSchema = requestBody.rootSchemaType;
+                      // schemaRef가 있으면 필드 편집 불가 (form-data와 동일한 동작)
+                      const hasSchemaRef = !!requestBody.schemaRef;
                       return (
                         <div>
+                          {/* Schema 참조 표시 */}
+                          {hasSchemaRef && (
+                            <div className="mb-3 flex items-center gap-2 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-md">
+                              <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                                Schema: {requestBody.schemaRef}
+                              </span>
+                              <button
+                                onClick={() => {
+                                  if (isObjectSchema(requestBody.rootSchemaType!)) {
+                                    setRequestBody({
+                                      ...requestBody,
+                                      schemaRef: undefined,
+                                      fields: [],
+                                      rootSchemaType: {
+                                        ...requestBody.rootSchemaType!,
+                                        properties: [],
+                                      },
+                                    });
+                                  } else {
+                                    setRequestBody({
+                                      ...requestBody,
+                                      schemaRef: undefined,
+                                      fields: [],
+                                    });
+                                  }
+                                }}
+                                disabled={isReadOnly}
+                                className="text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
+                                title="Remove Schema"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            </div>
+                          )}
                           <div className="mb-3 flex gap-2 items-center">
                             <button
                               onClick={() => {
@@ -432,9 +480,9 @@ export function ApiRequestCard({
                                   },
                                 });
                               }}
-                              disabled={isReadOnly}
+                              disabled={isReadOnly || hasSchemaRef}
                               className={`px-3 py-1 text-sm text-[#2563EB] hover:text-[#1E40AF] font-medium ${
-                                isReadOnly ? "opacity-50 cursor-not-allowed" : ""
+                                isReadOnly || hasSchemaRef ? "opacity-50 cursor-not-allowed" : ""
                               }`}
                             >
                               + Add Field
@@ -446,7 +494,7 @@ export function ApiRequestCard({
                                 isReadOnly ? "opacity-50 cursor-not-allowed" : ""
                               }`}
                             >
-                              + Add Schema
+                              {hasSchemaRef ? "Change Schema" : "+ Add Schema"}
                             </button>
                           </div>
                           <div className="space-y-2">
@@ -475,12 +523,12 @@ export function ApiRequestCard({
                                     },
                                   });
                                 }}
-                                isReadOnly={isReadOnly}
+                                isReadOnly={isReadOnly || hasSchemaRef}
                                 allowFileType={false}
                               />
                             ))}
                           </div>
-                          {(!objectSchema.properties || objectSchema.properties.length === 0) && (
+                          {(!objectSchema.properties || objectSchema.properties.length === 0) && !hasSchemaRef && (
                             <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
                               <p>No fields yet. Click "+ Add Field" to add one.</p>
                             </div>
