@@ -12,21 +12,10 @@ import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-/**
- * REST API 스키마를 비교하는 컴포넌트.
- * <p>
- * 스캔된 문서와 파일 기반 문서의 components.schemas를 비교하여 각 스키마별 일치 여부를 검사하고 결과를 Map으로 반환합니다.
- *
- * @since 0.0.1
- */
 @Slf4j
 @Component
 public class SchemaComparator {
 
-    /**
-     * 타입 카운트를 저장하는 클래스
-     * 내부적으로 Map<String, Integer>를 가지며, 키는 "{필드명:타입}" 형식
-     */
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
@@ -34,15 +23,6 @@ public class SchemaComparator {
         private Map<String, Integer> typeCounts = new HashMap<>();
     }
 
-    /**
-     * 스키마를 평탄화하여 타입별 개수를 구합니다.
-     * <p>
-     * 각 스키마에 대해 필드명과 타입을 조합한 키로 타입 개수를 카운트합니다.
-     * format이 "binary"인 경우 타입으로 취급합니다.
-     *
-     * @param components Components 객체 (스키마들이 포함됨)
-     * @return 스키마 이름 -> TypeCnts 맵
-     */
     public Map<String, TypeCnts> flattenSchemas(Components components) {
         Map<String, TypeCnts> result = new HashMap<>();
         
@@ -62,15 +42,6 @@ public class SchemaComparator {
         return result;
     }
 
-    /**
-     * 단일 스키마를 평탄화하여 타입별 개수를 구합니다.
-     *
-     * @param schemaName 스키마 이름
-     * @param schema 스키마 객체
-     * @param components Components 객체 ($ref 해결용)
-     * @param visited 방문한 스키마 추적 (순환 참조 방지)
-     * @return TypeCnts 객체
-     */
     private TypeCnts flattenSchema(String schemaName, Schema schema, Components components, Set<String> visited) {
         TypeCnts typeCnts = new TypeCnts();
         Map<String, Integer> typeCounts = new HashMap<>();
@@ -124,15 +95,6 @@ public class SchemaComparator {
         return typeCnts;
     }
 
-    /**
-     * Property에서 타입 카운트를 수집합니다.
-     *
-     * @param propertyName 필드명
-     * @param propertySchema Property 스키마
-     * @param components Components 객체
-     * @param typeCounts 타입 카운트를 누적할 Map
-     * @param visited 방문한 스키마 추적
-     */
     private void collectTypeCountsFromProperty(String propertyName, Schema propertySchema, 
                                                 Components components, Map<String, Integer> typeCounts,
                                                 Set<String> visited) {
@@ -201,12 +163,6 @@ public class SchemaComparator {
         }
     }
 
-    /**
-     * $ref에서 스키마 이름을 추출합니다.
-     *
-     * @param ref $ref 값 (예: "#/components/schemas/User")
-     * @return 스키마 이름 (예: "User"), 또는 null
-     */
     private String extractSchemaNameFromRef(String ref) {
         if (ref == null || !ref.startsWith("#/components/schemas/")) {
             return null;
@@ -214,13 +170,6 @@ public class SchemaComparator {
         return ref.substring("#/components/schemas/".length());
     }
 
-    /**
-     * Components에서 스키마 이름으로 스키마를 찾습니다.
-     *
-     * @param schemaName 스키마 이름
-     * @param components Components 객체
-     * @return Schema 객체, 없으면 null
-     */
     private Schema getSchemaByName(String schemaName, Components components) {
         if (schemaName == null || components == null) {
             return null;
@@ -234,12 +183,6 @@ public class SchemaComparator {
         return schemas.get(schemaName);
     }
 
-    /**
-     * 두 타입 카운트 맵을 병합합니다.
-     *
-     * @param target 누적할 대상 Map
-     * @param source 병합할 소스 Map
-     */
     private void mergeTypeCounts(Map<String, Integer> target, Map<String, Integer> source) {
         for (Map.Entry<String, Integer> entry : source.entrySet()) {
             String key = entry.getKey();
@@ -248,15 +191,6 @@ public class SchemaComparator {
         }
     }
 
-    /**
-     * 주어진 타입이 기본형 타입인지 확인합니다.
-     * <p>
-     * object와 array는 기본형이 아니므로 false를 반환합니다.
-     * 이들은 properties나 items를 처리해야 합니다.
-     *
-     * @param type 확인할 타입
-     * @return 기본형 타입(string, integer, number, boolean)이면 true
-     */
     private boolean isPrimitiveType(String type) {
         if (type == null) {
             return false;
@@ -265,17 +199,6 @@ public class SchemaComparator {
                type.equals("boolean");
     }
 
-    /**
-     * 평탄화된 스키마들을 비교하여 일치 여부를 판단합니다.
-     * <p>
-     * baseSchemas를 기준으로 순회하면서, 각 스키마에 대해:
-     * - targetSchemas에 해당 스키마가 없으면 false
-     * - 있으면 두 TypeCnts의 typeCounts를 비교하여 모든 키의 개수가 같으면 true, 하나라도 다르면 false
-     *
-     * @param baseSchemas 기준이 되는 평탄화된 스키마 맵
-     * @param targetSchemas 비교 대상 평탄화된 스키마 맵
-     * @return 스키마 이름 -> 일치 여부 (true/false) 맵
-     */
     public Map<String, Boolean> compareFlattenedSchemas(
             Map<String, TypeCnts> baseSchemas,
             Map<String, TypeCnts> targetSchemas) {
