@@ -22,7 +22,8 @@ jobs:
 
       - name: Fetch all branches and tags
         run: |
-          git fetch origin "+refs/heads/*:refs/heads/*" "+refs/tags/*:refs/tags/*"
+          git fetch --prune origin "+refs/heads/*:refs/remotes/origin/*"
+          git fetch --prune --tags origin
 
       - name: Git setup
         run: |
