@@ -8,6 +8,7 @@ import {
   isPrimitiveSchema,
   isObjectSchema,
   isArraySchema,
+  isRefSchema,
 } from "@/features/spec/types/schema.types";
 
 interface RequestBodyFormProps {
@@ -36,9 +37,32 @@ function getDefaultValue(schemaType: SchemaType): any {
     }
   }
   if (isArraySchema(schemaType)) {
-    return [];
+    // items가 object schema인 경우 properties를 기반으로 객체 생성
+    if (isObjectSchema(schemaType.items)) {
+      const obj: Record<string, any> = {};
+      schemaType.items.properties.forEach((field) => {
+        obj[field.key] = getDefaultValue(field.schemaType);
+      });
+      return [obj];
+    }
+    // items가 ref인 경우 빈 객체 (이미 변환되어야 하지만 안전장치)
+    if (isRefSchema(schemaType.items)) {
+      return [{}];
+    }
+    // primitive나 기타 타입
+    const itemValue = getDefaultValue(schemaType.items);
+    return itemValue !== undefined ? [itemValue] : [];
   }
   if (isObjectSchema(schemaType)) {
+    // object schema인 경우 properties를 기반으로 객체 생성
+    const obj: Record<string, any> = {};
+    schemaType.properties.forEach((field) => {
+      obj[field.key] = getDefaultValue(field.schemaType);
+    });
+    return obj;
+  }
+  if (isRefSchema(schemaType)) {
+    // Ref는 스키마 참조이므로 빈 객체 반환
     return {};
   }
   return null;
@@ -56,6 +80,11 @@ function JsonBodyForm({
 }) {
   const initializedRef = useRef<string>("");
 
+  // rootSchemaType을 기반으로 기본값 생성
+  const generateDefaultFromRootSchema = (rootSchemaType: SchemaType): any => {
+    return getDefaultValue(rootSchemaType);
+  };
+
   // fields를 기반으로 기본 JSON 객체 생성
   const generateDefaultJson = (fields: SchemaField[]): string => {
     const obj: Record<string, any> = {};
@@ -65,8 +94,32 @@ function JsonBodyForm({
     return JSON.stringify(obj, null, 2);
   };
 
-  // 초기값 설정 (value가 비어있고 fields가 있을 때)
+  // 초기값 설정
   useEffect(() => {
+    // rootSchemaType이 있으면 우선 사용
+    if (requestBody?.rootSchemaType) {
+      const rootKey = JSON.stringify(requestBody.rootSchemaType);
+      
+      if (rootKey !== initializedRef.current) {
+        initializedRef.current = rootKey;
+        
+        const defaultValue = generateDefaultFromRootSchema(requestBody.rootSchemaType);
+        if (defaultValue !== undefined && defaultValue !== null) {
+          const defaultJson = JSON.stringify(defaultValue, null, 2);
+          if (!value || value.trim() === "" || value === "{}" || value === "[]" || value === '""') {
+            onChange(defaultJson);
+          }
+        } else {
+          // Ref 타입이면 빈 값
+          if (value && value.trim() !== "") {
+            onChange("");
+          }
+        }
+      }
+      return;
+    }
+
+    // 기존 방식: fields 사용
     const fieldsKey = requestBody?.fields
       ? JSON.stringify(requestBody.fields.map((f) => f.key))
       : "";
@@ -89,7 +142,7 @@ function JsonBodyForm({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requestBody?.fields]);
+  }, [requestBody?.rootSchemaType, requestBody?.fields]);
 
   return (
     <div>
