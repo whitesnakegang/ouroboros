@@ -21,7 +21,7 @@ import lombok.extern.slf4j.Slf4j;
  * </ul>
  * <p>
  * This processor is automatically registered when Tempo is disabled
- * in {@link kr.co.ouroboros.core.rest.tryit.config.TryConfig}.
+ * in {@link kr.co.ouroboros.core.rest.tryit.config.TraceStorageConfig}.
  *
  * @author Ouroboros Team
  * @since 0.0.1

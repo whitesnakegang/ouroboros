@@ -1,7 +1,6 @@
 package kr.co.ouroboros.core.rest.tryit.config;
 
 import io.opentelemetry.sdk.trace.SpanProcessor;
-import kr.co.ouroboros.core.rest.tryit.config.properties.MethodTracingProperties;
 import kr.co.ouroboros.core.rest.tryit.config.properties.TempoProperties;
 import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.memory.processor.InMemoryTrySpanProcessor;
 import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.tempo.processor.TempoTrySpanProcessor;
@@ -12,19 +11,16 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.ComponentScan;
-import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
- * Try feature configuration.
+ * Trace storage configuration.
  * <p>
- * Auto-configuration for Ouroboros SDK Try feature.
+ * Auto-configuration for trace storage selection (Tempo or in-memory).
  * This configuration is automatically detected by Spring Boot when the SDK is on the classpath.
  * <p>
  * <b>Configuration Properties:</b>
  * <ul>
  *   <li>{@link TempoProperties} - Tempo storage configuration</li>
- *   <li>{@link MethodTracingProperties} - Method tracing configuration</li>
  * </ul>
  * <p>
  * <b>Beans:</b>
@@ -37,13 +33,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  */
 @Slf4j
 @AutoConfiguration
-@EnableConfigurationProperties({
-        TempoProperties.class,
-        MethodTracingProperties.class
-})
-@ComponentScan(basePackages = "kr.co.ouroboros")
-@EnableScheduling
-public class TryConfig {
+@EnableConfigurationProperties(TempoProperties.class)
+public class TraceStorageConfig {
     
     /**
      * Register a TempoTrySpanProcessor bean that enriches OpenTelemetry spans with a `tryId` attribute.

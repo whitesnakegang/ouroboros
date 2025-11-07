@@ -17,7 +17,7 @@ import kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.processor.
  * </ul>
  * <p>
  * This processor is automatically registered when Tempo is enabled
- * in {@link kr.co.ouroboros.core.rest.tryit.config.TryConfig}.
+ * in {@link kr.co.ouroboros.core.rest.tryit.config.TraceStorageConfig}.
  *
  * @author Ouroboros Team
  * @since 0.0.1

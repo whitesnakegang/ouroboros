@@ -6,7 +6,7 @@
  * <p>
  * <b>Components:</b>
  * <ul>
- *   <li>{@link kr.co.ouroboros.core.rest.tryit.config.TryConfig} - Auto-configuration for Try feature</li>
+ *   <li>{@link kr.co.ouroboros.core.rest.tryit.config.TraceStorageConfig} - Auto-configuration for trace storage selection</li>
  *   <li>{@link kr.co.ouroboros.core.rest.tryit.config.MethodTracingConfig} - AOP configuration for method tracing</li>
  * </ul>
  * <p>
