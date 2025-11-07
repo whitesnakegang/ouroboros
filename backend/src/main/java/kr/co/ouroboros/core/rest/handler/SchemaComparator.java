@@ -12,21 +12,10 @@ import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-/**
- * REST API 스키마를 비교하는 컴포넌트.
- * <p>
- * 스캔된 문서와 파일 기반 문서의 components.schemas를 비교하여 각 스키마별 일치 여부를 검사하고 결과를 Map으로 반환합니다.
- *
- * @since 0.0.1
- */
 @Slf4j
 @Component
 public class SchemaComparator {
 
-    /**
-     * 타입 카운트를 저장하는 클래스
-     * 내부적으로 Map<String, Integer>를 가지며, 키는 "{필드명:타입}" 형식
-     */
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
@@ -35,13 +24,12 @@ public class SchemaComparator {
     }
 
     /**
-     * 스키마를 평탄화하여 타입별 개수를 구합니다.
-     * <p>
-     * 각 스키마에 대해 필드명과 타입을 조합한 키로 타입 개수를 카운트합니다.
-     * format이 "binary"인 경우 타입으로 취급합니다.
+     * Compute flattened type-count representations for each schema defined in the provided Components.
      *
-     * @param components Components 객체 (스키마들이 포함됨)
-     * @return 스키마 이름 -> TypeCnts 맵
+     * @param components the OpenAPI Components object containing schema definitions; may be null
+     *                   or contain no schemas
+     * @return a map from schema name to its flattened TypeCnts; empty if {@code components} is null
+     *         or contains no schemas
      */
     public Map<String, TypeCnts> flattenSchemas(Components components) {
         Map<String, TypeCnts> result = new HashMap<>();
@@ -63,13 +51,13 @@ public class SchemaComparator {
     }
 
     /**
-     * 단일 스키마를 평탄화하여 타입별 개수를 구합니다.
+     * Computes flattened type counts for the given schema by traversing its properties, array items, and any referenced schemas while preventing infinite recursion from circular references.
      *
-     * @param schemaName 스키마 이름
-     * @param schema 스키마 객체
-     * @param components Components 객체 ($ref 해결용)
-     * @param visited 방문한 스키마 추적 (순환 참조 방지)
-     * @return TypeCnts 객체
+     * @param schemaName the name identifying the schema within components; used for circular-reference detection
+     * @param schema the schema to analyze; may be null
+     * @param components the Components container used to resolve `$ref` references; may be null
+     * @param visited a set of schema names already visited in the current traversal to detect and avoid circular references
+     * @return a TypeCnts containing a map of flattened type-count entries; the map will be empty if the schema is null or references cannot be resolved
      */
     private TypeCnts flattenSchema(String schemaName, Schema schema, Components components, Set<String> visited) {
         TypeCnts typeCnts = new TypeCnts();
@@ -125,13 +113,22 @@ public class SchemaComparator {
     }
 
     /**
-     * Property에서 타입 카운트를 수집합니다.
+     * Accumulates flattened type counts for a property (including nested properties, arrays, and $ref targets)
+     * into the provided map.
      *
-     * @param propertyName 필드명
-     * @param propertySchema Property 스키마
-     * @param components Components 객체
-     * @param typeCounts 타입 카운트를 누적할 Map
-     * @param visited 방문한 스키마 추적
+     * Processes the property's schema as follows:
+     * - If the schema is a $ref, merges the referenced schema's flattened counts directly into `typeCounts`.
+     * - If the schema is an array, records a single count for the array element type or referenced schema using the key
+     *   `propertyName:array.{TypeOrSchemaName}`.
+     * - If the schema is a primitive type, increments the count for `propertyName:{type}` (uses `binary` when format is `binary`).
+     * - If the schema has nested properties (object), recursively processes each nested property and merges their counts
+     *   without adding a parent prefix.
+     *
+     * @param propertyName the name of the property being processed; used as the key prefix for recorded types
+     * @param propertySchema the OpenAPI Schema object describing the property
+     * @param components the Components container used to resolve schema $ref references
+     * @param typeCounts the accumulating map of type keys to counts that will be updated in-place
+     * @param visited set of schema names already visited to detect and avoid circular references during resolution
      */
     private void collectTypeCountsFromProperty(String propertyName, Schema propertySchema, 
                                                 Components components, Map<String, Integer> typeCounts,
@@ -202,10 +199,10 @@ public class SchemaComparator {
     }
 
     /**
-     * $ref에서 스키마 이름을 추출합니다.
+     * Extracts the schema name from a Components schema reference.
      *
-     * @param ref $ref 값 (예: "#/components/schemas/User")
-     * @return 스키마 이름 (예: "User"), 또는 null
+     * @param ref the JSON Reference string, expected to start with "#/components/schemas/{SchemaName}"
+     * @return the schema name portion when `ref` starts with "#/components/schemas/", `null` otherwise
      */
     private String extractSchemaNameFromRef(String ref) {
         if (ref == null || !ref.startsWith("#/components/schemas/")) {
@@ -215,11 +212,11 @@ public class SchemaComparator {
     }
 
     /**
-     * Components에서 스키마 이름으로 스키마를 찾습니다.
+     * Retrieve a schema definition from the provided Components by its schema name.
      *
-     * @param schemaName 스키마 이름
-     * @param components Components 객체
-     * @return Schema 객체, 없으면 null
+     * @param schemaName the key name of the schema within the Components' schemas map
+     * @param components the Components container to search for the schema
+     * @return the Schema associated with the given name, or `null` if the name, components, or schema map is null or the name is not present
      */
     private Schema getSchemaByName(String schemaName, Components components) {
         if (schemaName == null || components == null) {
@@ -235,10 +232,10 @@ public class SchemaComparator {
     }
 
     /**
-     * 두 타입 카운트 맵을 병합합니다.
+     * Merge counts from the source map into the target map by summing values for matching keys.
      *
-     * @param target 누적할 대상 Map
-     * @param source 병합할 소스 Map
+     * @param target the map that will be updated; for each key present in {@code source} its value is added to the existing value in {@code target} (or inserted if absent)
+     * @param source the map supplying counts to add into {@code target}
      */
     private void mergeTypeCounts(Map<String, Integer> target, Map<String, Integer> source) {
         for (Map.Entry<String, Integer> entry : source.entrySet()) {
@@ -249,13 +246,10 @@ public class SchemaComparator {
     }
 
     /**
-     * 주어진 타입이 기본형 타입인지 확인합니다.
-     * <p>
-     * object와 array는 기본형이 아니므로 false를 반환합니다.
-     * 이들은 properties나 items를 처리해야 합니다.
+     * Determines whether the given type name represents a primitive OpenAPI/Swagger type.
      *
-     * @param type 확인할 타입
-     * @return 기본형 타입(string, integer, number, boolean)이면 true
+     * @param type the type name to check (for example, "string", "integer", "number", or "boolean")
+     * @return `true` if the type is one of "string", "integer", "number", or "boolean", `false` otherwise
      */
     private boolean isPrimitiveType(String type) {
         if (type == null) {
@@ -266,15 +260,16 @@ public class SchemaComparator {
     }
 
     /**
-     * 평탄화된 스키마들을 비교하여 일치 여부를 판단합니다.
-     * <p>
-     * baseSchemas를 기준으로 순회하면서, 각 스키마에 대해:
-     * - targetSchemas에 해당 스키마가 없으면 false
-     * - 있으면 두 TypeCnts의 typeCounts를 비교하여 모든 키의 개수가 같으면 true, 하나라도 다르면 false
+     * Compare flattened type-count representations of schemas from a base set against a target set.
      *
-     * @param baseSchemas 기준이 되는 평탄화된 스키마 맵
-     * @param targetSchemas 비교 대상 평탄화된 스키마 맵
-     * @return 스키마 이름 -> 일치 여부 (true/false) 맵
+     * For each schema present in {@code baseSchemas}, determines whether the corresponding {@code TypeCnts}
+     * in {@code targetSchemas} has identical {@code typeCounts}. If a schema from {@code baseSchemas} is
+     * missing in {@code targetSchemas}, it is considered not equal.
+     *
+     * @param baseSchemas   map of schema names to their flattened type counts (base reference)
+     * @param targetSchemas map of schema names to their flattened type counts (target to compare), may be {@code null}
+     * @return              a map from each schema name in {@code baseSchemas} to `true` if the target has the same
+     *                      type-counts for that schema, `false` otherwise
      */
     public Map<String, Boolean> compareFlattenedSchemas(
             Map<String, TypeCnts> baseSchemas,
