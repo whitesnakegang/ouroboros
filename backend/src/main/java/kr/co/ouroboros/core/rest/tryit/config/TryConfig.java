@@ -53,10 +53,10 @@ public class TryConfig {
      *
      * @return the created TempoTrySpanProcessor instance as a `SpanProcessor`
      */
-    @Bean
+    @Bean(name = "trySpanProcessor")
     @ConditionalOnMissingBean(name = "trySpanProcessor")
     @ConditionalOnProperty(name = "ouroboros.tempo.enabled", havingValue = "true", matchIfMissing = false)
-    public SpanProcessor trySpanProcessor() {
+    public SpanProcessor tempoTrySpanProcessor() {
         log.info("Creating TempoTrySpanProcessor bean (Tempo enabled)");
         TempoTrySpanProcessor processor = new TempoTrySpanProcessor();
         log.info("TempoTrySpanProcessor bean created successfully");
@@ -72,7 +72,7 @@ public class TryConfig {
      * @param traceStorage The trace storage (in-memory when Tempo is disabled)
      * @return the created InMemoryTrySpanProcessor instance as a `SpanProcessor`
      */
-    @Bean
+    @Bean(name = "trySpanProcessor")
     @ConditionalOnMissingBean(name = "trySpanProcessor")
     @ConditionalOnProperty(name = "ouroboros.tempo.enabled", havingValue = "false", matchIfMissing = true)
     public SpanProcessor inMemoryTrySpanProcessor(TraceStorage traceStorage) {
