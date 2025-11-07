@@ -903,10 +903,13 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
                 log.info("📦 Auto-created {} missing schema(s)", createdSchemas);
             }
 
-            // Step 7: Write merged document back to file
-            yamlParser.writeDocument(existingDoc);
+            // Step 7: Process and cache: writes to file + validates with scanned state + updates cache
+            specManager.processAndCacheSpec(Protocol.REST, existingDoc);
 
-            // Step 8: Build response
+            // Step 8: Reload mock registry (same as create/update/delete)
+            reloadMockRegistry();
+
+            // Step 9: Build response
             String summary = String.format("Successfully imported %d APIs and %d schemas%s",
                     importedApis, importedSchemas,
                     !renamedList.isEmpty() ? ", renamed " + renamedList.size() + " items due to duplicates" : "");
@@ -1313,5 +1316,15 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         Map<String, EndpointMeta> endpoints = mockLoaderService.loadFromYaml();
         endpoints.values().forEach(mockRegistry::register);
         log.info("Reloaded {} mock endpoints into registry", endpoints.size());
+    }
+
+    @Override
+    public String exportYaml() throws Exception {
+        lock.readLock().lock();
+        try {
+            return yamlParser.readYamlContent();
+        } finally {
+            lock.readLock().unlock();
+        }
     }
 }
