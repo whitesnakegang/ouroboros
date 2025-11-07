@@ -25,6 +25,9 @@ public class RestResponseMeta {
     /** HTTP status code for this response (e.g., 200, 400, 404) */
     private int statusCode;
 
+    /** Description of the response from OpenAPI spec (e.g., "Bad Request", "잘못된 요청 형식") */
+    private String description;
+
     /** Optional response headers to include in the mock response */
     private Map<String, Object> headers;
 

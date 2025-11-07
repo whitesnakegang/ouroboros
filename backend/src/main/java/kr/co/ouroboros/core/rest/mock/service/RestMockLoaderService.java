@@ -281,8 +281,18 @@ public class RestMockLoaderService {
      */
     @SuppressWarnings("unchecked")
     private RestResponseMeta parseResponse(int statusCode, Map<String, Object> response, Map<String, Object> schemas) {
+        // description 추출
+        String description = (String) response.get("description");
+
         Map<String, Object> content = (Map<String, Object>) response.get("content");
         if (content == null) {
+            // content가 없어도 description이 있으면 ResponseMeta 생성 (에러 응답용)
+            if (description != null) {
+                return RestResponseMeta.builder()
+                        .statusCode(statusCode)
+                        .description(description)
+                        .build();
+            }
             return null;
         }
 
@@ -309,6 +319,7 @@ public class RestMockLoaderService {
 
         return RestResponseMeta.builder()
                 .statusCode(statusCode)
+                .description(description)
                 .body(resolvedSchema)
                 .contentType(contentType)
                 .build();

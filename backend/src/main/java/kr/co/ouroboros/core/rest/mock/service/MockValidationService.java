@@ -2,6 +2,7 @@ package kr.co.ouroboros.core.rest.mock.service;
 
 import jakarta.servlet.http.HttpServletRequest;
 import kr.co.ouroboros.core.rest.mock.model.EndpointMeta;
+import kr.co.ouroboros.core.rest.mock.model.RestResponseMeta;
 import kr.co.ouroboros.core.rest.spec.service.SchemaService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -57,8 +58,8 @@ public class MockValidationService {
         if (forcedError != null) {
             try {
                 int errorCode = Integer.parseInt(forcedError);
-                return ValidationResult.error(errorCode,
-                        "Forced error response via X-Ouroboros-Error header");
+                String message = getErrorDescription(meta, errorCode);
+                return ValidationResult.error(errorCode, message);
             } catch (NumberFormatException e) {
                 log.warn("Invalid X-Ouroboros-Error header value: {}", forcedError);
             }
@@ -68,8 +69,9 @@ public class MockValidationService {
         if (meta.getAuthHeaders() != null) {
             for (String header : meta.getAuthHeaders()) {
                 if (request.getHeader(header) == null) {
-                    return ValidationResult.error(401,
-                            "Authentication required.");
+                    String baseMsg = getErrorDescription(meta, 401);
+                    String detailMsg = baseMsg != null ? baseMsg : "Authentication required";
+                    return ValidationResult.error(401, detailMsg);
                 }
             }
         }
@@ -79,8 +81,9 @@ public class MockValidationService {
         if (meta.getRequiredHeaders() != null) {
             for (String header : meta.getRequiredHeaders()) {
                 if (request.getHeader(header) == null) {
-                    return ValidationResult.error(400,
-                            "Missing required header");
+                    String baseMsg = getErrorDescription(meta, 400);
+                    String detailMsg = buildDetailMessage(baseMsg, "Missing required header: " + header);
+                    return ValidationResult.error(400, detailMsg);
                 }
             }
         }
@@ -90,8 +93,9 @@ public class MockValidationService {
         if (meta.getRequiredParams() != null) {
             for (String param : meta.getRequiredParams()) {
                 if (request.getParameter(param) == null) {
-                    return ValidationResult.error(400,
-                            "Missing required parameter");
+                    String baseMsg = getErrorDescription(meta, 400);
+                    String detailMsg = buildDetailMessage(baseMsg, "Missing required parameter: " + param);
+                    return ValidationResult.error(400, detailMsg);
                 }
             }
         }
@@ -143,7 +147,9 @@ public class MockValidationService {
         if (requestBody == null) {
             // InputStream이 비어있거나 파싱 실패
             if (meta.isRequestBodyRequired()) {
-                return ValidationResult.error(400, "Invalid JSON format in request body");
+                String baseMsg = getErrorDescription(meta, 400);
+                String detailMsg = buildDetailMessage(baseMsg, "Invalid JSON format in request body");
+                return ValidationResult.error(400, detailMsg);
             }
             return ValidationResult.success();
         }
@@ -164,14 +170,18 @@ public class MockValidationService {
         // 루트 타입에 따라 분기 처리
         if ("object".equals(rootType)) {
             if (!(requestBody instanceof Map<?, ?> bodyMap)) {
-                return ValidationResult.error(400, "Request body must be a JSON object");
+                String baseMsg = getErrorDescription(meta, 400);
+                String detailMsg = buildDetailMessage(baseMsg, "Request body must be a JSON object");
+                return ValidationResult.error(400, detailMsg);
             }
             return validateSchemaFields((Map<String, Object>) bodyMap, schema, "");
         }
 
         if ("array".equals(rootType)) {
             if (!(requestBody instanceof List<?> bodyList)) {
-                return ValidationResult.error(400, "Request body must be a JSON array");
+                String baseMsg = getErrorDescription(meta, 400);
+                String detailMsg = buildDetailMessage(baseMsg, "Request body must be a JSON array");
+                return ValidationResult.error(400, detailMsg);
             }
             Map<String, Object> itemSchema = (Map<String, Object>) schema.get("items");
             if (itemSchema == null) {
@@ -214,9 +224,9 @@ public class MockValidationService {
         if (required != null) {
             for (String field : required) {
                 if (!data.containsKey(field)) {
-                    // 필수 필드가 없으면 에러
+                    String fieldPath = path.isEmpty() ? field : path + "." + field;
                     return ValidationResult.error(400,
-                            "Missing required field: " + (path.isEmpty() ? field : path + "." + field));
+                            "Missing required field: " + fieldPath);
                 }
             }
         }
@@ -507,6 +517,28 @@ public class MockValidationService {
         public static ValidationResult error(int statusCode, String message) {
             return new ValidationResult(false, statusCode, message);
         }
+    }
+
+    /**
+     * 명세에 정의된 에러 응답의 description 가져오기
+     */
+    private String getErrorDescription(EndpointMeta meta, int statusCode) {
+        if (meta.getResponses() == null) {
+            return null;
+        }
+        RestResponseMeta responseMeta = meta.getResponses().get(statusCode);
+        return responseMeta != null ? responseMeta.getDescription() : null;
+    }
+
+    /**
+     * 명세의 description과 상세 정보를 조합
+     * 예: "잘못된 요청 형식 - Missing required header: X-Client-ID"
+     */
+    private String buildDetailMessage(String baseDescription, String detail) {
+        if (baseDescription != null && !baseDescription.isEmpty()) {
+            return baseDescription + " - " + detail;
+        }
+        return detail;
     }
 
 }
