@@ -1,5 +1,14 @@
 package kr.co.ouroboros.core.rest.handler;
 
+import static kr.co.ouroboros.core.rest.handler.EndpointDiffHelper.isDiffStatusEndpoint;
+import static kr.co.ouroboros.core.rest.handler.EndpointDiffHelper.isDiffUrl;
+import static kr.co.ouroboros.core.rest.handler.EndpointDiffHelper.markDiffEndpoint;
+import static kr.co.ouroboros.core.rest.handler.MockApiHelper.isMockApi;
+import static kr.co.ouroboros.core.rest.handler.RequestDiffHelper.HttpMethod;
+import static kr.co.ouroboros.core.rest.handler.RequestDiffHelper.compareAndMarkRequest;
+import static kr.co.ouroboros.core.rest.handler.RequestDiffHelper.safe;
+
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -13,10 +22,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import static kr.co.ouroboros.core.rest.handler.MockApiHelper.isMockApi;
-import static kr.co.ouroboros.core.rest.handler.RequestDiffHelper.*;
-import static kr.co.ouroboros.core.rest.handler.EndpointDiffHelper.*;
-
 @Slf4j
 @Component
 public class RestSpecSyncPipeline implements SpecSyncPipeline {
@@ -26,7 +31,6 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
 
     @Autowired
     private SchemaComparator schemaComparator;
-
 
 
     /**
@@ -44,17 +48,19 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
         OuroRestApiSpec restFileSpec = (OuroRestApiSpec) fileSpec;
         OuroRestApiSpec restScannedSpec = (OuroRestApiSpec) scannedSpec;
 
-        if (fileSpec == null && !restScannedSpec.getPaths().isEmpty()) {
+        if (fileSpec == null && !restScannedSpec.getPaths()
+                .isEmpty()) {
             restFileSpec = restScannedSpec;
             Map<String, PathItem> paths = restFileSpec.getPaths();
-            for(String url : paths.keySet()){
+            for (String url : paths.keySet()) {
                 PathItem pathItem = paths.get(url);
-                for(HttpMethod httpMethod : HttpMethod.values()){
+                for (HttpMethod httpMethod : HttpMethod.values()) {
                     Operation operationByMethod = getOperationByMethod(pathItem, httpMethod);
-                    if(operationByMethod != null){
+                    if (operationByMethod != null) {
                         // Generate x-ouroboros-id if not present
                         if (operationByMethod.getXOuroborosId() == null) {
-                            operationByMethod.setXOuroborosId(java.util.UUID.randomUUID().toString());
+                            operationByMethod.setXOuroborosId(java.util.UUID.randomUUID()
+                                    .toString());
                             log.debug("Generated x-ouroboros-id for {} {}: {}", httpMethod, url, operationByMethod.getXOuroborosId());
                         }
                         operationByMethod.setXOuroborosDiff("endpoint");
@@ -65,19 +71,36 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
             return restFileSpec;
         }
 
-        Map<String, Boolean> schemaMatchResults = compareSchemas(restFileSpec, restScannedSpec);
+        // File 스펙과 Scan 스펙에 대해 각각 평탄화하여 타입별 개수 구하기
+        Map<String, SchemaComparator.TypeCnts> fileFlattenedSchemas = schemaComparator.flattenSchemas(
+                restFileSpec != null ? restFileSpec.getComponents() : null);
+        Map<String, SchemaComparator.TypeCnts> scanFlattenedSchemas = schemaComparator.flattenSchemas(
+                restScannedSpec != null ? restScannedSpec.getComponents() : null);
+
+        // Scan 스펙을 기준으로 일치 여부 판단
+        Map<String, Boolean> scanSchemaResults = schemaComparator.compareFlattenedSchemas(scanFlattenedSchemas, fileFlattenedSchemas);
+
+        // File 스펙을 기준으로 일치 여부 판단 (File에만 있는 스키마도 처리)
+        Map<String, Boolean> fileSchemaResults = schemaComparator.compareFlattenedSchemas(fileFlattenedSchemas, scanFlattenedSchemas);
 
         // Preserve components.securitySchemes from fileSpec (scannedSpec doesn't have securitySchemes from annotation)
-        if (restFileSpec != null && restFileSpec.getComponents() != null && 
-            restFileSpec.getComponents().getSecuritySchemes() != null) {
+        if (restFileSpec != null && restFileSpec.getComponents() != null &&
+                restFileSpec.getComponents()
+                        .getSecuritySchemes() != null) {
             // scannedSpec에 fileSpec의 securitySchemes 복사
             if (restScannedSpec.getComponents() == null) {
                 restScannedSpec.setComponents(new kr.co.ouroboros.core.rest.common.dto.Components());
             }
-            restScannedSpec.getComponents().setSecuritySchemes(restFileSpec.getComponents().getSecuritySchemes());
-            log.info("✓ Preserved {} security scheme(s) from file spec: {}", 
-                restFileSpec.getComponents().getSecuritySchemes().size(),
-                restFileSpec.getComponents().getSecuritySchemes().keySet());
+            restScannedSpec.getComponents()
+                    .setSecuritySchemes(restFileSpec.getComponents()
+                            .getSecuritySchemes());
+            log.info("✓ Preserved {} security scheme(s) from file spec: {}",
+                    restFileSpec.getComponents()
+                            .getSecuritySchemes()
+                            .size(),
+                    restFileSpec.getComponents()
+                            .getSecuritySchemes()
+                            .keySet());
         }
 
         Map<String, PathItem> pathsScanned = safe(restScannedSpec.getPaths());
@@ -88,7 +111,8 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
             restFileSpec.setPaths(pathsFile);
         }
 
-        Iterator<Entry<String, PathItem>> it = pathsFile.entrySet().iterator();
+        Iterator<Entry<String, PathItem>> it = pathsFile.entrySet()
+                .iterator();
 
         while (it.hasNext()) {
             Map.Entry<String, PathItem> e = it.next();
@@ -97,7 +121,9 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
             int cnt = 0;
             for (HttpMethod httpMethod : HttpMethod.values()) {
                 Operation fileOp = getOperationByMethod(fileItem, httpMethod);
-                if (fileOp == null) continue;
+                if (fileOp == null) {
+                    continue;
+                }
 
                 if ("endpoint".equals(fileOp.getXOuroborosDiff())) {
                     setOperationByMethodToNull(fileItem, httpMethod);
@@ -117,18 +143,22 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
         for (String url : pathsScanned.keySet()) {
 
             // url이 다른가 먼저 봄
-            if(isDiffUrl(url, pathsFile, pathsScanned)) continue;
+            if (isDiffUrl(url, pathsFile, pathsScanned)) {
+                continue;
+            }
 
             PathItem fileItem = pathsFile.get(url);
             PathItem scanItem = pathsScanned.get(url);
 
-            for(HttpMethod httpMethod : HttpMethod.values()) {
+            for (HttpMethod httpMethod : HttpMethod.values()) {
                 // method 별로 봄
                 Operation fileOp = getOperationByMethod(fileItem, httpMethod);
                 Operation scanOp = getOperationByMethod(scanItem, httpMethod);
 
                 // scan이 없으면 볼 필요 없음 (미구현 상태)
-                if(scanOp == null) continue;
+                if (scanOp == null) {
+                    continue;
+                }
 
                 // 명세에 없는 endpoint를 만듦
                 if (fileOp == null) {
@@ -139,19 +169,23 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
                 }
 
                 // 각 method가 endpoint인지 확인
-                if(isDiffStatusEndpoint(fileOp)) continue;
-
-
+                if (isDiffStatusEndpoint(fileOp)) {
+                    continue;
+                }
 
                 // scan의 x-ouroboros-progress가 MOCK이면 file에 그대로 마킹만 해주고 넘어감
-                if(isMockApi(fileOp, scanOp)) continue;
+                if (isMockApi(fileOp, scanOp)) {
+                    continue;
+                }
 
                 // 3. endpoint diff가 있으면 reqCompare, resCompare는 스킵
-                reqCompare(url, fileOp, scanOp, schemaMatchResults, httpMethod);
+                // 파일 스펙과 스캔 스펙 모두 전달 (각각의 스키마 참조에 따라 사용)
+                reqCompare(url, fileOp, scanOp, fileSchemaResults, scanSchemaResults, httpMethod);
 
                 // 시영지기 @ApiResponse를 사용해서 명세를 정확히 작성했을 때만 response 검증
-                if(scanOp.getXOuroborosResponse() != null && scanOp.getXOuroborosResponse().equals("use")) {
-                    resCompare(url, httpMethod, fileOp, scanOp, schemaMatchResults);
+                if (scanOp.getXOuroborosResponse() != null && scanOp.getXOuroborosResponse()
+                        .equals("use")) {
+                    resCompare(url, httpMethod, fileOp, scanOp, scanSchemaResults);
                 }
             }
         }
@@ -162,7 +196,7 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
     /**
      * Get the Operation for the specified HTTP method from a PathItem.
      *
-     * @param item the PathItem containing operations for different HTTP methods
+     * @param item       the PathItem containing operations for different HTTP methods
      * @param httpMethod the HTTP method whose Operation should be returned
      * @return the Operation corresponding to the given method, or null if none is defined
      */
@@ -183,47 +217,50 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
             case PUT -> item.setPut(null);
             case PATCH -> item.setPatch(null);
             case DELETE -> item.setDelete(null);
-        };
+        }
+        ;
     }
 
-
-
-    /**
-     * Compare component schemas in the file-backed and runtime-scanned REST API specifications and report per-schema match status.
-     *
-     * @param restFileSpec    the file-based REST API specification to update
-     * @param restScannedSpec the runtime-scanned REST API specification to compare against
-     * @return a map keyed by schema name where `true` indicates the scanned schema matches the file schema, `false` otherwise
-     */
-    private Map<String, Boolean> compareSchemas(OuroRestApiSpec restFileSpec, OuroRestApiSpec restScannedSpec) {
-        return schemaComparator.compareSchemas(restScannedSpec.getComponents(), restFileSpec.getComponents());
-    }
 
     /**
      * Compare and mark differences between request parameters of the file and scanned operations for a given URL and HTTP method.
      *
-     * @param url the request path being compared
-     * @param fileOp the operation from the file specification
-     * @param scanOp the operation from the scanned specification
-     * @param schemaMatchResults map of component schema names to a boolean indicating whether each schema matches between scan and file
-     * @param method the HTTP method for which parameters are compared
+     * @param url               the request path being compared
+     * @param fileOp            the operation from the file specification
+     * @param scanOp            the operation from the scanned specification
+     * @param fileSchemaResults file-based schema comparison results (임시로 Boolean Map 사용)
+     * @param scanSchemaResults scan-based schema comparison results (임시로 Boolean Map 사용)
+     * @param method            the HTTP method for which parameters are compared
      */
-    private void reqCompare(String url, Operation fileOp, Operation scanOp, Map<String, Boolean> schemaMatchResults, HttpMethod method) {
-        compareAndMarkRequest(url, fileOp, scanOp, method, schemaMatchResults);
+    private void reqCompare(String url, Operation fileOp, Operation scanOp,
+            Map<String, Boolean> fileSchemaResults,
+            Map<String, Boolean> scanSchemaResults,
+            HttpMethod method) {
+        // 파일 스펙과 스캔 스펙 결과를 병합 (스키마 이름이 중복되면 스캔 결과 우선)
+        Map<String, Boolean> mergedResults = new HashMap<>();
+        if (fileSchemaResults != null) {
+            mergedResults.putAll(fileSchemaResults);
+        }
+        if (scanSchemaResults != null) {
+            mergedResults.putAll(scanSchemaResults);
+        }
+        compareAndMarkRequest(url, fileOp, scanOp, method, mergedResults);
     }
 
     /**
      * Compare responses for a specific endpoint and HTTP method using the scanned and file operations.
      *
-     * @param url                 the endpoint URL (path key)
-     * @param method              the HTTP method for the comparison
-     * @param fileOp              the Operation from the file-based specification
-     * @param scanOp              the Operation from the runtime-scanned specification
-     * @param schemaMatchResults  map of schema names to match status: `true` if the scanned schema matches the file schema, `false` otherwise
+     * @param url               the endpoint URL (path key)
+     * @param method            the HTTP method for the comparison
+     * @param fileOp            the Operation from the file-based specification
+     * @param scanOp            the Operation from the runtime-scanned specification
+     * @param scanSchemaResults scan-based schema comparison results (임시로 Boolean Map 사용)
      */
-    private void resCompare(String url, HttpMethod method, Operation fileOp, Operation scanOp, Map<String, Boolean> schemaMatchResults) {
-        // 이전 로직에 의해 fileOp과 scanOp은 endpoint랑 http-method가 똑같은 삳태가 보장됨.
+    private void resCompare(String url, HttpMethod method, Operation fileOp, Operation scanOp,
+            Map<String, Boolean> scanSchemaResults) {
+        // 이전 로직에 의해 fileOp과 scanOp은 endpoint랑 http-method가 똑같은 상태가 보장됨.
         // scan은 무조건 null이 아님
-        responseComparator.compareResponsesForMethod(url, method, scanOp, fileOp, schemaMatchResults);
+        // 파일 스펙과 스캔 스펙 결과를 병합 (스키마 이름이 중복되면 스캔 결과 우선)
+        responseComparator.compareResponsesForMethod(url, method, scanOp, fileOp, scanSchemaResults);
     }
 }

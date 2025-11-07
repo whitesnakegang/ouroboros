@@ -403,7 +403,19 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         return operation;
     }
 
+    /**
+     * Updates operation fields based on the request.
+     * <p>
+     * Field update rules:
+     * - null: field is not updated (existing value preserved)
+     * - empty array []: field is removed from operation
+     * - non-empty value: field is updated with new value
+     *
+     * @param operation the operation to update
+     * @param request the update request containing new values
+     */
     private void updateOperationFields(Map<String, Object> operation, UpdateRestApiRequest request) {
+        // String fields: update if not null
         if (request.getSummary() != null) {
             operation.put("summary", request.getSummary());
         }
@@ -411,22 +423,45 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
             operation.put("description", request.getDescription());
         }
 
+        // List fields: empty array removes, non-empty updates, null preserves
         if (request.getTags() != null) {
-            operation.put("tags", request.getTags());
+            if (request.getTags().isEmpty()) {
+                operation.remove("tags");
+                log.info("✓ Tags removed from operation");
+            } else {
+                operation.put("tags", request.getTags());
+            }
         }
+
         if (request.getParameters() != null) {
-            operation.put("parameters", convertParameters(request.getParameters()));
+            if (request.getParameters().isEmpty()) {
+                operation.remove("parameters");
+                log.info("✓ Parameters removed from operation");
+            } else {
+                operation.put("parameters", convertParameters(request.getParameters()));
+            }
         }
+
+        // Object fields: update if not null
         if (request.getRequestBody() != null) {
             operation.put("requestBody", convertRequestBody(request.getRequestBody()));
         }
+
+        // Map fields: update if not null
         if (request.getResponses() != null) {
             operation.put("responses", convertResponses(request.getResponses()));
         }
-        if (request.getSecurity() != null && !request.getSecurity().isEmpty()) {
-            List<Map<String, List<String>>> securityList = convertSecurity(request.getSecurity());
-            operation.put("security", securityList);
-            log.info("✓ Security updated in operation: {}", securityList);
+
+        // Security: empty array removes, non-empty updates, null preserves
+        if (request.getSecurity() != null) {
+            if (request.getSecurity().isEmpty()) {
+                operation.remove("security");
+                log.info("✓ Security removed from operation");
+            } else {
+                List<Map<String, List<String>>> securityList = convertSecurity(request.getSecurity());
+                operation.put("security", securityList);
+                log.info("✓ Security updated in operation: {}", securityList);
+            }
         }
 
         // Reset x-ouroboros-diff to "none" when user explicitly updates the spec
@@ -1316,5 +1351,15 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         Map<String, EndpointMeta> endpoints = mockLoaderService.loadFromYaml();
         endpoints.values().forEach(mockRegistry::register);
         log.info("Reloaded {} mock endpoints into registry", endpoints.size());
+    }
+
+    @Override
+    public String exportYaml() throws Exception {
+        lock.readLock().lock();
+        try {
+            return yamlParser.readYamlContent();
+        } finally {
+            lock.readLock().unlock();
+        }
     }
 }

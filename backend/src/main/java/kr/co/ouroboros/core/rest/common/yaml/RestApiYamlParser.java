@@ -139,6 +139,27 @@ public class RestApiYamlParser {
     }
 
     /**
+     * Reads the YAML file content as a string directly from the file.
+     * <p>
+     * This method reads the current saved content from the file without using cache.
+     * Used for export operations where the actual file content is needed.
+     *
+     * @return YAML file content as a string
+     * @throws Exception if file reading fails or file does not exist
+     */
+    public String readYamlContent() throws Exception {
+        Path filePath = getYamlFilePath();
+        if (!Files.exists(filePath)) {
+            throw new IllegalStateException("YAML file does not exist: " + filePath);
+        }
+        
+        try (InputStream is = Files.newInputStream(filePath)) {
+            byte[] bytes = is.readAllBytes();
+            return new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+        }
+    }
+
+    /**
      * Reads the OpenAPI document or creates a new one if it doesn't exist.
      *
      * @return OpenAPI document as a map

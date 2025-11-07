@@ -34,6 +34,10 @@ interface TestingState {
   addQueryParam: () => void;
   removeQueryParam: (index: number) => void;
 
+  // Authorization State
+  authorization: string;
+  setAuthorization: (authorization: string) => void;
+
   // Response State
   response: TestResponse | null;
   setResponse: (response: TestResponse | null) => void;
@@ -115,6 +119,9 @@ export const useTestingStore = create<TestingState>((set) => ({
         queryParams: state.request.queryParams.filter((_, i) => i !== index),
       },
     })),
+
+  authorization: "",
+  setAuthorization: (authorization) => set({ authorization }),
 
   response: null,
   setResponse: (response) => set({ response }),
