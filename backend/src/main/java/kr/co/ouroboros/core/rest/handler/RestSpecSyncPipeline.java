@@ -202,12 +202,14 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
 
 
     /**
-     * Compare and mark differences between request parameters of the file and scanned operations for a given URL and HTTP method.
+     * Compare request definitions between the file and scanned operations for a specific URL and HTTP method and mark any differences.
      *
      * @param url the request path being compared
      * @param fileOp the operation from the file specification
      * @param scanOp the operation from the scanned specification
      * @param method the HTTP method for which parameters are compared
+     * @param fileFlattenedSchemas flattened schema type counts extracted from the file specification, used to resolve and compare referenced types
+     * @param scanFlattenedSchemas flattened schema type counts extracted from the scanned specification, used to resolve and compare referenced types
      */
     private void reqCompare(String url, Operation fileOp, Operation scanOp, HttpMethod method,
             Map<String, SchemaComparator.TypeCnts> fileFlattenedSchemas,

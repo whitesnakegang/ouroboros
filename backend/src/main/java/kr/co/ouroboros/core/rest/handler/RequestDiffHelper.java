@@ -24,16 +24,18 @@ public final class RequestDiffHelper {
     public enum HttpMethod {GET, POST, PUT, PATCH, DELETE}
 
     /**
-     * Compare a file operation against a scanned operation and mark the file operation's diff and progress.
+     * Compare request parameter and body type counts between a file operation and a scanned operation,
+     * and update the file operation's XOuroboros diff, progress, and tag fields accordingly.
      *
-     * Compares the count of each data type in request parameters and request body.
-     * If counts differ, sets diff to "request" and progress to "MOCK".
-     * Otherwise sets diff to "none" and progress to "COMPLETED".
+     * If the aggregated type counts differ, the file operation is marked with DIFF_REQUEST and DIFF_MOCK.
+     * If they are identical, the file operation is marked with DIFF_NONE and DIFF_COMPLETED.
      *
      * @param url the endpoint path being compared
-     * @param fileOp the operation from the file specification; this object will be updated with diff and progress state
+     * @param fileOp the operation from the file specification; this object will be mutated to reflect diff/progress/tag
      * @param scanOp the operation from the scanned specification to compare against
      * @param method the HTTP method for the operation
+     * @param fileFlattenedSchemas flattened schema map for resolving referenced schemas from the file specification
+     * @param scanFlattenedSchemas flattened schema map for resolving referenced schemas from the scanned specification
      */
     public static void compareAndMarkRequest(String url, Operation fileOp, Operation scanOp, HttpMethod method,
             Map<String, SchemaComparator.TypeCnts> fileFlattenedSchemas,
@@ -84,12 +86,16 @@ public final class RequestDiffHelper {
     }
 
     /**
-     * Collect type counts from parameters list.
-     *
-     * @param parameters list of parameters to analyze
-     * @param typeCounts map to store type counts (will be modified)
-     * @param flattenedSchemas map of schema name to flattened type counts
-     */
+         * Accumulates type counts for non-path parameters into the provided map.
+         *
+         * This examines each parameter (skipping null entries and parameters with `in` equal to "path"),
+         * ignores parameters without a schema or a name, and increments type counts by delegating to
+         * countSchemaType. Resolved/flattened schema type counts from `flattenedSchemas` are used for `$ref` schemas.
+         *
+         * @param parameters      list of parameters to analyze; may contain nulls
+         * @param typeCounts      map to store and increment type count keys (modified by this method)
+         * @param flattenedSchemas map of schema name to flattened type counts used to resolve `$ref` schemas
+         */
     private static void collectTypeCountsFromParameters(List<Parameter> parameters, Map<String, Integer> typeCounts,
                                                        Map<String, SchemaComparator.TypeCnts> flattenedSchemas) {
         if (parameters == null || parameters.isEmpty()) {
@@ -122,12 +128,16 @@ public final class RequestDiffHelper {
     }
 
     /**
-     * Collect type counts from request body.
-     *
-     * @param requestBody the request body to analyze
-     * @param typeCounts map to store type counts (will be modified)
-     * @param flattenedSchemas map of schema name to flattened type counts
-     */
+         * Aggregate schema type occurrences from a request body's media types into the provided typeCounts map.
+         *
+         * Counts named properties when a media type schema exposes properties (e.g., multipart form data);
+         * otherwise counts the media type's top-level schema using the name "body". Referenced schemas are
+         * resolved using the provided flattenedSchemas map and their type counts are merged into typeCounts.
+         *
+         * @param requestBody     the request body to analyze
+         * @param typeCounts      map to store and accumulate type counts; this map is modified by the method
+         * @param flattenedSchemas mapping of schema name to precomputed type counts used to resolve `$ref` references
+         */
     private static void collectTypeCountsFromRequestBody(RequestBody requestBody, Map<String, Integer> typeCounts,
                                                         Map<String, SchemaComparator.TypeCnts> flattenedSchemas) {
         if (requestBody == null) {
@@ -167,15 +177,17 @@ public final class RequestDiffHelper {
     }
 
     /**
-     * Count the type of a single schema and add to the type counts map.
+     * Add type information from a schema into the provided typeCounts map, resolving referenced schemas when available.
      *
-     * Handles both inline schemas (with type field) and referenced schemas ($ref).
-     * Creates a key in the format "name:type" (e.g., "page:integer", "user:ref:User").
+     * If the schema is a reference ($ref) and flattenedSchemas contains the referenced entry, this method merges that
+     * referenced schema's type counts into typeCounts. For inline schemas, it increments a count for a key constructed
+     * from the provided name and the schema's type; when the schema's format equals "binary" the key uses "binary"
+     * instead of the schema type.
      *
-     * @param schema the schema to analyze
-     * @param name the name of the field/parameter
-     * @param typeCounts map to store type counts (will be modified)
-     * @param flattenedSchemas map of schema name to flattened type counts
+     * @param schema the schema to analyze; may be a reference or an inline schema
+     * @param name the field or parameter name to use when constructing type keys (must be non-empty)
+     * @param typeCounts map that will be updated with type count increments
+     * @param flattenedSchemas optional map of schema name to precomputed type counts used to resolve $ref entries
      */
     private static void countSchemaType(Schema schema, String name, Map<String, Integer> typeCounts,
                                        Map<String, SchemaComparator.TypeCnts> flattenedSchemas) {
@@ -217,10 +229,10 @@ public final class RequestDiffHelper {
     }
 
     /**
-     * Extracts the schema name from a JSON Reference ($ref) string.
+     * Derives the schema name from a JSON Reference ($ref) string.
      *
      * @param ref the $ref string (e.g., "#/components/schemas/User")
-     * @return the substring after the last '/' (e.g., "User"), or the original ref if no '/' is present
+     * @return the substring after the last '/' (e.g., "User"); returns an empty string if ref is null or empty, or the original ref if it contains no '/' or ends with '/'
      */
     private static String extractRefName(String ref) {
         if (ref == null || ref.isEmpty()) {
