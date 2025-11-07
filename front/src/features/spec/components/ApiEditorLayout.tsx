@@ -311,29 +311,18 @@ export function ApiEditorLayout() {
 
       if (spec.requestBody != null) {
         const reqBody = spec.requestBody as any;
-        console.log("🔍 RequestBody 로드 시작:", reqBody);
 
         if (reqBody.content && Object.keys(reqBody.content).length > 0) {
           const contentType = Object.keys(reqBody.content)[0];
-          console.log("🔍 Content-Type:", contentType);
 
           // 새로운 parseOpenAPIRequestBody 사용
           const parsed = parseOpenAPIRequestBody(reqBody, contentType);
-          console.log("🔍 파싱된 RequestBody:", parsed);
 
           if (parsed) {
             loadedRequestBody = parsed;
-          } else {
-            console.warn("⚠️ RequestBody 파싱 실패 - parsed가 null입니다");
           }
-        } else {
-          console.warn("⚠️ RequestBody에 content가 없습니다");
         }
-      } else {
-        console.log("ℹ️ RequestBody가 없습니다");
       }
-
-      console.log("✅ 최종 loadedRequestBody:", loadedRequestBody);
 
       // schemaRef가 있으면 스키마를 조회해서 fields 채우기
       if (
@@ -341,10 +330,8 @@ export function ApiEditorLayout() {
         (!loadedRequestBody.fields || loadedRequestBody.fields.length === 0)
       ) {
         try {
-          console.log("🔍 스키마 조회 시작:", loadedRequestBody.schemaRef);
           const schemaResponse = await getSchema(loadedRequestBody.schemaRef);
           const schemaData = schemaResponse.data;
-          console.log("🔍 조회된 스키마:", schemaData);
 
           if (schemaData.properties) {
             const fields = Object.entries(schemaData.properties).map(
@@ -363,10 +350,9 @@ export function ApiEditorLayout() {
             }
 
             loadedRequestBody.fields = fields;
-            console.log("✅ 스키마에서 fields 로드 완료:", fields);
           }
-        } catch (error) {
-          console.error("⚠️ 스키마 조회 실패:", error);
+        } catch {
+          // 스키마 조회 실패 시 무시
         }
       }
 
