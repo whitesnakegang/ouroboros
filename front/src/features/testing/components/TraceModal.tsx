@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { TryTraceSpan } from "@/features/spec/services/api";
 
 interface TraceModalProps {
@@ -15,6 +15,8 @@ interface TraceModalProps {
 
 export function TraceModal({ isOpen, onClose, traceData, initialExpandedSpanId }: TraceModalProps) {
   const [expandedSpans, setExpandedSpans] = useState<Set<string>>(new Set());
+  const [highlightedSpanId, setHighlightedSpanId] = useState<string | null>(null);
+  const highlightedSpanRef = useRef<HTMLDivElement | null>(null);
 
   // spanId로 span을 찾고, 해당 span까지의 부모 path를 반환하는 함수
   const findSpanPath = (spans: TryTraceSpan[], targetSpanId: string, path: string[] = []): string[] | null => {
@@ -31,14 +33,42 @@ export function TraceModal({ isOpen, onClose, traceData, initialExpandedSpanId }
     return null;
   };
 
-  // initialExpandedSpanId가 변경되면 해당 span과 부모들을 확장
+  // 모달이 닫힐 때 하이라이트 제거
+  useEffect(() => {
+    if (!isOpen) {
+      setHighlightedSpanId(null);
+    }
+  }, [isOpen]);
+
+  // initialExpandedSpanId가 변경되면 해당 span과 부모들을 확장하고 하이라이트
   useEffect(() => {
     if (initialExpandedSpanId && traceData.spans.length > 0) {
       const path = findSpanPath(traceData.spans, initialExpandedSpanId);
       if (path) {
         // 해당 span까지의 모든 부모를 확장
         setExpandedSpans(new Set(path));
+        // 해당 span을 하이라이트
+        setHighlightedSpanId(initialExpandedSpanId);
+        
+        // 하이라이트된 span으로 스크롤 (약간의 지연을 두어 DOM 업데이트 후 실행)
+        setTimeout(() => {
+          if (highlightedSpanRef.current) {
+            highlightedSpanRef.current.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+            });
+          }
+        }, 100);
+        
+        // 3초 후 하이라이트 제거
+        const timer = setTimeout(() => {
+          setHighlightedSpanId(null);
+        }, 3000);
+        
+        return () => clearTimeout(timer);
       }
+    } else {
+      setHighlightedSpanId(null);
     }
   }, [initialExpandedSpanId, traceData.spans]);
 
@@ -57,13 +87,15 @@ export function TraceModal({ isOpen, onClose, traceData, initialExpandedSpanId }
   const renderSpan = (span: TryTraceSpan, depth: number = 0) => {
     const isExpanded = expandedSpans.has(span.spanId);
     const hasChildren = span.children && span.children.length > 0;
+    const isHighlighted = highlightedSpanId === span.spanId;
 
     return (
       <div key={span.spanId} className="mb-2">
         <div
-          className={`flex items-start gap-2 p-3 rounded-md border ${
-            depth === 0
-              ? "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
+          ref={isHighlighted ? (el) => { highlightedSpanRef.current = el; } : null}
+          className={`flex items-start gap-2 p-3 rounded-md border transition-all ${
+            isHighlighted
+              ? "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 shadow-lg"
               : "bg-gray-50 dark:bg-[#0D1117] border-gray-200 dark:border-[#2D333B]"
           } ${hasChildren ? "cursor-pointer hover:bg-gray-100 dark:hover:bg-[#161B22] transition-colors" : ""}`}
           style={{ marginLeft: `${depth * 24}px` }}
