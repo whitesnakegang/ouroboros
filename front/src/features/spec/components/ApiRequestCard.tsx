@@ -5,6 +5,15 @@ import { getAllSchemas, type SchemaResponse } from "../services/api";
 import type { RequestBody, SchemaField } from "../types/schema.types";
 import { createDefaultField } from "../types/schema.types";
 
+// UTF-8 문자열을 Base64로 안전하게 인코딩하는 함수
+const safeBase64 = (value: string): string | null => {
+  try {
+    return window.btoa(unescape(encodeURIComponent(value)));
+  } catch {
+    return null;
+  }
+};
+
 interface KeyValuePair {
   key: string;
   value: string;
@@ -483,9 +492,19 @@ export function ApiRequestCard({
               </label>
               <select
                 value={auth.type}
-                onChange={(e) =>
-                  setAuth({ ...auth, type: e.target.value as any })
-                }
+                onChange={(e) => {
+                  const newType = e.target.value as AuthConfig["type"];
+                  // 타입 변경 시 기본값 설정
+                  if (newType === "bearer") {
+                    setAuth({ type: "bearer", bearer: { token: "" } });
+                  } else if (newType === "apiKey") {
+                    setAuth({ type: "apiKey", apiKey: { key: "X-API-Key", value: "", addTo: "header" } });
+                  } else if (newType === "basicAuth") {
+                    setAuth({ type: "basicAuth", basicAuth: { username: "", password: "" } });
+                  } else {
+                    setAuth({ type: "none" });
+                  }
+                }}
                 disabled={isReadOnly}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-[#30363D] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
@@ -496,12 +515,152 @@ export function ApiRequestCard({
               </select>
             </div>
 
-            {auth.type !== "none" && (
-              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
-                <p className="text-sm text-blue-700 dark:text-blue-300">
-                  ✓ <strong>{auth.type}</strong> 인증이 활성화됩니다. Mock
-                  서버가 Authorization 헤더를 검증합니다.
-                </p>
+            {auth.type === "bearer" && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Bearer Token
+                  </label>
+                  <input
+                    type="text"
+                    value={auth.bearer?.token || ""}
+                    onChange={(e) =>
+                      setAuth({
+                        ...auth,
+                        bearer: { token: e.target.value },
+                      })
+                    }
+                    placeholder="Bearer token (예: 123)"
+                    disabled={isReadOnly}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-[#30363D] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="p-3 bg-gray-50 dark:bg-[#0D1117] border border-gray-200 dark:border-[#2D333B] rounded-md">
+                  <p className="text-xs text-gray-600 dark:text-[#8B949E] mb-1">
+                    <strong>헤더 형식:</strong>
+                  </p>
+                  <code className="text-xs text-gray-900 dark:text-[#E6EDF3] font-mono">
+                    Authorization: Bearer {auth.bearer?.token || "&lt;token&gt;"}
+                  </code>
+                </div>
+              </div>
+            )}
+
+            {auth.type === "apiKey" && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    API Key Name
+                  </label>
+                  <input
+                    type="text"
+                    value={auth.apiKey?.key || "X-API-Key"}
+                    onChange={(e) =>
+                      setAuth({
+                        ...auth,
+                        apiKey: {
+                          ...auth.apiKey,
+                          key: e.target.value || "X-API-Key",
+                          value: auth.apiKey?.value || "",
+                          addTo: auth.apiKey?.addTo || "header",
+                        },
+                      })
+                    }
+                    placeholder="X-API-Key"
+                    disabled={isReadOnly}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-[#30363D] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    API Key Value
+                  </label>
+                  <input
+                    type="text"
+                    value={auth.apiKey?.value || ""}
+                    onChange={(e) =>
+                      setAuth({
+                        ...auth,
+                        apiKey: {
+                          ...auth.apiKey,
+                          key: auth.apiKey?.key || "X-API-Key",
+                          value: e.target.value,
+                          addTo: auth.apiKey?.addTo || "header",
+                        },
+                      })
+                    }
+                    placeholder="API Key 값 (예: abc123xyz456)"
+                    disabled={isReadOnly}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-[#30363D] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="p-3 bg-gray-50 dark:bg-[#0D1117] border border-gray-200 dark:border-[#2D333B] rounded-md">
+                  <p className="text-xs text-gray-600 dark:text-[#8B949E] mb-1">
+                    <strong>헤더 형식:</strong>
+                  </p>
+                  <code className="text-xs text-gray-900 dark:text-[#E6EDF3] font-mono">
+                    {auth.apiKey?.key || "X-API-Key"}: {auth.apiKey?.value || "&lt;value&gt;"}
+                  </code>
+                </div>
+              </div>
+            )}
+
+            {auth.type === "basicAuth" && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Username
+                  </label>
+                  <input
+                    type="text"
+                    value={auth.basicAuth?.username || ""}
+                    onChange={(e) =>
+                      setAuth({
+                        ...auth,
+                        basicAuth: {
+                          username: e.target.value,
+                          password: auth.basicAuth?.password || "",
+                        },
+                      })
+                    }
+                    placeholder="Username"
+                    disabled={isReadOnly}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-[#30363D] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Password
+                  </label>
+                  <input
+                    type="password"
+                    value={auth.basicAuth?.password || ""}
+                    onChange={(e) =>
+                      setAuth({
+                        ...auth,
+                        basicAuth: {
+                          username: auth.basicAuth?.username || "",
+                          password: e.target.value,
+                        },
+                      })
+                    }
+                    placeholder="Password"
+                    disabled={isReadOnly}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-[#30363D] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="p-3 bg-gray-50 dark:bg-[#0D1117] border border-gray-200 dark:border-[#2D333B] rounded-md">
+                  <p className="text-xs text-gray-600 dark:text-[#8B949E] mb-1">
+                    <strong>헤더 형식:</strong>
+                  </p>
+                  <code className="text-xs text-gray-900 dark:text-[#E6EDF3] font-mono break-all">
+                    Authorization: Basic{" "}
+                    {auth.basicAuth?.username && auth.basicAuth?.password
+                      ? safeBase64(`${auth.basicAuth.username}:${auth.basicAuth.password}`) ??
+                        "&lt;base64(username:password)&gt;"
+                      : "&lt;base64(username:password)&gt;"}
+                  </code>
+                </div>
               </div>
             )}
           </div>
