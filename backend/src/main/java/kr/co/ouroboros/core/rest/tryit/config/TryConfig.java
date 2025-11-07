@@ -1,11 +1,11 @@
 package kr.co.ouroboros.core.rest.tryit.config;
 
 import io.opentelemetry.sdk.trace.SpanProcessor;
-import kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.config.MethodTracingProperties;
+import kr.co.ouroboros.core.rest.tryit.config.properties.MethodTracingProperties;
+import kr.co.ouroboros.core.rest.tryit.config.properties.TempoProperties;
 import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.memory.processor.InMemoryTrySpanProcessor;
 import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.tempo.processor.TempoTrySpanProcessor;
 import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.TraceStorage;
-import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.tempo.config.TempoProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;

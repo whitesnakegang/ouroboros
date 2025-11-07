@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.config;
+package kr.co.ouroboros.core.rest.tryit.config.properties;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -89,3 +89,4 @@ public class MethodTracingProperties {
         this.allowedPackages = (allowedPackages != null) ? allowedPackages : new java.util.ArrayList<>();
     }
 }
+

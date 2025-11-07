@@ -2,8 +2,8 @@ package kr.co.ouroboros.core.rest.tryit.infrastructure.storage.tempo.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import kr.co.ouroboros.core.rest.tryit.config.properties.TempoProperties;
 import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.TraceClient;
-import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.tempo.config.TempoProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.*;
@@ -38,7 +38,7 @@ import java.util.List;
  *   <li>JSON response parsing</li>
  * </ul>
  * <p>
- * Configuration is provided via {@link kr.co.ouroboros.core.rest.tryit.infrastructure.storage.tempo.config.TempoProperties}.
+ * Configuration is provided via {@link kr.co.ouroboros.core.rest.tryit.config.properties.TempoProperties}.
  *
  * @author Ouroboros Team
  * @since 0.0.1

@@ -1,5 +1,6 @@
-package kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.config;
+package kr.co.ouroboros.core.rest.tryit.config;
 
+import kr.co.ouroboros.core.rest.tryit.config.properties.MethodTracingProperties;
 import kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.aspect.MethodTracingMethodInterceptor;
 
 import org.aopalliance.aop.Advice;
@@ -143,3 +144,4 @@ public class MethodTracingConfig {
         return new DefaultPointcutAdvisor(pointcut, advice);
     }
 }
+
