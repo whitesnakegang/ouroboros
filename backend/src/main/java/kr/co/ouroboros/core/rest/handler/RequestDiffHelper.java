@@ -6,9 +6,7 @@ import kr.co.ouroboros.core.rest.common.dto.Operation;
 import kr.co.ouroboros.core.rest.common.dto.Parameter;
 import kr.co.ouroboros.core.rest.common.dto.RequestBody;
 import kr.co.ouroboros.core.rest.common.dto.Schema;
-import lombok.extern.slf4j.Slf4j;
 
-@Slf4j
 public final class RequestDiffHelper {
 
     /**
@@ -38,28 +36,23 @@ public final class RequestDiffHelper {
      * @param method the HTTP method for the operation
      */
     public static void compareAndMarkRequest(String url, Operation fileOp, Operation scanOp, HttpMethod method) {
-        log.info("=====REQUEST DIFF COMPARISON==== [{}] [{}]", url, method);
 
         // 1. fileOp의 타입별 개수 수집
         Map<String, Integer> fileTypeCounts = new HashMap<>();
         collectTypeCounts(fileOp, fileTypeCounts);
-        log.info("[{}], [{}]: File Operation Type Counts = {}", url, method, fileTypeCounts);
 
         // 2. scanOp의 타입별 개수 수집
         Map<String, Integer> scanTypeCounts = new HashMap<>();
         collectTypeCounts(scanOp, scanTypeCounts);
-        log.info("[{}], [{}]: Scan Operation Type Counts = {}", url, method, scanTypeCounts);
 
         // 3. 타입별 개수 비교
         boolean typeDiff = !fileTypeCounts.equals(scanTypeCounts);
 
         if (typeDiff) {
-            log.info("[{}], [{}]: 타입별 개수 다름", url, method);
             fileOp.setXOuroborosDiff(DIFF_REQUEST);
             fileOp.setXOuroborosProgress(DIFF_MOCK);
             fileOp.setXOuroborosTag(DIFF_NONE);
         } else {
-            log.info("[{}], [{}]: 타입별 개수 동일", url, method);
             fileOp.setXOuroborosDiff(DIFF_NONE);
             fileOp.setXOuroborosProgress(DIFF_COMPLETED);
             fileOp.setXOuroborosTag(DIFF_NONE);
@@ -100,12 +93,23 @@ public final class RequestDiffHelper {
                 continue;
             }
 
+            // in이 path인 경우 스킵
+            String in = param.getIn();
+            if ("path".equalsIgnoreCase(in)) {
+                continue;
+            }
+
             Schema schema = param.getSchema();
             if (schema == null) {
                 continue;
             }
 
-            countSchemaType(schema, typeCounts);
+            String paramName = param.getName();
+            if (paramName == null || paramName.isEmpty()) {
+                continue;
+            }
+
+            countSchemaType(schema, paramName, typeCounts);
         }
     }
 
@@ -138,12 +142,16 @@ public final class RequestDiffHelper {
 
             // schema가 properties를 가지고 있는 경우 (multipart/form-data 등)
             if (schema.getProperties() != null && !schema.getProperties().isEmpty()) {
-                for (Schema propSchema : schema.getProperties().values()) {
-                    countSchemaType(propSchema, typeCounts);
+                for (Map.Entry<String, Schema> entry : schema.getProperties().entrySet()) {
+                    String propertyName = entry.getKey();
+                    Schema propSchema = entry.getValue();
+                    if (propertyName != null && !propertyName.isEmpty() && propSchema != null) {
+                        countSchemaType(propSchema, propertyName, typeCounts);
+                    }
                 }
             } else {
-                // schema에 직접 타입이나 $ref가 있는 경우
-                countSchemaType(schema, typeCounts);
+                // schema에 직접 타입이나 $ref가 있는 경우 - 이름이 없으므로 "body"를 기본 이름으로 사용
+                countSchemaType(schema, "body", typeCounts);
             }
         }
     }
@@ -152,13 +160,14 @@ public final class RequestDiffHelper {
      * Count the type of a single schema and add to the type counts map.
      *
      * Handles both inline schemas (with type field) and referenced schemas ($ref).
-     * For referenced schemas, extracts the schema name and increments count for "ref:{schemaName}".
+     * Creates a key in the format "name:type" (e.g., "page:integer", "user:ref:User").
      *
      * @param schema the schema to analyze
+     * @param name the name of the field/parameter
      * @param typeCounts map to store type counts (will be modified)
      */
-    private static void countSchemaType(Schema schema, Map<String, Integer> typeCounts) {
-        if (schema == null) {
+    private static void countSchemaType(Schema schema, String name, Map<String, Integer> typeCounts) {
+        if (schema == null || name == null || name.isEmpty()) {
             return;
         }
 
@@ -166,10 +175,10 @@ public final class RequestDiffHelper {
         String ref = schema.getRef();
         if (ref != null && !ref.isEmpty()) {
             // TODO: 나중에 구현될 스키마 비교 함수 호출
-            // 현재는 ref 이름을 추출하여 "ref:{schemaName}" 형태로 카운트
+            // 현재는 ref 이름을 추출하여 "name:ref:schemaName" 형태로 카운트
             String refName = extractRefName(ref);
-            String refKey = "ref:" + refName;
-            typeCounts.merge(refKey, 1, Integer::sum);
+            String key = name + ":ref:" + refName;
+            typeCounts.merge(key, 1, Integer::sum);
             return;
         }
 
@@ -178,11 +187,13 @@ public final class RequestDiffHelper {
         if (type != null && !type.isEmpty()) {
             // format이 binary인 경우 파일로 처리
             String format = schema.getFormat();
+            String key;
             if ("binary".equals(format)) {
-                typeCounts.merge("binary", 1, Integer::sum);
+                key = name + ":binary";
             } else {
-                typeCounts.merge(type, 1, Integer::sum);
+                key = name + ":" + type;
             }
+            typeCounts.merge(key, 1, Integer::sum);
         }
     }
 
