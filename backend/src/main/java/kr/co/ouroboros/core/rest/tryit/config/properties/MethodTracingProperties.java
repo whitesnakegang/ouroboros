@@ -10,7 +10,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * <p>
  * <b>Configuration Properties:</b>
  * <ul>
- *   <li>{@code ouroboros.method-tracing.enabled} - Enable/disable method tracing (default: true)</li>
+ *   <li>{@code ouroboros.method-tracing.enabled} - Enable/disable method tracing (default: false)</li>
  *   <li>{@code ouroboros.method-tracing.allowed-packages} - List of package prefixes to trace (default: empty)</li>
  * </ul>
  * <p>
@@ -21,8 +21,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * ouroboros.method-tracing.allowed-packages[1]=com.example.repository
  * }</pre>
  * <p>
- * Only classes in allowed packages will be traced. If allowed-packages is empty,
- * method tracing is effectively disabled.
+ * Method tracing is disabled by default. To enable it, set {@code ouroboros.method-tracing.enabled=true}
+ * and configure at least one allowed package. Only classes in allowed packages will be traced.
+ * If allowed-packages is empty, method tracing is effectively disabled.
  *
  * @author Ouroboros Team
  * @since 0.0.1
@@ -33,9 +34,9 @@ public class MethodTracingProperties {
     /**
      * Whether method tracing is enabled.
      * <p>
-     * Default: true
+     * Default: false
      */
-    private boolean enabled = true;
+    private boolean enabled = false;
     
     /**
      * List of package prefixes for classes to trace.
