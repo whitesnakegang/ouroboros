@@ -12,13 +12,6 @@ import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-/**
- * REST API 스키마를 비교하는 컴포넌트.
- * <p>
- * 스캔된 문서와 파일 기반 문서의 components.schemas를 비교하여 각 스키마별 일치 여부를 검사하고 결과를 Map으로 반환합니다.
- *
- * @since 0.0.1
- */
 @Slf4j
 @Component
 public class SchemaComparator {
@@ -30,6 +23,14 @@ public class SchemaComparator {
         private Map<String, Integer> typeCounts = new HashMap<>();
     }
 
+    /**
+     * Compute flattened type-count representations for each schema defined in the provided Components.
+     *
+     * @param components the OpenAPI Components object containing schema definitions; may be null
+     *                   or contain no schemas
+     * @return a map from schema name to its flattened TypeCnts; empty if {@code components} is null
+     *         or contains no schemas
+     */
     public Map<String, TypeCnts> flattenSchemas(Components components) {
         Map<String, TypeCnts> result = new HashMap<>();
         
@@ -49,6 +50,15 @@ public class SchemaComparator {
         return result;
     }
 
+    /**
+     * Computes flattened type counts for the given schema by traversing its properties, array items, and any referenced schemas while preventing infinite recursion from circular references.
+     *
+     * @param schemaName the name identifying the schema within components; used for circular-reference detection
+     * @param schema the schema to analyze; may be null
+     * @param components the Components container used to resolve `$ref` references; may be null
+     * @param visited a set of schema names already visited in the current traversal to detect and avoid circular references
+     * @return a TypeCnts containing a map of flattened type-count entries; the map will be empty if the schema is null or references cannot be resolved
+     */
     private TypeCnts flattenSchema(String schemaName, Schema schema, Components components, Set<String> visited) {
         TypeCnts typeCnts = new TypeCnts();
         Map<String, Integer> typeCounts = new HashMap<>();
@@ -102,7 +112,25 @@ public class SchemaComparator {
         return typeCnts;
     }
 
-    private void collectTypeCountsFromProperty(String propertyName, Schema propertySchema, 
+    /**
+     * Accumulates flattened type counts for a property (including nested properties, arrays, and $ref targets)
+     * into the provided map.
+     *
+     * Processes the property's schema as follows:
+     * - If the schema is a $ref, merges the referenced schema's flattened counts directly into `typeCounts`.
+     * - If the schema is an array, records a single count for the array element type or referenced schema using the key
+     *   `propertyName:array.{TypeOrSchemaName}`.
+     * - If the schema is a primitive type, increments the count for `propertyName:{type}` (uses `binary` when format is `binary`).
+     * - If the schema has nested properties (object), recursively processes each nested property and merges their counts
+     *   without adding a parent prefix.
+     *
+     * @param propertyName the name of the property being processed; used as the key prefix for recorded types
+     * @param propertySchema the OpenAPI Schema object describing the property
+     * @param components the Components container used to resolve schema $ref references
+     * @param typeCounts the accumulating map of type keys to counts that will be updated in-place
+     * @param visited set of schema names already visited to detect and avoid circular references during resolution
+     */
+    private void collectTypeCountsFromProperty(String propertyName, Schema propertySchema,
                                                 Components components, Map<String, Integer> typeCounts,
                                                 Set<String> visited) {
         if (propertySchema == null) {
@@ -170,6 +198,12 @@ public class SchemaComparator {
         }
     }
 
+    /**
+     * Extracts the schema name from a Components schema reference.
+     *
+     * @param ref the JSON Reference string, expected to start with "#/components/schemas/{SchemaName}"
+     * @return the schema name portion when `ref` starts with "#/components/schemas/", `null` otherwise
+     */
     private String extractSchemaNameFromRef(String ref) {
         if (ref == null || !ref.startsWith("#/components/schemas/")) {
             return null;
@@ -177,6 +211,13 @@ public class SchemaComparator {
         return ref.substring("#/components/schemas/".length());
     }
 
+    /**
+     * Retrieve a schema definition from the provided Components by its schema name.
+     *
+     * @param schemaName the key name of the schema within the Components' schemas map
+     * @param components the Components container to search for the schema
+     * @return the Schema associated with the given name, or `null` if the name, components, or schema map is null or the name is not present
+     */
     private Schema getSchemaByName(String schemaName, Components components) {
         if (schemaName == null || components == null) {
             return null;
@@ -190,6 +231,12 @@ public class SchemaComparator {
         return schemas.get(schemaName);
     }
 
+    /**
+     * Merge counts from the source map into the target map by summing values for matching keys.
+     *
+     * @param target the map that will be updated; for each key present in {@code source} its value is added to the existing value in {@code target} (or inserted if absent)
+     * @param source the map supplying counts to add into {@code target}
+     */
     private void mergeTypeCounts(Map<String, Integer> target, Map<String, Integer> source) {
         for (Map.Entry<String, Integer> entry : source.entrySet()) {
             String key = entry.getKey();
@@ -198,6 +245,12 @@ public class SchemaComparator {
         }
     }
 
+    /**
+     * Determines whether the given type name represents a primitive OpenAPI/Swagger type.
+     *
+     * @param type the type name to check (for example, "string", "integer", "number", or "boolean")
+     * @return `true` if the type is one of "string", "integer", "number", or "boolean", `false` otherwise
+     */
     private boolean isPrimitiveType(String type) {
         if (type == null) {
             return false;
@@ -206,6 +259,18 @@ public class SchemaComparator {
                type.equals("boolean");
     }
 
+    /**
+     * Compare flattened type-count representations of schemas from a base set against a target set.
+     *
+     * For each schema present in {@code baseSchemas}, determines whether the corresponding {@code TypeCnts}
+     * in {@code targetSchemas} has identical {@code typeCounts}. If a schema from {@code baseSchemas} is
+     * missing in {@code targetSchemas}, it is considered not equal.
+     *
+     * @param baseSchemas   map of schema names to their flattened type counts (base reference)
+     * @param targetSchemas map of schema names to their flattened type counts (target to compare), may be {@code null}
+     * @return              a map from each schema name in {@code baseSchemas} to `true` if the target has the same
+     *                      type-counts for that schema, `false` otherwise
+     */
     public Map<String, Boolean> compareFlattenedSchemas(
             Map<String, TypeCnts> baseSchemas,
             Map<String, TypeCnts> targetSchemas) {
