@@ -5,6 +5,15 @@ import { getAllSchemas, type SchemaResponse } from "../services/api";
 import type { RequestBody, SchemaField } from "../types/schema.types";
 import { createDefaultField } from "../types/schema.types";
 
+// UTF-8 문자열을 Base64로 안전하게 인코딩하는 함수
+const safeBase64 = (value: string): string | null => {
+  try {
+    return window.btoa(unescape(encodeURIComponent(value)));
+  } catch {
+    return null;
+  }
+};
+
 interface KeyValuePair {
   key: string;
   value: string;
@@ -647,7 +656,8 @@ export function ApiRequestCard({
                   <code className="text-xs text-gray-900 dark:text-[#E6EDF3] font-mono break-all">
                     Authorization: Basic{" "}
                     {auth.basicAuth?.username && auth.basicAuth?.password
-                      ? btoa(`${auth.basicAuth.username}:${auth.basicAuth.password}`)
+                      ? safeBase64(`${auth.basicAuth.username}:${auth.basicAuth.password}`) ??
+                        "&lt;base64(username:password)&gt;"
                       : "&lt;base64(username:password)&gt;"}
                   </code>
                 </div>
