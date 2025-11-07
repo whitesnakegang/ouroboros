@@ -20,6 +20,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Fetch all branches and tags
+        run: |
+          git fetch origin "+refs/heads/*:refs/heads/*" "+refs/tags/*:refs/tags/*"
+
       - name: Git setup
         run: |
           git config --global gc.auto 0
@@ -44,13 +48,10 @@ jobs:
           B64=$(printf "oauth2:%s" "$GITLAB_PAT" | base64 | tr -d '\n')
           echo "AUTH=Authorization: Basic $B64" >> $GITHUB_ENV
 
-      # --- 강제 동기화: heads/tags만, 숨은 refs 제외 ---
-      - name: Force-push all branches (like mirror, no hidden refs)
+      - name: Force-push all branches (mirror)
         run: |
-          # + (leading plus) = force update
-          # --prune = 원격에만 존재하는 브랜치 삭제
           git -c http.extraheader="$AUTH" push gitlab +refs/heads/*:refs/heads/* --prune
 
-      - name: Force-push all tags (and prune)
+      - name: Force-push all tags (mirror)
         run: |
           git -c http.extraheader="$AUTH" push gitlab +refs/tags/*:refs/tags/* --prune

@@ -75,7 +75,6 @@
 - ✅ **Error Reporting**: Detailed validation error messages
 - ✅ **Try Feature**: API execution tracking and analysis with **in-memory storage by default** (📖 [Setup Guide](./OUROBOROS_TRY_SETUP.md))
   - **Default**: In-memory trace storage (no setup required)
-  - **Optional**: Grafana Tempo integration for persistent storage
 
 ---
 
@@ -163,13 +162,11 @@ dependencies {
 </dependency>
 ```
 
+> **Note**: If you rely on Lombok annotations, make sure your build includes <code>annotationProcessor 'org.projectlombok:lombok'</code>. Without it, <code>@ApiState</code> metadata is not generated and automatic scanning will be skipped.
+
 ### Configuration (Optional)
 
-> **Note**: 
-> - **Trace Storage**: By default, Ouroboros uses **in-memory trace storage** (no setup required). Traces are immediately available but lost on application restart. For persistent storage, see [Try Feature Setup Guide](./OUROBOROS_TRY_SETUP.md#42-tempo-integration-optional).
-> - **Method Tracing**: Internal method tracing is **disabled by default**. If you need internal method tracing in the Try feature, you must add the `method-tracing` configuration.
-
-> **⚠️ Required for Method Tracing**: When using method tracing, you must also set `management.tracing.sampling.probability=1.0` to capture all method traces.
+> **Method Tracing**: Internal method tracing is **disabled by default**. If you need internal method tracing in the Try feature, you must add the `method-tracing` configuration and set `management.tracing.sampling.probability=1.0` to capture all method traces.
 
 `application.yml`:
 ```yaml
@@ -178,11 +175,7 @@ ouroboros:
   server:
     url: http://localhost:8080
     description: Local Development Server
-  # Trace Storage (default: in-memory, no configuration needed)
-  # tempo:
-  #   enabled: false  # default: false (uses in-memory storage)
   # Method Tracing configuration (required for internal method tracing in Try feature)
-  # Internal method tracing is disabled by default
   method-tracing:
     enabled: true
     allowed-packages: your.package.name  # Specify package paths to trace
