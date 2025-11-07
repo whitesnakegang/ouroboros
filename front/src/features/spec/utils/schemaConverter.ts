@@ -62,9 +62,19 @@ export function convertSchemaTypeToOpenAPI(schemaType: SchemaType): any {
   }
 
   if (isArraySchema(schemaType)) {
+    const itemsSchema = convertSchemaTypeToOpenAPI(schemaType.items);
+    
+    // items의 description과 required 추가 (itemsDescription, itemsRequired가 있는 경우)
+    if (schemaType.itemsDescription !== undefined) {
+      itemsSchema.description = schemaType.itemsDescription;
+    }
+    // items의 required는 OpenAPI 스펙상 items schema에 직접 지원하지 않으므로
+    // x-ouroboros-items-required 같은 확장 필드로 저장하거나 무시
+    // (일반적으로 array items는 모두 같은 타입이므로 required 개념이 없음)
+    
     const schema: any = {
       type: "array",
-      items: convertSchemaTypeToOpenAPI(schemaType.items),
+      items: itemsSchema,
     };
     
     if (schemaType.minItems !== undefined) {
@@ -206,11 +216,15 @@ export function parseOpenAPISchemaToSchemaType(schema: any): SchemaType {
 
   // Array
   if (schema.type === "array") {
+    const itemsSchema = schema.items
+      ? parseOpenAPISchemaToSchemaType(schema.items)
+      : { kind: "primitive", type: "string" } as SchemaType;
+    
     return {
       kind: "array",
-      items: schema.items
-        ? parseOpenAPISchemaToSchemaType(schema.items)
-        : { kind: "primitive", type: "string" },
+      items: itemsSchema,
+      itemsDescription: schema.items?.description,
+      itemsRequired: schema.items?.required,
       minItems: schema.minItems,
       maxItems: schema.maxItems,
     };

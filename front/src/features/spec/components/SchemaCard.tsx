@@ -23,9 +23,10 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
   const [currentSchemaDescription, setCurrentSchemaDescription] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isExpanded, setIsExpanded] = useState(false); // 기본적으로 접힌 상태
 
   // Schema Type 상태 (object만 허용)
-  const [schemaType, setSchemaType] = useState<"object">("object");
+  const schemaType: "object" = "object";
 
   // 에러 메시지에서 localhost 주소 제거 및 사용자 친화적인 메시지로 변환
   const getErrorMessage = (error: unknown): string => {
@@ -102,8 +103,7 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
         type: "object",
         title: `${currentSchemaName} Schema`,
         description:
-          currentSchemaDescription.trim() ||
-          `${currentSchemaName} 스키마 정의`,
+          currentSchemaDescription.trim() || `${currentSchemaName} 스키마 정의`,
         properties,
         required: required.length > 0 ? required : undefined,
         orders: schemaFields.map((f) => f.key),
@@ -126,12 +126,18 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
           required: schemaRequest.required,
           orders: schemaRequest.orders,
         };
-        console.log("🔍 Update Request:", JSON.stringify(updateRequest, null, 2));
+        console.log(
+          "🔍 Update Request:",
+          JSON.stringify(updateRequest, null, 2)
+        );
         await updateSchema(currentSchemaName, updateRequest);
         alert(`"${currentSchemaName}" 스키마가 수정되었습니다.`);
       } else {
         // 생성
-        console.log("🔍 Create Request:", JSON.stringify(schemaRequest, null, 2));
+        console.log(
+          "🔍 Create Request:",
+          JSON.stringify(schemaRequest, null, 2)
+        );
         await createSchema(schemaRequest);
         alert(`"${currentSchemaName}" 스키마가 생성되었습니다.`);
       }
@@ -153,156 +159,191 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
   };
 
   return (
-    <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm">
-      {/* Header */}
-      <div className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3] mb-2 flex items-center gap-2">
-        <svg
-          className="h-4 w-4 text-gray-500 dark:text-[#8B949E]"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-          />
-        </svg>
-        <span>Schema</span>
-      </div>
-      <p className="text-xs text-gray-600 dark:text-[#8B949E] mb-4">
-        Schema 편집 및 관리
-      </p>
-
-      {/* Content */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Schema 편집 및 관리
-            </p>
-            {error && <p className="text-sm text-red-500 mt-1">{error}</p>}
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={loadSchemas}
-              disabled={isLoading}
-              className="px-3 py-1 text-sm text-gray-600 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 font-medium border border-gray-300 dark:border-[#2D333B] rounded-md hover:bg-gray-50 dark:hover:bg-[#161B22] disabled:opacity-50"
-            >
-              {isLoading ? "로딩..." : "새로고침"}
-            </button>
-            <button
-              onClick={() => setIsSchemaModalOpen(true)}
-              disabled={isReadOnly}
-              className={`px-4 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md text-sm font-medium transition-colors ${
-                isReadOnly ? "opacity-50 cursor-not-allowed" : ""
-              }`}
-            >
-              Schema 관리
-            </button>
-          </div>
+    <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] shadow-sm">
+      {/* Header - 클릭 가능한 영역 */}
+      <div
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-[#0D1117] transition-colors flex items-center justify-between"
+      >
+        <div className="flex items-center gap-2">
+          <svg
+            className={`h-4 w-4 text-gray-500 dark:text-[#8B949E] transition-transform ${
+              isExpanded ? "rotate-90" : ""
+            }`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 5l7 7-7 7"
+            />
+          </svg>
+          <svg
+            className="h-4 w-4 text-gray-500 dark:text-[#8B949E]"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+            />
+          </svg>
+          <span className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
+            Schema
+          </span>
         </div>
+      </div>
 
-        {/* Schema Fields Table */}
-        <div className="space-y-4">
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Schema 이름
-            </label>
-            <input
-              type="text"
-              value={currentSchemaName}
-              onChange={(e) => setCurrentSchemaName(e.target.value)}
-              placeholder="Schema 이름을 입력하세요 (예: UserInfo, ProductData)"
-              disabled={isReadOnly}
-              className={`w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] ${
-                isReadOnly ? "opacity-60 cursor-not-allowed" : ""
-              }`}
-            />
-          </div>
-
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Schema 설명
-            </label>
-            <textarea
-              value={currentSchemaDescription}
-              onChange={(e) => setCurrentSchemaDescription(e.target.value)}
-              placeholder="Schema에 대한 설명을 입력하세요 (선택사항)"
-              rows={3}
-              disabled={isReadOnly}
-              className={`w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] resize-none ${
-                isReadOnly ? "opacity-60 cursor-not-allowed" : ""
-              }`}
-            />
-          </div>
-
-          {schemaType === "object" && (
-            <div className="mb-3 flex items-center justify-between">
-              <button
-                onClick={() => {
-                  setSchemaFields([...schemaFields, createDefaultField()]);
-                }}
-                disabled={isReadOnly}
-                className={`px-3 py-1 text-sm text-[#2563EB] hover:text-[#1E40AF] font-medium ${
-                  isReadOnly ? "opacity-50 cursor-not-allowed" : ""
-                }`}
-              >
-                + Add Field
-              </button>
-              <button
-                onClick={saveSchema}
-                disabled={isLoading || isReadOnly || !currentSchemaName}
-                className={`px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50 ${
-                  isReadOnly ? "opacity-50 cursor-not-allowed" : ""
-                }`}
-              >
-                {isLoading ? "저장 중..." : "Save Schema"}
-              </button>
-            </div>
-          )}
-
-          {schemaType === "object" && (
-            <div className="mb-2">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Schema Fields
-              </h4>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                재귀적 스키마 구조 지원 (Object, Array, Reference)
-              </p>
-            </div>
-          )}
-
-          {schemaType === "object" && (
-            <div className="space-y-2">
-              {schemaFields.map((field, index) => (
-                <SchemaFieldEditor
-                  key={index}
-                  field={field}
-                  onChange={(newField) => {
-                    const updated = [...schemaFields];
-                    updated[index] = newField;
-                    setSchemaFields(updated);
+      {/* Content - 접힘/펼침 상태에 따라 표시 */}
+      {isExpanded && (
+        <div className="px-4 pb-4 border-t border-gray-200 dark:border-[#2D333B]">
+          <div className="pt-4 space-y-4">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Schema 편집 및 관리
+                </p>
+                {error && <p className="text-sm text-red-500 mt-1">{error}</p>}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    loadSchemas();
                   }}
-                  onRemove={() => {
-                    const updated = schemaFields.filter((_, i) => i !== index);
-                    setSchemaFields(updated);
+                  disabled={isLoading}
+                  className="px-3 py-1 text-sm text-gray-600 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 font-medium border border-gray-300 dark:border-[#2D333B] rounded-md hover:bg-gray-50 dark:hover:bg-[#161B22] disabled:opacity-50"
+                >
+                  {isLoading ? "로딩..." : "새로고침"}
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsSchemaModalOpen(true);
                   }}
-                  isReadOnly={isReadOnly}
-                  allowFileType={false}
-                  allowMockExpression={true}
+                  disabled={isReadOnly}
+                  className={`px-4 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md text-sm font-medium transition-colors ${
+                    isReadOnly ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
+                >
+                  Schema 관리
+                </button>
+              </div>
+            </div>
+
+            {/* Schema Fields Table */}
+            <div className="space-y-4">
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Schema 이름
+                </label>
+                <input
+                  type="text"
+                  value={currentSchemaName}
+                  onChange={(e) => setCurrentSchemaName(e.target.value)}
+                  placeholder="Schema 이름을 입력하세요 (예: UserInfo, ProductData)"
+                  disabled={isReadOnly}
+                  className={`w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] ${
+                    isReadOnly ? "opacity-60 cursor-not-allowed" : ""
+                  }`}
                 />
-              ))}
-              {schemaFields.length === 0 && (
-                <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
-                  <p>No fields yet. Click "+ Add Field" to add one.</p>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Schema 설명
+                </label>
+                <textarea
+                  value={currentSchemaDescription}
+                  onChange={(e) => setCurrentSchemaDescription(e.target.value)}
+                  placeholder="Schema에 대한 설명을 입력하세요 (선택사항)"
+                  rows={3}
+                  disabled={isReadOnly}
+                  className={`w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] resize-none ${
+                    isReadOnly ? "opacity-60 cursor-not-allowed" : ""
+                  }`}
+                />
+              </div>
+
+              {schemaType === "object" && (
+                <div className="mb-3 flex items-center justify-between">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSchemaFields([...schemaFields, createDefaultField()]);
+                    }}
+                    disabled={isReadOnly}
+                    className={`px-3 py-1 text-sm text-[#2563EB] hover:text-[#1E40AF] font-medium ${
+                      isReadOnly ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
+                  >
+                    + Add Field
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      saveSchema();
+                    }}
+                    disabled={isLoading || isReadOnly || !currentSchemaName}
+                    className={`px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50 ${
+                      isReadOnly ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
+                  >
+                    {isLoading ? "저장 중..." : "Save Schema"}
+                  </button>
+                </div>
+              )}
+
+              {schemaType === "object" && (
+                <div className="mb-2">
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Schema Fields
+                  </h4>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    재귀적 스키마 구조 지원 (Object, Array, Reference)
+                  </p>
+                </div>
+              )}
+
+              {schemaType === "object" && (
+                <div className="space-y-2">
+                  {schemaFields.map((field, index) => (
+                    <SchemaFieldEditor
+                      key={index}
+                      field={field}
+                      onChange={(newField) => {
+                        const updated = [...schemaFields];
+                        updated[index] = newField;
+                        setSchemaFields(updated);
+                      }}
+                      onRemove={() => {
+                        const updated = schemaFields.filter(
+                          (_, i) => i !== index
+                        );
+                        setSchemaFields(updated);
+                      }}
+                      isReadOnly={isReadOnly}
+                      allowFileType={false}
+                      allowMockExpression={true}
+                    />
+                  ))}
+                  {schemaFields.length === 0 && (
+                    <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
+                      <p>No fields yet. Click "+ Add Field" to add one.</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Schema Modal (스키마 편집용) */}
       <SchemaModal
@@ -321,8 +362,6 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
         schemas={schemas}
         setSchemas={setSchemas}
       />
-
     </div>
   );
 }
-

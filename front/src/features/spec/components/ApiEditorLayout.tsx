@@ -11,17 +11,12 @@ import { useSpecStore } from "../store/spec.store";
 import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
 import { useTestingStore } from "@/features/testing/store/testing.store";
 import axios from "axios";
+import { downloadMarkdown } from "../utils/markdownExporter";
+import { downloadYaml } from "../utils/yamlExporter";
 import {
-  downloadMarkdown,
-  exportAllToMarkdown,
-} from "../utils/markdownExporter";
-import { buildOpenApiYamlFromSpecs, downloadYaml } from "../utils/yamlExporter";
-import {
-  getAllRestApiSpecs,
-  getAllSchemas,
-  type GetAllSchemasResponse,
   importYaml,
   type ImportYamlResponse,
+  exportYaml,
 } from "../services/api";
 import {
   createRestApiSpec,
@@ -30,8 +25,13 @@ import {
   getRestApiSpec,
   getSchema,
 } from "../services/api";
-import { convertRequestBodyToOpenAPI, parseOpenAPIRequestBody } from "../utils/schemaConverter";
+import {
+  convertRequestBodyToOpenAPI,
+  parseOpenAPIRequestBody,
+  parseOpenAPISchemaToSchemaField,
+} from "../utils/schemaConverter";
 import type { RequestBody } from "../types/schema.types";
+import { createPrimitiveField } from "../types/schema.types";
 
 interface KeyValuePair {
   key: string;
@@ -73,11 +73,12 @@ export function ApiEditorLayout() {
     protocol: testProtocol,
     setProtocol: setTestProtocol,
     request,
-    setRequest,
     setResponse,
     isLoading,
     setIsLoading,
     setTryId,
+    authorization,
+    setAuthorization,
   } = useTestingStore();
   const [activeTab, setActiveTab] = useState<"form" | "test">("form");
   const [isCodeSnippetOpen, setIsCodeSnippetOpen] = useState(false);
@@ -89,6 +90,8 @@ export function ApiEditorLayout() {
   const [executionStatus, setExecutionStatus] = useState<
     "idle" | "running" | "completed" | "error"
   >("idle");
+  const [isAuthorizationInputOpen, setIsAuthorizationInputOpen] =
+    useState(false);
 
   // Diff가 있는지 확인 (boolean으로 명시적 변환)
   const hasDiff = !!(
@@ -188,14 +191,13 @@ export function ApiEditorLayout() {
       setRequestHeaders([]);
       setRequestBody({
         type: "none",
-        contentType: "application/json",
         fields: [],
       });
       setAuth({ type: "none" });
       setStatusCodes([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedEndpoint, activeTab]);
+  }, [selectedEndpoint?.id]);
 
   // Load endpoint data from backend
   const loadEndpointData = async (id: string) => {
@@ -310,9 +312,42 @@ export function ApiEditorLayout() {
 
           // 새로운 parseOpenAPIRequestBody 사용
           const parsed = parseOpenAPIRequestBody(reqBody, contentType);
+
           if (parsed) {
             loadedRequestBody = parsed;
           }
+        }
+      }
+
+      // schemaRef가 있으면 스키마를 조회해서 fields 채우기
+      if (
+        loadedRequestBody.schemaRef &&
+        (!loadedRequestBody.fields || loadedRequestBody.fields.length === 0)
+      ) {
+        try {
+          const schemaResponse = await getSchema(loadedRequestBody.schemaRef);
+          const schemaData = schemaResponse.data;
+
+          if (schemaData.properties) {
+            const fields = Object.entries(schemaData.properties).map(
+              ([key, propSchema]: [string, any]) => {
+                return parseOpenAPISchemaToSchemaField(key, propSchema);
+              }
+            );
+
+            // required 필드 설정
+            if (schemaData.required && Array.isArray(schemaData.required)) {
+              fields.forEach((field) => {
+                if (schemaData.required!.includes(field.key)) {
+                  field.required = true;
+                }
+              });
+            }
+
+            loadedRequestBody.fields = fields;
+          }
+        } catch {
+          // 스키마 조회 실패 시 무시
         }
       }
 
@@ -369,13 +404,13 @@ export function ApiEditorLayout() {
                 if (schema.type === "array" && schema.items) {
                   const itemsSchema = schema.items;
                   const itemsRef = itemsSchema.$ref || itemsSchema.ref;
-                  
+
                   const schemaData: any = {
                     isArray: true,
                     minItems: schema.minItems,
                     maxItems: schema.maxItems,
                   };
-                  
+
                   if (itemsRef) {
                     // Array of Schema Reference
                     let schemaName: string;
@@ -414,7 +449,7 @@ export function ApiEditorLayout() {
                     // Array of Primitive Type
                     schemaData.type = itemsSchema.type;
                   }
-                  
+
                   statusCode.schema = schemaData;
                 } else {
                   // Non-array 타입
@@ -481,15 +516,8 @@ export function ApiEditorLayout() {
       // StatusCodes state 업데이트
       setStatusCodes(loadedStatusCodes);
 
-      // 테스트 스토어 업데이트
-      setRequest({
-        method: spec.method,
-        url: spec.path,
-        description: spec.description || spec.summary || "",
-        headers: testHeaders,
-        queryParams: testQueryParams,
-        body: "",
-      });
+      // 테스트 스토어 업데이트는 TestRequestPanel에서 처리하므로 여기서는 제거
+      // (TestRequestPanel에서 selectedEndpoint 변경 시 자동으로 로드됨)
     } catch (error) {
       console.error("API 스펙 로드 실패:", error);
       const errorMessage = getErrorMessage(error);
@@ -901,8 +929,7 @@ export function ApiEditorLayout() {
       setAuth({ type: "none" });
       setRequestBody({
         type: "json",
-        contentType: "application/json",
-        fields: [{ key: "email", value: "string", type: "string" }],
+        fields: [createPrimitiveField("email", "string")],
       });
       setStatusCodes([]);
     }
@@ -922,7 +949,6 @@ export function ApiEditorLayout() {
     setRequestHeaders([]);
     setRequestBody({
       type: "json",
-      contentType: "application/json",
       fields: [],
     });
     setStatusCodes([]);
@@ -983,17 +1009,33 @@ export function ApiEditorLayout() {
       )
     ) {
       try {
-        // TODO: 백엔드 API 엔드포인트 구현 필요
-        // 백엔드에서 실제 구현된 스펙을 가져와서 명세를 업데이트하는 API 호출
-        alert(
-          "기능 개발 중입니다.\n\n백엔드에서 실제 구현 → 명세 동기화 API가 필요합니다."
-        );
+        // 현재 엔드포인트의 정보를 백엔드에서 가져옴
+        const response = await getRestApiSpec(selectedEndpoint.id);
+        const spec = response.data;
 
-        // 예시: 향후 구현될 API 호출
-        // const response = await syncImplementationToSpec(selectedEndpoint.id);
-        // await loadEndpointData(selectedEndpoint.id);
-        // await loadEndpoints();
-        // alert("✅ 실제 구현이 명세에 성공적으로 반영되었습니다!");
+        // 현재 명세 정보를 그대로 업데이트 요청으로 전달
+        // 백엔드의 updateRestApiSpec 메서드에서 자동으로 x-ouroboros-diff를 "none"으로 설정함
+        const updateRequest = {
+          path: spec.path,
+          method: spec.method,
+          summary: spec.summary,
+          description: spec.description,
+          tags: spec.tags || [],
+          parameters: spec.parameters || [],
+          requestBody: spec.requestBody || undefined,
+          responses: spec.responses || {},
+          security: spec.security || [],
+        };
+
+        await updateRestApiSpec(selectedEndpoint.id, updateRequest);
+
+        // 엔드포인트 데이터 다시 로드하여 최신 상태 반영
+        await loadEndpointData(selectedEndpoint.id);
+
+        // 사이드바 목록도 다시 로드하여 diff 상태 업데이트
+        await loadEndpoints();
+
+        alert(" 실제 구현이 명세에 성공적으로 반영되었습니다!");
       } catch (error: unknown) {
         console.error("명세 동기화 실패:", error);
         const errorMessage = getErrorMessage(error);
@@ -1019,6 +1061,11 @@ export function ApiEditorLayout() {
         }
       });
 
+      // Authorization 헤더 추가 (입력된 경우)
+      if (authorization && authorization.trim()) {
+        headers["Authorization"] = authorization.trim();
+      }
+
       // X-Ouroboros-Try:on 헤더 추가
       headers["X-Ouroboros-Try"] = "on";
 
@@ -1041,17 +1088,81 @@ export function ApiEditorLayout() {
       const fullUrl = url.startsWith("http") ? url : url;
 
       // Request body 파싱 (GET 메서드가 아니고 body가 있을 때만)
-      let requestData = undefined;
+      let requestData: any = undefined;
       if (request.method !== "GET" && request.body && request.body.trim()) {
-        try {
-          requestData = JSON.parse(request.body);
-        } catch (e) {
-          console.error("Request body 파싱 실패:", e);
-          throw new Error(
-            `Request body가 유효한 JSON 형식이 아닙니다: ${
-              e instanceof Error ? e.message : String(e)
-            }`
-          );
+        const contentTypeHeader = request.headers.find(
+          (h) => h.key.toLowerCase() === "content-type"
+        );
+        const contentType = contentTypeHeader?.value || "application/json";
+
+        if (contentType.includes("multipart/form-data")) {
+          // FormData로 변환
+          const formData = new FormData();
+          try {
+            const bodyObj = JSON.parse(request.body);
+            Object.entries(bodyObj).forEach(([key, value]) => {
+              if (value !== undefined && value !== null) {
+                if (value instanceof File) {
+                  formData.append(key, value);
+                } else if (Array.isArray(value)) {
+                  value.forEach((item) => {
+                    if (item instanceof File) {
+                      formData.append(key, item);
+                    } else {
+                      formData.append(key, String(item));
+                    }
+                  });
+                } else {
+                  formData.append(key, String(value));
+                }
+              }
+            });
+            requestData = formData;
+            // FormData는 Content-Type을 자동으로 설정하므로 헤더에서 제거
+            delete headers["Content-Type"];
+          } catch (e) {
+            console.error("FormData 변환 실패:", e);
+            throw new Error("FormData 변환에 실패했습니다.");
+          }
+        } else if (contentType.includes("application/x-www-form-urlencoded")) {
+          // URLSearchParams로 변환
+          const params = new URLSearchParams();
+          try {
+            const bodyObj = JSON.parse(request.body);
+            Object.entries(bodyObj).forEach(([key, value]) => {
+              if (value !== undefined && value !== null) {
+                if (Array.isArray(value)) {
+                  value.forEach((item) => {
+                    params.append(key, String(item));
+                  });
+                } else {
+                  params.append(key, String(value));
+                }
+              }
+            });
+            requestData = params.toString();
+          } catch (e) {
+            console.error("URLSearchParams 변환 실패:", e);
+            throw new Error("URL-encoded 변환에 실패했습니다.");
+          }
+        } else if (
+          contentType.includes("application/xml") ||
+          contentType.includes("text/xml")
+        ) {
+          // XML은 문자열 그대로 전송
+          requestData = request.body;
+        } else {
+          // JSON (기본)
+          try {
+            requestData = JSON.parse(request.body);
+          } catch (e) {
+            console.error("Request body 파싱 실패:", e);
+            throw new Error(
+              `Request body가 유효한 JSON 형식이 아닙니다: ${
+                e instanceof Error ? e.message : String(e)
+              }`
+            );
+          }
         }
       }
 
@@ -1198,23 +1309,25 @@ export function ApiEditorLayout() {
                       d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
                     />
                   </svg>
-                  <span className="hidden sm:inline">Import</span>
                 </button>
                 <button
                   onClick={async () => {
                     try {
-                      const res = await getAllRestApiSpecs();
-                      const md = exportAllToMarkdown(res.data);
+                      const yaml = await exportYaml();
+                      const { convertYamlToMarkdown } = await import(
+                        "../utils/markdownExporter"
+                      );
+                      const md = convertYamlToMarkdown(yaml);
                       downloadMarkdown(
                         md,
-                        `ALL_APIS_${new Date().getTime()}.md`
+                        `API_DOCUMENTATION_${new Date().getTime()}.md`
                       );
                       alert("Markdown 파일이 다운로드되었습니다.");
                     } catch (e) {
                       console.error("Markdown 내보내기 오류:", e);
                       const errorMsg = getErrorMessage(e);
                       alert(
-                        `전체 Markdown 내보내기에 실패했습니다.\n오류: ${errorMsg}`
+                        `Markdown 내보내기에 실패했습니다.\n오류: ${errorMsg}`
                       );
                     }
                   }}
@@ -1234,40 +1347,20 @@ export function ApiEditorLayout() {
                       d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                     />
                   </svg>
-                  <span className="hidden sm:inline">Export</span>
                 </button>
                 <button
                   onClick={async () => {
                     try {
-                      const [specsRes, schemasRes] = await Promise.all([
-                        getAllRestApiSpecs(),
-                        getAllSchemas().catch((error) => {
-                          console.warn(
-                            "Schema 조회 실패, 빈 배열로 계속 진행:",
-                            error.message
-                          );
-                          return {
-                            status: 200,
-                            data: [],
-                            message: "Schema 조회 실패",
-                          } as GetAllSchemasResponse;
-                        }),
-                      ]);
-                      const yaml = buildOpenApiYamlFromSpecs(
-                        specsRes.data,
-                        (schemasRes as GetAllSchemasResponse).data
-                      );
+                      const yaml = await exportYaml();
                       downloadYaml(
                         yaml,
-                        `ALL_APIS_${new Date().getTime()}.yml`
+                        `ourorest_${new Date().getTime()}.yml`
                       );
                       alert("YAML 파일이 다운로드되었습니다.");
                     } catch (e) {
                       console.error("YAML 내보내기 오류:", e);
                       const errorMsg = getErrorMessage(e);
-                      alert(
-                        `전체 YAML 내보내기에 실패했습니다.\n오류: ${errorMsg}`
-                      );
+                      alert(`YAML 내보내기에 실패했습니다.\n오류: ${errorMsg}`);
                     }
                   }}
                   className="px-3 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-colors text-sm font-medium flex items-center gap-2"
@@ -1292,33 +1385,104 @@ export function ApiEditorLayout() {
                       d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
                     />
                   </svg>
-                  <span className="hidden sm:inline">Generate</span>
-                </button>
-                <button
-                  onClick={() => setIsCodeSnippetOpen(true)}
-                  className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2"
-                  title="Code Snippet 보기"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
-                    />
-                  </svg>
-                  Code Snippet
                 </button>
               </div>
             </div>
           ) : (
             // 테스트 폼일 때 버튼들
             <div className="flex flex-wrap items-center gap-2">
+              {/* Authorization Button & Input */}
+              <div className="relative flex items-center gap-2">
+                {!isAuthorizationInputOpen ? (
+                  <button
+                    onClick={() => setIsAuthorizationInputOpen(true)}
+                    className={`px-3 py-2 rounded-md border transition-colors text-sm font-medium flex items-center gap-2 ${
+                      authorization && authorization.trim()
+                        ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300"
+                        : "bg-white dark:bg-[#0D1117] border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22]"
+                    }`}
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                      />
+                    </svg>
+                    {authorization && authorization.trim() ? (
+                      <span className="flex items-center gap-1">
+                        <svg
+                          className="w-4 h-4 text-green-500"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                        Auth
+                      </span>
+                    ) : (
+                      <span>Auth</span>
+                    )}
+                  </button>
+                ) : (
+                  <div className="relative flex items-center">
+                    <input
+                      type="text"
+                      value={authorization}
+                      onChange={(e) => setAuthorization(e.target.value)}
+                      onBlur={() => {
+                        // 입력이 완료되면 입력창 숨김
+                        if (authorization && authorization.trim()) {
+                          setIsAuthorizationInputOpen(false);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          // Enter 키를 누르면 입력창 숨김
+                          if (authorization && authorization.trim()) {
+                            setIsAuthorizationInputOpen(false);
+                          }
+                        } else if (e.key === "Escape") {
+                          // Escape 키를 누르면 입력창 숨김
+                          setIsAuthorizationInputOpen(false);
+                        }
+                      }}
+                      placeholder="Authorization"
+                      autoFocus
+                      className="px-3 py-2 pr-10 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm w-64"
+                    />
+                    {authorization && authorization.trim() && (
+                      <div className="absolute right-3 flex items-center">
+                        <svg
+                          className="w-5 h-5 text-green-500"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
               {/* Run Button */}
               <button
                 onClick={handleRun}
@@ -1465,21 +1629,46 @@ export function ApiEditorLayout() {
             {/* Method + URL Card */}
             {protocol === "REST" && (
               <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm mb-6">
-                <div className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3] mb-2 flex items-center gap-2">
-                  <svg
-                    className="h-4 w-4 text-gray-500 dark:text-[#8B949E]"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                    />
-                  </svg>
-                  <span>Method & URL</span>
+                <div className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3] mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <svg
+                      className="h-4 w-4 text-gray-500 dark:text-[#8B949E]"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
+                    </svg>
+                    <span>Method & URL</span>
+                  </div>
+                  {/* Code Snippet 버튼 - 생성 완료된 명세서에서만 활성화 (수정 중일 때는 숨김) */}
+                  {selectedEndpoint && !isEditMode && (
+                    <button
+                      onClick={() => setIsCodeSnippetOpen(true)}
+                      className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2"
+                      title="Code Snippet 보기"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
+                        />
+                      </svg>
+                      <span className="hidden sm:inline">Code Snippet</span>
+                    </button>
+                  )}
                 </div>
                 <p className="text-xs text-gray-600 dark:text-[#8B949E] mb-4">
                   HTTP 메서드와 엔드포인트 URL을 입력하세요

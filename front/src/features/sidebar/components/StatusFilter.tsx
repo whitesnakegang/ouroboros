@@ -12,7 +12,7 @@ export function StatusFilter({
   const [isFocused, setIsFocused] = useState(false);
 
   return (
-    <div className="flex gap-1 border-b border-[#2D333B]">
+    <div className="flex gap-1 border-b border-gray-200 dark:border-[#2D333B]">
       <div className="relative group">
         <button
           onClick={() => onFilterChange("mock")}
@@ -20,8 +20,8 @@ export function StatusFilter({
           onBlur={() => setIsFocused(false)}
           className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
             activeFilter === "mock"
-              ? "text-[#E6EDF3] border-[#2563EB]"
-              : "text-[#8B949E] border-transparent hover:text-[#E6EDF3]"
+              ? "text-gray-900 dark:text-[#E6EDF3] border-[#2563EB]"
+              : "text-gray-600 dark:text-[#8B949E] border-transparent hover:text-gray-900 dark:hover:text-[#E6EDF3]"
           }`}
         >
           Mock
@@ -55,8 +55,8 @@ export function StatusFilter({
         onClick={() => onFilterChange("completed")}
         className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
           activeFilter === "completed"
-            ? "text-[#E6EDF3] border-[#2563EB]"
-            : "text-[#8B949E] border-transparent hover:text-[#E6EDF3]"
+            ? "text-gray-900 dark:text-[#E6EDF3] border-[#2563EB]"
+            : "text-gray-600 dark:text-[#8B949E] border-transparent hover:text-gray-900 dark:hover:text-[#E6EDF3]"
         }`}
       >
         Completed
