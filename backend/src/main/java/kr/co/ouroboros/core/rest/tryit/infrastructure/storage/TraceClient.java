@@ -18,7 +18,7 @@ import java.util.List;
  * <p>
  * <b>Implementations:</b>
  * <ul>
- *   <li>{@link kr.co.ouroboros.core.rest.tryit.infrastructure.storage.memory.InMemoryTraceClient} - In-memory storage</li>
+ *   <li>{@link kr.co.ouroboros.core.rest.tryit.infrastructure.storage.memory.client.InMemoryTraceClient} - In-memory storage</li>
  *   <li>{@link kr.co.ouroboros.core.rest.tryit.infrastructure.storage.tempo.client.RestTemplateTempoClient} - Tempo backend</li>
  * </ul>
  *

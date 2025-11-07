@@ -1,7 +1,8 @@
-package kr.co.ouroboros.core.rest.tryit.infrastructure.storage.memory;
+package kr.co.ouroboros.core.rest.tryit.infrastructure.storage.memory.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.TraceClient;
+import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.memory.InMemoryTraceStorage;
 import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.model.TraceDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
