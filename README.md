@@ -147,7 +147,7 @@
 #### Gradle
 ```gradle
 dependencies {
-    implementation 'io.github.whitesnakegang:ouroboros:0.1.0-SNAPSHOT'
+    implementation 'io.github.whitesnakegang:ouroboros:1.0.0'
     implementation 'org.springframework.boot:spring-boot-starter-web'
 }
 ```
@@ -157,7 +157,7 @@ dependencies {
 <dependency>
     <groupId>io.github.whitesnakegang</groupId>
     <artifactId>ouroboros</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>1.0.0</version>
 </dependency>
 ```
 
@@ -183,7 +183,7 @@ ouroboros:
    
    Open your browser and navigate to:
    ```
-   http://localhost:8080/ouroboros/index.html
+   http://localhost:8080/ouroboros/
    ```
    
    The intuitive web interface allows you to:
@@ -304,6 +304,9 @@ Ouroboros will automatically:
 ---
 
 ## 📖 Documentation
+
+### Official Site
+- [https://ouroboros.co.kr](https://ouroboros.co.kr) — 최신 가이드와 배포 문서를 확인할 수 있습니다.
 
 ### API Documentation
 - [Complete API Endpoints](./backend/docs/endpoints/README.md)
