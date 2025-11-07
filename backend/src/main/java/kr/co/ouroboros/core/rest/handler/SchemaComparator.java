@@ -130,7 +130,7 @@ public class SchemaComparator {
      * @param typeCounts the accumulating map of type keys to counts that will be updated in-place
      * @param visited set of schema names already visited to detect and avoid circular references during resolution
      */
-    private void collectTypeCountsFromProperty(String propertyName, Schema propertySchema, 
+    private void collectTypeCountsFromProperty(String propertyName, Schema propertySchema,
                                                 Components components, Map<String, Integer> typeCounts,
                                                 Set<String> visited) {
         if (propertySchema == null) {

@@ -58,10 +58,10 @@ public class ResponseComparator {
 
             // 스캔 스펙에는 있는데 파일 스펙에는 없는 경우
             if (fileResponse == null) {
-                log.info("[RESPONSE MISSING] {} {} - Response-Status {}: File spec에 해당 상태코드 응답이 없습니다. 스캔된 응답을 추가합니다.",
+                log.debug("[RESPONSE MISSING] {} {} - Response-Status {}: File spec에 해당 상태코드 응답이 없습니다. 불일치로 판정합니다.",
                         url, method, statusCode);
-                fileResponses.put(statusCode, scannedResponse);
-                continue;
+                hasMismatch = true;
+                break;
             }
 
             // 둘 다 같은 상태코드에 대한 Response가 있는 경우, 응답 스키마 비교
@@ -72,6 +72,7 @@ public class ResponseComparator {
             } else {
                 log.debug("[RESPONSE MISMATCH] {} {} - Status {}: 응답 형식이 일치하지 않습니다.", url, method, statusCode);
                 hasMismatch = true;
+                break;
             }
         }
 
