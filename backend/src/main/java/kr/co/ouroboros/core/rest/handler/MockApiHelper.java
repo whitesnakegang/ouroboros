@@ -25,7 +25,7 @@ public final class MockApiHelper {
      */
     public static boolean isMockApi(Operation fileOp, Operation scanOp) {
         String xOuroborosProgress = scanOp.getXOuroborosProgress();
-        if (xOuroborosProgress.equals("mock")) {
+        if (xOuroborosProgress.equalsIgnoreCase("mock")) {
             fileOp.setXOuroborosProgress("mock");
             fileOp.setXOuroborosTag(scanOp.getXOuroborosTag());
             return true;

@@ -38,11 +38,11 @@ public class OpenApiCustomizerConfig {
             }
 
             if (apiState.state() == State.COMPLETED) {
-                operation.getExtensions().put("x-ouroboros-progress", "COMPLETED");
+                operation.getExtensions().put("x-ouroboros-progress", "completed");
                 operation.getExtensions().put("x-ouroboros-tag", "none");
             } else {
-                operation.getExtensions().put("x-ouroboros-progress", "MOCK");
-                operation.getExtensions().put("x-ouroboros-tag", apiState.state().name());
+                operation.getExtensions().put("x-ouroboros-progress", "mock");
+                operation.getExtensions().put("x-ouroboros-tag", apiState.state().name().toLowerCase());
             }
 
             if(apiResponses != null || apiResponse != null){
