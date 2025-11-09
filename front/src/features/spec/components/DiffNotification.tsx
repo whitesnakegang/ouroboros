@@ -9,11 +9,13 @@ interface DiffDetails {
 
 interface DiffNotificationProps {
   diff: string; // "none", "request", "response", "endpoint", "both" 등
+  progress?: string; // "mock", "completed" 등
   onSyncToSpec?: () => void; // 명세에 자동 추가 버튼 핸들러
 }
 
 export function DiffNotification({
   diff,
+  progress,
   onSyncToSpec,
 }: DiffNotificationProps) {
   if (!diff || diff === "none") {
@@ -54,6 +56,10 @@ export function DiffNotification({
   };
 
   const diffDetails = parseDiffType(diff);
+  
+  // progress 상태 확인 (기본값: "mock")
+  const progressLower = progress?.toLowerCase() || "mock";
+  const isCompleted = progressLower === "completed";
 
   const getTypeLabel = () => {
     switch (diffDetails.type) {
@@ -92,8 +98,10 @@ export function DiffNotification({
             <Badge className="text-amber-500">{getTypeLabel()}</Badge>
           </div>
           <div className="text-xs text-gray-600 dark:text-[#8B949E] leading-relaxed mt-1">
-            이 API는 completed 상태로 실제 구현이 완료되었습니다. 백엔드에서
-            diff가 감지되었습니다. 아래 버튼으로 명세를 갱신할 수 있습니다.
+            {isCompleted
+              ? "이 API는 completed 상태로 실제 구현이 완료되었습니다. 백엔드에서 diff가 감지되었습니다."
+              : "이 API는 mock 상태입니다. 백엔드에서 diff가 감지되었습니다."}
+            {diffDetails.type === "endpoint" && " 아래 버튼으로 명세를 갱신할 수 있습니다."}
           </div>
         </div>
       </div>
@@ -125,9 +133,9 @@ export function DiffNotification({
               <span>
                 이 API는{" "}
                 <strong className="text-gray-900 dark:text-[#E6EDF3]">
-                  completed
+                  {isCompleted ? "completed" : "mock"}
                 </strong>{" "}
-                상태로 실제 구현이 완료되었습니다.
+                상태{isCompleted ? "로 실제 구현이 완료되었습니다" : "입니다"}.
               </span>
             </li>
             <li className="flex items-start gap-2">
@@ -168,6 +176,7 @@ export function DiffNotification({
               </svg>
               <span>명세서의 수정 및 삭제가 제한됩니다.</span>
             </li>
+            {diffDetails.type === "endpoint" && (
             <li className="flex items-start gap-2">
               <svg
                 className="w-3 h-3 text-gray-500 dark:text-[#8B949E] mt-0.5 flex-shrink-0"
@@ -187,10 +196,11 @@ export function DiffNotification({
                 클릭하여 명세에 자동으로 추가할 수 있습니다.
               </span>
             </li>
+            )}
           </ul>
         </div>
 
-        {onSyncToSpec && (
+        {onSyncToSpec && diffDetails.type === "endpoint" && (
           <div className="flex flex-wrap gap-2 pt-2">
             <Button
               variant="primary"
@@ -198,9 +208,6 @@ export function DiffNotification({
               className="text-xs"
             >
               실제 구현을 명세에 반영
-            </Button>
-            <Button variant="outline" className="text-xs">
-              상세 diff 보기
             </Button>
           </div>
         )}

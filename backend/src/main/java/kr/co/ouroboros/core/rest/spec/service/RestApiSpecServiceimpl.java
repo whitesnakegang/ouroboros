@@ -3,6 +3,9 @@ package kr.co.ouroboros.core.rest.spec.service;
 import kr.co.ouroboros.core.global.Protocol;
 import kr.co.ouroboros.core.global.manager.OuroApiSpecManager;
 import kr.co.ouroboros.core.rest.common.yaml.RestApiYamlParser;
+import kr.co.ouroboros.core.rest.mock.model.EndpointMeta;
+import kr.co.ouroboros.core.rest.mock.registry.RestMockRegistry;
+import kr.co.ouroboros.core.rest.mock.service.RestMockLoaderService;
 import kr.co.ouroboros.core.rest.spec.model.*;
 import kr.co.ouroboros.core.rest.spec.validator.SchemaValidator;
 import kr.co.ouroboros.ui.rest.spec.dto.CreateRestApiRequest;
@@ -18,6 +21,7 @@ import org.yaml.snakeyaml.Yaml;
 import java.util.*;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.stream.Collectors;
 
 /**
  * Implementation of {@link RestApiSpecService}.
@@ -37,11 +41,25 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
     private final SchemaValidator schemaValidator;
     private final OuroApiSpecManager specManager;
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
+    private final RestMockRegistry mockRegistry;
+    private final RestMockLoaderService mockLoaderService;
 
     private static final List<String> HTTP_METHODS = Arrays.asList(
             "get", "post", "put", "delete", "patch", "options", "head", "trace"
     );
 
+    /**
+     * Create and persist a new REST API operation in the OpenAPI document.
+     *
+     * The operation is added under the given path and HTTP method, missing security schemes
+     * and schemas are auto-created as needed, the spec cache is updated, and registered mocks
+     * are reloaded from the persisted YAML.
+     *
+     * @param request the request describing the API operation to create (path, method, metadata, security, etc.)
+     * @return a RestApiSpecResponse describing the newly created operation (id, path, method, summary, etc.)
+     * @throws IllegalArgumentException if an operation for the same path and method already exists
+     * @throws Exception for failures reading/writing or processing the OpenAPI document
+     */
     @Override
     public RestApiSpecResponse createRestApiSpec(CreateRestApiRequest request) throws Exception {
         lock.writeLock().lock();
@@ -91,6 +109,9 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
 
             // Process and cache: writes to file + validates with scanned state + updates cache
             specManager.processAndCacheSpec(Protocol.REST, openApiDoc);
+
+            // registry 초기화 후 재등록 (전체 읽기)
+            reloadMockRegistry();
 
             log.info("Created REST API spec: {} {} (ID: {})", request.getMethod().toUpperCase(), request.getPath(), id);
 
@@ -171,6 +192,16 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         }
     }
 
+    /**
+     * Updates an existing REST API specification identified by its Ouroboros ID, optionally changing its path, method, and other operation fields.
+     *
+     * Updates are persisted into the OpenAPI document, missing security schemes and schemas are auto-created as needed, the spec cache is refreshed, and the mock registry is reloaded.
+     *
+     * @param id      the x-ouroboros-id value of the operation to update
+     * @param request the update request containing fields to change (path, method, summary, description, parameters, requestBody, responses, security, etc.)
+     * @return the updated RestApiSpecResponse for the operation at its final path and method
+     * @throws IllegalArgumentException if the specification file does not exist, if no operation with the given id is found, or if moving the operation would conflict with an existing operation at the target path/method
+     */
     @Override
     public RestApiSpecResponse updateRestApiSpec(String id, UpdateRestApiRequest request) throws Exception {
         lock.writeLock().lock();
@@ -261,12 +292,23 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
             // Process and cache: writes to file + validates with scanned state + updates cache
             specManager.processAndCacheSpec(Protocol.REST, openApiDoc);
 
+            // registry 초기화 후 재등록 (전체 읽기)
+            reloadMockRegistry();
+
             return convertToResponse(id, finalPath, finalMethod, operation);
         } finally {
             lock.writeLock().unlock();
         }
     }
 
+    /**
+     * Deletes the REST API specification identified by the given ID from the stored OpenAPI document.
+     *
+     * Updates the persisted document, refreshes the in-memory spec cache, and reloads the mock registry after removal.
+     *
+     * @param id the `x-ouroboros-id` value of the REST API operation to remove
+     * @throws IllegalArgumentException if the specification file does not exist or no operation with the given ID is found
+     */
     @Override
     public void deleteRestApiSpec(String id) throws Exception {
         lock.writeLock().lock();
@@ -307,6 +349,10 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
 
             // Process and cache: writes to file + validates with scanned state + updates cache
             specManager.processAndCacheSpec(Protocol.REST, openApiDoc);
+
+            // registry 초기화 후 재등록 (전체 읽기)
+            reloadMockRegistry();
+
         } finally {
             lock.writeLock().unlock();
         }
@@ -326,7 +372,11 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         }
 
         if (request.getTags() != null && !request.getTags().isEmpty()) {
-            operation.put("tags", request.getTags());
+            // tags를 대문자로 변환
+            List<String> upperCaseTags = request.getTags().stream()
+                    .map(String::toUpperCase)
+                    .collect(Collectors.toList());
+            operation.put("tags", upperCaseTags);
         }
 
         if (request.getParameters() != null && !request.getParameters().isEmpty()) {
@@ -358,7 +408,19 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         return operation;
     }
 
+    /**
+     * Updates operation fields based on the request.
+     * <p>
+     * Field update rules:
+     * - null: field is not updated (existing value preserved)
+     * - empty array []: field is removed from operation
+     * - non-empty value: field is updated with new value
+     *
+     * @param operation the operation to update
+     * @param request the update request containing new values
+     */
     private void updateOperationFields(Map<String, Object> operation, UpdateRestApiRequest request) {
+        // String fields: update if not null
         if (request.getSummary() != null) {
             operation.put("summary", request.getSummary());
         }
@@ -366,22 +428,49 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
             operation.put("description", request.getDescription());
         }
 
+        // List fields: empty array removes, non-empty updates, null preserves
         if (request.getTags() != null) {
-            operation.put("tags", request.getTags());
+            if (request.getTags().isEmpty()) {
+                operation.remove("tags");
+                log.info("✓ Tags removed from operation");
+            } else {
+                // tags를 대문자로 변환
+                List<String> upperCaseTags = request.getTags().stream()
+                        .map(String::toUpperCase)
+                        .collect(Collectors.toList());
+                operation.put("tags", upperCaseTags);
+            }
         }
+
         if (request.getParameters() != null) {
-            operation.put("parameters", convertParameters(request.getParameters()));
+            if (request.getParameters().isEmpty()) {
+                operation.remove("parameters");
+                log.info("✓ Parameters removed from operation");
+            } else {
+                operation.put("parameters", convertParameters(request.getParameters()));
+            }
         }
+
+        // Object fields: update if not null
         if (request.getRequestBody() != null) {
             operation.put("requestBody", convertRequestBody(request.getRequestBody()));
         }
+
+        // Map fields: update if not null
         if (request.getResponses() != null) {
             operation.put("responses", convertResponses(request.getResponses()));
         }
-        if (request.getSecurity() != null && !request.getSecurity().isEmpty()) {
-            List<Map<String, List<String>>> securityList = convertSecurity(request.getSecurity());
-            operation.put("security", securityList);
-            log.info("✓ Security updated in operation: {}", securityList);
+
+        // Security: empty array removes, non-empty updates, null preserves
+        if (request.getSecurity() != null) {
+            if (request.getSecurity().isEmpty()) {
+                operation.remove("security");
+                log.info("✓ Security removed from operation");
+            } else {
+                List<Map<String, List<String>>> securityList = convertSecurity(request.getSecurity());
+                operation.put("security", securityList);
+                log.info("✓ Security updated in operation: {}", securityList);
+            }
         }
 
         // Reset x-ouroboros-diff to "none" when user explicitly updates the spec
@@ -495,6 +584,17 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
             result.put("xml", xml);
         }
 
+        // Array type - items and constraints
+        if ("array".equals(schema.getType()) && schema.getItems() != null) {
+            result.put("items", convertSchema(schema.getItems()));
+        }
+        if (schema.getMinItems() != null) {
+            result.put("minItems", schema.getMinItems());
+        }
+        if (schema.getMaxItems() != null) {
+            result.put("maxItems", schema.getMaxItems());
+        }
+
         return result;
     }
 
@@ -529,6 +629,16 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         if (property.getMockExpression() != null) {
             result.put("x-ouroboros-mock", property.getMockExpression());
         }
+        
+        // Object type - nested properties (재귀!)
+        if (property.getProperties() != null && !property.getProperties().isEmpty()) {
+            result.put("properties", convertProperties(property.getProperties()));
+        }
+        if (property.getRequired() != null && !property.getRequired().isEmpty()) {
+            result.put("required", property.getRequired());
+        }
+        
+        // Array type - items (재귀!)
         if (property.getItems() != null) {
             result.put("items", convertProperty(property.getItems()));
         }
@@ -538,6 +648,12 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         if (property.getMaxItems() != null) {
             result.put("maxItems", property.getMaxItems());
         }
+        
+        // Format (file 타입 구분용)
+        if (property.getFormat() != null) {
+            result.put("format", property.getFormat());
+        }
+        
         return result;
     }
 
@@ -659,16 +775,19 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
 
         Schema.SchemaBuilder builder = Schema.builder();
 
-        // Check for $ref (reference mode) in YAML
-        if (schemaMap.containsKey("$ref")) {
-            String dollarRef = (String) schemaMap.get("$ref");
+        // Check for $ref or ref (reference mode) in YAML
+        String dollarRef = (String) schemaMap.get("$ref");
+        String ref = (String) schemaMap.get("ref");
+        
+        if (dollarRef != null || ref != null) {
+            String refValue = dollarRef != null ? dollarRef : ref;
             
-            // Convert $ref to simplified ref for client
-            if (dollarRef != null && dollarRef.startsWith("#/components/schemas/")) {
-                String simplifiedRef = dollarRef.substring("#/components/schemas/".length());
+            // Convert $ref or ref to simplified ref for client
+            if (refValue != null && refValue.startsWith("#/components/schemas/")) {
+                String simplifiedRef = refValue.substring("#/components/schemas/".length());
                 builder.ref(simplifiedRef);
-            } else if (dollarRef != null) {
-                builder.ref(dollarRef);
+            } else if (refValue != null) {
+                builder.ref(refValue);
             }
             
             return builder.build();
@@ -697,6 +816,14 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
             builder.xmlName((String) xml.get("name"));
         }
 
+        // Parse array items and constraints
+        Map<String, Object> itemsMap = (Map<String, Object>) schemaMap.get("items");
+        if (itemsMap != null) {
+            builder.items(parseSchema(itemsMap));
+        }
+        builder.minItems((Integer) schemaMap.get("minItems"))
+               .maxItems((Integer) schemaMap.get("maxItems"));
+
         return builder.build();
     }
 
@@ -724,14 +851,33 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         // Inline mode
         builder.type((String) propMap.get("type"))
                 .description((String) propMap.get("description"))
-                .mockExpression((String) propMap.get("x-ouroboros-mock"))
-                .minItems((Integer) propMap.get("minItems"))
-                .maxItems((Integer) propMap.get("maxItems"));
+                .mockExpression((String) propMap.get("x-ouroboros-mock"));
+        
+        // Object type - nested properties (재귀!)
+        Map<String, Object> properties = (Map<String, Object>) propMap.get("properties");
+        if (properties != null) {
+            Map<String, Property> parsedProperties = new LinkedHashMap<>();
+            for (Map.Entry<String, Object> entry : properties.entrySet()) {
+                parsedProperties.put(entry.getKey(), parseProperty((Map<String, Object>) entry.getValue()));
+            }
+            builder.properties(parsedProperties);
+        }
+        
+        List<String> required = (List<String>) propMap.get("required");
+        if (required != null) {
+            builder.required(required);
+        }
 
+        // Array type - items (재귀!)
         Map<String, Object> items = (Map<String, Object>) propMap.get("items");
         if (items != null) {
             builder.items(parseProperty(items));
         }
+        builder.minItems((Integer) propMap.get("minItems"))
+               .maxItems((Integer) propMap.get("maxItems"));
+        
+        // Format (file 타입 구분용)
+        builder.format((String) propMap.get("format"));
 
         return builder.build();
     }
@@ -801,10 +947,13 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
                 log.info("📦 Auto-created {} missing schema(s)", createdSchemas);
             }
 
-            // Step 7: Write merged document back to file
-            yamlParser.writeDocument(existingDoc);
+            // Step 7: Process and cache: writes to file + validates with scanned state + updates cache
+            specManager.processAndCacheSpec(Protocol.REST, existingDoc);
 
-            // Step 8: Build response
+            // Step 8: Reload mock registry (same as create/update/delete)
+            reloadMockRegistry();
+
+            // Step 9: Build response
             String summary = String.format("Successfully imported %d APIs and %d schemas%s",
                     importedApis, importedSchemas,
                     !renamedList.isEmpty() ? ", renamed " + renamedList.size() + " items due to duplicates" : "");
@@ -965,6 +1114,18 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
 
                 // Update $ref references in the operation
                 updateSchemaReferences(operation, schemaRenameMap);
+
+                // tags를 대문자로 변환
+                if (operation.containsKey("tags") && operation.get("tags") instanceof List) {
+                    @SuppressWarnings("unchecked")
+                    List<Object> tagsObj = (List<Object>) operation.get("tags");
+                    if (tagsObj != null && !tagsObj.isEmpty()) {
+                        List<String> upperCaseTags = tagsObj.stream()
+                                .map(obj -> obj.toString().toUpperCase())
+                                .collect(Collectors.toList());
+                        operation.put("tags", upperCaseTags);
+                    }
+                }
 
                 // Enrich operation with Ouroboros fields
                 enrichOperationWithOuroborosFields(operation);
@@ -1199,6 +1360,27 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
                 securitySchemes.put(schemeName, scheme);
                 log.info("Auto-created security scheme: {}", schemeName);
             }
+        }
+    }
+
+    /**
+     * Reloads the mock registry from YAML file.
+     * Clears existing endpoints and re-registers all mock endpoints.
+     */
+    private void reloadMockRegistry() {
+        mockRegistry.clear();
+        Map<String, EndpointMeta> endpoints = mockLoaderService.loadFromYaml();
+        endpoints.values().forEach(mockRegistry::register);
+        log.info("Reloaded {} mock endpoints into registry", endpoints.size());
+    }
+
+    @Override
+    public String exportYaml() throws Exception {
+        lock.readLock().lock();
+        try {
+            return yamlParser.readYamlContent();
+        } finally {
+            lock.readLock().unlock();
         }
     }
 }

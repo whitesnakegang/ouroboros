@@ -5,7 +5,8 @@ import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import kr.co.ouroboros.core.global.mock.model.ResponseMeta;
+import jakarta.servlet.http.Part;
+import kr.co.ouroboros.core.rest.mock.model.RestResponseMeta;
 import kr.co.ouroboros.core.global.mock.service.SchemaMockBuilder;
 import kr.co.ouroboros.core.rest.mock.model.EndpointMeta;
 import kr.co.ouroboros.core.rest.mock.registry.RestMockRegistry;
@@ -16,6 +17,8 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -48,20 +51,18 @@ public class OuroborosMockFilter implements Filter {
     private final XmlMapper xmlMapper;
 
     /**
-     * Intercepts HTTP requests to route mock endpoints, validate incoming requests, and produce mock responses.
-     *
-     * <p>If the request does not match a registered mock endpoint the method delegates to the filter chain.
-     * For POST/PUT/PATCH requests the request body is parsed (JSON, array, object, or primitive) and stored
-     * as the request attribute "parsedRequestBody" for later use. The request is validated via the validation
-     * service; on validation failure an error response is sent using the validation result's status and message.
-     * On successful validation a mock response is generated and written to the response, and the filter chain is not continued.</p>
-     *
-     * @param req   the incoming servlet request (expected to be an HttpServletRequest)
-     * @param res   the servlet response (expected to be an HttpServletResponse)
-     * @param chain the filter chain to delegate to when the request is not handled as a mock
-     * @throws IOException      if an I/O error occurs while reading the request or writing the response
-     * @throws ServletException if a servlet error occurs during filtering
-     */
+         * Handle HTTP requests for registered mock endpoints by validating the request and producing a mock response;
+         * if the request does not match a registered mock endpoint, delegate to the provided filter chain.
+         *
+         * <p>When the incoming request is a POST, PUT, or PATCH and an expected request content type is defined for the
+         * endpoint, the request body is parsed (JSON, XML, form data, or multipart indicator) and stored as the request
+         * attribute "parsedRequestBody". If validation fails, an error response is sent using the validation result's
+         * status and message and processing stops; on successful validation a mock response is generated and written to
+         * the response, and the filter chain is not continued.</p>
+         *
+         * @throws IOException      if an I/O error occurs while reading the request or writing the response
+         * @throws ServletException if a servlet error occurs during filtering
+         */
     @Override
     public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
             throws IOException, ServletException {
@@ -86,17 +87,49 @@ public class OuroborosMockFilter implements Filter {
                 || "PUT".equalsIgnoreCase(request.getMethod())
                 || "PATCH".equalsIgnoreCase(request.getMethod())) {
             try {
-                // InputStream은 한 번만 읽을 수 있으므로 byte[]로 읽어서 저장
-                byte[] bodyBytes = request.getInputStream().readAllBytes();
-                if (bodyBytes.length > 0) {
-                    String body = new String(bodyBytes, StandardCharsets.UTF_8);
+                String expectedContentType = meta.getRequestBodyContentType();
+                String actualContentType = request.getContentType();
 
-                    // JSON 전체 파싱 (object, array, primitive 모두 허용)
-                    requestJson = objectMapper.readValue(body, Object.class);
-                } else {
-                    log.warn("Request body is empty (0 bytes)");
+                // Content-Type이 없으면 JSON으로 기본 처리
+                if (expectedContentType == null) {
+                    expectedContentType = "application/json";
                 }
-                //  검증 단계에서 사용할 수 있도록 attribute에 저장
+
+                // Registry에 등록된 Content-Type에 따라 파싱
+                if (expectedContentType.contains("multipart/form-data")) {
+                    // ===== multipart/form-data 처리 =====
+                    if (actualContentType != null && actualContentType.contains("multipart/form-data")) {
+                        // Mock 응답: 파일이 정상적으로 전송되었다고 가정
+                        Map<String, Object> mockFormData = new HashMap<>();
+                        mockFormData.put("_multipart", true);
+                        requestJson = mockFormData;
+                    } else {
+                        log.warn("Expected multipart/form-data but got: {}", actualContentType);
+                        requestJson = null;
+                    }
+                } else if (expectedContentType.contains("application/x-www-form-urlencoded")) {
+                    // ===== application/x-www-form-urlencoded 처리 =====
+                    Map<String, Object> formData = new HashMap<>();
+                    Map<String, String[]> parameterMap = request.getParameterMap();
+                    for (Map.Entry<String, String[]> entry : parameterMap.entrySet()) {
+                        String[] values = entry.getValue();
+                        formData.put(entry.getKey(), values.length == 1 ? values[0] : Arrays.asList(values));
+                    }
+                    requestJson = formData;
+                } else {
+                    // ===== XML 처리 =====
+                    byte[] bodyBytes = request.getInputStream().readAllBytes();
+                    if (bodyBytes.length > 0) {
+                        String body = new String(bodyBytes, StandardCharsets.UTF_8);
+                        if (expectedContentType.contains("application/xml")) {
+                            requestJson = xmlMapper.readValue(body, Object.class);
+                        } else {
+                            requestJson = objectMapper.readValue(body, Object.class);
+                        }
+                    } else {
+                        log.warn("Request body is empty (0 bytes)");
+                    }
+                }
                 request.setAttribute("parsedRequestBody", requestJson);
             } catch (Exception e) {
                 log.error("Failed to parse request body", e);
@@ -104,7 +137,6 @@ public class OuroborosMockFilter implements Filter {
                 request.setAttribute("parsedRequestBody", null);
             }
         }
-
         // ===== 3단계: 검증 - Validation Service에 위임 =====
         ValidationResult validationResult = validationService.validate(request, meta);
 
@@ -138,7 +170,7 @@ public class OuroborosMockFilter implements Filter {
             throws IOException {
 
         int statusCode = 200;
-        ResponseMeta responseMeta = meta.getResponses().get(statusCode);
+        RestResponseMeta responseMeta = meta.getResponses().get(statusCode);
 
         if (responseMeta == null) {
             log.error("No 200 response defined for endpoint: {} {}", meta.getMethod(), meta.getPath());

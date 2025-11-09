@@ -34,6 +34,10 @@ interface TestingState {
   addQueryParam: () => void;
   removeQueryParam: (index: number) => void;
 
+  // Authorization State
+  authorization: string;
+  setAuthorization: (authorization: string) => void;
+
   // Response State
   response: TestResponse | null;
   setResponse: (response: TestResponse | null) => void;
@@ -41,8 +45,6 @@ interface TestingState {
   // Test Execution State
   isLoading: boolean;
   setIsLoading: (isLoading: boolean) => void;
-  useDummyResponse: boolean;
-  setUseDummyResponse: (useDummy: boolean) => void;
 
   // Method List State (for Test tab)
   methodList: TryMethod[] | null;
@@ -118,14 +120,14 @@ export const useTestingStore = create<TestingState>((set) => ({
       },
     })),
 
+  authorization: "",
+  setAuthorization: (authorization) => set({ authorization }),
+
   response: null,
   setResponse: (response) => set({ response }),
 
   isLoading: false,
   setIsLoading: (isLoading) => set({ isLoading }),
-
-  useDummyResponse: false,
-  setUseDummyResponse: (useDummy) => set({ useDummyResponse: useDummy }),
 
   methodList: null,
   setMethodList: (methods) => set({ methodList: methods }),

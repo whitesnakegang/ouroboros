@@ -56,7 +56,7 @@ export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
       }`}
     >
       <div className="flex items-start gap-3">
-        {/* Mock 탭: 구현 상태 표시 점 (왼쪽) */}
+        {/* Mock 탭: 구현 상태 표시 점 (왼쪽) - 항상 표시 */}
         {filterType === "mock" && endpoint.implementationStatus && (
           <div
             className={`w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0 ${
@@ -72,41 +72,6 @@ export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
           />
         )}
 
-        {/* Completed 탭: 오류 또는 불일치 표시 아이콘 (왼쪽) */}
-        {filterType === "completed" && (endpoint.hasSpecError || (endpoint.diff && endpoint.diff !== "none")) && (
-          <div className="mt-1.5 flex-shrink-0" title={endpoint.diff && endpoint.diff !== "none" ? "명세와 구현이 일치하지 않습니다" : undefined}>
-            {endpoint.diff && endpoint.diff !== "none" ? (
-              <svg
-                className="w-3.5 h-3.5 text-amber-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                />
-              </svg>
-            ) : (
-              <svg
-                className="w-3.5 h-3.5 text-amber-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                />
-              </svg>
-            )}
-          </div>
-        )}
-
         <div className="flex-1 min-w-0">
           {/* Method 배지와 Path */}
           <div className="flex items-center gap-2 mb-1">
@@ -115,9 +80,27 @@ export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
             >
               {endpoint.method}
             </span>
-            <span className="text-sm text-gray-900 dark:text-[#E6EDF3] truncate font-mono">
+            <span className="text-sm text-gray-900 dark:text-[#E6EDF3] truncate font-mono flex-1 min-w-0">
               {endpoint.path}
             </span>
+            {/* Diff 주의 표시 아이콘 (Path 우측) - Mock 및 Completed 탭 모두 */}
+            {(endpoint.diff && endpoint.diff !== "none") || endpoint.hasSpecError ? (
+              <div className="flex-shrink-0 ml-1" title="명세와 구현이 일치하지 않습니다">
+                <svg
+                  className="w-3.5 h-3.5 text-amber-500"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
+                </svg>
+              </div>
+            ) : null}
           </div>
 
           {/* Description */}

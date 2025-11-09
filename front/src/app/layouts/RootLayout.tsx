@@ -1,7 +1,7 @@
 import { Outlet } from "react-router-dom";
 import { Sidebar } from "@/features/sidebar/components/Sidebar";
 import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect } from "react";
 
 export function RootLayout() {
   const { isDarkMode, isOpen, toggle, setTriggerNewForm } = useSidebarStore();
@@ -13,13 +13,38 @@ export function RootLayout() {
     }
   };
 
-  useEffect(() => {
+  // 다크 모드 설정 적용 (초기 로드 시 즉시 적용 및 변경 시)
+  useLayoutEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add("dark");
+      document.documentElement.style.colorScheme = "dark";
     } else {
       document.documentElement.classList.remove("dark");
+      document.documentElement.style.colorScheme = "light";
     }
   }, [isDarkMode]);
+
+  // 초기 로드 시 다크모드 상태 동기화 (크롬 테마와 무관하게)
+  useEffect(() => {
+    // localStorage에서 저장된 다크모드 상태 확인
+    const stored = localStorage.getItem("sidebar-store");
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed.state?.isDarkMode !== undefined) {
+          if (parsed.state.isDarkMode) {
+            document.documentElement.classList.add("dark");
+            document.documentElement.style.colorScheme = "dark";
+          } else {
+            document.documentElement.classList.remove("dark");
+            document.documentElement.style.colorScheme = "light";
+          }
+        }
+      } catch (_e) {
+        // localStorage 파싱 실패 시 무시
+      }
+    }
+  }, []);
 
   return (
     <div className="h-screen flex flex-col bg-white dark:bg-[#0D1117] transition-colors">

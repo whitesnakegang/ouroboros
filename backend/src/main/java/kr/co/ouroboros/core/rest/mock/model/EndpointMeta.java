@@ -1,5 +1,4 @@
 package kr.co.ouroboros.core.rest.mock.model;
-import kr.co.ouroboros.core.global.mock.model.ResponseMeta;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -50,9 +49,10 @@ public class EndpointMeta {
     private List<String> requiredHeaders;      // 일반 필수 헤더 (400 반환)
     private List<String> authHeaders;          // 인증 필수 헤더 (401 반환)
     private List<String> requiredParams;
-    private Map<Integer, ResponseMeta> responses;
+    private Map<Integer, RestResponseMeta> responses;
 
     // Request body validation metadata
     private boolean requestBodyRequired;       // requestBody의 required 필드
     private Map<String, Object> requestBodySchema;  // resolved schema (타입, 필수 필드 검증용)
+    private String requestBodyContentType; //application/json, application/xml등
 }

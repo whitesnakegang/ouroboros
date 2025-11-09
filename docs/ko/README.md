@@ -74,6 +74,7 @@
 - ✅ **자동 Enrichment**: 누락된 Ouroboros 확장 필드 자동 추가
 - ✅ **에러 리포팅**: 상세한 검증 에러 메시지
 - ✅ **Try 기능**: API 실행 추적 및 분석 (📖 [설정 가이드](./OUROBOROS_TRY_SETUP.md))
+  - **기본값**: In-memory trace 저장소 (설정 불필요)
 
 ---
 
@@ -147,7 +148,7 @@
 #### Gradle
 ```gradle
 dependencies {
-    implementation 'io.github.whitesnakegang:ouroboros:0.1.0-SNAPSHOT'
+    implementation 'io.github.whitesnakegang:ouroboros:1.0.0'
     implementation 'org.springframework.boot:spring-boot-starter-web'
 }
 ```
@@ -157,11 +158,17 @@ dependencies {
 <dependency>
     <groupId>io.github.whitesnakegang</groupId>
     <artifactId>ouroboros</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>1.0.0</version>
 </dependency>
 ```
 
+> **참고**: Lombok을 사용하는 경우 반드시 <code>annotationProcessor 'org.projectlombok:lombok'</code>를 추가해야 <code>@ApiState</code> 기반 자동 스캔이 정상 동작합니다.
+
 ### 설정 (선택 사항)
+
+> **Method Tracing**: 내부 메서드 추적은 기본적으로 비활성화되어 있습니다. Try 기능에서 내부 메서드를 추적하려면 `method-tracing` 설정을 추가하고 `management.tracing.sampling.probability=1.0`을 함께 설정해야 합니다.
+
+> **⚠️ Method Tracing 필수 설정**: Method Tracing 사용 시 `management.tracing.sampling.probability=1.0`을 설정하여 모든 트레이스를 수집해야 합니다.
 
 `application.yml`:
 ```yaml
@@ -170,6 +177,18 @@ ouroboros:
   server:
     url: http://localhost:8080
     description: Local Development Server
+  # Method Tracing 설정 (Try 기능에서 내부 메서드 추적 시 필요)
+  # 기본적으로 내부 메서드 추적은 비활성화되어 있습니다
+  method-tracing:
+    enabled: true
+    allowed-packages: your.package.name  # 추적할 패키지 경로 지정
+
+# Micrometer Tracing (Method Tracing 필수 설정)
+# 모든 트레이스를 수집하기 위해 sampling probability를 1.0으로 설정
+management:
+  tracing:
+    sampling:
+      probability: 1.0
 ```
 
 ### 사용 시작
@@ -183,7 +202,7 @@ ouroboros:
    
    브라우저에서 다음 주소로 접속하세요:
    ```
-   http://localhost:8080/ouroboros/index.html
+   http://localhost:8080/ouroboros
    ```
    
    직관적인 웹 인터페이스에서 다음을 할 수 있습니다:
@@ -304,6 +323,9 @@ Ouroboros가 자동으로:
 ---
 
 ## 📖 문서
+
+### 공식 사이트
+- [https://ouroboros.co.kr](https://ouroboros.co.kr) — 최신 가이드와 배포 문서를 확인할 수 있습니다.
 
 ### API 문서
 - [API 엔드포인트 전체 문서](../../backend/docs/endpoints/README.md)

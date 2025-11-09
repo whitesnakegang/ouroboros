@@ -1,15 +1,14 @@
 package kr.co.ouroboros.core.rest.mock.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import kr.co.ouroboros.core.rest.mock.model.EndpointMeta;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
+import kr.co.ouroboros.core.rest.mock.model.RestResponseMeta;
+import kr.co.ouroboros.core.rest.spec.service.SchemaService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -38,19 +37,19 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class MockValidationService {
-    private final ObjectMapper objectMapper;
+    private final SchemaService schemaService;
     /**
-     * Validate an incoming HttpServletRequest against the endpoint requirements defined in EndpointMeta for a mock endpoint.
+     * Validate an HttpServletRequest against the endpoint requirements defined by EndpointMeta.
      *
-     * Performs prioritized checks and returns the first failing ValidationResult:
-     * - forced error via X-Ouroboros-Error header (if parseable as an integer),
-     * - required authentication headers (401),
-     * - required headers (400),
-     * - required query parameters (400),
-     * - request body presence, JSON parsability, field types, and required fields per the request body schema (400).
+     * Performs prioritized checks and returns the first failing ValidationResult in this order:
+     * 1) forced error via X-Ouroboros-Error header (if parseable as an integer),
+     * 2) required authentication headers (401),
+     * 3) required headers (400),
+     * 4) required query parameters (400),
+     * 5) request body presence, JSON parsability, schema conformity and required fields (400).
      *
      * @param request the incoming HTTP servlet request to validate
-     * @param meta    the endpoint metadata describing required headers, params, and request body schema/requirements
+     * @param meta    the endpoint metadata describing required headers, query parameters, and request body schema/requirements
      * @return        a ValidationResult representing success or the first encountered error with an HTTP status code and message
      */
     public ValidationResult validate(HttpServletRequest request, EndpointMeta meta) {
@@ -59,8 +58,11 @@ public class MockValidationService {
         if (forcedError != null) {
             try {
                 int errorCode = Integer.parseInt(forcedError);
-                return ValidationResult.error(errorCode,
-                        "Forced error response via X-Ouroboros-Error header");
+                String message = getErrorDescription(meta, errorCode);
+                if (message == null || message.isBlank()) {
+                    message = "Forced mock error " + errorCode;
+                }
+                return ValidationResult.error(errorCode, message);
             } catch (NumberFormatException e) {
                 log.warn("Invalid X-Ouroboros-Error header value: {}", forcedError);
             }
@@ -70,8 +72,9 @@ public class MockValidationService {
         if (meta.getAuthHeaders() != null) {
             for (String header : meta.getAuthHeaders()) {
                 if (request.getHeader(header) == null) {
-                    return ValidationResult.error(401,
-                            "Authentication required.");
+                    String baseMsg = getErrorDescription(meta, 401);
+                    String detailMsg = baseMsg != null ? baseMsg : "Authentication required";
+                    return ValidationResult.error(401, detailMsg);
                 }
             }
         }
@@ -81,8 +84,9 @@ public class MockValidationService {
         if (meta.getRequiredHeaders() != null) {
             for (String header : meta.getRequiredHeaders()) {
                 if (request.getHeader(header) == null) {
-                    return ValidationResult.error(400,
-                            "Missing required header");
+                    String baseMsg = getErrorDescription(meta, 400);
+                    String detailMsg = buildDetailMessage(baseMsg, "Missing required header: " + header);
+                    return ValidationResult.error(400, detailMsg);
                 }
             }
         }
@@ -92,8 +96,9 @@ public class MockValidationService {
         if (meta.getRequiredParams() != null) {
             for (String param : meta.getRequiredParams()) {
                 if (request.getParameter(param) == null) {
-                    return ValidationResult.error(400,
-                            "Missing required parameter");
+                    String baseMsg = getErrorDescription(meta, 400);
+                    String detailMsg = buildDetailMessage(baseMsg, "Missing required parameter: " + param);
+                    return ValidationResult.error(400, detailMsg);
                 }
             }
         }
@@ -112,15 +117,18 @@ public class MockValidationService {
 
 
     /**
-     * Validate the HTTP request body against the endpoint's schema and requirement flags.
-     *
-     * Performs presence checks, JSON structure checks, required-field checks, and type checks
-     * according to the EndpointMeta.requestBodySchema and EndpointMeta.requestBodyRequired.
-     *
-     * @param request the incoming HttpServletRequest; the method reads the pre-parsed body from the `parsedRequestBody` attribute
-     * @param meta    endpoint metadata containing requestBodySchema and requestBodyRequired
-     * @return        a ValidationResult indicating success when the body satisfies requirements; otherwise an error result with an HTTP status code and message
-     */
+         * Validate the HTTP request body against the endpoint's schema and requirement flags.
+         *
+         * <p>This method reads a pre-parsed body from the request attribute "parsedRequestBody",
+         * treats a map containing "_multipart" = true as a skipped (valid) multipart body, and
+         * enforces presence when {@code meta.isRequestBodyRequired()} is true. When a request body
+         * schema is provided it validates the root schema type (object, array, or primitive) and
+         * delegates deeper checks to the schema validation helpers.
+         *
+         * @param request the incoming HttpServletRequest; expects the body to be available under the {@code parsedRequestBody} attribute
+         * @param meta    endpoint metadata containing requestBodySchema and requestBodyRequired flags
+         * @return        a ValidationResult that is valid when the body satisfies requirements; otherwise an error result with an HTTP status code and descriptive message
+         */
     @SuppressWarnings("unchecked")
     private ValidationResult validateRequestBody(HttpServletRequest request, EndpointMeta meta) {
         // ===== GET, DELETE 등은 body 없음 =====
@@ -133,10 +141,21 @@ public class MockValidationService {
         // ===== Attribute에서 미리 파싱된 body 가져오기 =====
         Object requestBody = request.getAttribute("parsedRequestBody");
 
+        // ===== multipart는 Content-Type만 확인하고 검증 스킵 =====
+        if (requestBody instanceof Map) {
+            Map<String, Object> bodyMap = (Map<String, Object>) requestBody;
+            if (Boolean.TRUE.equals(bodyMap.get("_multipart"))) {
+                log.debug("Multipart request validation skipped (mock mode)");
+                return ValidationResult.success();  // 검증 통과
+            }
+        }
+
         if (requestBody == null) {
             // InputStream이 비어있거나 파싱 실패
             if (meta.isRequestBodyRequired()) {
-                return ValidationResult.error(400, "Invalid JSON format in request body");
+                String baseMsg = getErrorDescription(meta, 400);
+                String detailMsg = buildDetailMessage(baseMsg, "Invalid JSON format in request body");
+                return ValidationResult.error(400, detailMsg);
             }
             return ValidationResult.success();
         }
@@ -157,14 +176,18 @@ public class MockValidationService {
         // 루트 타입에 따라 분기 처리
         if ("object".equals(rootType)) {
             if (!(requestBody instanceof Map<?, ?> bodyMap)) {
-                return ValidationResult.error(400, "Request body must be a JSON object");
+                String baseMsg = getErrorDescription(meta, 400);
+                String detailMsg = buildDetailMessage(baseMsg, "Request body must be a JSON object");
+                return ValidationResult.error(400, detailMsg);
             }
             return validateSchemaFields((Map<String, Object>) bodyMap, schema, "");
         }
 
         if ("array".equals(rootType)) {
             if (!(requestBody instanceof List<?> bodyList)) {
-                return ValidationResult.error(400, "Request body must be a JSON array");
+                String baseMsg = getErrorDescription(meta, 400);
+                String detailMsg = buildDetailMessage(baseMsg, "Request body must be a JSON array");
+                return ValidationResult.error(400, detailMsg);
             }
             Map<String, Object> itemSchema = (Map<String, Object>) schema.get("items");
             if (itemSchema == null) {
@@ -183,12 +206,16 @@ public class MockValidationService {
     }
 
     /**
-     * Recursively validates object fields against the provided JSON-like schema.
+     * Validate object fields in `data` against the provided JSON-like `schema` recursively.
      *
-     * @param data   the actual request data as a map of field names to values
-     * @param schema the schema definition (may include keys like "type", "properties", "required", "items")
-     * @param path   current field path used in error messages (e.g., "address.city"); may be empty
-     * @return       a ValidationResult that is valid on success; when invalid it contains the HTTP status code and an explanatory message for the first detected violation
+     * Validates only when the schema's root "type" is "object". Required properties, property
+     * types, nested objects, and array items are checked; the first detected violation is returned.
+     *
+     * @param data   map of field names to values representing the actual request data; may contain nested maps/lists
+     * @param schema schema definition containing keys such as "type", "properties", "required", and "items"
+     * @param path   current JSON path used to build field-specific error messages (e.g., "address.city"); may be empty
+     * @return       a ValidationResult that is valid on success; if invalid it contains the HTTP status code and
+     *               a descriptive message for the first detected violation
      */
     @SuppressWarnings("unchecked")
     private ValidationResult validateSchemaFields(Map<String, Object> data,
@@ -207,9 +234,9 @@ public class MockValidationService {
         if (required != null) {
             for (String field : required) {
                 if (!data.containsKey(field)) {
-                    // 필수 필드가 없으면 에러
+                    String fieldPath = path.isEmpty() ? field : path + "." + field;
                     return ValidationResult.error(400,
-                            "Missing required field: " + (path.isEmpty() ? field : path + "." + field));
+                            "Missing required field: " + fieldPath);
                 }
             }
         }
@@ -232,6 +259,16 @@ public class MockValidationService {
             if (propSchema == null) {
                 // 스키마에 없는 필드
                 continue;
+            }
+
+            // $ref 처리 - 스키마 resolve
+            if (propSchema.containsKey("$ref")) {
+                String ref = (String) propSchema.get("$ref");
+                propSchema = resolveSchemaRef(ref);
+                if (propSchema == null) {
+                    log.warn("Failed to resolve schema ref: {}", ref);
+                    continue;
+                }
             }
 
             String expectedType = (String) propSchema.get("type");
@@ -320,6 +357,16 @@ public class MockValidationService {
     private ValidationResult validateArrayItems(List<Object> array,
                                                 Map<String, Object> itemSchema,
                                                 String fieldPath) {
+        // $ref 또는 ref 처리 - items에서도 스키마 참조 가능
+        if (itemSchema.containsKey("$ref") || itemSchema.containsKey("ref")) {
+            String ref = (String) (itemSchema.get("$ref") != null ? itemSchema.get("$ref") : itemSchema.get("ref"));
+            itemSchema = resolveSchemaRef(ref);
+            if (itemSchema == null) {
+                log.warn("Failed to resolve array item schema ref: {}", ref);
+                return ValidationResult.success();
+            }
+        }
+        
         String itemType = (String) itemSchema.get("type");
         if (itemType == null) {
             return ValidationResult.success();
@@ -350,6 +397,110 @@ public class MockValidationService {
     }
 
     /**
+     * $ref를 실제 스키마로 resolve
+     *
+     * @param ref $ref 값 (예: "#/components/schemas/User")
+     * @return resolve된 스키마 Map, 실패 시 null
+     */
+    private Map<String, Object> resolveSchemaRef(String ref) {
+        try {
+            // #/components/schemas/SchemaName -> SchemaName 추출
+            String schemaName = ref.replace("#/components/schemas/", "");
+            
+            // SchemaService에서 스키마 조회
+            var schema = schemaService.getSchema(schemaName);
+            if (schema == null) {
+                return null;
+            }
+            
+            // SchemaResponse를 Map으로 재귀 변환
+            return convertSchemaResponseToMap(schema);
+        } catch (Exception e) {
+            log.error("Failed to resolve schema ref: {}", ref, e);
+            return null;
+        }
+    }
+    
+    /**
+     * SchemaResponse DTO를 Map<String, Object>로 재귀 변환
+     * Property DTO도 재귀적으로 변환하여 ClassCastException 방지
+     */
+    private Map<String, Object> convertSchemaResponseToMap(kr.co.ouroboros.ui.rest.spec.dto.SchemaResponse schema) {
+        Map<String, Object> result = new HashMap<>();
+        
+        if (schema.getType() != null) {
+            result.put("type", schema.getType());
+        }
+        
+        // Properties 재귀 변환 (Property DTO → Map)
+        if (schema.getProperties() != null && !schema.getProperties().isEmpty()) {
+            Map<String, Object> propertiesMap = new HashMap<>();
+            for (Map.Entry<String, kr.co.ouroboros.core.rest.spec.model.Property> entry : schema.getProperties().entrySet()) {
+                propertiesMap.put(entry.getKey(), convertPropertyToMap(entry.getValue()));
+            }
+            result.put("properties", propertiesMap);
+        }
+        
+        if (schema.getRequired() != null && !schema.getRequired().isEmpty()) {
+            result.put("required", schema.getRequired());
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Property DTO를 Map<String, Object>로 재귀 변환
+     */
+    private Map<String, Object> convertPropertyToMap(kr.co.ouroboros.core.rest.spec.model.Property property) {
+        Map<String, Object> result = new HashMap<>();
+        
+        // $ref 처리
+        if (property.getRef() != null && !property.getRef().isBlank()) {
+            String fullRef = property.getRef().startsWith("#/components/schemas/")
+                    ? property.getRef()
+                    : "#/components/schemas/" + property.getRef();
+            result.put("$ref", fullRef);
+            return result;
+        }
+        
+        // Type
+        if (property.getType() != null) {
+            result.put("type", property.getType());
+        }
+        
+        // Description
+        if (property.getDescription() != null) {
+            result.put("description", property.getDescription());
+        }
+        
+        // Object - nested properties (재귀!)
+        if (property.getProperties() != null && !property.getProperties().isEmpty()) {
+            Map<String, Object> nestedProps = new HashMap<>();
+            for (Map.Entry<String, kr.co.ouroboros.core.rest.spec.model.Property> entry : property.getProperties().entrySet()) {
+                nestedProps.put(entry.getKey(), convertPropertyToMap(entry.getValue()));
+            }
+            result.put("properties", nestedProps);
+        }
+        
+        if (property.getRequired() != null && !property.getRequired().isEmpty()) {
+            result.put("required", property.getRequired());
+        }
+        
+        // Array - items (재귀!)
+        if (property.getItems() != null) {
+            result.put("items", convertPropertyToMap(property.getItems()));
+        }
+        if (property.getMinItems() != null) {
+            result.put("minItems", property.getMinItems());
+        }
+        if (property.getMaxItems() != null) {
+            result.put("maxItems", property.getMaxItems());
+        }
+        
+        return result;
+    }
+
+    /**
      * 검증 결과를 담는 클래스
      */
     public record ValidationResult(
@@ -376,6 +527,37 @@ public class MockValidationService {
         public static ValidationResult error(int statusCode, String message) {
             return new ValidationResult(false, statusCode, message);
         }
+    }
+
+    /**
+     * Retrieves the description for a given HTTP status code from the endpoint's response metadata.
+     *
+     * @param meta endpoint metadata containing response definitions
+     * @param statusCode HTTP status code whose description to retrieve
+     * @return the description associated with the status code, or {@code null} if not present
+     */
+    private String getErrorDescription(EndpointMeta meta, int statusCode) {
+        if (meta.getResponses() == null) {
+            return null;
+        }
+        RestResponseMeta responseMeta = meta.getResponses().get(statusCode);
+        return responseMeta != null ? responseMeta.getDescription() : null;
+    }
+
+    /**
+     * Combine an optional base description with a detail message.
+     *
+     * If a non-empty base description is provided, returns "baseDescription - detail"; otherwise returns the detail.
+     *
+     * @param baseDescription optional base description; may be null or empty
+     * @param detail required detail message to append or return
+     * @return the composed message containing the base description and detail, or the detail alone if base is null/empty
+     */
+    private String buildDetailMessage(String baseDescription, String detail) {
+        if (baseDescription != null && !baseDescription.isEmpty()) {
+            return baseDescription + " - " + detail;
+        }
+        return detail;
     }
 
 }

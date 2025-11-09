@@ -11,6 +11,10 @@ interface StatusCode {
   schema?: {
     ref?: string; // 스키마 참조 (예: "User")
     properties?: Record<string, any>; // 인라인 스키마
+    type?: string; // Primitive 타입 (string, integer, number, boolean)
+    isArray?: boolean; // Array of Schema 여부
+    minItems?: number; // Array 최소 개수
+    maxItems?: number; // Array 최대 개수
   };
 }
 
@@ -80,18 +84,27 @@ export function ApiResponseCard({
     null
   );
 
+  // 스키마 목록 로드
+  const loadSchemas = async () => {
+    try {
+      const response = await getAllSchemas();
+      setSchemas(response.data);
+    } catch (err) {
+      console.error("스키마 로드 실패:", err);
+    }
+  };
+
   // 컴포넌트 마운트 시 스키마 목록 로드
   useEffect(() => {
-    const loadSchemas = async () => {
-      try {
-        const response = await getAllSchemas();
-        setSchemas(response.data);
-      } catch (err) {
-        console.error("스키마 로드 실패:", err);
-      }
-    };
     loadSchemas();
   }, []);
+
+  // 모달이 열릴 때마다 스키마 목록 다시 로드
+  useEffect(() => {
+    if (isResponseSchemaModalOpen) {
+      loadSchemas();
+    }
+  }, [isResponseSchemaModalOpen]);
 
   return (
     <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm">
@@ -119,53 +132,55 @@ export function ApiResponseCard({
       {/* Content */}
       <div className="space-y-4">
         <div>
-          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-4">
             <p className="text-sm text-gray-600 dark:text-gray-400">
               HTTP 상태 코드 관리
             </p>
-            <div className="flex gap-2">
-              <select
-                onChange={(e) => {
-                  const selectedCode = e.target.value;
-                  if (selectedCode) {
-                    const template = statusCodeTemplates.find(
-                      (t) => t.code === selectedCode
-                    );
-                    if (template) {
-                      addStatusCode(template);
-                      e.target.value = "";
+            {!isReadOnly && (
+              <div className="flex gap-2">
+                <select
+                  onChange={(e) => {
+                    const selectedCode = e.target.value;
+                    if (selectedCode) {
+                      const template = statusCodeTemplates.find(
+                        (t) => t.code === selectedCode
+                      );
+                      if (template) {
+                        addStatusCode(template);
+                        e.target.value = "";
+                      }
                     }
-                  }
-                }}
-                className="px-3 py-1 text-sm border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
-              >
-                <option value="">템플릿 선택...</option>
-                <optgroup label="Success">
-                  {statusCodeTemplates
-                    .filter((t) => t.type === "Success")
-                    .map((template) => (
-                      <option key={template.code} value={template.code}>
-                        {template.code} - {template.message}
-                      </option>
-                    ))}
-                </optgroup>
-                <optgroup label="Error">
-                  {statusCodeTemplates
-                    .filter((t) => t.type === "Error")
-                    .map((template) => (
-                      <option key={template.code} value={template.code}>
-                        {template.code} - {template.message}
-                      </option>
-                    ))}
-                </optgroup>
-              </select>
-              <button
-                onClick={() => addStatusCode()}
-                className="px-3 py-1 text-sm text-[#2563EB] font-medium border border-[#2563EB] rounded-md hover:bg-[#2563EB] hover:text-white transition-colors"
-              >
-                + Add Custom
-              </button>
-            </div>
+                  }}
+                  className="px-3 py-1 text-sm border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
+                >
+                  <option value="">템플릿 선택...</option>
+                  <optgroup label="Success">
+                    {statusCodeTemplates
+                      .filter((t) => t.type === "Success")
+                      .map((template) => (
+                        <option key={template.code} value={template.code}>
+                          {template.code} - {template.message}
+                        </option>
+                      ))}
+                  </optgroup>
+                  <optgroup label="Error">
+                    {statusCodeTemplates
+                      .filter((t) => t.type === "Error")
+                      .map((template) => (
+                        <option key={template.code} value={template.code}>
+                          {template.code} - {template.message}
+                        </option>
+                      ))}
+                  </optgroup>
+                </select>
+                <button
+                  onClick={() => addStatusCode()}
+                  className="px-3 py-1 text-sm text-[#2563EB] font-medium border border-[#2563EB] rounded-md hover:bg-[#2563EB] hover:text-white transition-colors"
+                >
+                  + Add Custom
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="overflow-x-auto">
@@ -202,7 +217,10 @@ export function ApiResponseCard({
                             updateStatusCode(index, "code", e.target.value)
                           }
                           placeholder="200"
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
+                          disabled={isReadOnly}
+                          className={`w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] ${
+                            isReadOnly ? "opacity-60 cursor-not-allowed" : ""
+                          }`}
                         />
                       </td>
                       <td className="px-4 py-3">
@@ -211,7 +229,10 @@ export function ApiResponseCard({
                           onChange={(e) =>
                             updateStatusCode(index, "type", e.target.value)
                           }
-                          className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
+                          disabled={isReadOnly}
+                          className={`px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] ${
+                            isReadOnly ? "opacity-60 cursor-not-allowed" : ""
+                          }`}
                         >
                           <option value="Success">Success</option>
                           <option value="Error">Error</option>
@@ -225,57 +246,229 @@ export function ApiResponseCard({
                             updateStatusCode(index, "message", e.target.value)
                           }
                           placeholder="예: 요청이 성공적으로 처리됨"
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
+                          disabled={isReadOnly}
+                          className={`w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] ${
+                            isReadOnly ? "opacity-60 cursor-not-allowed" : ""
+                          }`}
                         />
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => {
-                              setSelectedStatusCodeIndex(index);
-                              setIsResponseSchemaModalOpen(true);
-                            }}
-                            className="px-3 py-1.5 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] transition-colors"
-                          >
-                            {statusCode.schema?.ref
-                              ? `Schema: ${statusCode.schema.ref}`
-                              : statusCode.schema?.properties
-                              ? "Inline Schema"
-                              : "Schema 선택"}
-                          </button>
-                          {statusCode.schema && (
-                            <button
-                              onClick={() => {
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center gap-2">
+                            {/* Kind 선택 (Schema / Primitive / None) */}
+                            <select
+                              value={
+                                statusCode.schema?.ref || statusCode.schema?.properties
+                                  ? "schema"
+                                  : statusCode.schema?.type
+                                  ? "primitive"
+                                  : "none"
+                              }
+                              onChange={(e) => {
+                                if (isReadOnly) return;
                                 const updated = [...statusCodes];
-                                updated[index] = {
-                                  ...updated[index],
-                                  schema: undefined,
-                                };
+                                const kind = e.target.value;
+                                if (kind === "none") {
+                                  updated[index] = {
+                                    ...updated[index],
+                                    schema: undefined,
+                                  };
+                                } else if (kind === "primitive") {
+                                  updated[index] = {
+                                    ...updated[index],
+                                    schema: {
+                                      type: "string",
+                                      isArray: false,
+                                    },
+                                  };
+                                } else if (kind === "schema") {
+                                  // Schema 선택 시 빈 schema 객체로 설정하고 버튼만 보이게 함
+                                  updated[index] = {
+                                    ...updated[index],
+                                    schema: {
+                                      ref: undefined,
+                                      properties: undefined,
+                                    },
+                                  };
+                                }
                                 setStatusCodes(updated);
                               }}
-                              className="p-1 text-red-500 hover:text-red-600"
-                              title="Schema 제거"
+                              disabled={isReadOnly}
+                              className={`px-3 py-1.5 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] ${
+                                isReadOnly ? "opacity-60 cursor-not-allowed" : ""
+                              }`}
                             >
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
+                              <option value="none">None</option>
+                              <option value="schema">Schema</option>
+                              <option value="primitive">Primitive</option>
+                            </select>
+
+                            {/* Schema 선택 버튼 (Kind가 schema일 때 항상 표시) */}
+                            {(!statusCode.schema?.type && (statusCode.schema?.ref || statusCode.schema?.properties || statusCode.schema)) && (
+                              <button
+                                onClick={() => {
+                                  if (isReadOnly) return;
+                                  setSelectedStatusCodeIndex(index);
+                                  setIsResponseSchemaModalOpen(true);
+                                }}
+                                disabled={isReadOnly}
+                                className={`px-3 py-1.5 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] transition-colors min-w-[150px] text-left ${
+                                  isReadOnly ? "opacity-60 cursor-not-allowed" : ""
+                                }`}
                               >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M6 18L18 6M6 6l12 12"
+                                {statusCode.schema?.ref || "Select Schema..."}
+                              </button>
+                            )}
+
+                            {/* Primitive 타입 선택 */}
+                            {statusCode.schema?.type && !statusCode.schema?.ref && !statusCode.schema?.properties && (
+                              <select
+                                value={statusCode.schema.type}
+                                onChange={(e) => {
+                                  if (isReadOnly) return;
+                                  const updated = [...statusCodes];
+                                  updated[index] = {
+                                    ...updated[index],
+                                    schema: {
+                                      ...updated[index].schema!,
+                                      type: e.target.value,
+                                    },
+                                  };
+                                  setStatusCodes(updated);
+                                }}
+                                disabled={isReadOnly}
+                                className={`px-3 py-1.5 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] ${
+                                  isReadOnly ? "opacity-60 cursor-not-allowed" : ""
+                                }`}
+                              >
+                                <option value="string">string</option>
+                                <option value="integer">integer</option>
+                                <option value="number">number</option>
+                                <option value="boolean">boolean</option>
+                              </select>
+                            )}
+
+                            {/* Array 체크박스 */}
+                            {statusCode.schema && (
+                              <>
+                                <label className={`flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap ${
+                                  isReadOnly ? "opacity-60 cursor-not-allowed" : ""
+                                }`}>
+                                  <input
+                                    type="checkbox"
+                                    checked={statusCode.schema.isArray || false}
+                                    onChange={(e) => {
+                                      if (isReadOnly) return;
+                                      const updated = [...statusCodes];
+                                      updated[index] = {
+                                        ...updated[index],
+                                        schema: {
+                                          ...updated[index].schema!,
+                                          isArray: e.target.checked,
+                                        },
+                                      };
+                                      setStatusCodes(updated);
+                                    }}
+                                    disabled={isReadOnly}
+                                    className="w-3 h-3"
+                                    title="Array"
+                                  />
+                                  <span>Array</span>
+                                </label>
+                                <button
+                                  onClick={() => {
+                                    if (isReadOnly) return;
+                                    const updated = [...statusCodes];
+                                    updated[index] = {
+                                      ...updated[index],
+                                      schema: undefined,
+                                    };
+                                    setStatusCodes(updated);
+                                  }}
+                                  disabled={isReadOnly}
+                                  className={`p-1 text-red-500 hover:text-red-600 ${
+                                    isReadOnly ? "opacity-50 cursor-not-allowed" : ""
+                                  }`}
+                                  title="Clear"
+                                >
+                                  <svg
+                                    className="w-4 h-4"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M6 18L18 6M6 6l12 12"
+                                    />
+                                  </svg>
+                                </button>
+                              </>
+                            )}
+                          </div>
+                          {/* Array Items 개수 */}
+                          {statusCode.schema?.isArray && (
+                            <div className="flex items-center gap-2 text-xs">
+                              <label className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
+                                <span>Min:</span>
+                                <input
+                                  type="number"
+                                  value={statusCode.schema.minItems || ""}
+                                  onChange={(e) => {
+                                    if (isReadOnly) return;
+                                    const updated = [...statusCodes];
+                                    updated[index] = {
+                                      ...updated[index],
+                                      schema: {
+                                        ...updated[index].schema!,
+                                        minItems: e.target.value ? parseInt(e.target.value) : undefined,
+                                      },
+                                    };
+                                    setStatusCodes(updated);
+                                  }}
+                                  disabled={isReadOnly}
+                                  className={`w-16 px-2 py-1 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] ${
+                                    isReadOnly ? "opacity-60 cursor-not-allowed" : ""
+                                  }`}
+                                  placeholder="1"
+                                  min="0"
                                 />
-                              </svg>
-                            </button>
+                              </label>
+                              <label className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
+                                <span>Max:</span>
+                                <input
+                                  type="number"
+                                  value={statusCode.schema.maxItems || ""}
+                                  onChange={(e) => {
+                                    if (isReadOnly) return;
+                                    const updated = [...statusCodes];
+                                    updated[index] = {
+                                      ...updated[index],
+                                      schema: {
+                                        ...updated[index].schema!,
+                                        maxItems: e.target.value ? parseInt(e.target.value) : undefined,
+                                      },
+                                    };
+                                    setStatusCodes(updated);
+                                  }}
+                                  disabled={isReadOnly}
+                                  className={`w-16 px-2 py-1 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] ${
+                                    isReadOnly ? "opacity-60 cursor-not-allowed" : ""
+                                  }`}
+                                  placeholder="3"
+                                  min="1"
+                                />
+                              </label>
+                            </div>
                           )}
                         </div>
                       </td>
                       <td className="px-4 py-3">
                         <button
                           onClick={() => {
+                            if (isReadOnly) return;
                             if (expandedStatusCode === index) {
                               setExpandedStatusCode(null);
                             } else {
@@ -296,7 +489,10 @@ export function ApiResponseCard({
                               }
                             }
                           }}
-                          className="px-3 py-1.5 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] transition-colors flex items-center gap-1"
+                          disabled={isReadOnly}
+                          className={`px-3 py-1.5 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] transition-colors flex items-center gap-1 ${
+                            isReadOnly ? "opacity-60 cursor-not-allowed" : ""
+                          }`}
                         >
                           {statusCode.headers &&
                           statusCode.headers.length > 0 ? (
@@ -326,7 +522,10 @@ export function ApiResponseCard({
                       <td className="px-4 py-3">
                         <button
                           onClick={() => removeStatusCode(index)}
-                          className="p-2 text-red-500 hover:text-red-600"
+                          disabled={isReadOnly}
+                          className={`p-2 text-red-500 hover:text-red-600 ${
+                            isReadOnly ? "opacity-50 cursor-not-allowed" : ""
+                          }`}
                         >
                           <svg
                             className="w-5 h-5"
@@ -355,6 +554,7 @@ export function ApiResponseCard({
                               </h4>
                               <button
                                 onClick={() => {
+                                  if (isReadOnly) return;
                                   const updated = [...statusCodes];
                                   updated[index] = {
                                     ...updated[index],
@@ -365,7 +565,10 @@ export function ApiResponseCard({
                                   };
                                   setStatusCodes(updated);
                                 }}
-                                className="px-3 py-1 text-xs text-blue-600 dark:text-blue-400 border border-blue-600 dark:border-blue-400 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                disabled={isReadOnly}
+                                className={`px-3 py-1 text-xs text-blue-600 dark:text-blue-400 border border-blue-600 dark:border-blue-400 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 ${
+                                  isReadOnly ? "opacity-50 cursor-not-allowed" : ""
+                                }`}
                               >
                                 + Add Header
                               </button>
@@ -379,28 +582,37 @@ export function ApiResponseCard({
                                   type="text"
                                   value={header.key}
                                   onChange={(e) => {
+                                    if (isReadOnly) return;
                                     const updated = [...statusCodes];
                                     updated[index].headers![headerIndex].key =
                                       e.target.value;
                                     setStatusCodes(updated);
                                   }}
                                   placeholder="Header Key (e.g., Content-Type)"
-                                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                  disabled={isReadOnly}
+                                  className={`flex-1 px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                                    isReadOnly ? "opacity-60 cursor-not-allowed" : ""
+                                  }`}
                                 />
                                 <input
                                   type="text"
                                   value={header.value}
                                   onChange={(e) => {
+                                    if (isReadOnly) return;
                                     const updated = [...statusCodes];
                                     updated[index].headers![headerIndex].value =
                                       e.target.value;
                                     setStatusCodes(updated);
                                   }}
                                   placeholder="Header Value (e.g., application/json)"
-                                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                  disabled={isReadOnly}
+                                  className={`flex-1 px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                                    isReadOnly ? "opacity-60 cursor-not-allowed" : ""
+                                  }`}
                                 />
                                 <button
                                   onClick={() => {
+                                    if (isReadOnly) return;
                                     const updated = [...statusCodes];
                                     updated[index].headers = updated[
                                       index
@@ -409,7 +621,10 @@ export function ApiResponseCard({
                                     );
                                     setStatusCodes(updated);
                                   }}
-                                  className="p-2 text-red-500 hover:text-red-600"
+                                  disabled={isReadOnly}
+                                  className={`p-2 text-red-500 hover:text-red-600 ${
+                                    isReadOnly ? "opacity-50 cursor-not-allowed" : ""
+                                  }`}
                                 >
                                   <svg
                                     className="w-5 h-5"

@@ -110,6 +110,7 @@ export interface SchemaResponse {
   properties?: Record<string, SchemaField>;
   required?: string[];
   orders?: string[];
+  items?: any;  // array 타입일 경우
   xmlName?: string;
 }
 
@@ -538,6 +539,30 @@ export async function importYaml(file: File): Promise<ImportYamlResponse> {
   }
 
   return response.json();
+}
+
+/**
+ * YAML 파일 Export
+ * 백엔드에서 ourorest.yml 파일 전체 내용을 가져옵니다.
+ */
+export async function exportYaml(): Promise<string> {
+  const response = await fetch(`${API_BASE_URL}/export/yaml`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `YAML Export 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("YAML Export 실패:", { status: response.status });
+    throw new Error(errorMessage);
+  }
+
+  return response.text();
 }
 
 // Try 관련 API 인터페이스

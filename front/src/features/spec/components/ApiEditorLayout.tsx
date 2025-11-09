@@ -11,24 +11,28 @@ import { useSpecStore } from "../store/spec.store";
 import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
 import { useTestingStore } from "@/features/testing/store/testing.store";
 import axios from "axios";
+import { downloadMarkdown } from "../utils/markdownExporter";
+import { downloadYaml } from "../utils/yamlExporter";
 import {
-  downloadMarkdown,
-  exportAllToMarkdown,
-} from "../utils/markdownExporter";
-import { buildOpenApiYamlFromSpecs, downloadYaml } from "../utils/yamlExporter";
-import {
-  getAllRestApiSpecs,
-  getAllSchemas,
-  type GetAllSchemasResponse,
   importYaml,
   type ImportYamlResponse,
+  exportYaml,
 } from "../services/api";
 import {
   createRestApiSpec,
   updateRestApiSpec,
   deleteRestApiSpec,
   getRestApiSpec,
+  getSchema,
+  type RestApiSpecResponse,
 } from "../services/api";
+import {
+  convertRequestBodyToOpenAPI,
+  parseOpenAPIRequestBody,
+  parseOpenAPISchemaToSchemaField,
+} from "../utils/schemaConverter";
+import type { RequestBody } from "../types/schema.types";
+import { createPrimitiveField, isArraySchema, isRefSchema } from "../types/schema.types";
 
 interface KeyValuePair {
   key: string;
@@ -38,21 +42,6 @@ interface KeyValuePair {
   type?: string;
 }
 
-// Import RequestBody type from ApiRequestCard
-type RequestBody = {
-  type: "none" | "form-data" | "x-www-form-urlencoded" | "json" | "xml";
-  contentType: string;
-  fields: Array<{
-    key: string;
-    value: string;
-    type: string;
-    description?: string;
-    required?: boolean;
-    ref?: string; // 스키마 참조 시 사용 (예: "User")
-  }>;
-  schemaRef?: string; // 전체 스키마 참조 (예: "User")
-};
-
 interface StatusCode {
   code: string;
   type: "Success" | "Error";
@@ -61,6 +50,10 @@ interface StatusCode {
   schema?: {
     ref?: string; // 스키마 참조 (예: "User")
     properties?: Record<string, any>; // 인라인 스키마
+    type?: string; // Primitive 타입 (string, integer, number, boolean)
+    isArray?: boolean; // Array of Schema 여부
+    minItems?: number; // Array 최소 개수
+    maxItems?: number; // Array 최대 개수
   };
 }
 
@@ -81,13 +74,12 @@ export function ApiEditorLayout() {
     protocol: testProtocol,
     setProtocol: setTestProtocol,
     request,
-    setRequest,
     setResponse,
     isLoading,
     setIsLoading,
-    useDummyResponse,
-    setUseDummyResponse,
     setTryId,
+    authorization,
+    setAuthorization,
   } = useTestingStore();
   const [activeTab, setActiveTab] = useState<"form" | "test">("form");
   const [isCodeSnippetOpen, setIsCodeSnippetOpen] = useState(false);
@@ -99,6 +91,8 @@ export function ApiEditorLayout() {
   const [executionStatus, setExecutionStatus] = useState<
     "idle" | "running" | "completed" | "error"
   >("idle");
+  const [isAuthorizationInputOpen, setIsAuthorizationInputOpen] =
+    useState(false);
 
   // Diff가 있는지 확인 (boolean으로 명시적 변환)
   const hasDiff = !!(
@@ -108,8 +102,8 @@ export function ApiEditorLayout() {
   // Completed 상태인지 확인
   const isCompleted = selectedEndpoint?.progress?.toLowerCase() === "completed";
 
-  // 수정/삭제 불가능한 상태인지 확인 (completed이거나 diff가 있는 경우)
-  const isReadOnly = isCompleted || hasDiff;
+  // 수정/삭제 불가능한 상태인지 확인 (completed인 경우만, mock 상태는 diff가 있어도 수정/삭제 가능)
+  const isReadOnly = isCompleted;
 
   // 에러 메시지에서 localhost 주소 제거 및 사용자 친화적인 메시지로 변환
   const getErrorMessage = (error: unknown): string => {
@@ -187,10 +181,24 @@ export function ApiEditorLayout() {
         }
       }, 100);
     } else {
+      // selectedEndpoint가 없을 때 폼 초기화 (새로고침 시 하드코딩된 초기값 제거)
       setIsEditMode(false);
+      setMethod("POST");
+      setUrl("");
+      setTags("");
+      setDescription("");
+      setSummary("");
+      setQueryParams([]);
+      setRequestHeaders([]);
+      setRequestBody({
+        type: "none",
+        fields: [],
+      });
+      setAuth({ type: "none" });
+      setStatusCodes([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedEndpoint, activeTab]);
+  }, [selectedEndpoint?.id]);
 
   // Load endpoint data from backend
   const loadEndpointData = async (id: string) => {
@@ -204,6 +212,10 @@ export function ApiEditorLayout() {
     try {
       const response = await getRestApiSpec(id);
       const spec = response.data;
+
+      // 스펙 정보 저장 (CodeSnippetPanel에서 사용)
+      setCurrentSpec(spec);
+
       setMethod(spec.method);
       setUrl(spec.path);
       setDescription(spec.description || "");
@@ -241,7 +253,8 @@ export function ApiEditorLayout() {
             default:
               setAuth({ type: "none" });
           }
-          console.log("✓ Loaded security from backend:", schemeName);
+        } else {
+          setAuth({ type: "none" });
         }
       } else {
         setAuth({ type: "none" });
@@ -252,7 +265,6 @@ export function ApiEditorLayout() {
       const formQueryParams: KeyValuePair[] = [];
       const testHeaders: Array<{ key: string; value: string }> = [];
       const testQueryParams: Array<{ key: string; value: string }> = [];
-      let testBody = "";
 
       // Parameters를 헤더와 쿼리 파라미터로 분리
       if (spec.parameters && Array.isArray(spec.parameters)) {
@@ -261,7 +273,7 @@ export function ApiEditorLayout() {
             // 폼 state (편집용)
             formHeaders.push({
               key: param.name || "",
-              value: param.schema?.default || "",
+              value: param.schema?.default || param.example || "",
               required: param.required || false,
               description: param.description || "",
               type: param.schema?.type || "string",
@@ -275,7 +287,7 @@ export function ApiEditorLayout() {
             // 폼 state (편집용)
             formQueryParams.push({
               key: param.name || "",
-              value: param.schema?.default || "",
+              value: param.schema?.default || param.example || "",
               required: param.required || false,
               description: param.description || "",
               type: param.schema?.type || "string",
@@ -291,72 +303,272 @@ export function ApiEditorLayout() {
 
       // 폼 state 업데이트
       setQueryParams(formQueryParams);
-      setRequestHeaders(
-        formHeaders.length > 0
-          ? formHeaders
-          : [{ key: "Content-Type", value: "application/json" }]
-      );
+      setRequestHeaders(formHeaders);
 
-      // 기본 Content-Type 헤더 추가
-      if (!testHeaders.find((h) => h.key.toLowerCase() === "content-type")) {
-        testHeaders.unshift({ key: "Content-Type", value: "application/json" });
-      }
+      // RequestBody 처리 (새로운 schemaConverter 사용)
+      let loadedRequestBody: RequestBody = { type: "none", fields: [] };
 
-      // RequestBody 처리
-      if (spec.requestBody) {
+      if (spec.requestBody != null) {
         const reqBody = spec.requestBody as any;
-        if (reqBody.content && reqBody.content["application/json"]) {
-          const schema = reqBody.content["application/json"].schema;
-          if (schema && schema.properties) {
-            // 스키마에서 기본 JSON 객체 생성
-            const bodyObj: Record<string, any> = {};
-            Object.keys(schema.properties).forEach((key) => {
-              const prop = schema.properties[key];
-              if (prop.example !== undefined) {
-                bodyObj[key] = prop.example;
-              } else if (prop.type === "string") {
-                bodyObj[key] = prop.default || "string";
-              } else if (prop.type === "number" || prop.type === "integer") {
-                bodyObj[key] = prop.default || 0;
-              } else if (prop.type === "boolean") {
-                bodyObj[key] = prop.default || false;
-              }
-            });
-            testBody = JSON.stringify(bodyObj, null, 2);
-          }
-        } else if (reqBody.content) {
-          // 다른 content-type 처리 (예: text/plain)
+
+        if (reqBody.content && Object.keys(reqBody.content).length > 0) {
           const contentType = Object.keys(reqBody.content)[0];
-          const content = reqBody.content[contentType];
-          if (content.example !== undefined) {
-            testBody =
-              typeof content.example === "string"
-                ? content.example
-                : JSON.stringify(content.example, null, 2);
+
+          // 새로운 parseOpenAPIRequestBody 사용
+          const parsed = parseOpenAPIRequestBody(reqBody, contentType);
+
+          if (parsed) {
+            loadedRequestBody = parsed;
           }
         }
       }
 
-      // 테스트 스토어 업데이트
-      setRequest({
-        method: spec.method,
-        url: spec.path,
-        description: spec.description || spec.summary || "",
-        headers:
-          testHeaders.length > 0
-            ? testHeaders
-            : [{ key: "Content-Type", value: "application/json" }],
-        queryParams: testQueryParams,
-        body: testBody,
-      });
+      // schemaRef가 있으면 스키마를 조회해서 fields 채우기
+      if (
+        loadedRequestBody.schemaRef &&
+        (!loadedRequestBody.fields || loadedRequestBody.fields.length === 0)
+      ) {
+        try {
+          const schemaResponse = await getSchema(loadedRequestBody.schemaRef);
+          const schemaData = schemaResponse.data;
+
+          if (schemaData.properties) {
+            const fields = Object.entries(schemaData.properties).map(
+              ([key, propSchema]: [string, any]) => {
+                return parseOpenAPISchemaToSchemaField(key, propSchema);
+              }
+            );
+
+            // required 필드 설정
+            if (schemaData.required && Array.isArray(schemaData.required)) {
+              fields.forEach((field) => {
+                if (schemaData.required!.includes(field.key)) {
+                  field.required = true;
+                }
+              });
+            }
+
+            loadedRequestBody.fields = fields;
+          }
+        } catch {
+          // 스키마 조회 실패 시 무시
+        }
+      }
+
+      // rootSchemaType이 array이고 items가 ref인 경우 스키마 조회
+      if (loadedRequestBody.rootSchemaType && isArraySchema(loadedRequestBody.rootSchemaType)) {
+        if (isRefSchema(loadedRequestBody.rootSchemaType.items)) {
+          try {
+            const schemaResponse = await getSchema(loadedRequestBody.rootSchemaType.items.schemaName);
+            const schemaData = schemaResponse.data;
+
+            // 스키마의 properties를 items의 object schema로 변환
+            if (schemaData.properties) {
+              const properties = Object.entries(schemaData.properties).map(
+                ([key, propSchema]: [string, any]) => {
+                  return parseOpenAPISchemaToSchemaField(key, propSchema);
+                }
+              );
+
+              // required 필드 설정
+              if (schemaData.required && Array.isArray(schemaData.required)) {
+                properties.forEach((field) => {
+                  if (schemaData.required!.includes(field.key)) {
+                    field.required = true;
+                  }
+                });
+              }
+
+              // items를 object schema로 변환
+              loadedRequestBody.rootSchemaType = {
+                ...loadedRequestBody.rootSchemaType,
+                items: {
+                  kind: "object",
+                  properties,
+                },
+              };
+            }
+          } catch {
+            // 스키마 조회 실패 시 무시
+          }
+        }
+      }
+
+      // RequestBody state 업데이트
+      setRequestBody(loadedRequestBody);
+
+      // Responses 처리
+      const loadedStatusCodes: StatusCode[] = [];
+      if (spec.responses && typeof spec.responses === "object") {
+        // for...of 루프로 변경하여 비동기 처리 가능하게 함
+        for (const [code, response] of Object.entries(spec.responses)) {
+          if (!code || code.trim() === "") continue;
+
+          const responseData = response as any;
+
+          const statusCode: StatusCode = {
+            code: code,
+            type:
+              parseInt(code) >= 200 && parseInt(code) < 300
+                ? "Success"
+                : "Error",
+            message: responseData.description || "",
+          };
+
+          // Response headers 처리
+          if (
+            responseData.headers &&
+            typeof responseData.headers === "object"
+          ) {
+            statusCode.headers = Object.entries(responseData.headers).map(
+              ([key, header]: [string, any]) => ({
+                key: key,
+                value:
+                  (header as any).description ||
+                  (header as any).schema?.type ||
+                  "",
+              })
+            );
+          }
+
+          // Response schema 처리 - 모든 content type 확인
+          if (
+            responseData.content &&
+            typeof responseData.content === "object"
+          ) {
+            // 첫 번째 content type 사용 (보통 application/json)
+            const contentType = Object.keys(responseData.content)[0];
+            if (contentType) {
+              const content = responseData.content[contentType];
+              const schema = content?.schema;
+
+              if (schema) {
+                // Array 타입 감지
+                if (schema.type === "array" && schema.items) {
+                  const itemsSchema = schema.items;
+                  const itemsRef = itemsSchema.$ref || itemsSchema.ref;
+
+                  const schemaData: any = {
+                    isArray: true,
+                    minItems: schema.minItems,
+                    maxItems: schema.maxItems,
+                  };
+
+                  if (itemsRef) {
+                    // Array of Schema Reference
+                    let schemaName: string;
+                    if (
+                      typeof itemsRef === "string" &&
+                      itemsRef.includes("#/components/schemas/")
+                    ) {
+                      const refMatch = itemsRef.match(
+                        /#\/components\/schemas\/(.+)/
+                      );
+                      schemaName = refMatch ? refMatch[1] : itemsRef;
+                    } else {
+                      schemaName =
+                        typeof itemsRef === "string"
+                          ? itemsRef
+                          : String(itemsRef);
+                    }
+
+                    try {
+                      // 스키마 조회하여 properties 가져오기
+                      const schemaResponse = await getSchema(schemaName);
+                      const resolvedSchema = schemaResponse.data;
+
+                      schemaData.ref = schemaName;
+                      if (resolvedSchema.properties) {
+                        schemaData.properties = resolvedSchema.properties;
+                      }
+                    } catch (error) {
+                      console.error("⚠️ Response 스키마 조회 실패:", error);
+                      schemaData.ref = schemaName;
+                    }
+                  } else if (itemsSchema.properties) {
+                    // Array of Inline Schema
+                    schemaData.properties = itemsSchema.properties;
+                  } else if (itemsSchema.type) {
+                    // Array of Primitive Type
+                    schemaData.type = itemsSchema.type;
+                  }
+
+                  statusCode.schema = schemaData;
+                } else {
+                  // Non-array 타입
+                  const schemaRef = schema.$ref || schema.ref;
+                  if (schemaRef) {
+                    // Schema Reference
+                    let schemaName: string;
+                    if (
+                      typeof schemaRef === "string" &&
+                      schemaRef.includes("#/components/schemas/")
+                    ) {
+                      const refMatch = schemaRef.match(
+                        /#\/components\/schemas\/(.+)/
+                      );
+                      schemaName = refMatch ? refMatch[1] : schemaRef;
+                    } else {
+                      schemaName =
+                        typeof schemaRef === "string"
+                          ? schemaRef
+                          : String(schemaRef);
+                    }
+
+                    try {
+                      // 스키마 조회하여 properties 가져오기
+                      const schemaResponse = await getSchema(schemaName);
+                      const resolvedSchema = schemaResponse.data;
+
+                      if (resolvedSchema.properties) {
+                        statusCode.schema = {
+                          ref: schemaName,
+                          properties: resolvedSchema.properties,
+                        };
+                      } else {
+                        statusCode.schema = {
+                          ref: schemaName,
+                        };
+                      }
+                    } catch (error) {
+                      console.error("⚠️ Response 스키마 조회 실패:", error);
+                      statusCode.schema = {
+                        ref: schemaName,
+                      };
+                    }
+                  } else if (schema.properties) {
+                    // Inline Schema
+                    statusCode.schema = {
+                      properties: schema.properties,
+                    };
+                  } else if (schema.type) {
+                    // Primitive Type
+                    statusCode.schema = {
+                      type: schema.type,
+                    };
+                  }
+                }
+              }
+            }
+          }
+
+          loadedStatusCodes.push(statusCode);
+        }
+      }
+
+      // StatusCodes state 업데이트
+      setStatusCodes(loadedStatusCodes);
+
+      // 테스트 스토어 업데이트는 TestRequestPanel에서 처리하므로 여기서는 제거
+      // (TestRequestPanel에서 selectedEndpoint 변경 시 자동으로 로드됨)
     } catch (error) {
       console.error("API 스펙 로드 실패:", error);
       const errorMessage = getErrorMessage(error);
-      
+
       // 명세에 없는 내용일 경우 selectedEndpoint 초기화
       alert("명세에 없는 내용입니다. 선택된 엔드포인트가 존재하지 않습니다.");
       setSelectedEndpoint(null);
-      
+
       // 기존 에러 메시지는 콘솔에만 출력
       if (errorMessage) {
         console.error("상세 에러:", errorMessage);
@@ -368,6 +580,7 @@ export function ApiEditorLayout() {
   const [method, setMethod] = useState("POST");
   const [url, setUrl] = useState("");
   const [tags, setTags] = useState("");
+  const [currentSpec, setCurrentSpec] = useState<RestApiSpecResponse | null>(null);
   const [description, setDescription] = useState("");
   const [summary, setSummary] = useState("");
 
@@ -390,13 +603,10 @@ export function ApiEditorLayout() {
 
   // Request state
   const [queryParams, setQueryParams] = useState<KeyValuePair[]>([]);
-  const [requestHeaders, setRequestHeaders] = useState<KeyValuePair[]>([
-    { key: "Content-Type", value: "application/json" },
-  ]);
+  const [requestHeaders, setRequestHeaders] = useState<KeyValuePair[]>([]);
   const [requestBody, setRequestBody] = useState<RequestBody>({
-    type: "json",
-    contentType: "application/json",
-    fields: [{ key: "email", value: "string", type: "string" }],
+    type: "none",
+    fields: [],
   });
 
   // Response state
@@ -413,91 +623,6 @@ export function ApiEditorLayout() {
   const progressPercentage = totalEndpoints
     ? Math.round((completedEndpoints / totalEndpoints) * 100)
     : 0;
-
-  /**
-   * 프론트엔드 RequestBody를 OpenAPI RequestBody 구조로 변환
-   */
-  const convertRequestBodyToOpenAPI = (
-    frontendBody: RequestBody | null
-  ): {
-    description: string;
-    required: boolean;
-    content: Record<string, any>;
-  } | null => {
-    // null이거나 type이 "none"이면 null 반환
-    if (!frontendBody || frontendBody.type === "none") {
-      return null;
-    }
-
-    // Content-Type 결정
-    let contentType = "application/json";
-    if (frontendBody.type === "form-data") {
-      contentType = "multipart/form-data";
-    } else if (frontendBody.type === "x-www-form-urlencoded") {
-      contentType = "application/x-www-form-urlencoded";
-    } else if (frontendBody.type === "xml") {
-      contentType = "application/xml";
-    }
-
-    // 전체 스키마 참조가 있으면 ref만 사용
-    if (frontendBody.schemaRef) {
-      return {
-        description: "Request body",
-        required: true,
-        content: {
-          [contentType]: {
-            schema: {
-              ref: frontendBody.schemaRef,
-            },
-          },
-        },
-      };
-    }
-
-    // 인라인 스키마: fields를 OpenAPI properties로 변환
-    if (!frontendBody.fields || frontendBody.fields.length === 0) {
-      return null;
-    }
-
-    const properties: Record<string, any> = {};
-    const required: string[] = [];
-
-    frontendBody.fields.forEach((field) => {
-      if (field.key) {
-        const property: any = {
-          type: field.type || "string",
-        };
-
-        if (field.description) {
-          property.description = field.description;
-        }
-
-        if (field.value) {
-          property.mockExpression = field.value; // DataFaker 표현식
-        }
-
-        properties[field.key] = property;
-
-        if (field.required) {
-          required.push(field.key);
-        }
-      }
-    });
-
-    return {
-      description: "Request body",
-      required: required.length > 0,
-      content: {
-        [contentType]: {
-          schema: {
-            type: "object",
-            properties: properties,
-            required: required.length > 0 ? required : undefined,
-          },
-        },
-      },
-    };
-  };
 
   /**
    * queryParams를 OpenAPI parameters 구조로 변환
@@ -543,8 +668,6 @@ export function ApiEditorLayout() {
    * SecurityRequirement = { requirements: Map<String, List<String>> }
    */
   const convertAuthToSecurity = (): any[] => {
-    console.log("🔐 convertAuthToSecurity called, auth.type:", auth.type);
-
     if (auth.type === "none") {
       return [];
     }
@@ -574,7 +697,6 @@ export function ApiEditorLayout() {
     }
 
     if (!schemeName) {
-      console.warn("No schemeName matched for auth.type:", auth.type);
       return [];
     }
 
@@ -587,7 +709,6 @@ export function ApiEditorLayout() {
       },
     ];
 
-    console.log("✓ Converted security:", result);
     return result;
   };
 
@@ -605,31 +726,54 @@ export function ApiEditorLayout() {
       let schema: any;
 
       // StatusCode에 schema 정보가 있으면 사용
+      let baseSchema: any;
       if (code.schema) {
         if (code.schema.ref) {
-          // Reference 모드: ref만 전송
-          schema = {
+          // Reference 모드: ref로 전송 (백엔드에서 $ref로 변환)
+          baseSchema = {
             ref: code.schema.ref,
           };
         } else if (code.schema.properties) {
           // Inline 모드: properties 포함
-          schema = {
+          baseSchema = {
             type: "object",
             properties: code.schema.properties,
           };
+        } else if (code.schema.type) {
+          // Primitive 타입 (string, integer, number, boolean)
+          baseSchema = {
+            type: code.schema.type,
+          };
         } else {
           // 기본 schema
-          schema = {
+          baseSchema = {
             type: "object",
             properties: {},
           };
         }
       } else {
         // schema 정보가 없으면 기본 schema
-        schema = {
+        baseSchema = {
           type: "object",
           properties: {},
         };
+      }
+
+      // isArray가 true이면 array로 감싸기
+      if (code.schema?.isArray) {
+        schema = {
+          type: "array",
+          items: baseSchema,
+        };
+        // minItems/maxItems 추가
+        if (code.schema.minItems !== undefined) {
+          schema.minItems = code.schema.minItems;
+        }
+        if (code.schema.maxItems !== undefined) {
+          schema.maxItems = code.schema.maxItems;
+        }
+      } else {
+        schema = baseSchema;
       }
 
       const response: any = {
@@ -709,6 +853,9 @@ export function ApiEditorLayout() {
 
         // 사이드바 목록 다시 로드 (백그라운드에서)
         loadEndpoints();
+
+        // 저장 후 다시 로드하여 백엔드에서 최신 데이터 가져오기
+        await loadEndpointData(selectedEndpoint.id);
       } else {
         // 새 엔드포인트 생성
         const apiRequest = {
@@ -725,10 +872,6 @@ export function ApiEditorLayout() {
           responses: convertResponsesToOpenAPI(statusCodes),
           security: convertAuthToSecurity(),
         };
-
-        console.log("🔍 API Request:", JSON.stringify(apiRequest, null, 2));
-        console.log("🔐 Auth state:", auth);
-        console.log("🔐 Security:", apiRequest.security);
 
         const response = await createRestApiSpec(apiRequest);
 
@@ -749,7 +892,7 @@ export function ApiEditorLayout() {
         // 사이드바 목록 다시 로드
         await loadEndpoints();
 
-        // 수정된 엔드포인트를 다시 선택
+        // 생성된 엔드포인트를 선택하고 저장된 데이터 다시 로드
         const updatedEndpoint = {
           id: response.data.id,
           method,
@@ -760,6 +903,9 @@ export function ApiEditorLayout() {
           progress: "mock",
         };
         setSelectedEndpoint(updatedEndpoint);
+
+        // 생성 후 다시 로드하여 백엔드에서 최신 데이터 가져오기
+        await loadEndpointData(response.data.id);
       }
     } catch (error: unknown) {
       console.error("API 저장 실패:", error);
@@ -771,15 +917,9 @@ export function ApiEditorLayout() {
   const handleDelete = async () => {
     if (!selectedEndpoint) return;
 
-    // completed 상태이거나 diff가 있으면 삭제 불가
+    // completed 상태만 삭제 불가 (mock 상태는 diff가 있어도 삭제 가능)
     if (isCompleted) {
       alert("이미 완료(completed)된 API는 삭제할 수 없습니다.");
-      return;
-    }
-    if (hasDiff) {
-      alert(
-        "명세와 실제 구현이 불일치하는 API는 삭제할 수 없습니다.\n\n먼저 백엔드에서 실제 구현을 제거하거나, 불일치를 해결해주세요."
-      );
       return;
     }
 
@@ -806,15 +946,9 @@ export function ApiEditorLayout() {
   };
 
   const handleEdit = () => {
-    // completed 상태이거나 diff가 있으면 수정 불가
+    // completed 상태만 수정 불가 (mock 상태는 diff가 있어도 수정 가능)
     if (isCompleted) {
       alert("이미 완료(completed)된 API는 수정할 수 없습니다.");
-      return;
-    }
-    if (hasDiff) {
-      alert(
-        "명세와 실제 구현이 불일치하는 API는 수정할 수 없습니다.\n\n실제 구현에 맞춰 명세를 업데이트하려면 '실제 구현 → 명세에 자동 반영' 버튼을 사용하세요."
-      );
       return;
     }
     setIsEditMode(true);
@@ -835,11 +969,11 @@ export function ApiEditorLayout() {
       setDescription("");
       setSummary("");
       setQueryParams([]);
+      setRequestHeaders([]);
       setAuth({ type: "none" });
       setRequestBody({
         type: "json",
-        contentType: "application/json",
-        fields: [{ key: "email", value: "string", type: "string" }],
+        fields: [createPrimitiveField("email", "string")],
       });
       setStatusCodes([]);
     }
@@ -859,7 +993,6 @@ export function ApiEditorLayout() {
     setRequestHeaders([]);
     setRequestBody({
       type: "json",
-      contentType: "application/json",
       fields: [],
     });
     setStatusCodes([]);
@@ -920,17 +1053,33 @@ export function ApiEditorLayout() {
       )
     ) {
       try {
-        // TODO: 백엔드 API 엔드포인트 구현 필요
-        // 백엔드에서 실제 구현된 스펙을 가져와서 명세를 업데이트하는 API 호출
-        alert(
-          "기능 개발 중입니다.\n\n백엔드에서 실제 구현 → 명세 동기화 API가 필요합니다."
-        );
+        // 현재 엔드포인트의 정보를 백엔드에서 가져옴
+        const response = await getRestApiSpec(selectedEndpoint.id);
+        const spec = response.data;
 
-        // 예시: 향후 구현될 API 호출
-        // const response = await syncImplementationToSpec(selectedEndpoint.id);
-        // await loadEndpointData(selectedEndpoint.id);
-        // await loadEndpoints();
-        // alert("✅ 실제 구현이 명세에 성공적으로 반영되었습니다!");
+        // 현재 명세 정보를 그대로 업데이트 요청으로 전달
+        // 백엔드의 updateRestApiSpec 메서드에서 자동으로 x-ouroboros-diff를 "none"으로 설정함
+        const updateRequest = {
+          path: spec.path,
+          method: spec.method,
+          summary: spec.summary,
+          description: spec.description,
+          tags: spec.tags || [],
+          parameters: spec.parameters || [],
+          requestBody: spec.requestBody || undefined,
+          responses: spec.responses || {},
+          security: spec.security || [],
+        };
+
+        await updateRestApiSpec(selectedEndpoint.id, updateRequest);
+
+        // 엔드포인트 데이터 다시 로드하여 최신 상태 반영
+        await loadEndpointData(selectedEndpoint.id);
+
+        // 사이드바 목록도 다시 로드하여 diff 상태 업데이트
+        await loadEndpoints();
+
+        alert(" 실제 구현이 명세에 성공적으로 반영되었습니다!");
       } catch (error: unknown) {
         console.error("명세 동기화 실패:", error);
         const errorMessage = getErrorMessage(error);
@@ -945,71 +1094,109 @@ export function ApiEditorLayout() {
     setResponse(null);
 
     try {
-      if (useDummyResponse) {
-        // Dummy Response 사용
-        setTimeout(() => {
-          const dummyResponse = {
-            status: 200,
-            statusText: "OK",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Request-ID": "req-123456",
-            },
-            body: JSON.stringify(
-              {
-                token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.mock.token",
-                user: {
-                  id: "123",
-                  email: "test@example.com",
-                  name: "Test User",
-                },
-              },
-              null,
-              2
-            ),
-            responseTime: Math.floor(Math.random() * 200) + 50, // 50-250ms
-          };
-          setResponse(dummyResponse);
-          setExecutionStatus("completed");
-          setIsLoading(false);
-        }, 500);
-      } else {
-        // 실제 API 호출
-        const startTime = performance.now();
+      // 실제 API 호출 (Mock 엔드포인트는 백엔드에서 faker data 기반 응답 생성, Completed 엔드포인트는 실제 응답)
+      const startTime = performance.now();
 
-        // 헤더 변환
-        const headers: Record<string, string> = {};
-        request.headers.forEach((h) => {
-          if (h.key && h.value) {
-            headers[h.key] = h.value;
-          }
-        });
-
-        // X-Ouroboros-Try:on 헤더 추가
-        headers["X-Ouroboros-Try"] = "on";
-
-        // Query 파라미터 추가
-        let url = request.url;
-        if (request.queryParams.length > 0) {
-          const queryString = request.queryParams
-            .filter((p) => p.key && p.value)
-            .map(
-              (p) =>
-                `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`
-            )
-            .join("&");
-          if (queryString) {
-            url += `?${queryString}`;
-          }
+      // 헤더 변환
+      const headers: Record<string, string> = {};
+      request.headers.forEach((h) => {
+        if (h.key && h.value) {
+          headers[h.key] = h.value;
         }
+      });
 
-        // URL이 상대 경로인 경우 그대로 사용 (Vite 프록시 사용)
-        // 절대 URL(http://로 시작)인 경우에만 그대로 사용
-        const fullUrl = url.startsWith("http") ? url : url;
+      // Authorization 헤더 추가 (입력된 경우)
+      if (authorization && authorization.trim()) {
+        headers["Authorization"] = authorization.trim();
+      }
 
-        // Request body 파싱 (GET 메서드가 아니고 body가 있을 때만)
-        let requestData = undefined;
-        if (request.method !== "GET" && request.body && request.body.trim()) {
+      // X-Ouroboros-Try:on 헤더 추가
+      headers["X-Ouroboros-Try"] = "on";
+
+      // Query 파라미터 추가
+      let url = request.url;
+      if (request.queryParams.length > 0) {
+        const queryString = request.queryParams
+          .filter((p) => p.key && p.value)
+          .map(
+            (p) => `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`
+          )
+          .join("&");
+        if (queryString) {
+          url += `?${queryString}`;
+        }
+      }
+
+      // URL이 상대 경로인 경우 그대로 사용 (Vite 프록시 사용)
+      // 절대 URL(http://로 시작)인 경우에만 그대로 사용
+      const fullUrl = url.startsWith("http") ? url : url;
+
+      // Request body 파싱 (GET 메서드가 아니고 body가 있을 때만)
+      let requestData: any = undefined;
+      if (request.method !== "GET" && request.body && request.body.trim()) {
+        const contentTypeHeader = request.headers.find(
+          (h) => h.key.toLowerCase() === "content-type"
+        );
+        const contentType = contentTypeHeader?.value || "application/json";
+
+        if (contentType.includes("multipart/form-data")) {
+          // FormData로 변환
+          const formData = new FormData();
+          try {
+            const bodyObj = JSON.parse(request.body);
+            Object.entries(bodyObj).forEach(([key, value]) => {
+              if (value !== undefined && value !== null) {
+                if (value instanceof File) {
+                  formData.append(key, value);
+                } else if (Array.isArray(value)) {
+                  value.forEach((item) => {
+                    if (item instanceof File) {
+                      formData.append(key, item);
+                    } else {
+                      formData.append(key, String(item));
+                    }
+                  });
+                } else {
+                  formData.append(key, String(value));
+                }
+              }
+            });
+            requestData = formData;
+            // FormData는 Content-Type을 자동으로 설정하므로 헤더에서 제거
+            delete headers["Content-Type"];
+          } catch (e) {
+            console.error("FormData 변환 실패:", e);
+            throw new Error("FormData 변환에 실패했습니다.");
+          }
+        } else if (contentType.includes("application/x-www-form-urlencoded")) {
+          // URLSearchParams로 변환
+          const params = new URLSearchParams();
+          try {
+            const bodyObj = JSON.parse(request.body);
+            Object.entries(bodyObj).forEach(([key, value]) => {
+              if (value !== undefined && value !== null) {
+                if (Array.isArray(value)) {
+                  value.forEach((item) => {
+                    params.append(key, String(item));
+                  });
+                } else {
+                  params.append(key, String(value));
+                }
+              }
+            });
+            requestData = params.toString();
+          } catch (e) {
+            console.error("URLSearchParams 변환 실패:", e);
+            throw new Error("URL-encoded 변환에 실패했습니다.");
+          }
+        } else if (
+          contentType.includes("application/xml") ||
+          contentType.includes("text/xml")
+        ) {
+          // XML은 문자열 그대로 전송
+          requestData = request.body;
+        } else {
+          // JSON (기본)
           try {
             requestData = JSON.parse(request.body);
           } catch (e) {
@@ -1021,42 +1208,35 @@ export function ApiEditorLayout() {
             );
           }
         }
-
-        console.log("API 요청 전송:", {
-          method: request.method,
-          url: fullUrl,
-          headers,
-          data: requestData,
-        });
-
-        const response = await axios({
-          method: request.method,
-          url: fullUrl,
-          headers: headers,
-          data: requestData,
-        });
-
-        const endTime = performance.now();
-        const responseTime = Math.round(endTime - startTime);
-
-        // 응답 헤더에서 X-Ouroboros-Try-Id 추출
-        const responseHeaders = response.headers as Record<string, string>;
-        const tryIdValue =
-          responseHeaders["x-ouroboros-try-id"] ||
-          responseHeaders["X-Ouroboros-Try-Id"];
-        if (tryIdValue) {
-          setTryId(tryIdValue);
-        }
-
-        setResponse({
-          status: response.status,
-          statusText: response.statusText,
-          headers: responseHeaders,
-          body: JSON.stringify(response.data, null, 2),
-          responseTime,
-        });
-        setExecutionStatus("completed");
       }
+
+      const response = await axios({
+        method: request.method,
+        url: fullUrl,
+        headers: headers,
+        data: requestData,
+      });
+
+      const endTime = performance.now();
+      const responseTime = Math.round(endTime - startTime);
+
+      // 응답 헤더에서 X-Ouroboros-Try-Id 추출
+      const responseHeaders = response.headers as Record<string, string>;
+      const tryIdValue =
+        responseHeaders["x-ouroboros-try-id"] ||
+        responseHeaders["X-Ouroboros-Try-Id"];
+      if (tryIdValue) {
+        setTryId(tryIdValue);
+      }
+
+      setResponse({
+        status: response.status,
+        statusText: response.statusText,
+        headers: responseHeaders,
+        body: JSON.stringify(response.data, null, 2),
+        responseTime,
+      });
+      setExecutionStatus("completed");
     } catch (error) {
       console.error("API 요청 실패:", error);
       const endTime = performance.now();
@@ -1173,23 +1353,25 @@ export function ApiEditorLayout() {
                       d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
                     />
                   </svg>
-                  <span className="hidden sm:inline">Import</span>
                 </button>
                 <button
                   onClick={async () => {
                     try {
-                      const res = await getAllRestApiSpecs();
-                      const md = exportAllToMarkdown(res.data);
+                      const yaml = await exportYaml();
+                      const { convertYamlToMarkdown } = await import(
+                        "../utils/markdownExporter"
+                      );
+                      const md = convertYamlToMarkdown(yaml);
                       downloadMarkdown(
                         md,
-                        `ALL_APIS_${new Date().getTime()}.md`
+                        `API_DOCUMENTATION_${new Date().getTime()}.md`
                       );
                       alert("Markdown 파일이 다운로드되었습니다.");
                     } catch (e) {
                       console.error("Markdown 내보내기 오류:", e);
                       const errorMsg = getErrorMessage(e);
                       alert(
-                        `전체 Markdown 내보내기에 실패했습니다.\n오류: ${errorMsg}`
+                        `Markdown 내보내기에 실패했습니다.\n오류: ${errorMsg}`
                       );
                     }
                   }}
@@ -1209,40 +1391,20 @@ export function ApiEditorLayout() {
                       d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                     />
                   </svg>
-                  <span className="hidden sm:inline">Export</span>
                 </button>
                 <button
                   onClick={async () => {
                     try {
-                      const [specsRes, schemasRes] = await Promise.all([
-                        getAllRestApiSpecs(),
-                        getAllSchemas().catch((error) => {
-                          console.warn(
-                            "Schema 조회 실패, 빈 배열로 계속 진행:",
-                            error.message
-                          );
-                          return {
-                            status: 200,
-                            data: [],
-                            message: "Schema 조회 실패",
-                          } as GetAllSchemasResponse;
-                        }),
-                      ]);
-                      const yaml = buildOpenApiYamlFromSpecs(
-                        specsRes.data,
-                        (schemasRes as GetAllSchemasResponse).data
-                      );
+                      const yaml = await exportYaml();
                       downloadYaml(
                         yaml,
-                        `ALL_APIS_${new Date().getTime()}.yml`
+                        `ourorest_${new Date().getTime()}.yml`
                       );
                       alert("YAML 파일이 다운로드되었습니다.");
                     } catch (e) {
                       console.error("YAML 내보내기 오류:", e);
                       const errorMsg = getErrorMessage(e);
-                      alert(
-                        `전체 YAML 내보내기에 실패했습니다.\n오류: ${errorMsg}`
-                      );
+                      alert(`YAML 내보내기에 실패했습니다.\n오류: ${errorMsg}`);
                     }
                   }}
                   className="px-3 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-colors text-sm font-medium flex items-center gap-2"
@@ -1267,46 +1429,104 @@ export function ApiEditorLayout() {
                       d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
                     />
                   </svg>
-                  <span className="hidden sm:inline">Generate</span>
-                </button>
-                <button
-                  onClick={() => setIsCodeSnippetOpen(true)}
-                  className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2"
-                  title="Code Snippet 보기"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
-                    />
-                  </svg>
-                  Code Snippet
                 </button>
               </div>
             </div>
           ) : (
             // 테스트 폼일 때 버튼들
             <div className="flex flex-wrap items-center gap-2">
-              {/* Use Dummy Response Checkbox */}
-              <label className="flex items-center gap-2 cursor-pointer px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-transparent hover:bg-gray-50 dark:hover:bg-[#161B22] transition-colors">
-                <input
-                  type="checkbox"
-                  checked={useDummyResponse}
-                  onChange={(e) => setUseDummyResponse(e.target.checked)}
-                  className="w-4 h-4 text-[#2563EB] bg-white dark:bg-[#0D1117] border-gray-300 dark:border-[#2D333B] rounded focus:ring-[#2563EB] focus:ring-1"
-                />
-                <span className="text-sm font-medium text-gray-900 dark:text-[#E6EDF3]">
-                  Use Dummy Response
-                </span>
-              </label>
-
+              {/* Authorization Button & Input */}
+              <div className="relative flex items-center gap-2">
+                {!isAuthorizationInputOpen ? (
+                  <button
+                    onClick={() => setIsAuthorizationInputOpen(true)}
+                    className={`px-3 py-2 rounded-md border transition-colors text-sm font-medium flex items-center gap-2 ${
+                      authorization && authorization.trim()
+                        ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300"
+                        : "bg-white dark:bg-[#0D1117] border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22]"
+                    }`}
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                      />
+                    </svg>
+                    {authorization && authorization.trim() ? (
+                      <span className="flex items-center gap-1">
+                        <svg
+                          className="w-4 h-4 text-green-500"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                        Auth
+                      </span>
+                    ) : (
+                      <span>Auth</span>
+                    )}
+                  </button>
+                ) : (
+                  <div className="relative flex items-center">
+                    <input
+                      type="text"
+                      value={authorization}
+                      onChange={(e) => setAuthorization(e.target.value)}
+                      onBlur={() => {
+                        // 입력이 완료되면 입력창 숨김
+                        if (authorization && authorization.trim()) {
+                          setIsAuthorizationInputOpen(false);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          // Enter 키를 누르면 입력창 숨김
+                          if (authorization && authorization.trim()) {
+                            setIsAuthorizationInputOpen(false);
+                          }
+                        } else if (e.key === "Escape") {
+                          // Escape 키를 누르면 입력창 숨김
+                          setIsAuthorizationInputOpen(false);
+                        }
+                      }}
+                      placeholder="Authorization"
+                      autoFocus
+                      className="px-3 py-2 pr-10 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm w-64"
+                    />
+                    {authorization && authorization.trim() && (
+                      <div className="absolute right-3 flex items-center">
+                        <svg
+                          className="w-5 h-5 text-green-500"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
               {/* Run Button */}
               <button
                 onClick={handleRun}
@@ -1441,10 +1661,11 @@ export function ApiEditorLayout() {
               </div>
             )}
 
-            {/* Diff Notification - 불일치가 있을 때만 표시 */}
+            {/* Diff Notification - 불일치가 있을 때만 표시 (completed 또는 mock 상태 모두) */}
             {protocol === "REST" && selectedEndpoint && hasDiff && (
               <DiffNotification
                 diff={selectedEndpoint.diff || "none"}
+                progress={selectedEndpoint.progress}
                 onSyncToSpec={handleSyncDiffToSpec}
               />
             )}
@@ -1452,21 +1673,46 @@ export function ApiEditorLayout() {
             {/* Method + URL Card */}
             {protocol === "REST" && (
               <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm mb-6">
-                <div className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3] mb-2 flex items-center gap-2">
-                  <svg
-                    className="h-4 w-4 text-gray-500 dark:text-[#8B949E]"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                    />
-                  </svg>
-                  <span>Method & URL</span>
+                <div className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3] mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <svg
+                      className="h-4 w-4 text-gray-500 dark:text-[#8B949E]"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
+                    </svg>
+                    <span>Method & URL</span>
+                  </div>
+                  {/* Code Snippet 버튼 - 생성 완료된 명세서에서만 활성화 (수정 중일 때는 숨김) */}
+                  {selectedEndpoint && !isEditMode && (
+                    <button
+                      onClick={() => setIsCodeSnippetOpen(true)}
+                      className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2"
+                      title="Code Snippet 보기"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
+                        />
+                      </svg>
+                      <span className="hidden sm:inline">Code Snippet</span>
+                    </button>
+                  )}
                 </div>
                 <p className="text-xs text-gray-600 dark:text-[#8B949E] mb-4">
                   HTTP 메서드와 엔드포인트 URL을 입력하세요
@@ -1507,18 +1753,43 @@ export function ApiEditorLayout() {
                         </svg>
                       </div>
                     </div>
-                    <input
-                      type="text"
-                      value={url}
-                      onChange={(e) => setUrl(e.target.value)}
-                      placeholder="예: /api/users, /api/auth/login"
-                      disabled={!!(selectedEndpoint && !isEditMode)}
-                      className={`flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm font-mono ${
-                        selectedEndpoint && !isEditMode
-                          ? "opacity-60 cursor-not-allowed"
-                          : ""
-                      }`}
-                    />
+                    <div className="relative flex-1">
+                      <input
+                        type="text"
+                        value={url}
+                        onChange={(e) => setUrl(e.target.value)}
+                        placeholder="예: /api/users, /api/auth/login"
+                        disabled={!!(selectedEndpoint && !isEditMode)}
+                        className={`w-full px-3 py-2 ${
+                          hasDiff ? "pr-10" : ""
+                        } rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm font-mono ${
+                          selectedEndpoint && !isEditMode
+                            ? "opacity-60 cursor-not-allowed"
+                            : ""
+                        }`}
+                      />
+                      {/* Diff 주의 표시 아이콘 (URL 우측) */}
+                      {hasDiff && (
+                        <div
+                          className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"
+                          title="명세와 실제 구현이 일치하지 않습니다"
+                        >
+                          <svg
+                            className="w-4 h-4 text-amber-500"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                            />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Method Badge */}
@@ -1669,13 +1940,7 @@ export function ApiEditorLayout() {
                       ? "bg-gray-200 dark:bg-[#161B22] text-gray-400 dark:text-[#8B949E] cursor-not-allowed"
                       : "bg-[#2563EB] hover:bg-[#1E40AF] text-white"
                   }`}
-                  title={
-                    isCompleted
-                      ? "완료된 API는 수정할 수 없습니다"
-                      : hasDiff
-                      ? "불일치가 있는 API는 수정할 수 없습니다"
-                      : ""
-                  }
+                  title={isCompleted ? "완료된 API는 수정할 수 없습니다" : ""}
                 >
                   수정
                 </button>
@@ -1687,13 +1952,7 @@ export function ApiEditorLayout() {
                       ? "bg-gray-200 dark:bg-[#161B22] text-gray-400 dark:text-[#8B949E] cursor-not-allowed"
                       : "bg-red-500 hover:bg-red-600 text-white"
                   }`}
-                  title={
-                    isCompleted
-                      ? "완료된 API는 삭제할 수 없습니다"
-                      : hasDiff
-                      ? "불일치가 있는 API는 삭제할 수 없습니다"
-                      : ""
-                  }
+                  title={isCompleted ? "완료된 API는 삭제할 수 없습니다" : ""}
                 >
                   삭제
                 </button>
@@ -1726,10 +1985,7 @@ export function ApiEditorLayout() {
       <CodeSnippetPanel
         isOpen={isCodeSnippetOpen}
         onClose={() => setIsCodeSnippetOpen(false)}
-        method={method}
-        url={url}
-        headers={requestHeaders}
-        requestBody={requestBody}
+        spec={currentSpec}
       />
 
       {/* Import Result Modal */}

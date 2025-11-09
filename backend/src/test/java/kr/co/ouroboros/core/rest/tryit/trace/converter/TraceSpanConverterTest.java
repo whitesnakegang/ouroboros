@@ -1,6 +1,6 @@
 package kr.co.ouroboros.core.rest.tryit.trace.converter;
 
-import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.tempo.model.TraceDTO;
+import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.model.TraceDTO;
 import kr.co.ouroboros.core.rest.tryit.trace.dto.TraceSpanInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

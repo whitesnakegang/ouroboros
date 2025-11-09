@@ -58,10 +58,10 @@ public class ResponseComparator {
 
             // 스캔 스펙에는 있는데 파일 스펙에는 없는 경우
             if (fileResponse == null) {
-                log.info("[RESPONSE MISSING] {} {} - Response-Status {}: File spec에 해당 상태코드 응답이 없습니다. 스캔된 응답을 추가합니다.",
+                log.debug("[RESPONSE MISSING] {} {} - Response-Status {}: File spec에 해당 상태코드 응답이 없습니다. 불일치로 판정합니다.",
                         url, method, statusCode);
-                fileResponses.put(statusCode, scannedResponse);
-                continue;
+                hasMismatch = true;
+                break;
             }
 
             // 둘 다 같은 상태코드에 대한 Response가 있는 경우, 응답 스키마 비교
@@ -72,6 +72,7 @@ public class ResponseComparator {
             } else {
                 log.debug("[RESPONSE MISMATCH] {} {} - Status {}: 응답 형식이 일치하지 않습니다.", url, method, statusCode);
                 hasMismatch = true;
+                break;
             }
         }
 
@@ -139,54 +140,40 @@ public class ResponseComparator {
             return false;
         }
 
-        // 스캔된 문서의 각 Content Type에 대해 비교
+        // Content-type은 무시하고 schema만 비교
+        // scan 스펙의 각 MediaType의 schema가 file 스펙의 모든 MediaType의 schema 중 하나와 일치하는지 확인
         for (Map.Entry<String, MediaType> scannedEntry : scannedContent.entrySet()) {
-            String contentType = scannedEntry.getKey();
             MediaType scannedMediaType = scannedEntry.getValue();
-            MediaType fileMediaType = fileContent.get(contentType);
-
-            if (fileMediaType == null) {
-                // */*는 모든 content-type과 일치한다고 간주
-                if ("*/*".equals(contentType)) {
-                    log.debug("[CONTENT TYPE WILDCARD] {} {} - Status {}: Content-Type '*/*'는 모든 타입과 일치합니다.",
-                            endpoint, method, statusCode);
+            if (scannedMediaType == null || scannedMediaType.getSchema() == null) {
+                continue;
+            }
+            
+            Schema scannedSchema = scannedMediaType.getSchema();
+            boolean schemaMatched = false;
+            
+            // file 스펙의 모든 MediaType의 schema와 비교
+            for (Map.Entry<String, MediaType> fileEntry : fileContent.entrySet()) {
+                MediaType fileMediaType = fileEntry.getValue();
+                if (fileMediaType == null || fileMediaType.getSchema() == null) {
                     continue;
                 }
-                log.debug("[CONTENT TYPE MISSING] {} {} - Status {}: Content-Type {}가 파일 스펙에 없습니다.",
-                        endpoint, method, statusCode, contentType);
-                return false;
+                
+                Schema fileSchema = fileMediaType.getSchema();
+                if (compareSchemas(scannedSchema, fileSchema, method, endpoint, statusCode, null, schemaMatchResults)) {
+                    schemaMatched = true;
+                    break;
+                }
             }
-
-            if (!compareMediaTypes(scannedMediaType, fileMediaType, method, endpoint, statusCode, contentType, schemaMatchResults)) {
+            
+            // scan 스펙의 schema가 file 스펙의 어떤 schema와도 일치하지 않으면 false
+            if (!schemaMatched) {
+                log.debug("[SCHEMA MISMATCH] {} {} - Status {}: 스캔 스펙의 schema가 파일 스펙의 어떤 schema와도 일치하지 않습니다.",
+                        endpoint, method, statusCode);
                 return false;
             }
         }
 
         return true;
-    }
-
-    /**
-     * Compare two MediaType objects' schemas for a given response context.
-     *
-     * @param scannedMediaType   the scanned (baseline) MediaType
-     * @param fileMediaType      the file-based MediaType to compare against
-     * @param method             the HTTP method of the response
-     * @param endpoint           the endpoint path of the response
-     * @param statusCode         the HTTP status code of the response
-     * @param contentType        the Content-Type being compared
-     * @param schemaMatchResults a map of schema name to match result used to short-circuit referenced-schema comparisons
-     * @return `true` if the MediaType schemas match, `false` otherwise
-     */
-    private boolean compareMediaTypes(MediaType scannedMediaType, MediaType fileMediaType, HttpMethod method, String endpoint, String statusCode, String contentType,
-            Map<String, Boolean> schemaMatchResults) {
-        if (scannedMediaType == null && fileMediaType == null) {
-            return true;
-        }
-        if (scannedMediaType == null || fileMediaType == null) {
-            return false;
-        }
-
-        return compareSchemas(scannedMediaType.getSchema(), fileMediaType.getSchema(), method, endpoint, statusCode, contentType, schemaMatchResults);
     }
 
     /**
@@ -208,16 +195,16 @@ public class ResponseComparator {
             return true;
         }
         if (scannedSchema == null || fileSchema == null) {
-            log.debug("[SCHEMA NULL MISMATCH] {} {} - Status {}, Content-Type '{}': 한쪽 스키마가 null입니다.",
-                    endpoint, method, statusCode, contentType);
+            log.debug("[SCHEMA NULL MISMATCH] {} {} - Status {}: 한쪽 스키마가 null입니다.",
+                    endpoint, method, statusCode);
             return false;
         }
 
         // $ref 비교 (객체 참조인 경우)
         if (scannedSchema.getRef() != null || fileSchema.getRef() != null) {
             if (!Objects.equals(scannedSchema.getRef(), fileSchema.getRef())) {
-                log.debug("[SCHEMA REF MISMATCH] {} {} - Status {}, Content-Type '{}': $ref가 다릅니다. (스캔: {}, 파일: {})",
-                        endpoint, method, statusCode, contentType, scannedSchema.getRef(), fileSchema.getRef());
+                log.debug("[SCHEMA REF MISMATCH] {} {} - Status {}: $ref가 다릅니다. (스캔: {}, 파일: {})",
+                        endpoint, method, statusCode, scannedSchema.getRef(), fileSchema.getRef());
                 return false;
             }
 
@@ -227,8 +214,8 @@ public class ResponseComparator {
                 if (schemaName != null && schemaMatchResults.containsKey(schemaName)) {
                     boolean schemaMatch = schemaMatchResults.get(schemaName);
                     if (!schemaMatch) {
-                        log.debug("[SCHEMA REF MISMATCH] {} {} - Status {}, Content-Type '{}': 참조하는 스키마 '{}'가 일치하지 않습니다.",
-                                endpoint, method, statusCode, contentType, schemaName);
+                        log.debug("[SCHEMA REF MISMATCH] {} {} - Status {}: 참조하는 스키마 '{}'가 일치하지 않습니다.",
+                                endpoint, method, statusCode, schemaName);
                         return false;
                     }
                 }
@@ -237,8 +224,8 @@ public class ResponseComparator {
         // type 비교 (기본 타입인 경우)
         else {
             if (!Objects.equals(scannedSchema.getType(), fileSchema.getType())) {
-                log.debug("[SCHEMA TYPE MISMATCH] {} {} - Status {}, Content-Type '{}': 타입이 다릅니다. (스캔: {}, 파일: {})",
-                        endpoint, method, statusCode, contentType, scannedSchema.getType(), fileSchema.getType());
+                log.debug("[SCHEMA TYPE MISMATCH] {} {} - Status {}: 타입이 다릅니다. (스캔: {}, 파일: {})",
+                        endpoint, method, statusCode, scannedSchema.getType(), fileSchema.getType());
                 return false;
             }
         }

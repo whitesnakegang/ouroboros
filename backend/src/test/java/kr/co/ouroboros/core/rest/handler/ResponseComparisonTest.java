@@ -2,6 +2,7 @@ package kr.co.ouroboros.core.rest.handler;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -121,10 +122,10 @@ public class ResponseComparisonTest {
     }
     
     /**
-     * content-type이 다른 경우
-     * expect: 불일치판정
-     * diff : response
-     * progress : mock
+     * content-type이 다른 경우 (하지만 schema는 같은 경우)
+     * expect: content-type은 무시하고 schema만 비교하므로 일치 판정
+     * diff : none
+     * progress : completed
      */
     @Test
     public void Content_type이_다른_경우() throws Exception {
@@ -144,9 +145,9 @@ public class ResponseComparisonTest {
         // 응답 비교 실행
         responseComparator.compareResponsesForMethod("/api/test/content-type", HttpMethod.GET, scannedOperation, fileOperation, schemaMatchResults);
 
-        // 검증: content-type이 다르면 불일치 판정
-        assertEquals("response", fileOperation.getXOuroborosDiff(), "content-type이 다르면 diff는 'response'가 되어야 합니다.");
-        assertEquals("mock", fileOperation.getXOuroborosProgress(), "불일치면 completed였던 progress는 mock으로 바뀌어야 합니다.");
+        // 검증: content-type은 무시하고 schema만 비교하므로, schema가 같으면 일치 판정
+        assertEquals("none", fileOperation.getXOuroborosDiff(), "content-type은 무시하고 schema만 비교하므로, schema가 같으면 diff는 'none'이어야 합니다.");
+        assertEquals("completed", fileOperation.getXOuroborosProgress(), "schema가 같으면 progress는 'completed'여야 합니다.");
     }
     
     /**
@@ -180,9 +181,9 @@ public class ResponseComparisonTest {
     
     /**
      *  스캔스펙에_추가적인_status가_존재하고_나머지_status는_모두_일치하는_경우
-     *  expect: 파일스팩에 추가하고 일치 판정
-     *  diff: none
-     *  progress: completed
+     *  expect: 스캔 스펙에만 있는 status는 추가하지 않고 불일치 판정
+     *  diff: response
+     *  progress: mock
      * @throws Exception
      */
     @Test
@@ -200,11 +201,13 @@ public class ResponseComparisonTest {
 
         responseComparator.compareResponsesForMethod("/p", HttpMethod.GET, scannedOperation, fileOperation, new HashMap<>());
 
-        // 201이 추가되고 diff/progress는 변하지 않음
-        assertNotNull(fileOperation.getResponses()
-                .get("201"));
-        assertEquals("none", fileOperation.getXOuroborosDiff());
-        assertEquals("completed", fileOperation.getXOuroborosProgress());
+        // 201이 추가되지 않아야 함
+        assertNotNull(fileOperation.getResponses());
+        assertNotNull(fileOperation.getResponses().get("200"), "200 status는 존재해야 합니다.");
+        assertNull(fileOperation.getResponses().get("201"), "201 status는 추가되지 않아야 합니다.");
+        // 스캔 스펙에만 201이 있으므로 불일치 판정
+        assertEquals("response", fileOperation.getXOuroborosDiff(), "스캔 스펙에만 있는 status가 있으면 diff는 'response'가 되어야 합니다.");
+        assertEquals("mock", fileOperation.getXOuroborosProgress(), "불일치면 progress는 'mock'이어야 합니다.");
     }
     
     /**
@@ -257,5 +260,104 @@ public class ResponseComparisonTest {
 
         assertEquals("both", fileOperation.getXOuroborosDiff());
         assertEquals("mock", fileOperation.getXOuroborosProgress());
+    }
+    
+    /**
+     * 파일 스펙에 스캔 스펙에 없는 추가 content-type이 있는 경우
+     * Expect: content-type은 무시하고 schema만 비교하므로, scan 스펙에 있는 content-type의 schema가 일치하면 일치 판정
+     * diff: none (schema가 일치하는 경우)
+     * progress: completed (schema가 일치하는 경우)
+     * @throws Exception
+     */
+    @Test
+    public void 파일_스펙에_추가_content_type이_있지만_schema는_일치하는_경우() throws Exception {
+        // YAML 파일에서 테스트 데이터 로드
+        OuroRestApiSpec scannedSpec = resourceLoader.loadResponseTest("response-all-match-scanned.yaml");
+        OuroRestApiSpec fileSpec = resourceLoader.loadResponseTest("response-all-match-file.yaml");
+
+        // 스키마 매칭 결과 (User 스키마가 일치)
+        Map<String, Boolean> schemaMatchResults = new HashMap<>();
+        schemaMatchResults.put("User", true);
+
+        Operation scannedOperation = scannedSpec.getPaths()
+                .get("/api/test/users/{id}")
+                .getPut();
+        Operation fileOperation = fileSpec.getPaths()
+                .get("/api/test/users/{id}")
+                .getPut();
+
+        // file 스펙에 추가 content-type 추가 (application/xml)
+        // content-type은 무시하고 schema만 비교하므로, application/json의 schema가 일치하면 일치 판정
+        if (fileOperation.getResponses() != null && fileOperation.getResponses().get("200") != null) {
+            var fileResponse = fileOperation.getResponses().get("200");
+            if (fileResponse.getContent() != null) {
+                // application/xml content-type 추가
+                var xmlMediaType = new kr.co.ouroboros.core.rest.common.dto.MediaType();
+                var xmlSchema = new kr.co.ouroboros.core.rest.common.dto.Schema();
+                xmlSchema.setType("string");
+                xmlMediaType.setSchema(xmlSchema);
+                fileResponse.getContent().put("application/xml", xmlMediaType);
+            }
+        }
+
+        // 파일 스펙의 초기 상태: diff 없음("none")
+        fileOperation.setXOuroborosDiff("none");
+        fileOperation.setXOuroborosProgress("completed");
+
+        // 응답 비교 실행
+        responseComparator.compareResponsesForMethod("/api/test/users/{id}", HttpMethod.PUT, scannedOperation, fileOperation, schemaMatchResults);
+
+        // 검증: content-type은 무시하고 schema만 비교하므로, scan 스펙에 있는 application/json의 schema가 일치하면 일치 판정
+        assertEquals("none", fileOperation.getXOuroborosDiff(), "content-type은 무시하고 schema만 비교하므로, schema가 일치하면 diff는 'none'이어야 합니다.");
+        assertEquals("completed", fileOperation.getXOuroborosProgress(), "schema가 일치하면 progress는 'completed'여야 합니다.");
+    }
+    
+    /**
+     * 파일 스펙에 스캔 스펙에 없는 추가 content-type이 있고, schema도 다른 경우
+     * Expect: content-type은 무시하고 schema만 비교하므로, scan 스펙에 있는 content-type의 schema가 불일치하면 불일치 판정
+     * diff: response
+     * progress: mock
+     * @throws Exception
+     */
+    @Test
+    public void 파일_스펙에_추가_content_type이_있고_schema도_다른_경우() throws Exception {
+        // YAML 파일에서 테스트 데이터 로드
+        OuroRestApiSpec scannedSpec = resourceLoader.loadResponseTest("response-mismatch-scanned.yaml");
+        OuroRestApiSpec fileSpec = resourceLoader.loadResponseTest("response-mismatch-file.yaml");
+
+        // 스키마 매칭 결과 (User 스키마가 불일치)
+        Map<String, Boolean> schemaMatchResults = new HashMap<>();
+        schemaMatchResults.put("User", true);
+
+        Operation scannedOperation = scannedSpec.getPaths()
+                .get("/api/test/users")
+                .getGet();
+        Operation fileOperation = fileSpec.getPaths()
+                .get("/api/test/users")
+                .getGet();
+
+        // file 스펙에 추가 content-type 추가 (application/xml)
+        if (fileOperation.getResponses() != null && fileOperation.getResponses().get("200") != null) {
+            var fileResponse = fileOperation.getResponses().get("200");
+            if (fileResponse.getContent() != null) {
+                // application/xml content-type 추가
+                var xmlMediaType = new kr.co.ouroboros.core.rest.common.dto.MediaType();
+                var xmlSchema = new kr.co.ouroboros.core.rest.common.dto.Schema();
+                xmlSchema.setType("string");
+                xmlMediaType.setSchema(xmlSchema);
+                fileResponse.getContent().put("application/xml", xmlMediaType);
+            }
+        }
+
+        // 파일 스펙의 초기 상태: diff 없음("none")
+        fileOperation.setXOuroborosDiff("none");
+        fileOperation.setXOuroborosProgress("completed");
+
+        // 응답 비교 실행
+        responseComparator.compareResponsesForMethod("/api/test/users", HttpMethod.GET, scannedOperation, fileOperation, schemaMatchResults);
+
+        // 검증: content-type은 무시하고 schema만 비교하므로, scan 스펙에 있는 application/json의 schema가 불일치하면 불일치 판정
+        assertEquals("response", fileOperation.getXOuroborosDiff(), "content-type은 무시하고 schema만 비교하므로, schema가 불일치하면 diff는 'response'가 되어야 합니다.");
+        assertEquals("mock", fileOperation.getXOuroborosProgress(), "schema가 불일치하면 progress는 'mock'이어야 합니다.");
     }
 }

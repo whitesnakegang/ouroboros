@@ -1,6 +1,6 @@
 package kr.co.ouroboros.core.rest.mock.service;
 
-import kr.co.ouroboros.core.global.mock.model.ResponseMeta;
+import kr.co.ouroboros.core.rest.mock.model.RestResponseMeta;
 import kr.co.ouroboros.core.rest.common.yaml.RestApiYamlParser;
 import kr.co.ouroboros.core.rest.mock.model.EndpointMeta;
 import lombok.RequiredArgsConstructor;
@@ -206,26 +206,37 @@ public class RestMockLoaderService {
         // ===== Request Body 파싱 =====
         boolean requestBodyRequired = false;  // body가 필수인지
         Map<String, Object> requestBodySchema = null;  // body의 스키마 (타입/필드 검증용)
+        String requestBodyContentType = null;
+
         Map<String, Object> requestBody = (Map<String, Object>) operation.get("requestBody");
         if (requestBody != null) {
             requestBodyRequired = Boolean.TRUE.equals(requestBody.get("required"));
             // content.application/json.schema 추출
             Map<String, Object> content = (Map<String, Object>) requestBody.get("content");
             if (content != null) {
-                Map<String, Object> mediaType = (Map<String, Object>) content.get("application/json");
-                if (mediaType != null) {
-                    Map<String, Object> schema = (Map<String, Object>) mediaType.get("schema");
-                    if (schema != null) {
-                        // $ref가 있으면 실제 스키마로 치환
-                        // 예: {$ref: '#/components/schemas/User'} → {type: 'object', properties: {...}}
-                        requestBodySchema = resolveSchema(schema, schemas, new HashSet<>());
+                String[] supportedTypes = {
+                        "application/json",
+                        "application/xml",
+                        "application/x-www-form-urlencoded",
+                        "multipart/form-data"
+                };
+                Map<String, Object> mediaType = null;
+                for (String contentType : supportedTypes) {
+                    mediaType = (Map<String, Object>) content.get(contentType);
+                    if (mediaType != null) {
+                        requestBodyContentType = contentType;
+                        Map<String, Object> schema = (Map<String, Object>) mediaType.get("schema");
+                        if (schema != null) {
+                            requestBodySchema = resolveSchema(schema, schemas, new HashSet<>());
+                        }
+                        break;
                     }
                 }
             }
         }
 
         // ===== Response 파싱 =====
-        Map<Integer, ResponseMeta> responses = new HashMap<>();
+        Map<Integer, RestResponseMeta> responses = new HashMap<>();
         Map<String, Object> responsesMap = (Map<String, Object>) operation.get("responses");
         if (responsesMap != null) {
             for (Map.Entry<String, Object> responseEntry : responsesMap.entrySet()) {
@@ -234,7 +245,7 @@ public class RestMockLoaderService {
                     int statusCode = Integer.parseInt(responseEntry.getKey());
                     Map<String, Object> responseObj = (Map<String, Object>) responseEntry.getValue();
 
-                    ResponseMeta responseMeta = parseResponse(statusCode, responseObj, schemas);
+                    RestResponseMeta responseMeta = parseResponse(statusCode, responseObj, schemas);
                     if (responseMeta != null) {
                         responses.put(statusCode, responseMeta);
                     }
@@ -255,22 +266,38 @@ public class RestMockLoaderService {
                 .requiredParams(requiredParams)
                 .requestBodyRequired(requestBodyRequired)
                 .requestBodySchema(requestBodySchema)
+                .requestBodyContentType(requestBodyContentType)
                 .responses(responses)
                 .build();
     }
 
     /**
-     * Parse an OpenAPI response object and produce a ResponseMeta describing its status, body schema, and content type.
+     * Convert an OpenAPI response object into a RestResponseMeta describing the HTTP status, optional description,
+     * resolved response body schema, and chosen content type (preferring JSON then XML).
+     *
+     * If the response has no `content` but provides a `description`, a RestResponseMeta containing only the
+     * status and description is returned. If the response has no resolvable schema for supported content types,
+     * this method returns `null`.
      *
      * @param statusCode the HTTP status code for the response
-     * @param response   the OpenAPI response object (may contain a `content` map)
+     * @param response   the OpenAPI response object (may contain `description` and a `content` map keyed by media type)
      * @param schemas    the components/schemas map used to resolve `$ref` references
-     * @return the parsed ResponseMeta, or `null` if the response has no content or no resolvable schema
+     * @return the parsed RestResponseMeta, or `null` when no supported/resolvable schema is present (unless only a description is available)
      */
     @SuppressWarnings("unchecked")
-    private ResponseMeta parseResponse(int statusCode, Map<String, Object> response, Map<String, Object> schemas) {
+    private RestResponseMeta parseResponse(int statusCode, Map<String, Object> response, Map<String, Object> schemas) {
+        // description 추출
+        String description = (String) response.get("description");
+
         Map<String, Object> content = (Map<String, Object>) response.get("content");
         if (content == null) {
+            // content가 없어도 description이 있으면 ResponseMeta 생성 (에러 응답용)
+            if (description != null) {
+                return RestResponseMeta.builder()
+                        .statusCode(statusCode)
+                        .description(description)
+                        .build();
+            }
             return null;
         }
 
@@ -295,8 +322,9 @@ public class RestMockLoaderService {
         // $ref 있으면 실제 스키마로 치환
         Map<String, Object> resolvedSchema = resolveSchema(schema, schemas, new HashSet<>());
 
-        return ResponseMeta.builder()
+        return RestResponseMeta.builder()
                 .statusCode(statusCode)
+                .description(description)
                 .body(resolvedSchema)
                 .contentType(contentType)
                 .build();

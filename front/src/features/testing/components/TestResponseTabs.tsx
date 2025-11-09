@@ -15,7 +15,6 @@ export function TestResponseTabs() {
     response,
     methodList,
     totalDurationMs,
-    useDummyResponse,
     tryId,
     setMethodList,
     setTotalDurationMs,
@@ -26,10 +25,12 @@ export function TestResponseTabs() {
   const [isTraceModalOpen, setIsTraceModalOpen] = useState(false);
   const [traceData, setTraceData] = useState<TryTraceData | null>(null);
   const [isLoadingTrace, setIsLoadingTrace] = useState(false);
+  const [initialExpandedSpanId, setInitialExpandedSpanId] = useState<
+    string | null
+  >(null);
 
-  // Mock 엔드포인트인지 확인 (progress가 "mock"이거나 useDummyResponse가 true인 경우)
+  // Mock 엔드포인트인지 확인 (progress가 "completed"가 아닌 경우)
   const isMockEndpoint =
-    useDummyResponse ||
     selectedEndpoint?.progress?.toLowerCase() !== "completed";
 
   // test 탭이 활성화되고 tryId가 있을 때 메서드 리스트 로드
@@ -150,10 +151,11 @@ export function TestResponseTabs() {
             isMockEndpoint={isMockEndpoint}
             isLoading={isLoadingMethods}
             tryId={tryId}
-            onShowTrace={async () => {
+            onShowTrace={async (spanId?: string) => {
               if (!tryId) return;
               setIsLoadingTrace(true);
               setIsTraceModalOpen(true);
+              setInitialExpandedSpanId(spanId || null);
               try {
                 const response = await getTryTrace(tryId);
                 setTraceData(response.data);
@@ -176,8 +178,10 @@ export function TestResponseTabs() {
           onClose={() => {
             setIsTraceModalOpen(false);
             setTraceData(null);
+            setInitialExpandedSpanId(null);
           }}
           traceData={traceData}
+          initialExpandedSpanId={initialExpandedSpanId}
         />
       )}
     </div>
@@ -288,7 +292,7 @@ function TestContent({
   isMockEndpoint: boolean;
   isLoading: boolean;
   tryId: string | null;
-  onShowTrace: () => void;
+  onShowTrace: (spanId?: string) => void;
   isLoadingTrace: boolean;
 }) {
   // Mock 엔드포인트인 경우 메서드 실행 정보가 없음을 표시
@@ -430,7 +434,7 @@ function TestContent({
             </div>
             <div className="flex items-center gap-3">
               <button
-                onClick={onShowTrace}
+                onClick={() => onShowTrace()}
                 disabled={isLoadingTrace || !tryId}
                 className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-[#2D333B] disabled:text-gray-500 dark:disabled:text-[#8B949E] text-white rounded-md transition-colors text-sm font-medium flex items-center gap-2 disabled:cursor-not-allowed"
               >
@@ -477,21 +481,6 @@ function TestContent({
                   </>
                 )}
               </button>
-              <div className="w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                <svg
-                  className="w-8 h-8 text-blue-600 dark:text-blue-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-              </div>
             </div>
           </div>
         </div>
@@ -506,7 +495,8 @@ function TestContent({
           {methodList.map((method: TryMethod, index: number) => (
             <div
               key={method.spanId || index}
-              className="p-4 bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] rounded-md hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
+              onClick={() => onShowTrace(method.spanId)}
+              className="p-4 bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] rounded-md hover:border-blue-300 dark:hover:border-blue-700 transition-colors cursor-pointer"
             >
               <div className="flex items-start justify-between mb-2">
                 <div className="flex-1">
