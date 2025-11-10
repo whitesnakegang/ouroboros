@@ -285,8 +285,6 @@ public class UserController {
     @PostMapping
     @ApiState(
         state = ApiState.State.IMPLEMENTING,
-        owner = "backend-team",
-        description = "User creation API implementation in progress"
     )
     public ResponseEntity<User> createUser(@RequestBody User user) {
         // Actual implementation...
