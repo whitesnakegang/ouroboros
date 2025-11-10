@@ -32,7 +32,11 @@ import {
   parseOpenAPISchemaToSchemaField,
 } from "../utils/schemaConverter";
 import type { RequestBody } from "../types/schema.types";
-import { createPrimitiveField, isArraySchema, isRefSchema } from "../types/schema.types";
+import {
+  createPrimitiveField,
+  isArraySchema,
+  isRefSchema,
+} from "../types/schema.types";
 
 interface KeyValuePair {
   key: string;
@@ -139,17 +143,36 @@ export function ApiEditorLayout() {
     return message || "";
   };
 
-  // endpoints가 업데이트된 후 selectedEndpoint 유효성 검증
+  // endpoints가 업데이트된 후 selectedEndpoint 유효성 검증 및 상태 동기화
   useEffect(() => {
     if (selectedEndpoint && endpoints) {
-      // 현재 selectedEndpoint가 실제로 존재하는지 확인
-      const exists = Object.values(endpoints).some((group) =>
-        group.some((ep) => ep.id === selectedEndpoint.id)
-      );
+      // 현재 selectedEndpoint가 실제로 존재하는지 확인하고 최신 상태로 업데이트
+      let foundEndpoint: typeof selectedEndpoint | null = null;
 
-      if (!exists) {
+      for (const group of Object.values(endpoints)) {
+        const ep = group.find((e) => e.id === selectedEndpoint.id);
+        if (ep) {
+          foundEndpoint = ep;
+          break;
+        }
+      }
+
+      if (!foundEndpoint) {
         // 존재하지 않으면 초기화 (YML에서 삭제된 경우)
         setSelectedEndpoint(null);
+      } else {
+        // 존재하면 최신 상태로 업데이트 (progress, tag, diff 등)
+        // 상태가 변경된 경우에만 업데이트하여 무한 루프 방지
+        if (
+          foundEndpoint.progress !== selectedEndpoint.progress ||
+          foundEndpoint.tag !== selectedEndpoint.tag ||
+          foundEndpoint.diff !== selectedEndpoint.diff ||
+          foundEndpoint.implementationStatus !==
+            selectedEndpoint.implementationStatus ||
+          foundEndpoint.hasSpecError !== selectedEndpoint.hasSpecError
+        ) {
+          setSelectedEndpoint(foundEndpoint);
+        }
       }
     }
   }, [endpoints, selectedEndpoint, setSelectedEndpoint]);
@@ -356,10 +379,15 @@ export function ApiEditorLayout() {
       }
 
       // rootSchemaType이 array이고 items가 ref인 경우 스키마 조회
-      if (loadedRequestBody.rootSchemaType && isArraySchema(loadedRequestBody.rootSchemaType)) {
+      if (
+        loadedRequestBody.rootSchemaType &&
+        isArraySchema(loadedRequestBody.rootSchemaType)
+      ) {
         if (isRefSchema(loadedRequestBody.rootSchemaType.items)) {
           try {
-            const schemaResponse = await getSchema(loadedRequestBody.rootSchemaType.items.schemaName);
+            const schemaResponse = await getSchema(
+              loadedRequestBody.rootSchemaType.items.schemaName
+            );
             const schemaData = schemaResponse.data;
 
             // 스키마의 properties를 items의 object schema로 변환
@@ -559,6 +587,32 @@ export function ApiEditorLayout() {
       // StatusCodes state 업데이트
       setStatusCodes(loadedStatusCodes);
 
+      // 백엔드에서 받은 상태 정보(progress, tag, diff)를 selectedEndpoint에 반영
+      if (selectedEndpoint && selectedEndpoint.id === id) {
+        const updatedEndpoint = {
+          ...selectedEndpoint,
+          progress: spec.progress || selectedEndpoint.progress,
+          tag: spec.tag || selectedEndpoint.tag,
+          diff: spec.diff || selectedEndpoint.diff,
+          // implementationStatus와 hasSpecError는 progress, tag, diff로부터 계산됨
+          implementationStatus: (() => {
+            if (spec.progress?.toLowerCase() === "completed") return undefined;
+            switch (spec.tag) {
+              case "implementing":
+                return "in-progress" as const;
+              case "bugfix":
+                return "modifying" as const;
+              case "none":
+              default:
+                return "not-implemented" as const;
+            }
+          })(),
+          hasSpecError: spec.diff && spec.diff !== "none" ? true : undefined,
+        };
+        setSelectedEndpoint(updatedEndpoint);
+        updateEndpoint(updatedEndpoint);
+      }
+
       // 테스트 스토어 업데이트는 TestRequestPanel에서 처리하므로 여기서는 제거
       // (TestRequestPanel에서 selectedEndpoint 변경 시 자동으로 로드됨)
     } catch (error) {
@@ -580,7 +634,9 @@ export function ApiEditorLayout() {
   const [method, setMethod] = useState("POST");
   const [url, setUrl] = useState("");
   const [tags, setTags] = useState("");
-  const [currentSpec, setCurrentSpec] = useState<RestApiSpecResponse | null>(null);
+  const [currentSpec, setCurrentSpec] = useState<RestApiSpecResponse | null>(
+    null
+  );
   const [description, setDescription] = useState("");
   const [summary, setSummary] = useState("");
 
@@ -837,24 +893,11 @@ export function ApiEditorLayout() {
         alert("API 스펙이 수정되었습니다.");
         setIsEditMode(false);
 
-        // 수정된 엔드포인트를 로컬 상태에 반영
-        const updatedEndpoint = {
-          id: selectedEndpoint.id,
-          method, // 수정된 method 반영
-          path: url, // 수정된 path 반영
-          description,
-          implementationStatus: selectedEndpoint.implementationStatus,
-          hasSpecError: selectedEndpoint.hasSpecError,
-          tags: tags ? tags.split(",").map((tag) => tag.trim()) : [],
-          progress: "mock",
-        };
-        updateEndpoint(updatedEndpoint);
-        setSelectedEndpoint(updatedEndpoint);
-
         // 사이드바 목록 다시 로드 (백그라운드에서)
-        loadEndpoints();
+        await loadEndpoints();
 
         // 저장 후 다시 로드하여 백엔드에서 최신 데이터 가져오기
+        // loadEndpointData에서 백엔드 응답의 progress, tag, diff를 자동으로 반영함
         await loadEndpointData(selectedEndpoint.id);
       } else {
         // 새 엔드포인트 생성
@@ -875,37 +918,47 @@ export function ApiEditorLayout() {
 
         const response = await createRestApiSpec(apiRequest);
 
+        // 백엔드 응답에서 상태 정보 추출
+        const spec = response.data;
+        const group = tags ? tags.split(",")[0].trim() : "OTHERS";
+
+        // 백엔드 응답의 상태 정보를 사용하여 엔드포인트 생성
         const newEndpoint = {
-          id: response.data.id,
-          method,
-          path: url,
-          description,
-          implementationStatus: "not-implemented" as const,
-          tags: tags ? tags.split(",").map((tag) => tag.trim()) : [],
-          progress: "mock",
+          id: spec.id,
+          method: spec.method,
+          path: spec.path,
+          description: spec.description || spec.summary || "",
+          implementationStatus: (() => {
+            if (spec.progress?.toLowerCase() === "completed") return undefined;
+            switch (spec.tag) {
+              case "implementing":
+                return "in-progress" as const;
+              case "bugfix":
+                return "modifying" as const;
+              case "none":
+              default:
+                return "not-implemented" as const;
+            }
+          })(),
+          hasSpecError: spec.diff && spec.diff !== "none" ? true : undefined,
+          tags: spec.tags || [],
+          progress: spec.progress || "mock",
+          tag: spec.tag || "none",
+          diff: spec.diff || "none",
         };
 
-        const group = tags ? tags.split(",")[0].trim() : "OTHERS";
         addEndpoint(newEndpoint, group);
         alert(`${method} ${url} API가 생성되었습니다.`);
 
         // 사이드바 목록 다시 로드
         await loadEndpoints();
 
-        // 생성된 엔드포인트를 선택하고 저장된 데이터 다시 로드
-        const updatedEndpoint = {
-          id: response.data.id,
-          method,
-          path: url,
-          description,
-          implementationStatus: "not-implemented" as const,
-          tags: tags ? tags.split(",").map((tag) => tag.trim()) : [],
-          progress: "mock",
-        };
-        setSelectedEndpoint(updatedEndpoint);
+        // 생성된 엔드포인트를 선택
+        setSelectedEndpoint(newEndpoint);
 
         // 생성 후 다시 로드하여 백엔드에서 최신 데이터 가져오기
-        await loadEndpointData(response.data.id);
+        // loadEndpointData에서 백엔드 응답의 progress, tag, diff를 자동으로 반영함
+        await loadEndpointData(spec.id);
       }
     } catch (error: unknown) {
       console.error("API 저장 실패:", error);
@@ -1002,6 +1055,7 @@ export function ApiEditorLayout() {
   useEffect(() => {
     if (triggerNewForm) {
       handleNewForm();
+      setActiveTab("form"); // 새 명세서 작성 시 항상 폼 탭으로 전환
       setTriggerNewForm(false);
     }
   }, [triggerNewForm, handleNewForm, setTriggerNewForm]);
@@ -1297,12 +1351,22 @@ export function ApiEditorLayout() {
               API 생성 폼
             </button>
             <button
-              onClick={() => setActiveTab("test")}
+              onClick={() => {
+                // 새 명세서 작성 중일 때는 테스트 폼 접근 불가
+                if (!selectedEndpoint) {
+                  return;
+                }
+                setActiveTab("test");
+              }}
+              disabled={!selectedEndpoint}
               className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
                 activeTab === "test"
                   ? "text-gray-900 dark:text-[#E6EDF3] border-[#2563EB]"
                   : "text-gray-500 dark:text-[#8B949E] border-transparent hover:text-gray-900 dark:hover:text-[#E6EDF3]"
-              }`}
+              } ${!selectedEndpoint ? "opacity-50 cursor-not-allowed" : ""}`}
+              title={
+                !selectedEndpoint ? "먼저 API를 생성하거나 선택해주세요" : ""
+              }
             >
               테스트 폼
             </button>
