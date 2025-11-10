@@ -142,7 +142,7 @@ public class OuroborosMockFilter implements Filter {
 
         if (!validationResult.valid()) {
             // 검증 실패 - 에러 응답 전송 후 종료
-            sendError(response, validationResult.statusCode(), validationResult.message());
+            sendError(response, validationResult.statusCode(), validationResult.message(), meta);
             return;
         }
 
@@ -174,7 +174,7 @@ public class OuroborosMockFilter implements Filter {
 
         if (responseMeta == null) {
             log.error("No 200 response defined for endpoint: {} {}", meta.getMethod(), meta.getPath());
-            sendError(response, 500, "No response definition found for " + meta.getPath());
+            sendError(response, 500, "No response definition found for " + meta.getPath(), meta);
             return;
         }
 
@@ -236,30 +236,17 @@ public class OuroborosMockFilter implements Filter {
             return null;
         }
 
-        // Priority 1: 200 OK
-        if (meta.getResponses().containsKey(200)) {
-            return 200;
-        }
+        if (meta.getResponses().containsKey(200)) return 200;
+        if (meta.getResponses().containsKey(201)) return 201;
+        if (meta.getResponses().containsKey(204)) return 204;
 
-        // Priority 2: 201 Created
-        if (meta.getResponses().containsKey(201)) {
-            return 201;
-        }
-
-        // Priority 3: 204 No Content
-        if (meta.getResponses().containsKey(204)) {
-            return 204;
-        }
-
-        // Priority 4: Any other 2xx response
         for (Integer code : meta.getResponses().keySet()) {
             if (code >= 200 && code < 300) {
                 return code;
             }
         }
 
-        // Fallback: First available response (even if not 2xx)
-        return meta.getResponses().keySet().iterator().next();
+        return null;
     }
 
     /**
@@ -270,8 +257,27 @@ public class OuroborosMockFilter implements Filter {
      * @param message    the error message
      * @throws IOException if response writing fails
      */
-    private void sendError(HttpServletResponse response, int statusCode, String message) throws IOException {
+    private void sendError(HttpServletResponse response, int statusCode, String message, EndpointMeta meta) throws IOException {
         response.setStatus(statusCode);
+        // 명세에 정의된 에러 응답 확인
+        if (meta != null && meta.getResponses() != null) {
+            RestResponseMeta errorMeta = meta.getResponses().get(statusCode);
+
+            if (errorMeta != null && errorMeta.getBody() != null && !errorMeta.getBody().isEmpty()) {
+                // ✅ 명세에 따라 에러 응답 생성
+                Object body = schemaMockBuilder.build(errorMeta.getBody());
+
+                String contentType = errorMeta.getContentType() != null
+                        ? errorMeta.getContentType()
+                        : "application/json";
+                response.setContentType(contentType + ";charset=UTF-8");
+
+                response.getWriter().write(objectMapper.writeValueAsString(body));
+                log.debug("Error response sent from spec: {} {} -> {}", meta.getMethod(), meta.getPath(), statusCode);
+                return;
+            }
+        }
+
         response.setContentType("application/json;charset=UTF-8");
         Map<String, String> error = Map.of("error", message);
         response.getWriter().write(objectMapper.writeValueAsString(error));
