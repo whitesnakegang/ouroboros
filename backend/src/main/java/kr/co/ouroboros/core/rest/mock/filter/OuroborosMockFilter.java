@@ -173,8 +173,8 @@ public class OuroborosMockFilter implements Filter {
         RestResponseMeta responseMeta = meta.getResponses().get(statusCode);
 
         if (responseMeta == null) {
-            log.error("No 200 response defined for endpoint: {} {}", meta.getMethod(), meta.getPath());
-            sendError(response, 500, "No response definition found for " + meta.getPath(), meta);
+            log.error("No 2xx success response defined for endpoint: {} {}", meta.getMethod(), meta.getPath());
+            sendError(response, 500, "No 2xx success response definition found for " + meta.getPath(), meta);
             return;
         }
 
