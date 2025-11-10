@@ -169,12 +169,19 @@ public class OuroborosMockFilter implements Filter {
                          EndpointMeta meta, Object requestBody)
             throws IOException {
 
-        int statusCode = determineSuccessStatusCode(meta);
+        Integer statusCode = determineSuccessStatusCode(meta);
+
+        if (statusCode == null) {
+            log.error("No 2xx success response defined for endpoint: {} {}", meta.getMethod(), meta.getPath());
+            sendError(response, 500, "No 2xx success response definition found for " + meta.getPath(), meta);
+            return;
+        }
+
         RestResponseMeta responseMeta = meta.getResponses().get(statusCode);
 
         if (responseMeta == null) {
-            log.error("No 2xx success response defined for endpoint: {} {}", meta.getMethod(), meta.getPath());
-            sendError(response, 500, "No 2xx success response definition found for " + meta.getPath(), meta);
+            log.error("Response metadata missing for status {} in endpoint: {} {}", statusCode, meta.getMethod(), meta.getPath());
+            sendError(response, 500, "Response metadata missing for status " + statusCode, meta);
             return;
         }
 
@@ -272,7 +279,11 @@ public class OuroborosMockFilter implements Filter {
                         : "application/json";
                 response.setContentType(contentType + ";charset=UTF-8");
 
-                response.getWriter().write(objectMapper.writeValueAsString(body));
+                if (contentType.toLowerCase().contains("xml")) {
+                    response.getWriter().write(xmlMapper.writeValueAsString(body));
+                } else {
+                    response.getWriter().write(objectMapper.writeValueAsString(body));
+                }
                 log.debug("Error response sent from spec: {} {} -> {}", meta.getMethod(), meta.getPath(), statusCode);
                 return;
             }
