@@ -10,6 +10,7 @@ import {
   isArraySchema,
   isRefSchema,
 } from "@/features/spec/types/schema.types";
+import { JsonEditor } from "@/components/JsonEditor";
 
 interface RequestBodyFormProps {
   requestBody: RequestBody | null;
@@ -99,14 +100,22 @@ function JsonBodyForm({
     // rootSchemaType이 있으면 우선 사용
     if (requestBody?.rootSchemaType) {
       const rootKey = JSON.stringify(requestBody.rootSchemaType);
-      
+
       if (rootKey !== initializedRef.current) {
         initializedRef.current = rootKey;
-        
-        const defaultValue = generateDefaultFromRootSchema(requestBody.rootSchemaType);
+
+        const defaultValue = generateDefaultFromRootSchema(
+          requestBody.rootSchemaType
+        );
         if (defaultValue !== undefined && defaultValue !== null) {
           const defaultJson = JSON.stringify(defaultValue, null, 2);
-          if (!value || value.trim() === "" || value === "{}" || value === "[]" || value === '""') {
+          if (
+            !value ||
+            value.trim() === "" ||
+            value === "{}" ||
+            value === "[]" ||
+            value === '""'
+          ) {
             onChange(defaultJson);
           }
         } else {
@@ -146,11 +155,11 @@ function JsonBodyForm({
 
   return (
     <div>
-      <textarea
+      <JsonEditor
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={onChange}
         placeholder='{\n  "key": "value"\n}'
-        className="w-full h-40 px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] font-mono text-sm"
+        height="300px"
       />
     </div>
   );
@@ -478,11 +487,11 @@ function FormField({
                   </div>
                 ) : (
                   <>
-                    <textarea
+                    <JsonEditor
                       value={JSON.stringify(arrayValue, null, 2)}
-                      onChange={(e) => {
+                      onChange={(newValue) => {
                         try {
-                          const parsed = JSON.parse(e.target.value);
+                          const parsed = JSON.parse(newValue);
                           if (Array.isArray(parsed)) {
                             onChange(parsed);
                           }
@@ -491,7 +500,7 @@ function FormField({
                         }
                       }}
                       placeholder="[]"
-                      className="w-full px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] font-mono text-sm min-h-[120px] resize-y"
+                      height="200px"
                     />
                     <div className="flex gap-2">
                       <button
@@ -596,18 +605,18 @@ function FormField({
                 ))}
               </div>
             ) : (
-              <textarea
+              <JsonEditor
                 value={JSON.stringify(objectValue, null, 2)}
-                onChange={(e) => {
+                onChange={(newValue) => {
                   try {
-                    const parsed = JSON.parse(e.target.value);
+                    const parsed = JSON.parse(newValue);
                     onChange(parsed);
                   } catch {
                     // Invalid JSON, keep as is
                   }
                 }}
                 placeholder='{\n  "key": "value"\n}'
-                className="w-full px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] font-mono text-sm min-h-[120px] resize-y"
+                height="200px"
               />
             )}
             <label className="flex items-center gap-1 text-xs text-[#8B949E]">

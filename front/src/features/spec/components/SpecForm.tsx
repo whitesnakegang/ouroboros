@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { JsonEditor } from "@/components/JsonEditor";
 
 interface KeyValuePair {
   key: string;
@@ -528,35 +529,45 @@ export function SpecForm({ protocol }: SpecFormProps) {
                     : "multipart/form-data"}
                 </span>
               </div>
-              <textarea
-                value={requestBody.content}
-                onChange={(e) =>
-                  setRequestBody({ ...requestBody, content: e.target.value })
-                }
-                rows={8}
-                placeholder={
-                  requestBody.type === "raw"
-                    ? '{\n  "key": "value",\n  "nested": {\n    "property": "value"\n  }\n}'
-                    : requestBody.type === "form-data"
-                    ? "key1=value1\nkey2=value2"
-                    : "param1=value1&param2=value2"
-                }
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-gray-900 text-green-400 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 resize-none"
-              />
-              <div className="absolute top-2 right-2 flex gap-2">
-                <button
-                  onClick={() => {
-                    try {
-                      const formatted = JSON.stringify(
-                        JSON.parse(requestBody.content),
-                        null,
-                        2
-                      );
-                      setRequestBody({ ...requestBody, content: formatted });
-                    } catch {
-                      // JSON이 아닌 경우 무시
-                    }
-                  }}
+              {requestBody.type === "raw" ? (
+                <JsonEditor
+                  value={requestBody.content}
+                  onChange={(value) =>
+                    setRequestBody({ ...requestBody, content: value })
+                  }
+                  placeholder='{\n  "key": "value",\n  "nested": {\n    "property": "value"\n  }\n}'
+                  height="300px"
+                />
+              ) : (
+                <textarea
+                  value={requestBody.content}
+                  onChange={(e) =>
+                    setRequestBody({ ...requestBody, content: e.target.value })
+                  }
+                  rows={8}
+                  placeholder={
+                    requestBody.type === "form-data"
+                      ? "key1=value1\nkey2=value2"
+                      : "param1=value1&param2=value2"
+                  }
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-gray-900 text-green-400 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 resize-none"
+                />
+              )}
+              {requestBody.type === "raw" && (
+                <div className="absolute top-2 right-2 flex gap-2">
+                  <button
+                    onClick={() => {
+                      try {
+                        const formatted = JSON.stringify(
+                          JSON.parse(requestBody.content),
+                          null,
+                          2
+                        );
+                        setRequestBody({ ...requestBody, content: formatted });
+                      } catch {
+                        // JSON이 아닌 경우 무시
+                      }
+                    }}
                   className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
                   title="JSON 포맷팅"
                 >
@@ -572,6 +583,7 @@ export function SpecForm({ protocol }: SpecFormProps) {
                   Clear
                 </button>
               </div>
+              )}
             </div>
           )}
         </div>
