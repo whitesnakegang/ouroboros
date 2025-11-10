@@ -14,11 +14,14 @@ interface Endpoint {
   progress?: string;
   tag?: string;
   diff?: string;
+  protocol?: Protocol; // 프로토콜 정보 추가
 }
 
 export interface EndpointData {
   [group: string]: Endpoint[];
 }
+
+export type Protocol = "REST" | "GraphQL" | "WebSocket" | null;
 
 interface SidebarState {
   isOpen: boolean;
@@ -36,6 +39,8 @@ interface SidebarState {
   setTriggerNewForm: (trigger: boolean) => void;
   loadEndpoints: () => Promise<void>;
   isLoading: boolean;
+  protocol: Protocol;
+  setProtocol: (protocol: Protocol) => void;
 }
 
 // 백엔드 스펙을 프론트엔드 엔드포인트 형태로 변환
@@ -68,6 +73,7 @@ function convertSpecToEndpoint(spec: RestApiSpecResponse): Endpoint {
     progress: spec.progress,
     tag: spec.tag,
     diff: spec.diff,
+    protocol: "REST", // 현재는 REST API만 지원하므로 기본값은 REST
   };
 }
 
@@ -120,6 +126,8 @@ export const useSidebarStore = create<SidebarState>()(
       triggerNewForm: false,
       setTriggerNewForm: (trigger) => set({ triggerNewForm: trigger }),
       isLoading: false,
+      protocol: null,
+      setProtocol: (protocol) => set({ protocol }),
       loadEndpoints: async () => {
         set({ isLoading: true });
         try {

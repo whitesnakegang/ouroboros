@@ -2,12 +2,10 @@ import { useState, useEffect, useCallback } from "react";
 import { ApiRequestCard } from "./ApiRequestCard";
 import { ApiResponseCard } from "./ApiResponseCard";
 import { SchemaCard } from "./SchemaCard";
-import { ProtocolTabs } from "./ProtocolTabs";
 import { CodeSnippetPanel } from "./CodeSnippetPanel";
 import { ImportResultModal } from "./ImportResultModal";
 import { TestLayout } from "@/features/testing/components/TestLayout";
 import { DiffNotification } from "./DiffNotification";
-import { useSpecStore } from "../store/spec.store";
 import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
 import { useTestingStore } from "@/features/testing/store/testing.store";
 import axios from "axios";
@@ -62,7 +60,6 @@ interface StatusCode {
 }
 
 export function ApiEditorLayout() {
-  const { protocol, setProtocol } = useSpecStore();
   const {
     selectedEndpoint,
     deleteEndpoint,
@@ -73,6 +70,8 @@ export function ApiEditorLayout() {
     loadEndpoints,
     updateEndpoint,
     endpoints,
+    protocol,
+    setProtocol,
   } = useSidebarStore();
   const {
     protocol: testProtocol,
@@ -1034,6 +1033,8 @@ export function ApiEditorLayout() {
 
   const handleNewForm = useCallback(() => {
     // 새 작성 폼으로 전환
+    // 선택된 프로토콜에 따라 다른 폼을 표시할 수 있도록 구조화
+    // 현재는 REST만 지원하지만, 나중에 WebSocket/GraphQL 지원 시 확장 가능
     setSelectedEndpoint(null);
     setMethod("POST");
     // 값은 비워 placeholder가 보이도록 처리
@@ -1049,6 +1050,10 @@ export function ApiEditorLayout() {
       fields: [],
     });
     setStatusCodes([]);
+
+    // 프로토콜에 따른 추가 초기화 (나중에 확장 가능)
+    // if (protocol === "WebSocket") { ... }
+    // if (protocol === "GraphQL") { ... }
   }, [setSelectedEndpoint]);
 
   // 사이드바 Add 버튼 클릭 시 새 폼 초기화
@@ -1643,23 +1648,6 @@ export function ApiEditorLayout() {
         </div>
       </div>
 
-      {/* Protocol Tabs - 항상 표시 */}
-      <div className="border-b border-gray-200 dark:border-[#2D333B] px-6 bg-white dark:bg-[#0D1117]">
-        {activeTab === "form" ? (
-          <ProtocolTabs
-            selectedProtocol={protocol}
-            onProtocolChange={setProtocol}
-            onNewForm={handleNewForm}
-          />
-        ) : (
-          <ProtocolTabs
-            selectedProtocol={testProtocol}
-            onProtocolChange={setTestProtocol}
-            onNewForm={handleNewForm}
-          />
-        )}
-      </div>
-
       {/* Main Content */}
       <div className="flex-1 overflow-auto">
         {activeTab === "test" ? (
@@ -1693,8 +1681,35 @@ export function ApiEditorLayout() {
             id="api-form-container"
             className="w-full max-w-6xl mx-auto px-6 py-8"
           >
-            {/* Protocol not supported message */}
-            {protocol !== "REST" && (
+            {/* Protocol not selected or not supported message */}
+            {protocol === null && (
+              <div className="h-full flex items-center justify-center py-12">
+                <div className="text-center">
+                  <div className="w-16 h-16 mx-auto mb-6 rounded-md bg-gray-100 dark:bg-[#161B22] border border-gray-300 dark:border-[#2D333B] flex items-center justify-center">
+                    <svg
+                      className="w-8 h-8 text-gray-500 dark:text-[#8B949E]"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                      />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-[#E6EDF3] mb-2">
+                    프로토콜을 선택해주세요
+                  </h3>
+                  <p className="text-gray-600 dark:text-[#8B949E]">
+                    사이드바에서 프로토콜을 선택한 후 Add 버튼을 클릭하세요.
+                  </p>
+                </div>
+              </div>
+            )}
+            {protocol !== null && protocol !== "REST" && (
               <div className="h-full flex items-center justify-center py-12">
                 <div className="text-center">
                   <div className="w-16 h-16 mx-auto mb-6 rounded-md bg-gray-100 dark:bg-[#161B22] border border-gray-300 dark:border-[#2D333B] flex items-center justify-center">
