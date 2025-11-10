@@ -1,12 +1,11 @@
 import { useState, useEffect } from "react";
 import { SchemaFieldEditor } from "./SchemaFieldEditor";
 import { SchemaModal } from "./SchemaModal";
-import { getAllSchemas, getSchema, type SchemaResponse } from "../services/api";
+import { getAllSchemas, type SchemaResponse } from "../services/api";
 import type { SchemaField, RequestBody } from "../types/schema.types";
 import {
   createDefaultField,
 } from "../types/schema.types";
-import { parseOpenAPISchemaToSchemaField } from "../utils/schemaConverter";
 
 interface WsReplyFormProps {
   address: string;
@@ -81,38 +80,6 @@ export function WsReplyForm({
       });
     } else {
       alert("스키마는 object 타입만 지원됩니다.");
-    }
-  };
-
-  // Schema Reference에서 필드 로드
-  const loadSchemaFields = async (schemaRef: string) => {
-    try {
-      const schemaResponse = await getSchema(schemaRef);
-      const schemaData = schemaResponse.data;
-
-      if (schemaData.properties) {
-        const fields = Object.entries(schemaData.properties).map(
-          ([key, propSchema]: [string, any]) => {
-            return parseOpenAPISchemaToSchemaField(key, propSchema);
-          }
-        );
-
-        // required 필드 설정
-        if (schemaData.required && Array.isArray(schemaData.required)) {
-          fields.forEach((field) => {
-            if (schemaData.required!.includes(field.key)) {
-              field.required = true;
-            }
-          });
-        }
-
-        setSchema({
-          ...schema,
-          fields,
-        });
-      }
-    } catch (error) {
-      console.error("스키마 필드 로드 실패:", error);
     }
   };
 

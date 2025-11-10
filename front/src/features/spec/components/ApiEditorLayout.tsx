@@ -72,11 +72,8 @@ export function ApiEditorLayout() {
     updateEndpoint,
     endpoints,
     protocol,
-    setProtocol,
   } = useSidebarStore();
   const {
-    protocol: testProtocol,
-    setProtocol: setTestProtocol,
     request,
     setResponse,
     isLoading,

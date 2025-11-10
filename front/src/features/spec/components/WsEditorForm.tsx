@@ -1,9 +1,7 @@
-import { useState } from "react";
 import { WsReceiverForm } from "./WsReceiverForm";
 import { WsReplyForm } from "./WsReplyForm";
 import { SchemaCard } from "./SchemaCard";
 import type { RequestBody } from "../types/schema.types";
-import { createDefaultField } from "../types/schema.types";
 
 interface KeyValuePair {
   key: string;
