@@ -3,7 +3,7 @@ package kr.co.ouroboros.core.rest.tryit.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.co.ouroboros.ui.rest.tryit.dto.TryMethodListResponse;
 import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.tempo.client.TempoClient;
-import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.tempo.model.TraceDTO;
+import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.model.TraceDTO;
 import kr.co.ouroboros.core.rest.tryit.trace.builder.TraceTreeBuilder;
 import kr.co.ouroboros.core.rest.tryit.trace.converter.TraceSpanConverter;
 import kr.co.ouroboros.core.rest.tryit.trace.dto.SpanNode;

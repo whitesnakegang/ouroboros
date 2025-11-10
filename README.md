@@ -73,7 +73,8 @@
 - ✅ **Implementation Comparison**: Sync code and specs with `@ApiState` annotation
 - ✅ **Automatic Enrichment**: Automatically add missing Ouroboros extension fields
 - ✅ **Error Reporting**: Detailed validation error messages
-- ✅ **Try Feature**: API execution tracking and analysis (📖 [Setup Guide](./OUROBOROS_TRY_SETUP.md))
+- ✅ **Try Feature**: API execution tracking and analysis with **in-memory storage by default** (📖 [Setup Guide](./OUROBOROS_TRY_SETUP.md))
+  - **Default**: In-memory trace storage (no setup required)
 
 ---
 
@@ -147,7 +148,7 @@
 #### Gradle
 ```gradle
 dependencies {
-    implementation 'io.github.whitesnakegang:ouroboros:0.1.0-SNAPSHOT'
+    implementation 'io.github.whitesnakegang:ouroboros:1.0.0'
     implementation 'org.springframework.boot:spring-boot-starter-web'
 }
 ```
@@ -157,11 +158,15 @@ dependencies {
 <dependency>
     <groupId>io.github.whitesnakegang</groupId>
     <artifactId>ouroboros</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>1.0.0</version>
 </dependency>
 ```
 
+> **Note**: If you rely on Lombok annotations, make sure your build includes <code>annotationProcessor 'org.projectlombok:lombok'</code>. Without it, <code>@ApiState</code> metadata is not generated and automatic scanning will be skipped.
+
 ### Configuration (Optional)
+
+> **Method Tracing**: Internal method tracing is **disabled by default**. If you need internal method tracing in the Try feature, you must add the `method-tracing` configuration and set `management.tracing.sampling.probability=1.0` to capture all method traces.
 
 `application.yml`:
 ```yaml
@@ -170,6 +175,17 @@ ouroboros:
   server:
     url: http://localhost:8080
     description: Local Development Server
+  # Method Tracing configuration (required for internal method tracing in Try feature)
+  method-tracing:
+    enabled: true
+    allowed-packages: your.package.name  # Specify package paths to trace
+
+# Micrometer Tracing (Required for Method Tracing)
+# Set sampling probability to 1.0 to capture all traces
+management:
+  tracing:
+    sampling:
+      probability: 1.0
 ```
 
 ### Getting Started
@@ -183,7 +199,7 @@ ouroboros:
    
    Open your browser and navigate to:
    ```
-   http://localhost:8080/ouroboros/index.html
+   http://localhost:8080/ouroboros/
    ```
    
    The intuitive web interface allows you to:
@@ -269,8 +285,6 @@ public class UserController {
     @PostMapping
     @ApiState(
         state = ApiState.State.IMPLEMENTING,
-        owner = "backend-team",
-        description = "User creation API implementation in progress"
     )
     public ResponseEntity<User> createUser(@RequestBody User user) {
         // Actual implementation...
@@ -304,6 +318,9 @@ Ouroboros will automatically:
 ---
 
 ## 📖 Documentation
+
+### Official Site
+- [https://ouroboros.co.kr](https://ouroboros.co.kr) — 최신 가이드와 배포 문서를 확인할 수 있습니다.
 
 ### API Documentation
 - [Complete API Endpoints](./backend/docs/endpoints/README.md)

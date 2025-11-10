@@ -149,7 +149,7 @@ export function convertRequestBodyToOpenAPI(
     contentType = "application/xml";
   }
 
-  // 전체 스키마 참조
+  // 전체 스키마 참조 (기존 방식)
   if (body.schemaRef) {
     return {
       description: body.description || "Request body",
@@ -164,7 +164,21 @@ export function convertRequestBodyToOpenAPI(
     };
   }
 
-  // 인라인 스키마
+  // rootSchemaType이 있으면 그것을 사용 (json/xml 타입)
+  if (body.rootSchemaType) {
+    const rootSchema = convertSchemaTypeToOpenAPI(body.rootSchemaType);
+    return {
+      description: body.description || "Request body",
+      required: body.required !== false,
+      content: {
+        [contentType]: {
+          schema: rootSchema,
+        },
+      },
+    };
+  }
+
+  // 인라인 스키마 (기존 방식, form-data 등)
   if (!body.fields || body.fields.length === 0) {
     return null;
   }
@@ -313,6 +327,21 @@ export function parseOpenAPIRequestBody(
     const schemaName = refValue.includes("#/components/schemas/")
       ? refValue.replace("#/components/schemas/", "")
       : refValue;
+    
+    // json/xml 타입이면 rootSchemaType으로 설정
+    if (type === "json" || type === "xml") {
+      return {
+        type,
+        rootSchemaType: {
+          kind: "ref",
+          schemaName,
+        },
+        description: openApiBody.description,
+        required: openApiBody.required !== false,
+      };
+    }
+    
+    // 기존 방식
     return {
       type,
       schemaRef: schemaName,
@@ -321,7 +350,30 @@ export function parseOpenAPIRequestBody(
     };
   }
 
-  // 인라인 스키마
+  // json/xml 타입이면 rootSchemaType으로 파싱
+  if (type === "json" || type === "xml") {
+    const rootSchemaType = parseOpenAPISchemaToSchemaType(schema);
+    
+    // object 타입이고 properties가 있으면 fields로 변환 (하위 호환성)
+    if (rootSchemaType.kind === "object" && rootSchemaType.properties.length > 0) {
+      return {
+        type,
+        rootSchemaType,
+        fields: rootSchemaType.properties,
+        description: openApiBody.description,
+        required: openApiBody.required !== false,
+      };
+    }
+    
+    return {
+      type,
+      rootSchemaType,
+      description: openApiBody.description,
+      required: openApiBody.required !== false,
+    };
+  }
+
+  // 인라인 스키마 (form-data 등, 기존 방식)
   if (schema.type === "object" && schema.properties) {
     const fields: SchemaField[] = [];
 

@@ -1,10 +1,8 @@
 package kr.co.ouroboros.core.rest.tryit.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.tempo.client.TempoClient;
-import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.tempo.model.TraceDTO;
+import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.TraceDataRetriever;
 import kr.co.ouroboros.core.rest.tryit.trace.analyzer.IssueAnalyzer;
-import kr.co.ouroboros.core.rest.tryit.trace.converter.TraceSpanConverter;
+import kr.co.ouroboros.core.rest.tryit.trace.util.TraceDurationCalculator;
 import kr.co.ouroboros.ui.rest.tryit.dto.TryIssuesResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,9 +34,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TryIssuesService {
     
-    private final TempoClient tempoClient;
-    private final ObjectMapper objectMapper;
-    private final TraceSpanConverter traceSpanConverter;
+    private final TraceDataRetriever traceDataRetriever;
     private final IssueAnalyzer issueAnalyzer;
     
     /**
@@ -50,51 +46,22 @@ public class TryIssuesService {
     public TryIssuesResponse getIssues(String tryIdStr) {
         log.info("Retrieving issues for tryId: {}", tryIdStr);
         
-        // Check if Tempo is enabled
-        if (!tempoClient.isEnabled()) {
-            log.debug("Tempo is not enabled, returning empty issues");
-            return buildEmptyResponse(tryIdStr);
-        }
-        
-        try {
-            // Query Tempo for trace with this tryId
-            String query = String.format("{ span.ouro.try_id = \"%s\" }", tryIdStr);
-            String traceId = tempoClient.pollForTrace(query);
-            
-            if (traceId == null) {
-                log.debug("Trace not found in Tempo for tryId: {}", tryIdStr);
-                return buildEmptyResponse(tryIdStr);
-            }
-            
-            // Fetch trace data
-            String traceDataJson = tempoClient.getTrace(traceId);
-            
-            if (traceDataJson == null) {
-                log.warn("Trace data is null for traceId: {}", traceId);
-                return buildEmptyResponse(tryIdStr);
-            }
-            
-            // Parse trace data
-            TraceDTO traceData = objectMapper.readValue(traceDataJson, TraceDTO.class);
-            
-            // Convert to TraceSpanInfo
-            var spans = traceSpanConverter.convert(traceData);
-            
-            // Calculate total duration
-            long totalDurationMs = calculateTotalDuration(spans);
-            
-            // Detect issues (without building tree for performance)
-            var issues = issueAnalyzer.analyze(spans, totalDurationMs);
-            
-            return TryIssuesResponse.builder()
-                    .tryId(tryIdStr)
-                    .issues(issues)
-                    .build();
-            
-        } catch (Exception e) {
-            log.error("Error retrieving issues for tryId: {}", tryIdStr, e);
-            return buildEmptyResponse(tryIdStr);
-        }
+        return traceDataRetriever.getTraceData(tryIdStr)
+                .map(result -> {
+                    List<kr.co.ouroboros.core.rest.tryit.trace.dto.TraceSpanInfo> spans = result.getSpans();
+                    
+                    // Calculate total duration
+                    long totalDurationMs = TraceDurationCalculator.calculateTotalDuration(spans);
+                    
+                    // Detect issues (without building tree for performance)
+                    var issues = issueAnalyzer.analyze(spans, totalDurationMs);
+                    
+                    return TryIssuesResponse.builder()
+                            .tryId(tryIdStr)
+                            .issues(issues)
+                            .build();
+                })
+                .orElse(buildEmptyResponse(tryIdStr));
     }
     
     /**
@@ -108,36 +75,5 @@ public class TryIssuesService {
                 .tryId(tryId)
                 .issues(List.of())
                 .build();
-    }
-    
-    /**
-     * Calculates total duration of the trace from span timestamps.
-     * <p>
-     * Finds the earliest start time and latest end time across all spans,
-     * then calculates the difference in milliseconds.
-     *
-     * @param spans List of trace span information
-     * @return Total duration in milliseconds, or 0 if spans are empty or invalid
-     */
-    private long calculateTotalDuration(List<kr.co.ouroboros.core.rest.tryit.trace.dto.TraceSpanInfo> spans) {
-        if (spans == null || spans.isEmpty()) {
-            return 0;
-        }
-        
-        long minStart = Long.MAX_VALUE;
-        long maxEnd = Long.MIN_VALUE;
-        
-        for (var span : spans) {
-            if (span.getStartTimeNanos() != null && span.getEndTimeNanos() != null) {
-                minStart = Math.min(minStart, span.getStartTimeNanos());
-                maxEnd = Math.max(maxEnd, span.getEndTimeNanos());
-            }
-        }
-        
-        if (minStart == Long.MAX_VALUE || maxEnd == Long.MIN_VALUE) {
-            return 0;
-        }
-        
-        return (maxEnd - minStart) / 1_000_000; // Convert nanoseconds to milliseconds
     }
 }

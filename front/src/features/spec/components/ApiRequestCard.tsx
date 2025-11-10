@@ -2,8 +2,18 @@ import { useState, useEffect } from "react";
 import { SchemaModal } from "./SchemaModal";
 import { SchemaFieldEditor } from "./SchemaFieldEditor";
 import { getAllSchemas, type SchemaResponse } from "../services/api";
-import type { RequestBody, SchemaField } from "../types/schema.types";
-import { createDefaultField } from "../types/schema.types";
+import type { RequestBody, SchemaField, SchemaType, PrimitiveTypeName } from "../types/schema.types";
+import { 
+  createDefaultField, 
+  createPrimitiveField,
+  createObjectField,
+  createArrayField,
+  createRefField,
+  isPrimitiveSchema,
+  isObjectSchema,
+  isArraySchema,
+  isRefSchema,
+} from "../types/schema.types";
 
 // UTF-8 문자열을 Base64로 안전하게 인코딩하는 함수
 const safeBase64 = (value: string): string | null => {
@@ -124,12 +134,33 @@ export function ApiRequestCard({
     name: string;
     fields: SchemaField[];
   }) => {
-    // SchemaModal에서 이미 재귀적으로 변환된 필드를 그대로 사용
-    setRequestBody({
-      ...requestBody,
-      schemaRef: schema.name,
-      fields: schema.fields,
-    });
+    // rootSchemaType이 ref 타입이면 rootSchemaType 업데이트
+    if (requestBody.rootSchemaType && isRefSchema(requestBody.rootSchemaType)) {
+      setRequestBody({
+        ...requestBody,
+        rootSchemaType: {
+          kind: "ref",
+          schemaName: schema.name,
+        },
+      });
+    } else if (requestBody.rootSchemaType && isObjectSchema(requestBody.rootSchemaType)) {
+      // object 타입일 때는 rootSchemaType의 properties를 스키마의 fields로 채움
+      setRequestBody({
+        ...requestBody,
+        rootSchemaType: {
+          ...requestBody.rootSchemaType,
+          properties: schema.fields,
+        },
+        schemaRef: schema.name,
+      });
+    } else {
+      // 기존 방식: SchemaModal에서 이미 재귀적으로 변환된 필드를 그대로 사용
+      setRequestBody({
+        ...requestBody,
+        schemaRef: schema.name,
+        fields: schema.fields,
+      });
+    }
   };
 
   return (
@@ -262,7 +293,9 @@ export function ApiRequestCard({
                   onClick={() => {
                     const newBody: RequestBody = {
                       type: type,
-                      fields: type === "none" ? [] : [createDefaultField()],
+                      fields: type === "none" ? [] : (type === "json" || type === "xml" ? [] : [createDefaultField()]),
+                      // json/xml일 때는 rootSchemaType을 object로 기본 설정
+                      rootSchemaType: (type === "json" || type === "xml") ? createObjectField("").schemaType : undefined,
                     };
                     setRequestBody(newBody);
                   }}
@@ -279,11 +312,58 @@ export function ApiRequestCard({
             </div>
 
             {/* Table Format for all types except none */}
-            {requestBody.type !== "none" && requestBody.fields && (
+            {requestBody.type !== "none" && (
               <div>
+                {/* JSON/XML 타입일 때 Root Type 선택 */}
+                {(requestBody.type === "json" || requestBody.type === "xml") && (
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Root Type
+                    </label>
+                    <select
+                      value={requestBody.rootSchemaType?.kind || "object"}
+                      onChange={(e) => {
+                        const kind = e.target.value as SchemaType["kind"];
+                        let newRootSchemaType: SchemaType;
+                        
+                        switch (kind) {
+                          case "object":
+                            newRootSchemaType = createObjectField("").schemaType;
+                            break;
+                          case "array":
+                            newRootSchemaType = createArrayField("").schemaType;
+                            break;
+                          case "primitive":
+                            newRootSchemaType = createPrimitiveField("", "string").schemaType;
+                            break;
+                          case "ref":
+                            newRootSchemaType = createRefField("", "").schemaType;
+                            break;
+                          default:
+                            newRootSchemaType = createObjectField("").schemaType;
+                        }
+                        
+                        setRequestBody({
+                          ...requestBody,
+                          rootSchemaType: newRootSchemaType,
+                          fields: kind === "object" ? [] : undefined,
+                          schemaRef: undefined,
+                        });
+                      }}
+                      disabled={isReadOnly}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm"
+                    >
+                      <option value="object">Object</option>
+                      <option value="array">Array</option>
+                      <option value="primitive">Primitive (string, number, etc.)</option>
+                      <option value="ref">Schema Reference</option>
+                    </select>
+                  </div>
+                )}
+
                 <div className="mb-3 flex gap-2 items-center">
-                  {/* Schema 참조 표시 */}
-                  {requestBody.schemaRef && (
+                  {/* Schema 참조 표시 (JSON/XML이 아닐 때만) */}
+                  {requestBody.schemaRef && requestBody.type !== "json" && requestBody.type !== "xml" && (
                     <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-md">
                       <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
                         Schema: {requestBody.schemaRef}
@@ -307,6 +387,9 @@ export function ApiRequestCard({
                     </div>
                   )}
                   
+                  {/* JSON/XML이 아닐 때만 Add Field 버튼 표시 */}
+                  {requestBody.type !== "json" && requestBody.type !== "xml" && (
+                    <>
                   <button
                     onClick={() => {
                       setRequestBody({
@@ -333,11 +416,248 @@ export function ApiRequestCard({
                   >
                     {requestBody.schemaRef ? "Change Schema" : "+ Add Schema"}
                   </button>
+                    </>
+                  )}
                 </div>
                 
-                {/* 새로운 재귀적 SchemaField Editor */}
+                {/* JSON/XML 타입일 때 Root Type에 따른 편집 UI */}
+                {(requestBody.type === "json" || requestBody.type === "xml") && requestBody.rootSchemaType && (
+                  <div>
+                    {/* Object 타입 */}
+                    {isObjectSchema(requestBody.rootSchemaType) && (() => {
+                      const objectSchema = requestBody.rootSchemaType;
+                      // schemaRef가 있으면 필드 편집 불가 (form-data와 동일한 동작)
+                      const hasSchemaRef = !!requestBody.schemaRef;
+                      return (
+                        <div>
+                          {/* Schema 참조 표시 */}
+                          {hasSchemaRef && (
+                            <div className="mb-3 flex items-center gap-2 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-md">
+                              <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                                Schema: {requestBody.schemaRef}
+                              </span>
+                              <button
+                                onClick={() => {
+                                  if (isObjectSchema(requestBody.rootSchemaType!)) {
+                                    setRequestBody({
+                                      ...requestBody,
+                                      schemaRef: undefined,
+                                      fields: [],
+                                      rootSchemaType: {
+                                        ...requestBody.rootSchemaType!,
+                                        properties: [],
+                                      },
+                                    });
+                                  } else {
+                                    setRequestBody({
+                                      ...requestBody,
+                                      schemaRef: undefined,
+                                      fields: [],
+                                    });
+                                  }
+                                }}
+                                disabled={isReadOnly}
+                                className="text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
+                                title="Remove Schema"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            </div>
+                          )}
+                          <div className="mb-3 flex gap-2 items-center">
+                            <button
+                              onClick={() => {
+                                setRequestBody({
+                                  ...requestBody,
+                                  rootSchemaType: {
+                                    ...objectSchema,
+                                    properties: [
+                                      ...objectSchema.properties,
+                                      createDefaultField(),
+                                    ],
+                                  },
+                                });
+                              }}
+                              disabled={isReadOnly || hasSchemaRef}
+                              className={`px-3 py-1 text-sm text-[#2563EB] hover:text-[#1E40AF] font-medium ${
+                                isReadOnly || hasSchemaRef ? "opacity-50 cursor-not-allowed" : ""
+                              }`}
+                            >
+                              + Add Field
+                            </button>
+                            <button
+                              onClick={() => setIsSchemaModalOpen(true)}
+                              disabled={isReadOnly}
+                              className={`px-3 py-1 text-sm text-emerald-600 hover:text-emerald-700 font-medium ${
+                                isReadOnly ? "opacity-50 cursor-not-allowed" : ""
+                              }`}
+                            >
+                              {hasSchemaRef ? "Change Schema" : "+ Add Schema"}
+                            </button>
+                          </div>
+                          <div className="space-y-2">
+                            {objectSchema.properties.map((field, index) => (
+                              <SchemaFieldEditor
+                                key={index}
+                                field={field}
+                                onChange={(newField) => {
+                                  const updated = [...objectSchema.properties];
+                                  updated[index] = newField;
+                                  setRequestBody({
+                                    ...requestBody,
+                                    rootSchemaType: {
+                                      ...objectSchema,
+                                      properties: updated,
+                                    },
+                                  });
+                                }}
+                                onRemove={() => {
+                                  const updated = objectSchema.properties.filter((_, i) => i !== index);
+                                  setRequestBody({
+                                    ...requestBody,
+                                    rootSchemaType: {
+                                      ...objectSchema,
+                                      properties: updated,
+                                    },
+                                  });
+                                }}
+                                isReadOnly={isReadOnly || hasSchemaRef}
+                                allowFileType={false}
+                              />
+                            ))}
+                          </div>
+                          {(!objectSchema.properties || objectSchema.properties.length === 0) && !hasSchemaRef && (
+                            <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
+                              <p>No fields yet. Click "+ Add Field" to add one.</p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Array 타입 */}
+                    {isArraySchema(requestBody.rootSchemaType) && (
+                      <div>
+                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Array Items:
+                        </p>
+                        <div className="ml-4">
+                          <SchemaFieldEditor
+                            field={{
+                              key: "items",
+                              schemaType: requestBody.rootSchemaType.items,
+                              description: requestBody.rootSchemaType.itemsDescription,
+                              required: requestBody.rootSchemaType.itemsRequired,
+                            }}
+                            onChange={(newField) => {
+                              setRequestBody({
+                                ...requestBody,
+                                rootSchemaType: {
+                                  ...requestBody.rootSchemaType!,
+                                  items: newField.schemaType,
+                                  itemsDescription: newField.description,
+                                  itemsRequired: newField.required,
+                                } as typeof requestBody.rootSchemaType,
+                              });
+                            }}
+                            depth={0}
+                            isReadOnly={isReadOnly}
+                            allowFileType={false}
+                          />
+                          <div className="flex gap-2 mt-2">
+                            <input
+                              type="number"
+                              value={requestBody.rootSchemaType.minItems || ""}
+                              onChange={(e) => {
+                                setRequestBody({
+                                  ...requestBody,
+                                  rootSchemaType: {
+                                    ...requestBody.rootSchemaType!,
+                                    minItems: e.target.value ? parseInt(e.target.value) : undefined,
+                                  } as typeof requestBody.rootSchemaType,
+                                });
+                              }}
+                              placeholder="Min items"
+                              disabled={isReadOnly}
+                              className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900"
+                            />
+                            <input
+                              type="number"
+                              value={requestBody.rootSchemaType.maxItems || ""}
+                              onChange={(e) => {
+                                setRequestBody({
+                                  ...requestBody,
+                                  rootSchemaType: {
+                                    ...requestBody.rootSchemaType!,
+                                    maxItems: e.target.value ? parseInt(e.target.value) : undefined,
+                                  } as typeof requestBody.rootSchemaType,
+                                });
+                              }}
+                              placeholder="Max items"
+                              disabled={isReadOnly}
+                              className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Primitive 타입 */}
+                    {isPrimitiveSchema(requestBody.rootSchemaType) && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Primitive Type
+                        </label>
+                        <select
+                          value={requestBody.rootSchemaType.type}
+                          onChange={(e) => {
+                            setRequestBody({
+                              ...requestBody,
+                              rootSchemaType: {
+                                ...requestBody.rootSchemaType!,
+                                type: e.target.value as PrimitiveTypeName,
+                                format: e.target.value === "file" ? "binary" : undefined,
+                              } as typeof requestBody.rootSchemaType,
+                            });
+                          }}
+                          disabled={isReadOnly}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm"
+                        >
+                          <option value="string">string</option>
+                          <option value="integer">integer</option>
+                          <option value="number">number</option>
+                          <option value="boolean">boolean</option>
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Ref 타입 */}
+                    {isRefSchema(requestBody.rootSchemaType) && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Schema Reference
+                        </label>
+                        <button
+                          onClick={() => setIsSchemaModalOpen(true)}
+                          disabled={isReadOnly}
+                          className={`w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50 text-sm ${
+                            isReadOnly ? "opacity-50 cursor-not-allowed" : ""
+                          }`}
+                        >
+                          {requestBody.rootSchemaType.schemaName || "Select Schema..."}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* JSON/XML이 아닐 때 기존 필드 편집 UI */}
+                {requestBody.type !== "json" && requestBody.type !== "xml" && requestBody.fields && (
+                  <>
                 <div className="space-y-2">
-                  {requestBody.fields && requestBody.fields.map((field, index) => (
+                      {requestBody.fields.map((field, index) => (
                     <SchemaFieldEditor
                       key={index}
                       field={field}
@@ -366,6 +686,8 @@ export function ApiRequestCard({
                   <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
                     <p>No fields yet. Click "+ Add Field" to add one.</p>
                   </div>
+                    )}
+                  </>
                 )}
               </div>
             )}

@@ -12,6 +12,10 @@
  *   <li>{@link kr.co.ouroboros.core.rest.tryit.service.TryTraceService} - Retrieves full call trace</li>
  *   <li>{@link kr.co.ouroboros.core.rest.tryit.service.TryIssuesService} - Retrieves detected issues</li>
  * </ul>
+ * <p>
+ * <b>Note:</b> TraceDataRetriever is located in
+ * {@link kr.co.ouroboros.core.rest.tryit.infrastructure.storage} package
+ * as it is a storage-related component.
  *
  * @since 0.0.1
  */

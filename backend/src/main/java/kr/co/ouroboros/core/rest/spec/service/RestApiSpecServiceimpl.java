@@ -21,6 +21,7 @@ import org.yaml.snakeyaml.Yaml;
 import java.util.*;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.stream.Collectors;
 
 /**
  * Implementation of {@link RestApiSpecService}.
@@ -371,7 +372,11 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         }
 
         if (request.getTags() != null && !request.getTags().isEmpty()) {
-            operation.put("tags", request.getTags());
+            // tags를 대문자로 변환
+            List<String> upperCaseTags = request.getTags().stream()
+                    .map(String::toUpperCase)
+                    .collect(Collectors.toList());
+            operation.put("tags", upperCaseTags);
         }
 
         if (request.getParameters() != null && !request.getParameters().isEmpty()) {
@@ -403,7 +408,19 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         return operation;
     }
 
+    /**
+     * Updates operation fields based on the request.
+     * <p>
+     * Field update rules:
+     * - null: field is not updated (existing value preserved)
+     * - empty array []: field is removed from operation
+     * - non-empty value: field is updated with new value
+     *
+     * @param operation the operation to update
+     * @param request the update request containing new values
+     */
     private void updateOperationFields(Map<String, Object> operation, UpdateRestApiRequest request) {
+        // String fields: update if not null
         if (request.getSummary() != null) {
             operation.put("summary", request.getSummary());
         }
@@ -411,22 +428,49 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
             operation.put("description", request.getDescription());
         }
 
+        // List fields: empty array removes, non-empty updates, null preserves
         if (request.getTags() != null) {
-            operation.put("tags", request.getTags());
+            if (request.getTags().isEmpty()) {
+                operation.remove("tags");
+                log.info("✓ Tags removed from operation");
+            } else {
+                // tags를 대문자로 변환
+                List<String> upperCaseTags = request.getTags().stream()
+                        .map(String::toUpperCase)
+                        .collect(Collectors.toList());
+                operation.put("tags", upperCaseTags);
+            }
         }
+
         if (request.getParameters() != null) {
-            operation.put("parameters", convertParameters(request.getParameters()));
+            if (request.getParameters().isEmpty()) {
+                operation.remove("parameters");
+                log.info("✓ Parameters removed from operation");
+            } else {
+                operation.put("parameters", convertParameters(request.getParameters()));
+            }
         }
+
+        // Object fields: update if not null
         if (request.getRequestBody() != null) {
             operation.put("requestBody", convertRequestBody(request.getRequestBody()));
         }
+
+        // Map fields: update if not null
         if (request.getResponses() != null) {
             operation.put("responses", convertResponses(request.getResponses()));
         }
-        if (request.getSecurity() != null && !request.getSecurity().isEmpty()) {
-            List<Map<String, List<String>>> securityList = convertSecurity(request.getSecurity());
-            operation.put("security", securityList);
-            log.info("✓ Security updated in operation: {}", securityList);
+
+        // Security: empty array removes, non-empty updates, null preserves
+        if (request.getSecurity() != null) {
+            if (request.getSecurity().isEmpty()) {
+                operation.remove("security");
+                log.info("✓ Security removed from operation");
+            } else {
+                List<Map<String, List<String>>> securityList = convertSecurity(request.getSecurity());
+                operation.put("security", securityList);
+                log.info("✓ Security updated in operation: {}", securityList);
+            }
         }
 
         // Reset x-ouroboros-diff to "none" when user explicitly updates the spec
@@ -1070,6 +1114,18 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
 
                 // Update $ref references in the operation
                 updateSchemaReferences(operation, schemaRenameMap);
+
+                // tags를 대문자로 변환
+                if (operation.containsKey("tags") && operation.get("tags") instanceof List) {
+                    @SuppressWarnings("unchecked")
+                    List<Object> tagsObj = (List<Object>) operation.get("tags");
+                    if (tagsObj != null && !tagsObj.isEmpty()) {
+                        List<String> upperCaseTags = tagsObj.stream()
+                                .map(obj -> obj.toString().toUpperCase())
+                                .collect(Collectors.toList());
+                        operation.put("tags", upperCaseTags);
+                    }
+                }
 
                 // Enrich operation with Ouroboros fields
                 enrichOperationWithOuroborosFields(operation);

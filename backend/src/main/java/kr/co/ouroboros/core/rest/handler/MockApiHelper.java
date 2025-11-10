@@ -17,15 +17,18 @@ public final class MockApiHelper {
     }
 
     /**
-     * Determines whether the operation should be treated as a mock and, if so, marks and tags the file operation accordingly.
+     * Marks the file operation as a mock and copies its mock tag when the scanned operation indicates mock progress.
      *
-     * @param fileOp  the operation from the file to update when mock status applies
-     * @param scanOp  the scanned operation whose mock metadata is the source of truth
-     * @return `true` if the scanned operation's XOuroborosProgress equals "MOCK", `false` otherwise.
+     * If the scanned operation's XOuroborosProgress equals "mock" (case-insensitive), this method sets
+     * fileOp's XOuroborosProgress to "mock" and copies XOuroborosTag from scanOp to fileOp.
+     *
+     * @param fileOp the operation from the file to update when mock status applies
+     * @param scanOp the scanned operation whose mock metadata is the source of truth
+     * @return true if scanOp's XOuroborosProgress equals "mock" (case-insensitive), false otherwise
      */
     public static boolean isMockApi(Operation fileOp, Operation scanOp) {
         String xOuroborosProgress = scanOp.getXOuroborosProgress();
-        if (xOuroborosProgress.equals("mock")) {
+        if (xOuroborosProgress.equalsIgnoreCase("mock")) {
             fileOp.setXOuroborosProgress("mock");
             fileOp.setXOuroborosTag(scanOp.getXOuroborosTag());
             return true;

@@ -5,6 +5,8 @@ import java.util.List;
 /**
  * Tempo REST API client for querying traces.
  * <p>
+ * <b>Deprecated:</b> This interface is deprecated. Use {@link kr.co.ouroboros.core.rest.tryit.infrastructure.storage.TraceClient} instead.
+ * <p>
  * This interface provides methods for interacting with Tempo (distributed tracing backend)
  * to query and retrieve trace data.
  * <p>
@@ -16,11 +18,22 @@ import java.util.List;
  *   <li>Check if Tempo is enabled and available</li>
  * </ul>
  * <p>
- * Implementation: {@link kr.co.ouroboros.core.rest.tryit.infrastructure.storage.tempo.client.RestTemplateTempoClient}
+ * <b>Migration:</b>
+ * <p>
+ * Replace {@code TempoClient} with {@code TraceClient} in your code:
+ * <pre>{@code
+ * // Old
+ * private final TempoClient tempoClient;
+ * 
+ * // New
+ * private final TraceClient traceClient;
+ * }</pre>
  *
  * @author Ouroboros Team
  * @since 0.0.1
+ * @deprecated Use {@link kr.co.ouroboros.core.rest.tryit.infrastructure.storage.TraceClient} instead
  */
+@Deprecated
 public interface TempoClient {
     
     /**

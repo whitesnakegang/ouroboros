@@ -2,7 +2,7 @@ package kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.aspect;
 
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
-import kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.config.MethodTracingProperties;
+import kr.co.ouroboros.core.rest.tryit.config.properties.MethodTracingProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aopalliance.intercept.MethodInterceptor;
@@ -31,7 +31,7 @@ import java.lang.reflect.Parameter;
  *   <li>Handles errors and propagates them while recording in observation</li>
  * </ul>
  * <p>
- * This interceptor is configured by {@link kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.config.MethodTracingConfig}
+ * This interceptor is configured by {@link kr.co.ouroboros.core.rest.tryit.config.MethodTracingConfig}
  * and only applies to classes in allowed packages as specified in
  * {@link MethodTracingProperties}.
  *

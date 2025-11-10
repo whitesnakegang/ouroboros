@@ -8,7 +8,9 @@ import {
   isPrimitiveSchema,
   isObjectSchema,
   isArraySchema,
+  isRefSchema,
 } from "@/features/spec/types/schema.types";
+import { JsonEditor } from "@/components/JsonEditor";
 
 interface RequestBodyFormProps {
   requestBody: RequestBody | null;
@@ -36,9 +38,32 @@ function getDefaultValue(schemaType: SchemaType): any {
     }
   }
   if (isArraySchema(schemaType)) {
-    return [];
+    // items가 object schema인 경우 properties를 기반으로 객체 생성
+    if (isObjectSchema(schemaType.items)) {
+      const obj: Record<string, any> = {};
+      schemaType.items.properties.forEach((field) => {
+        obj[field.key] = getDefaultValue(field.schemaType);
+      });
+      return [obj];
+    }
+    // items가 ref인 경우 빈 객체 (이미 변환되어야 하지만 안전장치)
+    if (isRefSchema(schemaType.items)) {
+      return [{}];
+    }
+    // primitive나 기타 타입
+    const itemValue = getDefaultValue(schemaType.items);
+    return itemValue !== undefined ? [itemValue] : [];
   }
   if (isObjectSchema(schemaType)) {
+    // object schema인 경우 properties를 기반으로 객체 생성
+    const obj: Record<string, any> = {};
+    schemaType.properties.forEach((field) => {
+      obj[field.key] = getDefaultValue(field.schemaType);
+    });
+    return obj;
+  }
+  if (isRefSchema(schemaType)) {
+    // Ref는 스키마 참조이므로 빈 객체 반환
     return {};
   }
   return null;
@@ -56,6 +81,11 @@ function JsonBodyForm({
 }) {
   const initializedRef = useRef<string>("");
 
+  // rootSchemaType을 기반으로 기본값 생성
+  const generateDefaultFromRootSchema = (rootSchemaType: SchemaType): any => {
+    return getDefaultValue(rootSchemaType);
+  };
+
   // fields를 기반으로 기본 JSON 객체 생성
   const generateDefaultJson = (fields: SchemaField[]): string => {
     const obj: Record<string, any> = {};
@@ -65,8 +95,40 @@ function JsonBodyForm({
     return JSON.stringify(obj, null, 2);
   };
 
-  // 초기값 설정 (value가 비어있고 fields가 있을 때)
+  // 초기값 설정
   useEffect(() => {
+    // rootSchemaType이 있으면 우선 사용
+    if (requestBody?.rootSchemaType) {
+      const rootKey = JSON.stringify(requestBody.rootSchemaType);
+
+      if (rootKey !== initializedRef.current) {
+        initializedRef.current = rootKey;
+
+        const defaultValue = generateDefaultFromRootSchema(
+          requestBody.rootSchemaType
+        );
+        if (defaultValue !== undefined && defaultValue !== null) {
+          const defaultJson = JSON.stringify(defaultValue, null, 2);
+          if (
+            !value ||
+            value.trim() === "" ||
+            value === "{}" ||
+            value === "[]" ||
+            value === '""'
+          ) {
+            onChange(defaultJson);
+          }
+        } else {
+          // Ref 타입이면 빈 값
+          if (value && value.trim() !== "") {
+            onChange("");
+          }
+        }
+      }
+      return;
+    }
+
+    // 기존 방식: fields 사용
     const fieldsKey = requestBody?.fields
       ? JSON.stringify(requestBody.fields.map((f) => f.key))
       : "";
@@ -89,15 +151,15 @@ function JsonBodyForm({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requestBody?.fields]);
+  }, [requestBody?.rootSchemaType, requestBody?.fields]);
 
   return (
     <div>
-      <textarea
+      <JsonEditor
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={onChange}
         placeholder='{\n  "key": "value"\n}'
-        className="w-full h-40 px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] font-mono text-sm"
+        height="300px"
       />
     </div>
   );
@@ -425,11 +487,11 @@ function FormField({
                   </div>
                 ) : (
                   <>
-                    <textarea
+                    <JsonEditor
                       value={JSON.stringify(arrayValue, null, 2)}
-                      onChange={(e) => {
+                      onChange={(newValue) => {
                         try {
-                          const parsed = JSON.parse(e.target.value);
+                          const parsed = JSON.parse(newValue);
                           if (Array.isArray(parsed)) {
                             onChange(parsed);
                           }
@@ -438,7 +500,7 @@ function FormField({
                         }
                       }}
                       placeholder="[]"
-                      className="w-full px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] font-mono text-sm min-h-[120px] resize-y"
+                      height="200px"
                     />
                     <div className="flex gap-2">
                       <button
@@ -543,18 +605,18 @@ function FormField({
                 ))}
               </div>
             ) : (
-              <textarea
+              <JsonEditor
                 value={JSON.stringify(objectValue, null, 2)}
-                onChange={(e) => {
+                onChange={(newValue) => {
                   try {
-                    const parsed = JSON.parse(e.target.value);
+                    const parsed = JSON.parse(newValue);
                     onChange(parsed);
                   } catch {
                     // Invalid JSON, keep as is
                   }
                 }}
                 placeholder='{\n  "key": "value"\n}'
-                className="w-full px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] font-mono text-sm min-h-[120px] resize-y"
+                height="200px"
               />
             )}
             <label className="flex items-center gap-1 text-xs text-[#8B949E]">

@@ -1,37 +1,12 @@
-import { useState } from "react";
-// @ts-expect-error - openapi-snippet has no type definitions
-import OpenAPISnippet from "openapi-snippet";
-import type { RequestBody } from "../types/schema.types";
-import { convertRequestBodyToOpenAPI } from "../utils/schemaConverter";
-
-interface KeyValuePair {
-  key: string;
-  value: string;
-  required?: boolean;
-  description?: string;
-  type?: string;
-}
+import { useState, useEffect } from "react";
+import type { RestApiSpecResponse } from "../services/api";
+import { getSchema } from "../services/api";
 
 interface CodeSnippetPanelProps {
   isOpen: boolean;
   onClose: () => void;
-  method: string;
-  url: string;
-  headers: KeyValuePair[];
-  requestBody?: RequestBody;
+  spec: RestApiSpecResponse | null;
 }
-
-// openapi-snippet의 target 매핑
-const languageTargets: Record<string, string> = {
-  javascript: "javascript_fetch",
-  typescript: "javascript_fetch", // TypeScript는 JavaScript와 동일한 target 사용
-  python: "python_requests",
-  curl: "shell_curl",
-  shell: "shell_curl",
-  java: "java_okhttp",
-  swift: "swift_urlsession",
-  go: "go_native",
-};
 
 const languages = [
   { id: "javascript", name: "JavaScript" },
@@ -44,162 +19,168 @@ const languages = [
   { id: "go", name: "Go" },
 ];
 
-// OpenAPI 스펙을 구성하는 함수
-function buildOpenAPISpec(
-  method: string,
-  url: string,
-  headers: KeyValuePair[],
-  requestBody?: RequestBody
-): any {
-  const openApiSpec: any = {
-    openapi: "3.1.0",
-    info: {
-      title: "API Documentation",
-      version: "1.0.0",
-    },
-    paths: {},
-  };
+// 스키마에서 기본값 생성 (재귀)
+function generateDefaultValue(schema: any, schemas: Record<string, any> = {}): any {
+  if (!schema) return undefined;
 
-  // Parameters를 OpenAPI 형식으로 변환 (headers)
-  const parameters: any[] = [];
-  headers.forEach((header) => {
-    if (header.key && header.value) {
-      parameters.push({
-        name: header.key,
-        in: "header",
-        required: header.required || false,
-        schema: {
-          type: "string",
-        },
-        description: header.description || "",
-      });
+  // $ref 또는 ref 처리
+  if (schema.$ref || schema.ref) {
+    const refName = (schema.$ref || schema.ref)
+      .replace("#/components/schemas/", "")
+      .replace("components/schemas/", "");
+    const refSchema = schemas[refName];
+    if (refSchema) {
+      return generateDefaultValue(refSchema, schemas);
     }
-  });
+    // 스키마를 찾을 수 없으면 빈 객체
+    return {};
+  }
 
-  // RequestBody를 OpenAPI 형식으로 변환
-  let openApiRequestBody = requestBody
-    ? convertRequestBodyToOpenAPI(requestBody)
-    : null;
+  // array 타입
+  if (schema.type === "array") {
+    if (schema.items) {
+      const itemValue = generateDefaultValue(schema.items, schemas);
+      return itemValue !== undefined ? [itemValue] : [];
+    }
+    return [];
+  }
 
-  // schemaRef가 있는 경우 $ref를 제거 (components 섹션이 없으므로)
-  // openapi-snippet은 $ref를 처리하려면 components 섹션이 필요함
-  if (openApiRequestBody?.content) {
-    const contentTypes = Object.keys(openApiRequestBody.content);
-    for (const contentType of contentTypes) {
-      const mediaType = openApiRequestBody.content[contentType];
-      // $ref나 ref가 있으면 제거 (이미 generateSnippet에서 schemaRef 체크하지만 안전장치)
-      if (mediaType?.schema?.$ref || mediaType?.schema?.ref) {
-        // schemaRef가 있는 경우 requestBody를 null로 설정하여 fallback 사용
-        openApiRequestBody = null;
-        break; // null로 설정했으므로 더 이상 처리할 필요 없음
+  // object 타입
+  if (schema.type === "object" && schema.properties) {
+    const obj: any = {};
+    Object.entries(schema.properties).forEach(([key, propSchema]: [string, any]) => {
+      const value = generateDefaultValue(propSchema, schemas);
+      if (value !== undefined) {
+        obj[key] = value;
+      }
+    });
+    return Object.keys(obj).length > 0 ? obj : undefined;
+  }
+
+  // primitive 타입
+  if (schema.type === "string") return "string";
+  if (schema.type === "integer" || schema.type === "number") return 0;
+  if (schema.type === "boolean") return false;
+
+  return undefined;
+}
+
+// RequestBody에서 body 값 생성
+async function generateBodyValue(requestBody: any): Promise<any> {
+  if (!requestBody || !requestBody.content) return undefined;
+
+  const contentType = Object.keys(requestBody.content)[0];
+  if (!contentType) return undefined;
+
+  const mediaType = requestBody.content[contentType];
+  if (!mediaType || !mediaType.schema) return undefined;
+
+  const schema = mediaType.schema;
+  const schemas: Record<string, any> = {};
+
+  // $ref 또는 ref가 있으면 스키마 조회
+  if (schema.$ref || schema.ref) {
+    const refName = (schema.$ref || schema.ref)
+      .replace("#/components/schemas/", "")
+      .replace("components/schemas/", "");
+    try {
+      const response = await getSchema(refName);
+      schemas[refName] = response.data;
+    } catch {
+      // 스키마 조회 실패 시 빈 객체 반환
+      return {};
+    }
+  }
+
+  // array의 items에 ref가 있는 경우
+  if (schema.type === "array" && schema.items) {
+    if (schema.items.$ref || schema.items.ref) {
+      const refName = (schema.items.$ref || schema.items.ref)
+        .replace("#/components/schemas/", "")
+        .replace("components/schemas/", "");
+      try {
+        const response = await getSchema(refName);
+        const refSchema = response.data;
+        schemas[refName] = refSchema;
+        // ref 스키마를 items로 사용하여 generateDefaultValue 호출
+        const itemValue = generateDefaultValue(refSchema, schemas);
+        return itemValue !== undefined ? [itemValue] : [{}];
+      } catch {
+        return [{}];
       }
     }
   }
 
-  // Operation 구성
-  const operation: any = {
-    summary: `${method} ${url}`,
-    operationId: `${method.toLowerCase()}_${url
-      .replace(/\//g, "_")
-      .replace(/[{}]/g, "")}`,
-  };
-
-  if (parameters.length > 0) {
-    operation.parameters = parameters;
-  }
-
-  if (openApiRequestBody) {
-    operation.requestBody = openApiRequestBody;
-  }
-
-  // Path 구성
-  openApiSpec.paths[url] = {
-    [method.toLowerCase()]: operation,
-  };
-
-  return openApiSpec;
+  return generateDefaultValue(schema, schemas);
 }
 
 export function CodeSnippetPanel({
   isOpen,
   onClose,
-  method,
-  url,
-  headers,
-  requestBody,
+  spec,
 }: CodeSnippetPanelProps) {
   const [selectedLanguage, setSelectedLanguage] = useState("javascript");
   const [copied, setCopied] = useState(false);
+  const [snippet, setSnippet] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const generateSnippet = (lang: string): string => {
-    const langConfig = languages.find((l) => l.id === lang);
-    if (!langConfig) return "";
-
-    // schemaRef가 있는 경우 openapi-snippet을 사용하지 않고 fallback 사용
-    // (components 섹션이 없어서 $ref를 처리할 수 없음)
-    if (requestBody?.schemaRef) {
-      return generateFallbackSnippet(lang, method, url, headers, requestBody);
+  useEffect(() => {
+    if (!isOpen || !spec) {
+      setSnippet("");
+      return;
     }
 
-    const target = languageTargets[lang];
-    if (!target) {
-      // 지원하지 않는 언어는 fallback 사용
-      return generateFallbackSnippet(lang, method, url, headers, requestBody);
-    }
+    const generateSnippet = async () => {
+      setLoading(true);
+      try {
+        const method = spec.method;
+        const url = spec.path;
+        const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
+        const fullUrl = `${baseUrl}${url}`;
 
-    try {
-      // OpenAPI 스펙 구성
-      const openApiSpec = buildOpenAPISpec(method, url, headers, requestBody);
-
-      // openapi-snippet을 사용하여 코드 생성
-      const result = OpenAPISnippet.getEndpointSnippets(
-        openApiSpec,
-        url,
-        method.toLowerCase(),
-        [target]
-      );
-
-      // 반환값 처리 (제공하신 예제 + 보완)
-      if (result) {
-        // result.snippets가 있는 경우
-        if (
-          result.snippets &&
-          Array.isArray(result.snippets) &&
-          result.snippets.length > 0
-        ) {
-          const snippet = result.snippets[0];
-          return snippet.content || snippet.snippet || "";
+        // Headers 추출
+        const headers: Record<string, string> = {};
+        if (spec.parameters && Array.isArray(spec.parameters)) {
+          spec.parameters.forEach((param: any) => {
+            if (param.in === "header" && param.name) {
+              headers[param.name] = param.schema?.default || "";
+            }
+          });
         }
-        // result 자체가 배열인 경우
-        if (Array.isArray(result) && result.length > 0) {
-          const snippet = result[0];
-          return (
-            snippet.content ||
-            snippet.snippet ||
-            (typeof snippet === "string" ? snippet : "")
-          );
+
+        // RequestBody 처리
+        let bodyValue: any = undefined;
+        if (spec.requestBody && method !== "GET") {
+          bodyValue = await generateBodyValue(spec.requestBody);
         }
-        // result에 직접 content나 snippet이 있는 경우
-        if (result.content) return result.content;
-        if (result.snippet) return result.snippet;
-        if (typeof result === "string") return result;
+
+        // 스니펫 생성
+        const snippet = generateCodeSnippet(
+          selectedLanguage,
+          method,
+          fullUrl,
+          headers,
+          bodyValue
+        );
+        setSnippet(snippet);
+      } catch (error) {
+        console.error("스니펫 생성 실패:", error);
+        setSnippet("// 스니펫 생성 중 오류가 발생했습니다.");
+      } finally {
+        setLoading(false);
       }
-    } catch {
-      // 에러 발생 시 fallback 사용
-    }
+    };
 
-    // openapi-snippet이 실패하거나 지원하지 않는 경우 fallback
-    return generateFallbackSnippet(lang, method, url, headers, requestBody);
-  };
+    generateSnippet();
+  }, [isOpen, spec, selectedLanguage]);
 
   const copyToClipboard = () => {
-    const code = generateSnippet(selectedLanguage);
-    navigator.clipboard.writeText(code);
+    navigator.clipboard.writeText(snippet);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !spec) return null;
 
   return (
     <>
@@ -272,19 +253,26 @@ export function CodeSnippetPanel({
           <div className="bg-gray-50 dark:bg-[#0D1117] rounded-md border border-gray-200 dark:border-[#2D333B] overflow-hidden">
             <div className="flex items-center justify-between bg-white dark:bg-[#161B22] px-4 py-2 border-b border-gray-200 dark:border-[#2D333B]">
               <span className="text-sm text-gray-600 dark:text-[#8B949E] font-mono">
-                {method} {url}
+                {spec.method} {spec.path}
               </span>
               <button
                 onClick={copyToClipboard}
-                className="px-3 py-1 text-sm bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-colors"
+                disabled={loading || !snippet}
+                className="px-3 py-1 text-sm bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {copied ? "복사됨" : "복사"}
               </button>
             </div>
             <div className="bg-[#0D1117] dark:bg-[#010409] p-4 rounded-md">
+              {loading ? (
+                <div className="text-sm text-[#E6EDF3] text-center py-8">
+                  스니펫 생성 중...
+                </div>
+              ) : (
               <pre className="text-sm text-[#E6EDF3] whitespace-pre-wrap overflow-x-auto font-mono">
-                <code>{generateSnippet(selectedLanguage)}</code>
+                  <code>{snippet || "// 스니펫을 생성할 수 없습니다."}</code>
               </pre>
+              )}
             </div>
           </div>
         </div>
@@ -293,251 +281,174 @@ export function CodeSnippetPanel({
   );
 }
 
-// Fallback 함수: openapi-snippet이 실패하거나 지원하지 않는 경우
-function generateFallbackSnippet(
+// 코드 스니펫 생성 함수
+function generateCodeSnippet(
   lang: string,
   method: string,
   url: string,
-  headers: KeyValuePair[],
-  requestBody?: RequestBody
+  headers: Record<string, string>,
+  bodyValue?: any
 ): string {
-  const headerString = headers
-    .filter((h) => h.key && h.value)
-    .map((h) => {
-      if (lang === "javascript" || lang === "typescript") {
-        return `  "${h.key}": "${h.value}"`;
-      } else if (lang === "python") {
-        return `    "${h.key}": "${h.value}"`;
-      } else if (lang === "curl" || lang === "shell") {
-        return `  -H "${h.key}: ${h.value}"`;
-      } else if (lang === "java") {
-        return `      .header("${h.key}", "${h.value}")`;
-      } else if (lang === "swift") {
-        return `    "${h.key}": "${h.value}"`;
-      } else if (lang === "go") {
-        return `    req.Header.Set("${h.key}", "${h.value}")`;
-      }
-      return "";
-    })
-    .filter(Boolean)
-    .join(lang === "curl" || lang === "shell" ? " \\\n" : "\n");
-
-  // RequestBody 처리 개선
-  let bodyString = "";
-  let bodyVar = "";
-  if (requestBody && method !== "GET" && requestBody.type !== "none") {
-    // requestBody에서 실제 값을 추출
-    const bodyValue = extractRequestBodyValue(requestBody);
-
-    if (bodyValue !== undefined) {
-      if (requestBody.type === "json") {
-        const bodyJson = JSON.stringify(bodyValue, null, 2);
-        if (lang === "javascript") {
-          bodyVar = `\n\nconst body = ${bodyJson};`;
-          bodyString = `\n  body: JSON.stringify(body)`;
-        } else if (lang === "typescript") {
-          bodyVar = `\n\nconst body: Record<string, any> = ${bodyJson};`;
-          bodyString = `\n  body: JSON.stringify(body)`;
-        } else if (lang === "python") {
-          bodyVar = `\n\nbody = ${bodyJson}`;
-          bodyString = `\n    json=body`;
-        } else if (lang === "curl" || lang === "shell") {
-          bodyString = ` -d '${JSON.stringify(bodyValue)}'`;
-        } else if (lang === "swift") {
-          const swiftDict = Object.entries(bodyValue)
-            .map(([k, v]) => `    "${k}": ${JSON.stringify(v)}`)
-            .join(",\n");
-          bodyVar = `\n\nlet body: [String: Any] = [\n${swiftDict}\n]`;
-          bodyString = `\nrequest.httpBody = try? JSONSerialization.data(withJSONObject: body)`;
-        } else if (lang === "go") {
-          const goMap = Object.entries(bodyValue)
-            .map(([k, v]) => `        "${k}": ${JSON.stringify(v)}`)
-            .join(",\n");
-          bodyVar = `\n\nbody := map[string]interface{}{\n${goMap}\n}`;
-          bodyString = `jsonBody, _ := json.Marshal(body)\nreq, _ := http.NewRequest("${method}", "${url}", bytes.NewBuffer(jsonBody))`;
-        }
-      } else if (requestBody.type === "form-data") {
-        // Form-data 처리
-        if (lang === "python") {
-          bodyVar = `\n\nfiles = ${JSON.stringify(bodyValue)}`;
-          bodyString = `\n    files=files`;
-        } else if (lang === "curl" || lang === "shell") {
-          const formData = Object.entries(bodyValue)
-            .map(([k, v]) => `-F "${k}=${v}"`)
-            .join(" \\\n  ");
-          bodyString = ` \\\n  ${formData}`;
-        }
-      } else if (requestBody.type === "x-www-form-urlencoded") {
-        // URL-encoded 처리
-        if (lang === "python") {
-          bodyVar = `\n\ndata = ${JSON.stringify(bodyValue)}`;
-          bodyString = `\n    data=data`;
-        } else if (lang === "curl" || lang === "shell") {
-          const formData = Object.entries(bodyValue)
-            .map(
-              ([k, v]) =>
-                `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`
-            )
-            .join("&");
-          bodyString = ` -d '${formData}'`;
-        }
-      } else if (requestBody.type === "xml") {
-        // XML 처리
-        if (lang === "curl" || lang === "shell") {
-          bodyString = ` -d '${bodyValue}'`;
-        }
-      }
-    }
-  }
+  const headerEntries = Object.entries(headers).filter(([_, v]) => v);
+  const hasBody = bodyValue !== undefined && method !== "GET";
 
   switch (lang) {
-    case "javascript":
-      return `const response = await fetch("${url}", {
-  method: "${method}",
-  headers: {
-${headerString}
-  }${bodyString}
-});${bodyVar}`;
+    case "javascript": {
+      const headerStr = headerEntries
+        .map(([k, v]) => `    "${k}": "${v}"`)
+        .join(",\n");
+      const headersPart = headerStr
+        ? `  headers: {\n${headerStr}\n  },`
+        : "";
+      const bodyPart = hasBody
+        ? `\n  body: JSON.stringify(${JSON.stringify(bodyValue, null, 2)})`
+        : "";
 
-    case "typescript":
-      return `const response: Response = await fetch("${url}", {
-  method: "${method}",
-  headers: {
-${headerString}
-  }${bodyString}
-});${bodyVar}`;
+      return `const options = {
+  method: '${method}'${headersPart ? `,\n${headersPart}` : ""}${bodyPart}
+};
 
-    case "python":
+fetch('${url}', options)
+  .then(response => response.json())
+  .then(data => console.log(data))
+  .catch(err => console.error(err));`;
+    }
+
+    case "typescript": {
+      const headerStr = headerEntries
+        .map(([k, v]) => `    "${k}": "${v}"`)
+        .join(",\n");
+      const headersPart = headerStr
+        ? `  headers: {\n${headerStr}\n  },`
+        : "";
+      const bodyPart = hasBody
+        ? `\n  body: JSON.stringify(${JSON.stringify(bodyValue, null, 2)})`
+        : "";
+
+      return `const options: RequestInit = {
+  method: '${method}'${headersPart ? `,\n${headersPart}` : ""}${bodyPart}
+};
+
+fetch('${url}', options)
+  .then((response: Response) => response.json())
+  .then((data: any) => console.log(data))
+  .catch((err: Error) => console.error(err));`;
+    }
+
+    case "python": {
+      const headerStr = headerEntries
+        .map(([k, v]) => `    "${k}": "${v}"`)
+        .join(",\n");
+      const headersPart = headerStr ? `    headers={\n${headerStr}\n    },\n` : "";
+      const bodyPart = hasBody
+        ? `    json=${JSON.stringify(bodyValue, null, 2)},\n`
+        : "";
+
       return `import requests
 
 response = requests.${method.toLowerCase()}( 
-    "${url}",
-    headers={
-${headerString}
-    }${bodyString}
-)${bodyVar}`;
+    '${url}',
+${headersPart}${bodyPart})
+print(response.json())`;
+    }
 
-    case "curl":
-      return `curl -X ${method} "${url}" \\
-${headerString}${bodyString ? ` \\` : ""}${bodyString}`;
+    case "curl": {
+      const headerParts = headerEntries.map(([k, v]) => `  -H "${k}: ${v}"`);
+      const bodyPart = hasBody
+        ? `  -d '${JSON.stringify(bodyValue)}'`
+        : "";
 
-    case "shell":
-      return `curl -X ${method} "${url}" \\\n${headerString}${bodyString}`;
+      return `curl -X ${method} '${url}' \\
+${headerParts.join(" \\\n")}${bodyPart ? ` \\\n${bodyPart}` : ""}`;
+    }
 
-    case "java":
-      return `CloseableHttpClient httpClient = HttpClients.createDefault();
-Http${method.charAt(0) + method.slice(1).toLowerCase()} request = new Http${
-        method.charAt(0) + method.slice(1).toLowerCase()
-      }("${url}");
+    case "shell": {
+      const headerParts = headerEntries.map(([k, v]) => `  -H "${k}: ${v}"`);
+      const bodyPart = hasBody
+        ? `  -d '${JSON.stringify(bodyValue)}'`
+        : "";
 
-${headerString}
+      return `curl -X ${method} '${url}' \\
+${headerParts.join(" \\\n")}${bodyPart ? ` \\\n${bodyPart}` : ""}`;
+    }
 
-CloseableHttpResponse response = httpClient.execute(request);`;
+    case "java": {
+      const headerParts = headerEntries
+        .map(([k, v]) => `      .header("${k}", "${v}")`)
+        .join("\n");
+      const bodyPart = hasBody
+        ? `      .body(JSON.stringify(${JSON.stringify(bodyValue)}))`
+        : "";
 
-    case "swift":
+      return `import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.net.URI;
+
+HttpClient client = HttpClient.newHttpClient();
+HttpRequest request = HttpRequest.newBuilder()
+      .uri(URI.create("${url}"))
+      .method("${method}", ${bodyPart ? `HttpRequest.BodyPublishers.ofString(${JSON.stringify(JSON.stringify(bodyValue))})` : "HttpRequest.BodyPublishers.noBody()"})
+${headerParts}
+
+HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());`;
+    }
+
+    case "swift": {
+      const headerStr = headerEntries
+        .map(([k, v]) => `    "${k}": "${v}"`)
+        .join(",\n");
+      const headersPart = headerStr ? `    ${headerStr}\n  ]` : "  ]";
+      const bodyPart = hasBody
+        ? `\n    request.httpBody = try? JSONSerialization.data(withJSONObject: ${JSON.stringify(bodyValue)})`
+        : "";
+
       return `import Foundation
 
 let url = URL(string: "${url}")!
 var request = URLRequest(url: url)
 request.httpMethod = "${method}"
+request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 request.allHTTPHeaderFields = [
-${headerString}
-]${bodyString}${bodyVar}
+${headersPart}${bodyPart}
 
 let task = URLSession.shared.dataTask(with: request) { data, response, error in
-    // Handle response
+    if let data = data {
+        let json = try? JSONSerialization.jsonObject(with: data)
+        print(json ?? "No data")
+    }
 }
 task.resume()`;
+    }
 
     case "go": {
-      const jsonImport = bodyVar
-        ? 'import (\n    "bytes"\n    "encoding/json"\n    "net/http"\n)'
-        : 'import "net/http"';
-      const reqLine = bodyVar
-        ? bodyString
-        : `req, _ := http.NewRequest("${method}", "${url}", nil)`;
-      return `${jsonImport}
+      const headerParts = headerEntries
+        .map(([k, v]) => `    req.Header.Set("${k}", "${v}")`)
+        .join("\n");
+      const bodyPart = hasBody
+        ? `\n    jsonBody, _ := json.Marshal(${JSON.stringify(bodyValue)})\n    req, _ = http.NewRequest("${method}", "${url}", bytes.NewBuffer(jsonBody))`
+        : `\n    req, _ := http.NewRequest("${method}", "${url}", nil)`;
 
-${reqLine}${bodyVar}
-${headerString}
+      return `package main
+
+import (
+    "bytes"
+    "encoding/json"
+    "net/http"
+)
+
+${bodyPart}
+${headerParts}
 
 client := &http.Client{}
 resp, err := client.Do(req)
 if err != nil {
-    // Handle error
+    panic(err)
 }
 defer resp.Body.Close()`;
     }
 
     default:
-      return "";
-  }
-}
-
-// requestBody에서 실제 값을 추출하는 함수 (재귀)
-function extractRequestBodyValue(field: any): any {
-  if (!field) return undefined;
-
-  // SchemaField 타입인 경우
-  if (field.schemaType) {
-    const schemaType = field.schemaType;
-
-    if (schemaType.kind === "primitive") {
-      // Primitive 타입: value가 있으면 사용, 없으면 mockExpression 또는 기본값
-      return (
-        field.value || field.mockExpression || getDefaultValue(schemaType.type)
-      );
-    } else if (schemaType.kind === "object") {
-      // Object 타입: properties를 재귀적으로 처리
-      const obj: any = {};
-      if (schemaType.properties) {
-        schemaType.properties.forEach((prop: any) => {
-          const value = extractRequestBodyValue(prop);
-          if (value !== undefined) {
-            obj[prop.key] = value;
-          }
-        });
-      }
-      return Object.keys(obj).length > 0 ? obj : undefined;
-    } else if (schemaType.kind === "array") {
-      // Array 타입: items를 재귀적으로 처리
-      const itemValue = extractRequestBodyValue({
-        schemaType: schemaType.items,
-      });
-      return itemValue !== undefined ? [itemValue] : undefined;
-    } else if (schemaType.kind === "ref") {
-      // Ref 타입: 스키마 참조이므로 기본값 반환
-      return undefined;
-    }
-  }
-
-  // 일반 객체인 경우 (fields 배열)
-  if (Array.isArray(field.fields)) {
-    const obj: any = {};
-    field.fields.forEach((f: any) => {
-      const value = extractRequestBodyValue(f);
-      if (value !== undefined) {
-        obj[f.key] = value;
-      }
-    });
-    return Object.keys(obj).length > 0 ? obj : undefined;
-  }
-
-  return undefined;
-}
-
-function getDefaultValue(type: string): any {
-  switch (type) {
-    case "string":
-      return "";
-    case "integer":
-    case "number":
-      return 0;
-    case "boolean":
-      return false;
-    case "file":
-      return undefined;
-    default:
-      return "";
+      return `// ${lang} 언어는 아직 지원되지 않습니다.`;
   }
 }
