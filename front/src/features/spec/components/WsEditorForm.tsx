@@ -258,7 +258,7 @@ export function WsEditorForm({
                   type="button"
                   onClick={() => setProtocol("ws://")}
                   disabled={isReadOnly}
-                  className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                     protocol === "ws://"
                       ? "bg-[#2563EB] text-white"
                       : "bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22]"
@@ -270,7 +270,7 @@ export function WsEditorForm({
                   type="button"
                   onClick={() => setProtocol("wss://")}
                   disabled={isReadOnly}
-                  className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                     protocol === "wss://"
                       ? "bg-[#2563EB] text-white"
                       : "bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22]"
@@ -311,111 +311,116 @@ export function WsEditorForm({
         </div>
       </div>
 
-      {/* Receivers */}
+      {/* Receivers & Replies */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-[#E6EDF3]">
-            Receivers
+            Receivers & Replies
           </h2>
           {!isReadOnly && (
-            <button
-              onClick={addReceiver}
-              className="px-4 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md text-sm font-medium transition-colors flex items-center gap-2"
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            <div className="flex items-center gap-2">
+              <button
+                onClick={addReceiver}
+                className="px-3 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md text-sm font-medium transition-colors flex items-center gap-2"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 4v16m8-8H4"
-                />
-              </svg>
-              Receiver 추가
-            </button>
-          )}
-        </div>
-        <div className="space-y-4">
-          {receivers.map((receiver, index) => (
-            <WsReceiverForm
-              key={index}
-              address={receiver.address}
-              setAddress={(address) =>
-                updateReceiver(index, { ...receiver, address })
-              }
-              headers={receiver.headers}
-              setHeaders={(headers) =>
-                updateReceiver(index, { ...receiver, headers })
-              }
-              schema={receiver.schema}
-              setSchema={(schema) =>
-                updateReceiver(index, { ...receiver, schema })
-              }
-              onRemove={() => removeReceiver(index)}
-              isReadOnly={isReadOnly}
-            />
-          ))}
-          {receivers.length === 0 && (
-            <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm border border-gray-200 dark:border-[#2D333B] rounded-md bg-gray-50 dark:bg-[#0D1117]">
-              <p>Receiver가 없습니다. "Receiver 추가" 버튼을 클릭하여 추가하세요.</p>
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+                Receiver 추가
+              </button>
+              <button
+                onClick={addReply}
+                className="px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md text-sm font-medium transition-colors flex items-center gap-2"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+                Reply 추가
+              </button>
             </div>
           )}
         </div>
-      </div>
 
-      {/* Replies */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-[#E6EDF3]">
-            Replies
-          </h2>
-          {!isReadOnly && (
-            <button
-              onClick={addReply}
-              className="px-4 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md text-sm font-medium transition-colors flex items-center gap-2"
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 4v16m8-8H4"
-                />
-              </svg>
-              Reply 추가
-            </button>
-          )}
+        {/* Receivers */}
+        <div className="mb-6">
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-3">
+            Receivers
+          </h3>
+          <div className="space-y-4">
+            {receivers.map((receiver, index) => (
+              <WsReceiverForm
+                key={index}
+                address={receiver.address}
+                setAddress={(address) =>
+                  updateReceiver(index, { ...receiver, address })
+                }
+                headers={receiver.headers}
+                setHeaders={(headers) =>
+                  updateReceiver(index, { ...receiver, headers })
+                }
+                schema={receiver.schema}
+                setSchema={(schema) =>
+                  updateReceiver(index, { ...receiver, schema })
+                }
+                onRemove={() => removeReceiver(index)}
+                isReadOnly={isReadOnly}
+              />
+            ))}
+            {receivers.length === 0 && (
+              <div className="text-center py-6 text-gray-500 dark:text-gray-400 text-sm border border-gray-200 dark:border-[#2D333B] rounded-md bg-gray-50 dark:bg-[#0D1117]">
+                <p>Receiver가 없습니다. "Receiver 추가" 버튼을 클릭하여 추가하세요.</p>
+              </div>
+            )}
+          </div>
         </div>
-        <div className="space-y-4">
-          {replies.map((reply, index) => (
-            <WsReplyForm
-              key={index}
-              address={reply.address}
-              setAddress={(address) =>
-                updateReply(index, { ...reply, address })
-              }
-              schema={reply.schema}
-              setSchema={(schema) =>
-                updateReply(index, { ...reply, schema })
-              }
-              onRemove={() => removeReply(index)}
-              isReadOnly={isReadOnly}
-            />
-          ))}
-          {replies.length === 0 && (
-            <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm border border-gray-200 dark:border-[#2D333B] rounded-md bg-gray-50 dark:bg-[#0D1117]">
-              <p>Reply가 없습니다. "Reply 추가" 버튼을 클릭하여 추가하세요.</p>
-            </div>
-          )}
+
+        {/* Replies */}
+        <div>
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-3">
+            Replies
+          </h3>
+          <div className="space-y-4">
+            {replies.map((reply, index) => (
+              <WsReplyForm
+                key={index}
+                address={reply.address}
+                setAddress={(address) =>
+                  updateReply(index, { ...reply, address })
+                }
+                schema={reply.schema}
+                setSchema={(schema) =>
+                  updateReply(index, { ...reply, schema })
+                }
+                onRemove={() => removeReply(index)}
+                isReadOnly={isReadOnly}
+              />
+            ))}
+            {replies.length === 0 && (
+              <div className="text-center py-6 text-gray-500 dark:text-gray-400 text-sm border border-gray-200 dark:border-[#2D333B] rounded-md bg-gray-50 dark:bg-[#0D1117]">
+                <p>Reply가 없습니다. "Reply 추가" 버튼을 클릭하여 추가하세요.</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
