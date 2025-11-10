@@ -169,7 +169,7 @@ public class OuroborosMockFilter implements Filter {
                          EndpointMeta meta, Object requestBody)
             throws IOException {
 
-        int statusCode = 200;
+        int statusCode = determineSuccessStatusCode(meta);
         RestResponseMeta responseMeta = meta.getResponses().get(statusCode);
 
         if (responseMeta == null) {
@@ -221,6 +221,45 @@ public class OuroborosMockFilter implements Filter {
 
         response.getWriter().write(bodyText);
         log.debug("Mock response sent with merged request: {} {} -> {}", meta.getMethod(), meta.getPath(), statusCode);
+    }
+
+    /**
+     * Determine the appropriate success status code (2xx) from the endpoint's response definitions.
+     *
+     * Priority order: 200 > 201 > 204 > other 2xx > first available response
+     *
+     * @param meta endpoint metadata containing response definitions
+     * @return the selected status code, or null if no responses are defined
+     */
+    private Integer determineSuccessStatusCode(EndpointMeta meta) {
+        if (meta.getResponses() == null || meta.getResponses().isEmpty()) {
+            return null;
+        }
+
+        // Priority 1: 200 OK
+        if (meta.getResponses().containsKey(200)) {
+            return 200;
+        }
+
+        // Priority 2: 201 Created
+        if (meta.getResponses().containsKey(201)) {
+            return 201;
+        }
+
+        // Priority 3: 204 No Content
+        if (meta.getResponses().containsKey(204)) {
+            return 204;
+        }
+
+        // Priority 4: Any other 2xx response
+        for (Integer code : meta.getResponses().keySet()) {
+            if (code >= 200 && code < 300) {
+                return code;
+            }
+        }
+
+        // Fallback: First available response (even if not 2xx)
+        return meta.getResponses().keySet().iterator().next();
     }
 
     /**
