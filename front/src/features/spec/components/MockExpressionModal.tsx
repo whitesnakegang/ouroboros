@@ -40,25 +40,40 @@ export function MockExpressionModal({
 
   const providers = dataFakerMethods.providers as Provider[];
 
-  // 초기값 파싱 (예: {{$name.fullName}} → provider: Name, method: fullName)
+  // 초기값 파싱 (예: {{$name.fullName}} → expression 값으로 찾기)
   useEffect(() => {
     if (initialValue && isOpen) {
-      const match = initialValue.match(/\{\{\$(\w+)\.(\w+)\}\}/);
+      // {{$...}} 형식에서 expression 추출 (파라미터 제거)
+      const match = initialValue.match(/\{\{\$(.+?)\}\}/);
       if (match) {
-        const [, providerExpr, methodName] = match;
-        const provider = providers.find(
-          (p) => p.name.toLowerCase().replace(/\s+/g, "") === providerExpr.toLowerCase()
-        );
-        if (provider) {
-          setSelectedProvider(provider);
-          const method = provider.methods.find((m) => m.name === methodName);
+        const expressionWithParams = match[1];
+        // 파라미터가 있는 경우 제거 (예: "lorem.fixedString(10)" → "lorem.fixedString")
+        const expression = expressionWithParams.split('(')[0].trim();
+        
+        // 모든 provider의 methods에서 expression과 일치하는 것 찾기
+        for (const provider of providers) {
+          const method = provider.methods.find((m) => m.expression === expression);
+          
           if (method) {
+            setSelectedProvider(provider);
             setSelectedMethod(method);
+            
+            // 파라미터 추출 (있는 경우)
+            const paramMatch = expressionWithParams.match(/\((.+)\)/);
+            if (paramMatch && method.hasParams) {
+              const params = paramMatch[1].split(',').map(p => p.trim());
+              setOptions({ 
+                length: params[0] || "", 
+                min: params[1] || "", 
+                max: params[2] || "" 
+              });
+            }
+            break;
           }
         }
       }
     }
-  }, [initialValue, isOpen]);
+  }, [initialValue, isOpen, providers]);
 
   // 검색어 필터링
   const filteredProviders = searchQuery
@@ -71,12 +86,12 @@ export function MockExpressionModal({
       )
     : providers;
 
-  // 최종 표현식 생성
+  // 최종 표현식 생성 - JSON의 expression 값을 직접 사용
   const generateExpression = () => {
     if (!selectedMethod || !selectedProvider) return "";
     
-    const providerKey = selectedProvider.name.toLowerCase().replace(/\s+/g, "");
-    let expr = `{{$${providerKey}.${selectedMethod.name}`;
+    // JSON의 expression 값을 직접 사용 (예: "name.fullName", "lorem.fixedString")
+    let expr = selectedMethod.expression;
     
     // 파라미터가 있는 메소드의 경우
     if (selectedMethod.hasParams) {
@@ -90,8 +105,9 @@ export function MockExpressionModal({
       }
     }
     
-    expr += "}}";
-    return expr;
+    // expressionFormat 적용 ({{$%s}})
+    const format = dataFakerMethods.expressionFormat || "{{$%s}}";
+    return format.replace('%s', expr);
   };
 
   const handleConfirm = () => {

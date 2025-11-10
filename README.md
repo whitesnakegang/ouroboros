@@ -148,7 +148,7 @@
 #### Gradle
 ```gradle
 dependencies {
-    implementation 'io.github.whitesnakegang:ouroboros:1.0.0'
+    implementation 'io.github.whitesnakegang:ouroboros:1.0.1'
     implementation 'org.springframework.boot:spring-boot-starter-web'
 }
 ```
@@ -158,7 +158,7 @@ dependencies {
 <dependency>
     <groupId>io.github.whitesnakegang</groupId>
     <artifactId>ouroboros</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
 </dependency>
 ```
 
@@ -285,8 +285,6 @@ public class UserController {
     @PostMapping
     @ApiState(
         state = ApiState.State.IMPLEMENTING,
-        owner = "backend-team",
-        description = "User creation API implementation in progress"
     )
     public ResponseEntity<User> createUser(@RequestBody User user) {
         // Actual implementation...

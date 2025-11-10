@@ -206,7 +206,7 @@ If you have any questions or concerns, please contact us:
 
 ## Revision History
 
-* **v1.0.0** (2025-01-01): Initial Code of Conduct
+* **v1.0.0** (2025-11-10): Initial Code of Conduct
 
 ---
 
