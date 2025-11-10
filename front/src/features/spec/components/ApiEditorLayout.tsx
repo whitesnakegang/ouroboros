@@ -6,6 +6,8 @@ import { CodeSnippetPanel } from "./CodeSnippetPanel";
 import { ImportResultModal } from "./ImportResultModal";
 import { TestLayout } from "@/features/testing/components/TestLayout";
 import { DiffNotification } from "./DiffNotification";
+import { WsEditorForm } from "./WsEditorForm";
+import type { RequestBody } from "../types/schema.types";
 import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
 import { useTestingStore } from "@/features/testing/store/testing.store";
 import axios from "axios";
@@ -29,7 +31,6 @@ import {
   parseOpenAPIRequestBody,
   parseOpenAPISchemaToSchemaField,
 } from "../utils/schemaConverter";
-import type { RequestBody } from "../types/schema.types";
 import {
   createPrimitiveField,
   isArraySchema,
@@ -667,6 +668,27 @@ export function ApiEditorLayout() {
   // Response state
   const [statusCodes, setStatusCodes] = useState<StatusCode[]>([]);
 
+  // WebSocket state
+  const [wsEntryPoint, setWsEntryPoint] = useState("");
+  const [wsSummary, setWsSummary] = useState("");
+  const [wsDescription, setWsDescription] = useState("");
+  const [wsTags, setWsTags] = useState("");
+  const [wsSubprotocol, setWsSubprotocol] = useState("v11.stomp");
+  const [wsProtocol, setWsProtocol] = useState<"ws://" | "wss://">("wss://");
+  const [wsReceivers, setWsReceivers] = useState<
+    Array<{
+      address: string;
+      headers: KeyValuePair[];
+      schema: RequestBody;
+    }>
+  >([]);
+  const [wsReplies, setWsReplies] = useState<
+    Array<{
+      address: string;
+      schema: RequestBody;
+    }>
+  >([]);
+
   const methods = ["GET", "POST", "PUT", "PATCH", "DELETE"];
 
   // 진행률: 전체 엔드포인트 대비 completed 비율
@@ -1051,10 +1073,19 @@ export function ApiEditorLayout() {
     });
     setStatusCodes([]);
 
-    // 프로토콜에 따른 추가 초기화 (나중에 확장 가능)
-    // if (protocol === "WebSocket") { ... }
+    // 프로토콜에 따른 추가 초기화
+    if (protocol === "WebSocket") {
+      setWsEntryPoint("");
+      setWsSummary("");
+      setWsDescription("");
+      setWsTags("");
+      setWsSubprotocol("v11.stomp");
+      setWsProtocol("wss://");
+      setWsReceivers([]);
+      setWsReplies([]);
+    }
     // if (protocol === "GraphQL") { ... }
-  }, [setSelectedEndpoint]);
+  }, [setSelectedEndpoint, protocol]);
 
   // 사이드바 Add 버튼 클릭 시 새 폼 초기화
   useEffect(() => {
@@ -1709,36 +1740,60 @@ export function ApiEditorLayout() {
                 </div>
               </div>
             )}
-            {protocol !== null && protocol !== "REST" && (
-              <div className="h-full flex items-center justify-center py-12">
-                <div className="text-center">
-                  <div className="w-16 h-16 mx-auto mb-6 rounded-md bg-gray-100 dark:bg-[#161B22] border border-gray-300 dark:border-[#2D333B] flex items-center justify-center">
-                    <svg
-                      className="w-8 h-8 text-gray-500 dark:text-[#8B949E]"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                      />
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-semibold text-gray-900 dark:text-[#E6EDF3] mb-2">
-                    {protocol} 명세서 준비 중
-                  </h3>
-                  <p className="text-gray-600 dark:text-[#8B949E] mb-4">
-                    현재는 REST API만 지원합니다.
-                  </p>
-                  <p className="text-sm text-gray-500 dark:text-[#8B949E]">
-                    프로토콜 탭을 클릭하여 REST로 전환할 수 있습니다.
-                  </p>
-                </div>
-              </div>
+            {protocol === "WebSocket" && (
+              <WsEditorForm
+                entryPoint={wsEntryPoint}
+                setEntryPoint={setWsEntryPoint}
+                summary={wsSummary}
+                setSummary={setWsSummary}
+                description={wsDescription}
+                setDescription={setWsDescription}
+                tags={wsTags}
+                setTags={setWsTags}
+                subprotocol={wsSubprotocol}
+                setSubprotocol={setWsSubprotocol}
+                protocol={wsProtocol}
+                setProtocol={setWsProtocol}
+                receivers={wsReceivers}
+                setReceivers={setWsReceivers}
+                replies={wsReplies}
+                setReplies={setWsReplies}
+                isReadOnly={!!(selectedEndpoint && !isEditMode)}
+              />
             )}
+            {protocol !== null &&
+              protocol !== "REST" &&
+              protocol !== "WebSocket" && (
+                <div className="h-full flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <div className="w-16 h-16 mx-auto mb-6 rounded-md bg-gray-100 dark:bg-[#161B22] border border-gray-300 dark:border-[#2D333B] flex items-center justify-center">
+                      <svg
+                        className="w-8 h-8 text-gray-500 dark:text-[#8B949E]"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                        />
+                      </svg>
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-[#E6EDF3] mb-2">
+                      {protocol} 명세서 준비 중
+                    </h3>
+                    <p className="text-gray-600 dark:text-[#8B949E] mb-4">
+                      현재는 REST API와 WebSocket만 지원합니다.
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-[#8B949E]">
+                      프로토콜 탭을 클릭하여 REST 또는 WebSocket으로 전환할 수
+                      있습니다.
+                    </p>
+                  </div>
+                </div>
+              )}
 
             {/* Diff Notification - 불일치가 있을 때만 표시 (completed 또는 mock 상태 모두) */}
             {protocol === "REST" && selectedEndpoint && hasDiff && (
