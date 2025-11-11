@@ -141,7 +141,18 @@ export function Sidebar({ onAddNew }: SidebarProps) {
           </div>
         </div>
 
-        <div className="relative mb-3">
+        <ProtocolTabs
+          selectedProtocol={protocol}
+          onProtocolChange={setProtocol}
+          onNewForm={() => {
+            if (setTriggerNewForm) {
+              setTriggerNewForm(true);
+            }
+          }}
+          compact={true}
+        />
+
+        <div className="relative mb-3 mt-3">
           <svg
             className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#8B949E]"
             fill="none"
@@ -187,17 +198,6 @@ export function Sidebar({ onAddNew }: SidebarProps) {
         <StatusFilter
           activeFilter={activeFilter}
           onFilterChange={setActiveFilter}
-        />
-
-        <ProtocolTabs
-          selectedProtocol={protocol}
-          onProtocolChange={setProtocol}
-          onNewForm={() => {
-            if (setTriggerNewForm) {
-              setTriggerNewForm(true);
-            }
-          }}
-          compact={true}
         />
       </div>
 
