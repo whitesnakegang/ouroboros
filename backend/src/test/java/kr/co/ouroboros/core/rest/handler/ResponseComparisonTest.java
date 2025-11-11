@@ -2,6 +2,7 @@ package kr.co.ouroboros.core.rest.handler;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -180,9 +181,9 @@ public class ResponseComparisonTest {
     
     /**
      *  스캔스펙에_추가적인_status가_존재하고_나머지_status는_모두_일치하는_경우
-     *  expect: 파일스팩에 추가하고 일치 판정
-     *  diff: none
-     *  progress: completed
+     *  expect: 스캔 스펙에만 있는 status는 추가하지 않고 불일치 판정
+     *  diff: response
+     *  progress: mock
      * @throws Exception
      */
     @Test
@@ -200,11 +201,13 @@ public class ResponseComparisonTest {
 
         responseComparator.compareResponsesForMethod("/p", HttpMethod.GET, scannedOperation, fileOperation, new HashMap<>());
 
-        // 201이 추가되고 diff/progress는 변하지 않음
-        assertNotNull(fileOperation.getResponses()
-                .get("201"));
-        assertEquals("none", fileOperation.getXOuroborosDiff());
-        assertEquals("completed", fileOperation.getXOuroborosProgress());
+        // 201이 추가되지 않아야 함
+        assertNotNull(fileOperation.getResponses());
+        assertNotNull(fileOperation.getResponses().get("200"), "200 status는 존재해야 합니다.");
+        assertNull(fileOperation.getResponses().get("201"), "201 status는 추가되지 않아야 합니다.");
+        // 스캔 스펙에만 201이 있으므로 불일치 판정
+        assertEquals("response", fileOperation.getXOuroborosDiff(), "스캔 스펙에만 있는 status가 있으면 diff는 'response'가 되어야 합니다.");
+        assertEquals("mock", fileOperation.getXOuroborosProgress(), "불일치면 progress는 'mock'이어야 합니다.");
     }
     
     /**

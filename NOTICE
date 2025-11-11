@@ -18,114 +18,136 @@ limitations under the License.
 
 ================================================================================
 
-This product includes or depends on the following third-party libraries:
+This product includes or depends on the following third-party libraries (alphabetical within each section):
 
 --------------------------------------------------------------------------------
+Backend (Java):
+--------------------------------------------------------------------------------
+
 Spring Framework
 Copyright (c) 2002-2025 Pivotal Software, Inc.
 Licensed under the Apache License 2.0
 https://github.com/spring-projects/spring-framework
 
-Spring Boot
+Spring Boot (including Actuator and AOP starters)
 Copyright (c) 2012-2025 Pivotal Software, Inc.
 Licensed under the Apache License 2.0
 https://github.com/spring-projects/spring-boot
 
---------------------------------------------------------------------------------
-SpringDoc OpenAPI
+SpringDoc OpenAPI Starter WebMVC API
 Copyright (c) 2019-2025 SpringDoc
 Licensed under the Apache License 2.0
 https://github.com/springdoc/springdoc-openapi
 
---------------------------------------------------------------------------------
 SnakeYAML
-Copyright (c) 2008, SnakeYAML
+Copyright (c) 2008-2025 SnakeYAML
 Licensed under the Apache License 2.0
 https://github.com/snakeyaml/snakeyaml
 
---------------------------------------------------------------------------------
 DataFaker
 Copyright (c) 2023 DataFaker Contributors
 Licensed under the Apache License 2.0
 https://github.com/datafaker-net/datafaker
 
---------------------------------------------------------------------------------
-Jackson
-Copyright (c) 2007- Tatu Saloranta and other contributors
+Jackson (Databind & Dataformat modules)
+Copyright (c) 2007-2025 FasterXML
 Licensed under the Apache License 2.0
 https://github.com/FasterXML/jackson
 
---------------------------------------------------------------------------------
-Lombok
-Copyright (c) 2009-2021 The Project Lombok Authors
+Lombok (core & annotation processors)
+Copyright (c) 2009-2025 The Project Lombok Authors
 Licensed under the MIT License
 https://github.com/projectlombok/lombok
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Micrometer Tracing Bridge (micrometer-tracing-bridge-otel)
+Copyright (c) 2016-2025 VMware, Inc. or its affiliates
+Licensed under the Apache License 2.0
+https://github.com/micrometer-metrics/tracing
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+OpenTelemetry Java (OTLP exporter and SDK components)
+Copyright (c) 2016-2025 The OpenTelemetry Authors
+Licensed under the Apache License 2.0
+https://github.com/open-telemetry/opentelemetry-java
 
 --------------------------------------------------------------------------------
-React
+Frontend (JavaScript / TypeScript):
+--------------------------------------------------------------------------------
+
+Axios
+Copyright (c) 2014-present Matt Zabriskie
+Licensed under the MIT License
+https://github.com/axios/axios
+
+js-yaml (@types/js-yaml 포함)
+Copyright (c) 2011-2025 Vitaly Puzrin
+Licensed under the MIT License
+https://github.com/nodeca/js-yaml
+
+openapi-snippet
+Copyright (c) 2017-2025 Kyle Welsby
+Licensed under the MIT License
+https://github.com/ahmadnassri/openapi-snippet
+
+React & React DOM (including hooks runtime)
 Copyright (c) Meta Platforms, Inc. and affiliates.
 Licensed under the MIT License
 https://github.com/facebook/react
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+React Router DOM (including data/router packages)
+Copyright (c) 2015-present Remix Software Inc.
+Licensed under the MIT License
+https://github.com/remix-run/react-router
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+React Syntax Highlighter
+Copyright (c) 2018 Conor Farrelly
+Licensed under the MIT License
+https://github.com/react-syntax-highlighter/react-syntax-highlighter
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+Tailwind CSS (including PostCSS plugins)
+Copyright (c) Tailwind Labs, Inc.
+Licensed under the MIT License
+https://github.com/tailwindlabs/tailwindcss
 
---------------------------------------------------------------------------------
+Vite & @vitejs/plugin-react (includes Vite Plugin Node Polyfills)
+Copyright (c) 2019-present Yuxi (Evan) You and Vite contributors
+Licensed under the MIT License
+https://github.com/vitejs/vite
+
 Zustand
 Copyright (c) 2019 Paul Henschel
 Licensed under the MIT License
 https://github.com/pmndrs/zustand
 
 --------------------------------------------------------------------------------
-Axios
-Copyright (c) 2014-present Matt Zabriskie
+Tooling & Build:
+--------------------------------------------------------------------------------
+
+TypeScript (compiler & language services)
+Copyright (c) Microsoft Corporation
+Licensed under the Apache License 2.0
+https://github.com/microsoft/TypeScript
+
+Autoprefixer (PostCSS plugin)
+Copyright (c) 2013 Andrey Sitnik
 Licensed under the MIT License
-https://github.com/axios/axios
+https://github.com/postcss/autoprefixer
+
+PostCSS
+Copyright (c) 2013-present Andrey Sitnik
+Licensed under the MIT License
+https://github.com/postcss/postcss
+
+ESLint (core & plugins)
+Copyright (c) JS Foundation and other contributors
+Licensed under the MIT License
+https://github.com/eslint/eslint
+
+TypeScript ESLint (parser & plugin)
+Copyright (c) 2019-present Microsoft Corporation and other contributors
+Licensed under the BSD 2-Clause License
+https://github.com/typescript-eslint/typescript-eslint
 
 --------------------------------------------------------------------------------
-TailwindCSS
-Copyright (c) Tailwind Labs, Inc.
-Licensed under the MIT License
-https://github.com/tailwindlabs/tailwindcss
-
---------------------------------------------------------------------------------
-Vite
-Copyright (c) 2019-present, Yuxi (Evan) You and Vite contributors
-Licensed under the MIT License
-https://github.com/vitejs/vite
 
 ================================================================================
 
