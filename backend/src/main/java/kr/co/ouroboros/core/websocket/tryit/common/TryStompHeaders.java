@@ -30,6 +30,11 @@ public final class TryStompHeaders {
     public static final String INTERNAL_SCOPE_HEADER = "kr.co.ouroboros.tryScope";
 
     /**
+     * 아웃바운드 인터셉터에서 Scope 관리를 위해 사용하는 헤더 이름.
+     */
+    public static final String INTERNAL_OUTBOUND_SCOPE_HEADER = "kr.co.ouroboros.tryOutboundScope";
+
+    /**
      * Try 헤더가 활성화되었음을 나타내는 값.
      */
     public static final String TRY_HEADER_ENABLED_VALUE = "on";
