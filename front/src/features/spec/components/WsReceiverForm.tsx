@@ -6,7 +6,6 @@ import type { SchemaField, RequestBody } from "../types/schema.types";
 import {
   createDefaultField,
 } from "../types/schema.types";
-import { parseOpenAPISchemaToSchemaField } from "../utils/schemaConverter";
 
 interface KeyValuePair {
   key: string;

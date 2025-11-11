@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { ApiRequestCard } from "./ApiRequestCard";
 import { ApiResponseCard } from "./ApiResponseCard";
 import { SchemaCard } from "./SchemaCard";
@@ -85,6 +85,7 @@ export function ApiEditorLayout() {
   const [activeTab, setActiveTab] = useState<"form" | "test">("form");
   const [isCodeSnippetOpen, setIsCodeSnippetOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isNewFormMode, setIsNewFormMode] = useState(false);
   const [importResult, setImportResult] = useState<ImportYamlResponse | null>(
     null
   );
@@ -178,6 +179,7 @@ export function ApiEditorLayout() {
   useEffect(() => {
     if (selectedEndpoint && selectedEndpoint.id) {
       setIsEditMode(false); // 항목 선택 시 읽기 전용 모드로 시작
+      setIsNewFormMode(false); // 엔드포인트 선택 시 새 폼 모드 해제
       loadEndpointData(selectedEndpoint.id);
 
       // 폼 부분으로 스크롤 (activeTab에 따라 다른 컨테이너로 스크롤)
@@ -670,21 +672,15 @@ export function ApiEditorLayout() {
   const [wsSummary, setWsSummary] = useState("");
   const [wsDescription, setWsDescription] = useState("");
   const [wsTags, setWsTags] = useState("");
-  const [wsSubprotocol, setWsSubprotocol] = useState("v11.stomp");
-  const [wsProtocol, setWsProtocol] = useState<"ws://" | "wss://">("wss://");
-  const [wsReceivers, setWsReceivers] = useState<
-    Array<{
-      address: string;
-      headers: KeyValuePair[];
-      schema: RequestBody;
-    }>
-  >([]);
-  const [wsReplies, setWsReplies] = useState<
-    Array<{
-      address: string;
-      schema: RequestBody;
-    }>
-  >([]);
+  const [wsReceiver, setWsReceiver] = useState<{
+    address: string;
+    headers: KeyValuePair[];
+    schema: RequestBody;
+  } | null>(null);
+  const [wsReply, setWsReply] = useState<{
+    address: string;
+    schema: RequestBody;
+  } | null>(null);
 
   const methods = ["GET", "POST", "PUT", "PATCH", "DELETE"];
 
@@ -973,6 +969,7 @@ export function ApiEditorLayout() {
 
         // 생성된 엔드포인트를 선택
         setSelectedEndpoint(newEndpoint);
+        setIsNewFormMode(false); // 저장 후 새 폼 모드 해제
 
         // 생성 후 다시 로드하여 백엔드에서 최신 데이터 가져오기
         // loadEndpointData에서 백엔드 응답의 progress, tag, diff를 자동으로 반영함
@@ -1055,6 +1052,7 @@ export function ApiEditorLayout() {
     // 선택된 프로토콜에 따라 다른 폼을 표시할 수 있도록 구조화
     // 현재는 REST만 지원하지만, 나중에 WebSocket/GraphQL 지원 시 확장 가능
     setSelectedEndpoint(null);
+    setIsNewFormMode(true);
     setMethod("POST");
     // 값은 비워 placeholder가 보이도록 처리
     setUrl("");
@@ -1076,10 +1074,8 @@ export function ApiEditorLayout() {
       setWsSummary("");
       setWsDescription("");
       setWsTags("");
-      setWsSubprotocol("v11.stomp");
-      setWsProtocol("wss://");
-      setWsReceivers([]);
-      setWsReplies([]);
+      setWsReceiver(null);
+      setWsReply(null);
     }
     // if (protocol === "GraphQL") { ... }
   }, [setSelectedEndpoint, protocol]);
@@ -1092,6 +1088,28 @@ export function ApiEditorLayout() {
       setTriggerNewForm(false);
     }
   }, [triggerNewForm, handleNewForm, setTriggerNewForm]);
+
+  // 프로토콜 변경 시 새 폼 모드 해제
+  // Add 버튼을 눌러서 새 폼을 작성 중이어도 프로토콜을 변경하면 새 폼 모드를 해제해야 함
+  const prevProtocolRef = useRef(protocol);
+  const triggerNewFormRef = useRef(triggerNewForm);
+  
+  // triggerNewForm 변경 시 ref 업데이트
+  useEffect(() => {
+    triggerNewFormRef.current = triggerNewForm;
+  }, [triggerNewForm]);
+  
+  useEffect(() => {
+    // 프로토콜이 변경되었을 때
+    if (prevProtocolRef.current !== protocol) {
+      // triggerNewForm이 true인 경우는 Add 버튼을 누른 직후이므로 무시
+      if (!triggerNewFormRef.current) {
+        // 프로토콜 변경 시 새 폼 모드 해제
+        setIsNewFormMode(false);
+      }
+    }
+    prevProtocolRef.current = protocol;
+  }, [protocol]);
 
   const handleImportYAML = async () => {
     // 파일 선택 input 생성
@@ -1710,7 +1728,7 @@ export function ApiEditorLayout() {
             className="w-full max-w-6xl mx-auto px-6 py-8"
           >
             {/* Protocol not selected or not supported message */}
-            {protocol === null && (
+            {(protocol === null || (protocol !== null && selectedEndpoint === null && !isNewFormMode)) && (
               <div className="h-full flex items-center justify-center py-12">
                 <div className="text-center">
                   <div className="w-16 h-16 mx-auto mb-6 rounded-md bg-gray-100 dark:bg-[#161B22] border border-gray-300 dark:border-[#2D333B] flex items-center justify-center">
@@ -1737,7 +1755,7 @@ export function ApiEditorLayout() {
                 </div>
               </div>
             )}
-            {protocol === "WebSocket" && (
+            {protocol === "WebSocket" && (selectedEndpoint !== null || isNewFormMode) && (
               <WsEditorForm
                 entryPoint={wsEntryPoint}
                 setEntryPoint={setWsEntryPoint}
@@ -1747,14 +1765,10 @@ export function ApiEditorLayout() {
                 setDescription={setWsDescription}
                 tags={wsTags}
                 setTags={setWsTags}
-                subprotocol={wsSubprotocol}
-                setSubprotocol={setWsSubprotocol}
-                protocol={wsProtocol}
-                setProtocol={setWsProtocol}
-                receivers={wsReceivers}
-                setReceivers={setWsReceivers}
-                replies={wsReplies}
-                setReplies={setWsReplies}
+                receiver={wsReceiver}
+                setReceiver={setWsReceiver}
+                reply={wsReply}
+                setReply={setWsReply}
                 isReadOnly={!!(selectedEndpoint && !isEditMode)}
               />
             )}
@@ -1802,7 +1816,7 @@ export function ApiEditorLayout() {
             )}
 
             {/* Method + URL Card */}
-            {protocol === "REST" && (
+            {protocol === "REST" && (selectedEndpoint !== null || isNewFormMode) && (
               <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm mb-6">
                 <div className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3] mb-2 flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -2005,7 +2019,7 @@ export function ApiEditorLayout() {
             )}
 
             {/* Request Card */}
-            {protocol === "REST" && (
+            {protocol === "REST" && (selectedEndpoint !== null || isNewFormMode) && (
               <ApiRequestCard
                 queryParams={queryParams}
                 setQueryParams={setQueryParams}
@@ -2020,7 +2034,7 @@ export function ApiEditorLayout() {
             )}
 
             {/* Response Card */}
-            {protocol === "REST" && (
+            {protocol === "REST" && (selectedEndpoint !== null || isNewFormMode) && (
               <div className="mt-6">
                 <ApiResponseCard
                   statusCodes={statusCodes}
@@ -2031,7 +2045,7 @@ export function ApiEditorLayout() {
             )}
 
             {/* Schema Card */}
-            {protocol === "REST" && (
+            {protocol === "REST" && (selectedEndpoint !== null || isNewFormMode) && (
               <div className="mt-6">
                 <SchemaCard isReadOnly={!!(selectedEndpoint && !isEditMode)} />
               </div>
