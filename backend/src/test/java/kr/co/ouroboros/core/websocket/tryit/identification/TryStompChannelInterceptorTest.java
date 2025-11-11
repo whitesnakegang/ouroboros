@@ -12,7 +12,6 @@ import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.messaging.support.MessageHeaderAccessor;
 
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -48,7 +47,6 @@ class TryStompChannelInterceptorTest {
         String tryIdHeader = accessor.getFirstNativeHeader(TryStompHeaders.TRY_ID_HEADER);
         assertNotNull(tryIdHeader);
         assertDoesNotThrow(() -> UUID.fromString(tryIdHeader));
-        assertEquals(tryIdHeader, accessor.getSessionAttributes().get(TryStompHeaders.SESSION_TRY_ID_ATTR));
 
         // 컨텍스트가 설정되었는지 확인
         UUID tryIdFromContext = TryContext.getTryId();
@@ -60,13 +58,12 @@ class TryStompChannelInterceptorTest {
     }
 
     @Test
-    void preSend_shouldReuseSessionTryId() {
+    void preSend_shouldGenerateNewTryIdEvenIfSessionHasOne() {
         UUID existingTryId = UUID.randomUUID();
         StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
         accessor.setSessionId("session-1");
-        accessor.setSessionAttributes(new HashMap<>());
         accessor.setLeaveMutable(true);
-        accessor.getSessionAttributes().put(TryStompHeaders.SESSION_TRY_ID_ATTR, existingTryId.toString());
+        accessor.setNativeHeader(TryStompHeaders.TRY_HEADER, TryStompHeaders.TRY_HEADER_ENABLED_VALUE);
         Message<byte[]> message = MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
 
         Message<?> intercepted = interceptor.preSend(message, dummyChannel);
@@ -74,7 +71,9 @@ class TryStompChannelInterceptorTest {
         assertNotNull(mutatedAccessor);
 
         String tryIdHeader = mutatedAccessor.getFirstNativeHeader(TryStompHeaders.TRY_ID_HEADER);
-        assertEquals(existingTryId.toString(), tryIdHeader);
+        assertNotNull(tryIdHeader);
+        assertDoesNotThrow(() -> UUID.fromString(tryIdHeader));
+        assertNotEquals(existingTryId.toString(), tryIdHeader);
 
         interceptor.afterSendCompletion(intercepted, dummyChannel, true, null);
         assertNull(TryContext.getTryId());
@@ -108,7 +107,6 @@ class TryStompChannelInterceptorTest {
     private Message<byte[]> createStompMessageWithHeader(StompCommand command, Map<String, String> headers) {
         StompHeaderAccessor accessor = StompHeaderAccessor.create(command);
         accessor.setSessionId("session-try");
-        accessor.setSessionAttributes(new HashMap<>());
         accessor.setLeaveMutable(true);
         headers.forEach(accessor::setNativeHeader);
         return MessageBuilder.createMessage("{}".getBytes(StandardCharsets.UTF_8), accessor.getMessageHeaders());

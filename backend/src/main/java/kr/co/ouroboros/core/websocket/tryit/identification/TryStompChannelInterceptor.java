@@ -14,9 +14,6 @@ import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.stereotype.Component;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -49,33 +46,16 @@ public class TryStompChannelInterceptor implements ChannelInterceptor {
             return message;
         }
 
-        boolean mutated = false;
-
         Scope scope = TryContext.setTryId(tryId);
         if (scope != null) {
             accessor.setHeader(TryStompHeaders.INTERNAL_SCOPE_HEADER, scope);
-            mutated = true;
         }
 
-        // 세션과 헤더에 tryId를 기록하여 이후 프레임에서도 재사용한다.
+        // 프레임 헤더에 tryId를 기록하여 이후 전송 시에도 식별자를 유지한다.
         accessor.setNativeHeader(TryStompHeaders.TRY_ID_HEADER, tryId.toString());
         accessor.setHeader(TryStompHeaders.TRY_ID_HEADER, tryId.toString());
-        mutated = true;
-        Map<String, Object> sessionAttributes = accessor.getSessionAttributes();
-        if (sessionAttributes != null) {
-            sessionAttributes.put(TryStompHeaders.SESSION_TRY_ID_ATTR, tryId.toString());
-        } else {
-            Map<String, Object> newSessionAttributes = new HashMap<>();
-            newSessionAttributes.put(TryStompHeaders.SESSION_TRY_ID_ATTR, tryId.toString());
-            accessor.setSessionAttributes(newSessionAttributes);
-            mutated = true;
-        }
 
         log.trace("STOMP {} 프레임에서 Try 컨텍스트를 설정했습니다. tryId={}", command, tryId);
-        if (!mutated) {
-            return message;
-        }
-
         return MessageBuilder.createMessage(message.getPayload(), accessor.getMessageHeaders());
     }
 
@@ -103,13 +83,7 @@ public class TryStompChannelInterceptor implements ChannelInterceptor {
 
     @Nullable
     private UUID resolveTryId(StompHeaderAccessor accessor, boolean tryRequested) {
-        // 1) 이미 세션에 tryId가 저장되어 있다면 재사용
-        UUID sessionTryId = extractSessionTryId(accessor);
-        if (sessionTryId != null) {
-            return sessionTryId;
-        }
-
-        // 2) 프레임 헤더에 tryId가 포함되어 있다면 그대로 사용
+        // 1) 프레임 헤더에 tryId가 포함되어 있다면 그대로 사용
         String headerTryId = getFirstNativeHeader(accessor, TryStompHeaders.TRY_ID_HEADER);
         if (headerTryId != null) {
             try {
@@ -119,7 +93,7 @@ public class TryStompChannelInterceptor implements ChannelInterceptor {
             }
         }
 
-        // 3) Try 요청 헤더가 활성화됐으면 새로 생성
+        // 2) Try 요청 헤더가 활성화됐으면 새로 생성
         if (tryRequested) {
             UUID newTryId = UUID.randomUUID();
             log.debug("STOMP Try 요청을 감지하여 새로운 tryId를 생성했습니다: {}", newTryId);
@@ -127,24 +101,6 @@ public class TryStompChannelInterceptor implements ChannelInterceptor {
         }
 
         return null;
-    }
-
-    @Nullable
-    private UUID extractSessionTryId(StompHeaderAccessor accessor) {
-        Map<String, Object> sessionAttributes = accessor.getSessionAttributes();
-        if (sessionAttributes == null) {
-            return null;
-        }
-        Object sessionValue = sessionAttributes.get(TryStompHeaders.SESSION_TRY_ID_ATTR);
-        if (sessionValue == null) {
-            return null;
-        }
-        try {
-            return UUID.fromString(Objects.toString(sessionValue));
-        } catch (IllegalArgumentException e) {
-            log.warn("세션에 저장된 tryId 형식이 올바르지 않습니다: {}", sessionValue);
-            return null;
-        }
     }
 
     @Nullable
