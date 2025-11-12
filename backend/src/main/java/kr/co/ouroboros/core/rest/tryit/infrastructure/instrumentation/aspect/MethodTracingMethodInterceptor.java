@@ -61,12 +61,17 @@ public class MethodTracingMethodInterceptor implements MethodInterceptor {
     }
 
     /**
-         * Start an Observation for the intercepted method, record method and parameter attributes, execute the invocation, record any thrown error, and stop the Observation.
-         *
-         * @param invocation the intercepted method invocation
-         * @return the result produced by the intercepted method
-         * @throws Throwable if the intercepted method throws an exception
-         */
+     * Intercepts a method invocation and wraps it in a Micrometer Observation when a Try context is present.
+     *
+     * <p>If no Try id is present (TryContext.hasTryId() is false), the invocation proceeds without instrumentation.
+     * When instrumented, the Observation is started with attributes for the declaring class and method, attempts to
+     * record parameter types and names, records any thrown error on the Observation, and stops the Observation
+     * when the invocation completes.</p>
+     *
+     * @param invocation the intercepted method invocation
+     * @return the result produced by the intercepted method
+     * @throws Throwable if the intercepted method throws an exception
+     */
     @Override
     public Object invoke(MethodInvocation invocation) throws Throwable {
         // Try 요청이 아니면 계측 없이 바로 실행

@@ -62,13 +62,13 @@ public class TraceStorageConfig {
     }
     
     /**
-     * Register an InMemoryTrySpanProcessor bean that collects spans in memory.
-     * <p>
-     * This bean is used when Tempo is disabled. It adds tryId attributes to spans
-     * and collects them in InMemoryTraceStorage for later retrieval.
+     * Provides an in-memory SpanProcessor used when Tempo is disabled.
      *
-     * @param traceStorage The trace storage (in-memory when Tempo is disabled)
-     * @return the created InMemoryTrySpanProcessor instance as a `SpanProcessor`
+     * The processor attaches try identifiers to spans and stores them in the provided
+     * TraceStorage for later retrieval.
+     *
+     * @param traceStorage the TraceStorage used to persist spans in memory
+     * @return the created InMemoryTrySpanProcessor as a `SpanProcessor`
      */
     @Bean(name = "trySpanProcessor")
     @ConditionalOnMissingBean(name = "trySpanProcessor")

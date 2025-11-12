@@ -53,19 +53,15 @@ public class TryOnlySampler implements Sampler {
     private static final String TRY_VALUE = "on";
 
     /**
-     * Determines whether a span should be sampled.
-     * <p>
-     * First checks the HTTP request header directly (X-Ouroboros-Try: on).
-     * If no HTTP context is available (for internal spans), falls back to TryContext.
-     * Only samples spans for Try requests to eliminate tracing overhead for normal requests.
+     * Determines if a span should be sampled by checking the X-Ouroboros-Try HTTP header and, when no HTTP context is available, falling back to TryContext.
      *
-     * @param parentContext The parent context (may contain parent span)
-     * @param traceId The trace ID
-     * @param name The span name
-     * @param spanKind The span kind (CLIENT, SERVER, INTERNAL, etc.)
-     * @param attributes The span attributes
-     * @param parentLinks The parent links
-     * @return RECORD_AND_SAMPLE if Try request, DROP otherwise
+     * @param parentContext the parent context that may contain a parent span
+     * @param traceId the trace identifier
+     * @param name the span name
+     * @param spanKind the span kind (e.g., CLIENT, SERVER, INTERNAL)
+     * @param attributes the span attributes
+     * @param parentLinks associated parent links
+     * @return {@code RECORD_AND_SAMPLE} if the request is a Try request, {@code DROP} otherwise
      */
     @Override
     public SamplingResult shouldSample(Context parentContext,
@@ -115,9 +111,9 @@ public class TryOnlySampler implements Sampler {
     }
 
     /**
-     * Returns a description of this sampler.
+     * Identifies this sampler as one that samples only Try requests via the X-Ouroboros-Try header.
      *
-     * @return A human-readable description
+     * @return the description string indicating the sampler samples only Try requests via the X-Ouroboros-Try header
      */
     @Override
     public String getDescription() {
