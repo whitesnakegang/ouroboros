@@ -3,6 +3,7 @@
   "info": {
     "title": "WebSocket API",
     "version": "1.0.0",
+    "description": "WebSocket api spec test",
     "x-generator": "springwolf"
   },
   "defaultContentType": "application/json",
@@ -17,8 +18,8 @@
     "_chat.send": {
       "address": "/chat.send",
       "messages": {
-        "com.example.demo.websocket.ChatMessage": {
-          "$ref": "#/components/messages/com.example.demo.websocket.ChatMessage"
+        "ChatMessage": {
+          "$ref": "#/components/messages/ChatMessage"
         }
       },
       "bindings": {
@@ -28,8 +29,8 @@
     "_chat.sendToRoom": {
       "address": "/chat.sendToRoom",
       "messages": {
-        "com.example.demo.websocket.ChatMessage": {
-          "$ref": "#/components/messages/com.example.demo.websocket.ChatMessage"
+        "ChatMessage": {
+          "$ref": "#/components/messages/ChatMessage"
         }
       },
       "bindings": {
@@ -39,41 +40,8 @@
     "_chat.send_test": {
       "address": "/chat.send/test",
       "messages": {
-        "com.example.demo.websocket.ChatMessage": {
-          "$ref": "#/components/messages/com.example.demo.websocket.ChatMessage"
-        }
-      },
-      "bindings": {
-        "stomp": {}
-      }
-    },
-    "_notice.send": {
-      "address": "/notice.send",
-      "messages": {
-        "com.example.demo.websocket.NoticeMessage": {
-          "$ref": "#/components/messages/com.example.demo.websocket.NoticeMessage"
-        }
-      },
-      "bindings": {
-        "stomp": {}
-      }
-    },
-    "_notice.sendToDestination": {
-      "address": "/notice.sendToDestination",
-      "messages": {
-        "com.example.demo.websocket.NoticeMessage": {
-          "$ref": "#/components/messages/com.example.demo.websocket.NoticeMessage"
-        }
-      },
-      "bindings": {
-        "stomp": {}
-      }
-    },
-    "_topic_notices_public": {
-      "address": "/topic/notices/public",
-      "messages": {
-        "com.example.demo.websocket.NoticeMessage": {
-          "$ref": "#/components/messages/com.example.demo.websocket.NoticeMessage"
+        "ChatMessage": {
+          "$ref": "#/components/messages/ChatMessage"
         }
       },
       "bindings": {
@@ -83,19 +51,41 @@
     "_topic_rooms_announcement": {
       "address": "/topic/rooms/announcement",
       "messages": {
-        "com.example.demo.websocket.ChatMessage": {
-          "$ref": "#/components/messages/com.example.demo.websocket.ChatMessage"
+        "ChatMessage": {
+          "$ref": "#/components/messages/ChatMessage"
         }
       },
       "bindings": {
         "stomp": {}
       }
     },
-    "_topic_rooms_public": {
+    "_topic_rooms_public111": {
       "address": "/topic/rooms/public",
       "messages": {
-        "com.example.demo.websocket.ChatMessage": {
-          "$ref": "#/components/messages/com.example.demo.websocket.ChatMessage"
+        "ChatMessage": {
+          "$ref": "#/components/messages/ChatMessage"
+        }
+      },
+      "bindings": {
+        "stomp": {}
+      }
+    },
+    "_topic_rooms_public222": {
+      "address": "/topic/rooms/public",
+      "messages": {
+        "ChatMessage": {
+          "$ref": "#/components/messages/ChatMessage"
+        }
+      },
+      "bindings": {
+        "stomp": {}
+      }
+    },
+    "_topic_rooms_public333": {
+      "address": "/topic/rooms/public",
+      "messages": {
+        "ChatMessage": {
+          "$ref": "#/components/messages/ChatMessage"
         }
       },
       "bindings": {
@@ -113,7 +103,7 @@
           {}
         ]
       },
-      "com.example.demo.websocket.ChatMessage": {
+      "ChatMessage": {
         "title": "ChatMessage",
         "type": "object",
         "properties": {
@@ -143,59 +133,21 @@
             "type": "ENTER"
           }
         ]
-      },
-      "com.example.demo.websocket.NoticeMessage": {
-        "title": "NoticeMessage",
-        "type": "object",
-        "properties": {
-          "content": {
-            "type": "string"
-          },
-          "destination": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          }
-        },
-        "examples": [
-          {
-            "content": "string",
-            "destination": "string",
-            "title": "string"
-          }
-        ]
       }
     },
     "messages": {
-      "com.example.demo.websocket.ChatMessage": {
+      "ChatMessage": {
         "headers": {
           "$ref": "#/components/schemas/SpringStompDefaultHeaders"
         },
         "payload": {
           "schemaFormat": "application/vnd.aai.asyncapi+json;version=3.0.0",
           "schema": {
-            "$ref": "#/components/schemas/com.example.demo.websocket.ChatMessage"
+            "$ref": "#/components/schemas/ChatMessage"
           }
         },
-        "name": "com.example.demo.websocket.ChatMessage",
+        "name": "ChatMessage",
         "title": "ChatMessage",
-        "bindings": {
-          "stomp": {}
-        }
-      },
-      "com.example.demo.websocket.NoticeMessage": {
-        "headers": {
-          "$ref": "#/components/schemas/SpringStompDefaultHeaders"
-        },
-        "payload": {
-          "schemaFormat": "application/vnd.aai.asyncapi+json;version=3.0.0",
-          "schema": {
-            "$ref": "#/components/schemas/com.example.demo.websocket.NoticeMessage"
-          }
-        },
-        "name": "com.example.demo.websocket.NoticeMessage",
-        "title": "NoticeMessage",
         "bindings": {
           "stomp": {}
         }
@@ -213,55 +165,101 @@
       },
       "messages": [
         {
-          "$ref": "#/channels/_chat.sendToRoom/messages/com.example.demo.websocket.ChatMessage"
+          "$ref": "#/channels/_chat.sendToRoom/messages/ChatMessage"
         }
-      ]
+      ],
+      "x-ouroboros-progress": "none",
+      "x-ouroboros-diff": "none"
     },
-    "_chat.send_receive_broadcastToDefault": {
+    "_chat.send_receive_public111": {
       "action": "receive",
       "channel": {
         "$ref": "#/channels/_chat.send"
       },
-      "tags": [
-        {
-          "x-ouroboros-progress": "completed"
-        }
-      ],
       "bindings": {
         "stomp": {}
       },
       "messages": [
         {
-          "$ref": "#/channels/_chat.send/messages/com.example.demo.websocket.ChatMessage"
+          "$ref": "#/channels/_chat.send/messages/ChatMessage"
         }
       ],
       "reply": {
         "channel": {
-          "$ref": "#/channels/_topic_rooms_public"
+          "$ref": "#/channels/_topic_rooms_public111"
         },
         "messages": [
           {
-            "$ref": "#/channels/_topic_rooms_public/messages/com.example.demo.websocket.ChatMessage"
+            "$ref": "#/channels/_topic_rooms_public/messages/ChatMessage"
           }
         ]
-      }
+      },
+      "x-ouroboros-progress": "none",
+      "x-ouroboros-diff": "none"
+    },
+        "_chat.send_receive_public222": {
+      "action": "receive",
+      "channel": {
+        "$ref": "#/channels/_chat.send"
+      },
+      "bindings": {
+        "stomp": {}
+      },
+      "messages": [
+        {
+          "$ref": "#/channels/_chat.send/messages/ChatMessage"
+        }
+      ],
+      "reply": {
+        "channel": {
+          "$ref": "#/channels/_topic_rooms_public222"
+        },
+        "messages": [
+          {
+            "$ref": "#/channels/_topic_rooms_public/messages/ChatMessage"
+          }
+        ]
+      },
+      "x-ouroboros-progress": "none",
+      "x-ouroboros-diff": "none"
+    },
+        "_chat.send_receive_public333": {
+      "action": "receive",
+      "channel": {
+        "$ref": "#/channels/_chat.send"
+      },
+      "bindings": {
+        "stomp": {}
+      },
+      "messages": [
+        {
+          "$ref": "#/channels/_chat.send/messages/ChatMessage"
+        }
+      ],
+      "reply": {
+        "channel": {
+          "$ref": "#/channels/_topic_rooms_public333"
+        },
+        "messages": [
+          {
+            "$ref": "#/channels/_topic_rooms_public/messages/ChatMessage"
+          }
+        ]
+      },
+      "x-ouroboros-progress": "none",
+      "x-ouroboros-diff": "none"
     },
     "_chat.send_test_receive_broadcastToDefaultTest": {
       "action": "receive",
       "channel": {
         "$ref": "#/channels/_chat.send_test"
       },
-      "tags": [
-        {
-          "x-ouroboros-progress": "completed"
-        }
-      ],
       "bindings": {
         "stomp": {}
       },
       "messages": [
         {
-          "$ref": "#/channels/_chat.send_test/messages/com.example.demo.websocket.ChatMessage"
+          "$ref": "#/channels/_chat.send_test/messages/ChatMessage"
         }
       ],
       "reply": {
@@ -270,53 +268,12 @@
         },
         "messages": [
           {
-            "$ref": "#/channels/_topic_rooms_public/messages/com.example.demo.websocket.ChatMessage"
+            "$ref": "#/channels/_topic_rooms_public/messages/ChatMessage"
           }
         ]
-      }
-    },
-    "_notice.sendToDestination_receive_sendToDestination": {
-      "action": "receive",
-      "channel": {
-        "$ref": "#/channels/_notice.sendToDestination"
       },
-      "bindings": {
-        "stomp": {}
-      },
-      "messages": [
-        {
-          "$ref": "#/channels/_notice.sendToDestination/messages/com.example.demo.websocket.NoticeMessage"
-        }
-      ]
-    },
-    "_notice.send_receive_broadcast": {
-      "action": "receive",
-      "channel": {
-        "$ref": "#/channels/_notice.send"
-      },
-      "tags": [
-        {
-          "x-ouroboros-progress": "completed"
-        }
-      ],
-      "bindings": {
-        "stomp": {}
-      },
-      "messages": [
-        {
-          "$ref": "#/channels/_notice.send/messages/com.example.demo.websocket.NoticeMessage"
-        }
-      ],
-      "reply": {
-        "channel": {
-          "$ref": "#/channels/_topic_notices_public"
-        },
-        "messages": [
-          {
-            "$ref": "#/channels/_topic_notices_public/messages/com.example.demo.websocket.NoticeMessage"
-          }
-        ]
-      }
+      "x-ouroboros-progress": "none",
+      "x-ouroboros-diff": "none"
     }
   }
 }
