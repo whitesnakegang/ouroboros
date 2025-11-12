@@ -17,45 +17,27 @@ public class AsyncApiCustomizerConfig implements OperationCustomizer {
     @Override
     public void customize(Operation operation, Method method) {
         ApiState annotation = method.getAnnotation(ApiState.class);
-        if (annotation == null) {
-            return;
-        }
+        if (annotation == null) return;
 
         String progressValue;
         switch (annotation.state()) {
-            case COMPLETED:
-                progressValue = "completed";
-                break;
-            case BUGFIX:
-                progressValue = "bugfix";
-                break;
-            case IMPLEMENTING:
-                progressValue = "implementing";
-                break;
-            default:
-                return;
+            case COMPLETED:     progressValue = "completed";     break;
+            case BUGFIX:        progressValue = "bugfix";        break;
+            case IMPLEMENTING:  progressValue = "implementing";  break;
+            default:            return;
         }
 
-        List<Tag> tags = operation.getTags();
-        if (tags == null) {
-            tags = new ArrayList<>();
-            operation.setTags(tags);
+        // Operation 수준의 x- 확장 필드에 직접 기록
+        putExt(operation, "x-ouroboros-progress",   progressValue);
+    }
+
+    private static void putExt(Operation op, String key, Object value) {
+        Map<String, Object> ext = op.getExtensionFields();
+        if (ext == null) {
+            ext = new LinkedHashMap<>();
+            op.setExtensionFields(ext);
         }
-
-        final String finalProgressValue = progressValue;
-        boolean already = tags.stream().anyMatch(t -> {
-            Map<String, Object> ext = t.getExtensionFields();
-            return ext != null
-                    && finalProgressValue.equalsIgnoreCase(String.valueOf(ext.get("x-ouroboros-progress")));
-        });
-        if (already) return;
-
-        Tag tag = new Tag();
-        Map<String, Object> ext = new LinkedHashMap<>();
-        ext.put("x-ouroboros-progress", progressValue);
-        tag.setExtensionFields(ext);
-        tags.add(tag);
+        // 이미 값이 있으면 덮어쓰지 않으려면 putIfAbsent 사용
+        ext.putIfAbsent(key, value);
     }
 }
-
-
