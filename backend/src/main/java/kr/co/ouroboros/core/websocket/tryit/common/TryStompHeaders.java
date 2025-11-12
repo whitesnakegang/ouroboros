@@ -5,6 +5,11 @@ package kr.co.ouroboros.core.websocket.tryit.common;
  */
 public final class TryStompHeaders {
 
+    /**
+     * Prevents instantiation of this utility class.
+     *
+     * @throws IllegalStateException indicating the class must not be instantiated
+     */
     private TryStompHeaders() {
         throw new IllegalStateException("Utility class");
     }
@@ -39,5 +44,4 @@ public final class TryStompHeaders {
      */
     public static final String TRY_HEADER_ENABLED_VALUE = "on";
 }
-
 

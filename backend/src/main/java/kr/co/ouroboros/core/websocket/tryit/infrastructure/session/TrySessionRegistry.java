@@ -19,15 +19,35 @@ public class TrySessionRegistry {
 
     private final Map<UUID, TrySessionRegistration> registrations = new ConcurrentHashMap<>();
 
+    /**
+     * Associates the given tryId with the provided session registration in the registry.
+     *
+     * If a mapping for the same tryId already exists, it is replaced with the new registration.
+     *
+     * @param tryId        the identifier for the try operation to register
+     * @param registration the session registration (sessionId and associated message) to associate with the tryId
+     */
     public void register(@NonNull UUID tryId, @NonNull TrySessionRegistration registration) {
         registrations.put(tryId, registration);
         log.trace("Registered tryId {} for session {}", tryId, registration.sessionId());
     }
 
+    /**
+     * Look up the TrySessionRegistration associated with a given tryId.
+     *
+     * @param tryId the UUID of the try execution to look up
+     * @return an Optional containing the registration for the given tryId, or {@link Optional#empty()} if none exists
+     */
     public Optional<TrySessionRegistration> find(UUID tryId) {
         return Optional.ofNullable(registrations.get(tryId));
     }
 
+    /**
+     * Remove the registration associated with the given try identifier.
+     *
+     * @param tryId the try identifier whose registration should be removed
+     * @return the removed registration wrapped in an Optional if present, otherwise an empty Optional
+     */
     public Optional<TrySessionRegistration> remove(UUID tryId) {
         TrySessionRegistration removed = registrations.remove(tryId);
         if (removed != null) {
@@ -36,6 +56,11 @@ public class TrySessionRegistry {
         return Optional.ofNullable(removed);
     }
 
+    /**
+     * Remove all mappings whose registration's sessionId matches the given sessionId.
+     *
+     * @param sessionId the session identifier whose associated try mappings will be removed
+     */
     public void removeBySessionId(@NonNull String sessionId) {
         registrations.entrySet()
                 .removeIf(entry -> sessionId.equals(entry.getValue().sessionId()));
@@ -45,4 +70,3 @@ public class TrySessionRegistry {
     public record TrySessionRegistration(String sessionId, TryDispatchMessage message) {
     }
 }
-

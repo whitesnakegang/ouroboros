@@ -11,9 +11,18 @@ public final class OtelContextTaskDecorator implements TaskDecorator {
 
     public static final OtelContextTaskDecorator INSTANCE = new OtelContextTaskDecorator();
 
+    /**
+     * Prevents external instantiation of this decorator and enforces the in-class singleton.
+     */
     private OtelContextTaskDecorator() {
     }
 
+    /**
+     * Wraps a Runnable so it executes with the OpenTelemetry Context that was current at decoration time.
+     *
+     * @param runnable the task to decorate; may be {@code null}
+     * @return the decorated Runnable that activates the captured OpenTelemetry Context when executed, or {@code null} if {@code runnable} is {@code null}
+     */
     @Override
     public Runnable decorate(Runnable runnable) {
         if (runnable == null) {
@@ -27,4 +36,3 @@ public final class OtelContextTaskDecorator implements TaskDecorator {
         };
     }
 }
-
