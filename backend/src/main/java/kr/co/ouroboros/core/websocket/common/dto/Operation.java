@@ -20,7 +20,7 @@ public class Operation {
 
     private String action;
     private ChannelReference channel;
-    private List<Map<String, Object>> tags;
+    private List<Map<String, String>> tags;
     private Map<String, Object> bindings;
     private List<MessageReference> messages;
     private Reply reply;
