@@ -3,6 +3,7 @@ package kr.co.ouroboros.core.websocket.tryit.identification;
 import io.opentelemetry.context.Scope;
 import kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.context.TryContext;
 import kr.co.ouroboros.core.websocket.tryit.common.TryStompHeaders;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
@@ -16,10 +17,13 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 class TryStompChannelInterceptorTest {
 
-    private final TryStompChannelInterceptor interceptor = new TryStompChannelInterceptor();
+    private final TryPublisherNotifier publisherNotifier = mock(TryPublisherNotifier.class);
+    private final TryStompChannelInterceptor interceptor = new TryStompChannelInterceptor(publisherNotifier);
     private final TryStompOutboundChannelInterceptor outboundInterceptor = new TryStompOutboundChannelInterceptor();
     private final MessageChannel dummyChannel = new MessageChannel() {
         @Override
@@ -32,6 +36,11 @@ class TryStompChannelInterceptorTest {
             return true;
         }
     };
+
+    @BeforeEach
+    void setUp() {
+        reset(publisherNotifier);
+    }
 
     @Test
     void preSend_shouldGenerateTryIdWhenHeaderOn() {
@@ -52,6 +61,8 @@ class TryStompChannelInterceptorTest {
         UUID tryIdFromContext = TryContext.getTryId();
         assertNotNull(tryIdFromContext);
         assertEquals(tryIdHeader, tryIdFromContext.toString());
+
+        verify(publisherNotifier).notifyPublisher(any(UUID.class), any(StompHeaderAccessor.class), eq(message));
 
         interceptor.afterSendCompletion(intercepted, dummyChannel, true, null);
         assertNull(TryContext.getTryId());
@@ -75,6 +86,8 @@ class TryStompChannelInterceptorTest {
         assertDoesNotThrow(() -> UUID.fromString(tryIdHeader));
         assertNotEquals(existingTryId.toString(), tryIdHeader);
 
+        verify(publisherNotifier).notifyPublisher(any(UUID.class), any(StompHeaderAccessor.class), eq(message));
+
         interceptor.afterSendCompletion(intercepted, dummyChannel, true, null);
         assertNull(TryContext.getTryId());
     }
@@ -86,6 +99,8 @@ class TryStompChannelInterceptorTest {
         StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(intercepted, StompHeaderAccessor.class);
         assertNotNull(accessor);
         assertNull(accessor.getFirstNativeHeader(TryStompHeaders.TRY_ID_HEADER));
+
+        verifyNoInteractions(publisherNotifier);
 
         interceptor.afterSendCompletion(intercepted, dummyChannel, true, null);
         assertNull(TryContext.getTryId());

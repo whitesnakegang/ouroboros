@@ -3,6 +3,7 @@ package kr.co.ouroboros.core.websocket.tryit.identification;
 import io.opentelemetry.context.Scope;
 import kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.context.TryContext;
 import kr.co.ouroboros.core.websocket.tryit.common.TryStompHeaders;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.Nullable;
 import org.springframework.messaging.Message;
@@ -24,7 +25,10 @@ import java.util.UUID;
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class TryStompChannelInterceptor implements ChannelInterceptor {
+
+    private final TryPublisherNotifier tryPublisherNotifier;
 
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
@@ -51,11 +55,16 @@ public class TryStompChannelInterceptor implements ChannelInterceptor {
             accessor.setHeader(TryStompHeaders.INTERNAL_SCOPE_HEADER, scope);
         }
 
+        if (tryRequested && StompCommand.SEND.equals(command)) {
+            tryPublisherNotifier.notifyPublisher(tryId, accessor, message);
+        }
+
         // 프레임 헤더에 tryId를 기록하여 이후 전송 시에도 식별자를 유지한다.
         accessor.setNativeHeader(TryStompHeaders.TRY_ID_HEADER, tryId.toString());
         accessor.setHeader(TryStompHeaders.TRY_ID_HEADER, tryId.toString());
 
         log.trace("STOMP {} 프레임에서 Try 컨텍스트를 설정했습니다. tryId={}", command, tryId);
+
         return MessageBuilder.createMessage(message.getPayload(), accessor.getMessageHeaders());
     }
 
