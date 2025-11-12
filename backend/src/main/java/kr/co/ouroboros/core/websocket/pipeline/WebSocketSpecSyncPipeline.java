@@ -5,10 +5,15 @@ import kr.co.ouroboros.core.global.handler.SpecSyncPipeline;
 import kr.co.ouroboros.core.global.spec.OuroApiSpec;
 import kr.co.ouroboros.core.websocket.common.dto.Operation;
 import kr.co.ouroboros.core.websocket.common.dto.OuroWebSocketApiSpec;
+import kr.co.ouroboros.core.websocket.handler.comparator.WebSocketSchemaComparator;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class WebSocketSpecSyncPipeline implements SpecSyncPipeline {
+
+    private final WebSocketSchemaComparator schemaComparator;
 
     @Override
     public OuroApiSpec validate(OuroApiSpec fileSpec, OuroApiSpec scannedSpec) {
@@ -17,6 +22,7 @@ public class WebSocketSpecSyncPipeline implements SpecSyncPipeline {
         OuroWebSocketApiSpec wsScannedSpec = (OuroWebSocketApiSpec) scannedSpec;
 
         // TODO 채털명으로 메세지 정답지 만들기 [AUTHOR : 방준엽]
+        Map<String, Boolean> schemaMap = schemaComparator.compareSchemas(wsFileSpec, wsScannedSpec);
 
         Map<String, Operation> scanOpMap = wsScannedSpec.getOperations();
 
