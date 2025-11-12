@@ -44,17 +44,70 @@ public class TryStompOutboundChannelInterceptor implements ChannelInterceptor {
             }
         }
 
+        // StompCommand가 없으면 MESSAGE로 설정 (StompEncoder에서 필수)
+        // 브로커가 브로드캐스트 메시지를 만들 때 command를 설정하지 않는 경우가 있음
+        StompCommand command = accessor.getCommand();
+        boolean needNewAccessor = (command == null);
+        
+        if (needNewAccessor) {
+            // command가 없으면 새 accessor를 생성하고 원본 메시지의 모든 헤더를 보존
+            // 특히 Spring 메시징 헤더(simpSubscriptionId, simpDestination 등)를 명시적으로 복사
+            StompHeaderAccessor newAccessor = StompHeaderAccessor.create(StompCommand.MESSAGE);
+            newAccessor.setLeaveMutable(true);
+            
+            // 원본 메시지의 모든 헤더를 복사 (Spring 메시징 헤더 포함)
+            // copyHeaders()로 기본 헤더를 복사한 후, Spring 메시징 헤더를 명시적으로 설정
+            newAccessor.copyHeaders(message.getHeaders());
+            
+            // 원본 accessor에서 중요한 Spring 메시징 헤더를 명시적으로 복사
+            // 이렇게 하면 StompEncoder가 subscription, destination 등을 제대로 인코딩할 수 있음
+            String subscriptionId = accessor.getSubscriptionId();
+            String destination = accessor.getDestination();
+            String sessionId = accessor.getSessionId();
+            String messageId = accessor.getMessageId();
+            
+            if (subscriptionId != null) {
+                newAccessor.setSubscriptionId(subscriptionId);
+            }
+            if (destination != null) {
+                newAccessor.setDestination(destination);
+            }
+            if (sessionId != null) {
+                newAccessor.setSessionId(sessionId);
+            }
+            if (messageId != null) {
+                newAccessor.setMessageId(messageId);
+            }
+            
+            // 원본 메시지의 native 헤더도 복사 (content-type 등)
+            accessor.toNativeHeaderMap().forEach((key, values) -> {
+                if (values != null && !values.isEmpty()) {
+                    newAccessor.setNativeHeader(key, values.get(0));
+                }
+            });
+            
+            // tryId 헤더 추가
+            newAccessor.setNativeHeader(TryStompHeaders.TRY_ID_HEADER, tryId.toString());
+            newAccessor.setHeader(TryStompHeaders.TRY_ID_HEADER, tryId.toString());
+            
+            log.trace("Outbound STOMP 메시지에 tryId({}) 헤더를 설정했습니다 (command 없음, 새 accessor 생성). subscriptionId={}, destination={}", 
+                    tryId, newAccessor.getSubscriptionId(), newAccessor.getDestination());
+            
+            // 새 accessor의 헤더로 메시지 재생성
+            // 원본 메시지의 payload는 그대로 유지하고 헤더만 업데이트
+            return MessageBuilder.createMessage(message.getPayload(), newAccessor.getMessageHeaders());
+        }
+        
+        // command가 있으면 원본 accessor에 tryId 헤더만 추가
         accessor.setNativeHeader(TryStompHeaders.TRY_ID_HEADER, tryId.toString());
         accessor.setHeader(TryStompHeaders.TRY_ID_HEADER, tryId.toString());
-        log.trace("Outbound STOMP 메시지에 tryId({}) 헤더를 설정했습니다.", tryId);
+        
+        log.trace("Outbound STOMP 메시지에 tryId({}) 헤더를 설정했습니다. command={}, destination={}, subscriptionId={}", 
+                tryId, accessor.getCommand(), accessor.getDestination(), accessor.getSubscriptionId());
 
-        StompHeaderAccessor newAccessor = StompHeaderAccessor.create(
-                accessor.getCommand() != null ? accessor.getCommand() : StompCommand.MESSAGE
-        );
-        newAccessor.copyHeaders(accessor.getMessageHeaders());
-        newAccessor.setLeaveMutable(true);
-
-        return MessageBuilder.createMessage(message.getPayload(), newAccessor.getMessageHeaders());
+        // 원본 메시지의 모든 헤더를 보존하면서 tryId 헤더만 추가
+        // accessor는 mutable 상태이므로 변경사항이 이미 반영되어 있음
+        return MessageBuilder.createMessage(message.getPayload(), accessor.getMessageHeaders());
     }
 
     @Override
