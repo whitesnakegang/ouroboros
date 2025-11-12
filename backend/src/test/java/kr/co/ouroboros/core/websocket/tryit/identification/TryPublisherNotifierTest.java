@@ -48,12 +48,10 @@ class TryPublisherNotifierTest {
         TrySessionRegistry.TrySessionRegistration registration = registrationCaptor.getValue();
         assertThat(registration.sessionId()).isEqualTo("session-123");
         TryDispatchMessage dispatchMessage = registration.message();
-        assertThat(dispatchMessage.tryId()).isEqualTo(tryId.toString());
-        assertThat(dispatchMessage.destination()).isEqualTo("/app/try");
         assertThat(dispatchMessage.headers()).containsEntry("sample-header", "value");
+        assertThat(dispatchMessage.headers()).containsEntry("destination", "/app/try");
         assertThat(dispatchMessage.headers()).doesNotContainKey(TryStompHeaders.TRY_ID_HEADER);
         assertThat(dispatchMessage.payload()).isEqualTo("{}");
-        assertThat(dispatchMessage.requestedAt()).isNotNull();
 
         verify(messagingTemplate).convertAndSendToUser(eq("session-123"), eq("/queue/try"), eq(dispatchMessage), anyMap());
     }

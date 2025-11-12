@@ -10,7 +10,6 @@ import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -50,7 +49,7 @@ public class TryPublisherNotifier {
             return;
         }
 
-        TryDispatchMessage dispatchMessage = buildDispatchMessage(tryId, accessor, message);
+        TryDispatchMessage dispatchMessage = buildDispatchMessage(accessor, message);
         trySessionRegistry.register(tryId, new TrySessionRegistry.TrySessionRegistration(sessionId, dispatchMessage));
 
         Map<String, Object> headers = createHeaders(sessionId);
@@ -58,12 +57,10 @@ public class TryPublisherNotifier {
         log.trace("세션 {}에 Try 알림을 전송했습니다. tryId={}", sessionId, tryId);
     }
 
-    private TryDispatchMessage buildDispatchMessage(UUID tryId, StompHeaderAccessor accessor, Message<?> message) {
-        String destination = accessor.getDestination();
+    private TryDispatchMessage buildDispatchMessage(StompHeaderAccessor accessor, Message<?> message) {
         String payload = extractPayload(message.getPayload());
         Map<String, String> headers = extractHeaders(accessor);
-        Instant requestedAt = Instant.now();
-        return new TryDispatchMessage(tryId.toString(), destination, payload, headers, requestedAt);
+        return new TryDispatchMessage(payload, headers);
     }
 
     private String extractPayload(Object payload) {
@@ -85,6 +82,12 @@ public class TryPublisherNotifier {
                     flattened.put(key, values.get(0));
                 }
             });
+        }
+        // destination이 headers에 없으면 명시적으로 추가
+        // (destination은 STOMP 메시지 헤더에 포함되므로 클라이언트에서 필요할 수 있음)
+        String destination = accessor.getDestination();
+        if (destination != null && !flattened.containsKey("destination")) {
+            flattened.put("destination", destination);
         }
         return flattened;
     }
