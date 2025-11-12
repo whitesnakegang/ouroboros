@@ -40,6 +40,14 @@ dependencyManagement {
 dependencies {
 	implementation "org.springdoc:springdoc-openapi-starter-webmvc-api:2.8.13"
 
+	// spring wolf
+	// TODO spring wolf ui 말고 다른걸로 바꿔야 함
+	implementation 'io.github.springwolf:springwolf-stomp:1.17.0'
+	runtimeOnly 'io.github.springwolf:springwolf-ui:1.17.0'
+
+	// WebSocket
+	implementation 'org.springframework.boot:spring-boot-starter-websocket'
+
 	// 사용자 앱 쪽 Boot 버전에 '기생'하고 싶다면 compileOnly 유지 (라이브러리 자체는 Boot에 종속 X)
 	compileOnly "org.springframework.boot:spring-boot-starter-web"
     compileOnly 'org.springframework.boot:spring-boot-autoconfigure'
