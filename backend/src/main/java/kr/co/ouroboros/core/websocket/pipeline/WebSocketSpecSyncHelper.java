@@ -39,37 +39,13 @@ public class WebSocketSpecSyncHelper {
         Map<String, List<Operation>> channelNameOperationMap = new HashMap<>();
         if (operationMap != null) {
             for (Entry<String, Operation> operationEntry : operationMap.entrySet()) {
-                String channelName = extractChannelNameFromOperationKey(operationEntry.getKey());
+                String channelRef = operationEntry.getValue().getChannel().getRef();
                 channelNameOperationMap
-                    .computeIfAbsent(channelName, k -> new ArrayList<>())
+                    .computeIfAbsent(channelRef, k -> new ArrayList<>())
                     .add(operationEntry.getValue());
             }
         }
         return channelNameOperationMap;
-    }
-
-    /**
-     * Operation 키에서 채널 이름을 추출합니다.
-     * 예: "_chat.send_receive_broadcastToDefault" -> "_chat.send"
-     * 
-     * @param operationKey operation의 키 (예: "_chat.send_receive_broadcastToDefault")
-     * @return 채널 이름 (예: "_chat.send")
-     */
-    public static String extractChannelNameFromOperationKey(String operationKey) {
-        if (operationKey == null || operationKey.isEmpty()) {
-            return "";
-        }
-        
-        // 언더스코어로 분리
-        String[] parts = operationKey.split("_");
-        
-        // 첫 번째와 두 번째 부분을 합쳐서 채널 이름 생성
-        if (parts.length >= 2) {
-            return parts[0] + "_" + parts[1];
-        }
-        
-        // 언더스코어가 하나만 있거나 없는 경우 원본 반환
-        return parts[0];
     }
 
     /**
@@ -95,17 +71,21 @@ public class WebSocketSpecSyncHelper {
         // 마지막 점 뒤의 부분을 반환
         return ref.substring(lastDotIndex + 1);
     }
-
-    /**
-     * Operation이 참조하는 Channel을 fileSpec에 추가합니다.
-     * 이미 존재하는 경우에는 추가하지 않습니다.
-     * 
-     * @param fileSpec 파일에서 로드한 스펙 (대상)
-     * @param scannedSpec 스캔한 스펙 (소스)
-     * @param operation 추가된 Operation
-     * @param channelName 채널 이름
-     */
-    public static void addReferencedChannel(OuroWebSocketApiSpec fileSpec, OuroWebSocketApiSpec scannedSpec, Operation operation, String channelName) {
+    public static void addReferencedChannel(OuroWebSocketApiSpec fileSpec, OuroWebSocketApiSpec scannedSpec, String channelRef) {
+        // channelRef에서 마지막 '/' 뒤의 부분을 파싱하여 channelName에 저장
+        // 예: "#/channels/_chat.send_new_test" -> "_chat.send_new_test"
+        String channelName;
+        if (channelRef != null && !channelRef.isEmpty()) {
+            int lastSlashIndex = channelRef.lastIndexOf('/');
+            if (lastSlashIndex != -1 && lastSlashIndex < channelRef.length() - 1) {
+                channelName = channelRef.substring(lastSlashIndex + 1);
+            } else {
+                channelName = channelRef; // '/'가 없으면 전체 문자열 사용
+            }
+        } else {
+            return; // channelRef가 null이거나 비어있으면 처리하지 않음
+        }
+        
         // channels Map 초기화
         Map<String, Channel> fileChannels = fileSpec.getChannels();
         if (fileChannels == null) {
@@ -367,4 +347,5 @@ public class WebSocketSpecSyncHelper {
         return fullName.substring(lastDotIndex + 1);
     }
 }
+
 
