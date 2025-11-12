@@ -1,6 +1,5 @@
 package kr.co.ouroboros.core.websocket.pipeline;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import kr.co.ouroboros.core.global.handler.SpecSyncPipeline;
@@ -8,10 +7,15 @@ import kr.co.ouroboros.core.global.spec.OuroApiSpec;
 import kr.co.ouroboros.core.websocket.common.dto.MessageReference;
 import kr.co.ouroboros.core.websocket.common.dto.Operation;
 import kr.co.ouroboros.core.websocket.common.dto.OuroWebSocketApiSpec;
+import kr.co.ouroboros.core.websocket.handler.comparator.WebSocketSchemaComparator;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class WebSocketSpecSyncPipeline implements SpecSyncPipeline {
+
+    private final WebSocketSchemaComparator schemaComparator;
 
     @Override
     public OuroApiSpec validate(OuroApiSpec fileSpec, OuroApiSpec scannedSpec) {
@@ -20,7 +24,8 @@ public class WebSocketSpecSyncPipeline implements SpecSyncPipeline {
         OuroWebSocketApiSpec wsScannedSpec = (OuroWebSocketApiSpec) scannedSpec;
 
         // TODO 채털명으로 메세지 정답지 만들기 [AUTHOR : 방준엽]
-        Map<String, Boolean> resultMap = new HashMap<>();
+        Map<String, Boolean> schemaMap = schemaComparator.compareSchemas(wsFileSpec, wsScannedSpec);
+        
         Map<String, Operation> fileOpMap = wsFileSpec.getOperations();
         Map<String, Operation> scanOpMap = wsScannedSpec.getOperations();
 
@@ -71,7 +76,7 @@ public class WebSocketSpecSyncPipeline implements SpecSyncPipeline {
 
             if(fileMessage.getRef().equals(scanMessage.getRef())){
                 // $ref가 같은 경우 schema 정답지 확인
-                if(resultMap.get(WebSocketSpecSyncHelper.extractClassNameFromRef(scanMessage.getRef()))){
+                if(schemaMap.get(WebSocketSpecSyncHelper.extractClassNameFromRef(scanMessage.getRef()))){
                     // 정답인 경우
                     for (Operation operation : fileChannelNameOperationMap.get(channelName)) {
                         operation.setXOuroborosProgress("completed");
