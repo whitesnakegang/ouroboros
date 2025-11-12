@@ -72,6 +72,7 @@ export function ApiEditorLayout() {
     updateEndpoint,
     endpoints,
     protocol,
+    setProtocol,
   } = useSidebarStore();
   const {
     request,
@@ -81,6 +82,7 @@ export function ApiEditorLayout() {
     setTryId,
     authorization,
     setAuthorization,
+    setProtocol: setTestingProtocol,
   } = useTestingStore();
   const [activeTab, setActiveTab] = useState<"form" | "test">("form");
   const [isCodeSnippetOpen, setIsCodeSnippetOpen] = useState(false);
@@ -180,7 +182,19 @@ export function ApiEditorLayout() {
     if (selectedEndpoint && selectedEndpoint.id) {
       setIsEditMode(false); // 항목 선택 시 읽기 전용 모드로 시작
       setIsNewFormMode(false); // 엔드포인트 선택 시 새 폼 모드 해제
-      loadEndpointData(selectedEndpoint.id);
+      
+      // WebSocket 엔드포인트인 경우 프로토콜 설정 및 테스트 탭으로 이동
+      if (selectedEndpoint.protocol === "WebSocket") {
+        setProtocol("WebSocket");
+        setTestingProtocol("WebSocket");
+        setActiveTab("test");
+        // WebSocket은 REST API 스펙이 없으므로 loadEndpointData 호출하지 않음
+      } else {
+        // REST 엔드포인트인 경우 프로토콜 설정 및 데이터 로드
+        setProtocol("REST");
+        setTestingProtocol("REST");
+        loadEndpointData(selectedEndpoint.id);
+      }
 
       // 폼 부분으로 스크롤 (activeTab에 따라 다른 컨테이너로 스크롤)
       setTimeout(() => {

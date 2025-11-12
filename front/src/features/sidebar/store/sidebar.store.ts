@@ -149,6 +149,48 @@ export const useSidebarStore = create<SidebarState>()(
             grouped[group].push(convertSpecToEndpoint(spec));
           });
 
+          // 더미 WebSocket 엔드포인트 추가 (테스트용)
+          const wsGroup = "WebSocket";
+          if (!grouped[wsGroup]) {
+            grouped[wsGroup] = [];
+          }
+
+          // 더미 WebSocket 엔드포인트들 추가
+          const dummyWsEndpoints: Endpoint[] = [
+            {
+              id: "ws-dummy-chat",
+              method: "WEBSOCKET",
+              path: "/ws/chat",
+              description: "채팅 WebSocket 연결",
+              protocol: "WebSocket",
+              tags: ["WebSocket", "Chat"],
+              progress: "mock",
+              tag: "none",
+            },
+            {
+              id: "ws-dummy-notifications",
+              method: "WEBSOCKET",
+              path: "/ws/notifications",
+              description: "실시간 알림 WebSocket",
+              protocol: "WebSocket",
+              tags: ["WebSocket", "Notifications"],
+              progress: "mock",
+              tag: "none",
+            },
+            {
+              id: "ws-dummy-broadcast",
+              method: "WEBSOCKET",
+              path: "/ws/broadcast",
+              description: "브로드캐스트 메시지 WebSocket",
+              protocol: "WebSocket",
+              tags: ["WebSocket", "Broadcast"],
+              progress: "mock",
+              tag: "none",
+            },
+          ];
+
+          grouped[wsGroup].push(...dummyWsEndpoints);
+
           set({ endpoints: grouped, isLoading: false });
         } catch (error) {
           console.error("API 목록 로드 실패:", error);

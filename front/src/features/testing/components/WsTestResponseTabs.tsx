@@ -5,6 +5,114 @@ import type { TryMethod, TryTraceData } from "@/features/spec/services/api";
 import { getTryMethodList, getTryTrace } from "@/features/spec/services/api";
 import { TraceModal } from "./TraceModal";
 import type { WebSocketMessage } from "../store/testing.store";
+// JSON 포맷팅을 위한 간단한 컴포넌트
+const JsonHighlighter = ({ 
+  code, 
+  isSent 
+}: { 
+  code: string; 
+  isSent: boolean;
+}) => {
+  const formatJson = (text: string): string => {
+    try {
+      return JSON.stringify(JSON.parse(text), null, 2);
+    } catch {
+      return text;
+    }
+  };
+
+  const highlightJson = (jsonStr: string): JSX.Element => {
+    const formatted = formatJson(jsonStr);
+    const lines = formatted.split('\n');
+    
+    return (
+      <>
+        {lines.map((line, lineIndex) => {
+          // 간단한 JSON 하이라이팅
+          const parts: (string | JSX.Element)[] = [];
+          let lastIndex = 0;
+          
+          // 키 (따옴표로 감싸진 문자열 뒤에 콜론)
+          const keyMatch = line.match(/("(?:[^"\\]|\\.)*")\s*:/);
+          if (keyMatch && keyMatch.index !== undefined) {
+            if (keyMatch.index > lastIndex) {
+              parts.push(line.substring(lastIndex, keyMatch.index));
+            }
+            parts.push(
+              <span key={`key-${lineIndex}`} className={isSent ? "text-blue-300" : "text-blue-400"}>
+                {keyMatch[0]}
+              </span>
+            );
+            lastIndex = keyMatch.index + keyMatch[0].length;
+          }
+          
+          // 문자열 값
+          const stringValueMatch = line.match(/:\s*("(?:[^"\\]|\\.)*")/);
+          if (stringValueMatch && stringValueMatch.index !== undefined && stringValueMatch.index >= lastIndex) {
+            if (stringValueMatch.index > lastIndex) {
+              parts.push(line.substring(lastIndex, stringValueMatch.index));
+            }
+            parts.push(
+              <span key={`str-${lineIndex}`} className={isSent ? "text-green-300" : "text-green-400"}>
+                {stringValueMatch[0]}
+              </span>
+            );
+            lastIndex = stringValueMatch.index + stringValueMatch[0].length;
+          }
+          
+          // 숫자 값
+          const numberMatch = line.match(/:\s*(\d+\.?\d*)/);
+          if (numberMatch && numberMatch.index !== undefined && numberMatch.index >= lastIndex) {
+            if (numberMatch.index > lastIndex) {
+              parts.push(line.substring(lastIndex, numberMatch.index));
+            }
+            parts.push(
+              <span key={`num-${lineIndex}`} className={isSent ? "text-yellow-300" : "text-yellow-400"}>
+                {numberMatch[0]}
+              </span>
+            );
+            lastIndex = numberMatch.index + numberMatch[0].length;
+          }
+          
+          // boolean/null 값
+          const boolMatch = line.match(/:\s*(true|false|null)\b/);
+          if (boolMatch && boolMatch.index !== undefined && boolMatch.index >= lastIndex) {
+            if (boolMatch.index > lastIndex) {
+              parts.push(line.substring(lastIndex, boolMatch.index));
+            }
+            parts.push(
+              <span key={`bool-${lineIndex}`} className={isSent ? "text-purple-300" : "text-purple-400"}>
+                {boolMatch[0]}
+              </span>
+            );
+            lastIndex = boolMatch.index + boolMatch[0].length;
+          }
+          
+          if (lastIndex < line.length) {
+            parts.push(line.substring(lastIndex));
+          }
+          
+          return (
+            <span key={lineIndex}>
+              {parts.length > 0 ? parts : line}
+              {lineIndex < lines.length - 1 && '\n'}
+            </span>
+          );
+        })}
+      </>
+    );
+  };
+
+  return (
+    <pre className={`p-3 text-sm font-mono overflow-x-auto rounded ${
+      isSent 
+        ? "bg-black/20 text-white" 
+        : "bg-[#1e1e1e] text-[#d4d4d4]"
+    }`}>
+      <code>{highlightJson(code)}</code>
+    </pre>
+  );
+};
 
 export function WsTestResponseTabs() {
   const {
@@ -154,35 +262,51 @@ export function WsTestResponseTabs() {
 
   return (
     <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] shadow-sm">
-      {/* Connection Status */}
-      <div className="px-4 py-3 border-b border-gray-200 dark:border-[#2D333B] flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div
-            className={`w-3 h-3 rounded-full ${
-              wsConnectionStatus === "connected"
-                ? "bg-green-500"
-                : wsConnectionStatus === "connecting"
-                ? "bg-yellow-500"
-                : "bg-gray-400"
-            }`}
-          />
-          <span className="text-sm font-medium text-gray-900 dark:text-[#E6EDF3]">
-            {wsConnectionStatus === "connected"
-              ? "Connected"
-              : wsConnectionStatus === "connecting"
-              ? "Connecting..."
-              : "Disconnected"}
-          </span>
-          {wsConnectionStatus === "connected" && wsConnectionStartTime && (
-            <span className="text-xs text-gray-600 dark:text-[#8B949E]">
-              ({formatConnectionDuration(wsStats.connectionDuration)})
+      {/* Response Header */}
+      <div className="px-4 py-3 border-b border-gray-200 dark:border-[#2D333B] bg-gray-50 dark:bg-[#0D1117]">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
+              Response
             </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-[#8B949E]">
-          <span>Sent: {wsStats.totalSent}</span>
-          <span>|</span>
-          <span>Received: {wsStats.totalReceived}</span>
+            {wsConnectionStatus === "connected" ? (
+              <span className="px-2 py-0.5 text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+                Connected
+              </span>
+            ) : wsConnectionStatus === "connecting" ? (
+              <span className="px-2 py-0.5 text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded-full flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 bg-yellow-500 rounded-full animate-pulse"></div>
+                Connecting
+              </span>
+            ) : (
+              <span className="px-2 py-0.5 text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-full">
+                Disconnected
+              </span>
+            )}
+            {wsConnectionStatus === "connected" && wsConnectionStartTime && (
+              <span className="text-xs text-gray-600 dark:text-[#8B949E]">
+                {formatConnectionDuration(wsStats.connectionDuration)}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-[#8B949E]">
+              <div className="flex items-center gap-1">
+                <svg className="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
+                </svg>
+                <span className="font-medium">{wsStats.totalSent}</span>
+              </div>
+              <div className="w-px h-4 bg-gray-300 dark:bg-[#2D333B]"></div>
+              <div className="flex items-center gap-1">
+                <svg className="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
+                </svg>
+                <span className="font-medium">{wsStats.totalReceived}</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -323,68 +447,93 @@ function ResponseContent({
 
   return (
     <div>
-      {/* Filters & Actions */}
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setMessageFilter("all")}
-            className={`px-3 py-1 text-xs rounded-md transition-colors ${
-              messageFilter === "all"
-                ? "bg-[#2563EB] text-white"
-                : "bg-gray-100 dark:bg-[#0D1117] text-gray-700 dark:text-[#8B949E] hover:bg-gray-200 dark:hover:bg-[#161B22]"
-            }`}
-          >
-            All
-          </button>
-          <button
-            onClick={() => setMessageFilter("sent")}
-            className={`px-3 py-1 text-xs rounded-md transition-colors ${
-              messageFilter === "sent"
-                ? "bg-[#2563EB] text-white"
-                : "bg-gray-100 dark:bg-[#0D1117] text-gray-700 dark:text-[#8B949E] hover:bg-gray-200 dark:hover:bg-[#161B22]"
-            }`}
-          >
-            Sent
-          </button>
-          <button
-            onClick={() => setMessageFilter("received")}
-            className={`px-3 py-1 text-xs rounded-md transition-colors ${
-              messageFilter === "received"
-                ? "bg-[#2563EB] text-white"
-                : "bg-gray-100 dark:bg-[#0D1117] text-gray-700 dark:text-[#8B949E] hover:bg-gray-200 dark:hover:bg-[#161B22]"
-            }`}
-          >
-            Received
-          </button>
-        </div>
-
-        <div className="flex-1 min-w-[200px]">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="메시지 검색..."
-            className="w-full px-3 py-1 text-xs rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-[#8B949E]">
+      {/* Filters & Actions Bar */}
+      <div className="mb-4 bg-gray-50 dark:bg-[#0D1117] border border-gray-200 dark:border-[#2D333B] rounded-md p-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Search Bar */}
+          <div className="flex-1 min-w-[200px] relative">
+            <svg
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#8B949E]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
             <input
-              type="checkbox"
-              checked={isJsonFormatted}
-              onChange={(e) => setIsJsonFormatted(e.target.checked)}
-              className="rounded"
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search messages..."
+              className="w-full pl-9 pr-3 py-2 text-sm rounded-md bg-white dark:bg-[#161B22] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
             />
-            JSON 포맷팅
-          </label>
+          </div>
 
-          <div className="relative">
+          {/* Filter Buttons */}
+          <div className="flex items-center gap-1 bg-white dark:bg-[#161B22] border border-gray-300 dark:border-[#2D333B] rounded-md p-1">
+            <button
+              onClick={() => setMessageFilter("all")}
+              className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                messageFilter === "all"
+                  ? "bg-[#2563EB] text-white"
+                  : "text-gray-700 dark:text-[#8B949E] hover:bg-gray-100 dark:hover:bg-[#0D1117]"
+              }`}
+            >
+              All Messages
+            </button>
+            <button
+              onClick={() => setMessageFilter("sent")}
+              className={`px-3 py-1.5 text-xs font-medium rounded transition-colors flex items-center gap-1.5 ${
+                messageFilter === "sent"
+                  ? "bg-[#2563EB] text-white"
+                  : "text-gray-700 dark:text-[#8B949E] hover:bg-gray-100 dark:hover:bg-[#0D1117]"
+              }`}
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
+              </svg>
+              Sent
+            </button>
+            <button
+              onClick={() => setMessageFilter("received")}
+              className={`px-3 py-1.5 text-xs font-medium rounded transition-colors flex items-center gap-1.5 ${
+                messageFilter === "received"
+                  ? "bg-[#2563EB] text-white"
+                  : "text-gray-700 dark:text-[#8B949E] hover:bg-gray-100 dark:hover:bg-[#0D1117]"
+              }`}
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
+              </svg>
+              Received
+            </button>
+          </div>
+
+          {/* Options */}
+          <div className="flex items-center gap-2 ml-auto">
+            <label className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-[#8B949E] hover:bg-white dark:hover:bg-[#161B22] rounded-md transition-colors cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isJsonFormatted}
+                onChange={(e) => setIsJsonFormatted(e.target.checked)}
+                className="rounded"
+              />
+              Format JSON
+            </label>
+
             <button
               onClick={() => exportMessages("json")}
-              className="px-3 py-1 text-xs bg-gray-100 dark:bg-[#0D1117] text-gray-700 dark:text-[#8B949E] hover:bg-gray-200 dark:hover:bg-[#161B22] rounded-md transition-colors border border-gray-300 dark:border-[#2D333B]"
+              className="px-3 py-1.5 text-xs font-medium bg-white dark:bg-[#161B22] text-gray-700 dark:text-[#8B949E] hover:bg-gray-100 dark:hover:bg-[#0D1117] rounded-md transition-colors border border-gray-300 dark:border-[#2D333B] flex items-center gap-1.5"
             >
-              Export JSON
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Export
             </button>
           </div>
         </div>
@@ -416,46 +565,87 @@ function MessageBubble({
   formatContent: (content: string) => string;
 }) {
   const isSent = message.direction === "sent";
+  const isJson = (() => {
+    try {
+      JSON.parse(message.content);
+      return true;
+    } catch {
+      return false;
+    }
+  })();
 
   return (
-    <div
-      className={`flex ${isSent ? "justify-end" : "justify-start"}`}
-    >
+    <div className="group relative">
       <div
-        className={`max-w-[70%] rounded-lg p-3 ${
+        className={`flex items-start gap-3 p-4 rounded-lg border transition-all hover:shadow-md ${
           isSent
-            ? "bg-blue-500 text-white"
-            : "bg-gray-100 dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] border border-gray-300 dark:border-[#2D333B]"
+            ? "bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800/50"
+            : "bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800/50"
         }`}
       >
-        <div className="flex items-center gap-2 mb-2">
-          <span
-            className={`text-xs font-semibold px-2 py-0.5 rounded ${
+        {/* Direction Icon */}
+        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+          isSent
+            ? "bg-blue-500 text-white"
+            : "bg-green-500 text-white"
+        }`}>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            {isSent ? (
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
+            ) : (
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
+            )}
+          </svg>
+        </div>
+
+        {/* Message Content */}
+        <div className="flex-1 min-w-0">
+          {/* Header */}
+          <div className="flex items-center gap-2 mb-2">
+            <span className={`text-xs font-bold uppercase tracking-wide ${
               isSent
-                ? "bg-blue-600 text-white"
-                : "bg-gray-200 dark:bg-[#161B22] text-gray-700 dark:text-[#8B949E]"
-            }`}
-          >
-            {isSent ? "SENT" : "RECEIVED"}
-          </span>
-          <span className="text-xs opacity-75">
-            {formatTimestamp(message.timestamp)}
-          </span>
-        </div>
-
-        <div className="text-xs font-mono mb-1 text-gray-600 dark:text-gray-400">
-          {message.address}
-        </div>
-
-        <div className="text-sm whitespace-pre-wrap break-words">
-          {formatContent(message.content)}
-        </div>
-
-        {message.tryId && (
-          <div className="mt-2 text-xs opacity-75">
-            Try ID: {message.tryId}
+                ? "text-blue-700 dark:text-blue-400"
+                : "text-green-700 dark:text-green-400"
+            }`}>
+              {isSent ? "Sent" : "Received"}
+            </span>
+            <span className="text-xs text-gray-500 dark:text-[#8B949E]">
+              {formatTimestamp(message.timestamp)}
+            </span>
+            {message.tryId && (
+              <span className="ml-auto text-xs font-mono text-gray-500 dark:text-[#8B949E] opacity-0 group-hover:opacity-100 transition-opacity">
+                #{message.tryId.slice(0, 8)}
+              </span>
+            )}
           </div>
-        )}
+
+          {/* Destination/Address */}
+          <div className="mb-3 flex items-center gap-2">
+            <svg className="w-3.5 h-3.5 text-gray-400 dark:text-[#8B949E]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span className="text-xs font-mono text-gray-700 dark:text-[#E6EDF3]">
+              {message.address}
+            </span>
+          </div>
+
+          {/* Body */}
+          <div className="relative">
+            {isJson ? (
+              <div className="rounded-md overflow-hidden border border-gray-200 dark:border-[#2D333B]">
+                <JsonHighlighter 
+                  code={message.content} 
+                  isSent={isSent}
+                />
+              </div>
+            ) : (
+              <div className="whitespace-pre-wrap break-words text-sm font-mono bg-white dark:bg-[#0D1117] p-3 rounded-md border border-gray-200 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3]">
+                {message.content || <span className="text-gray-400 dark:text-[#8B949E] italic">(empty)</span>}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -20,7 +20,10 @@ export interface TestResponse {
   responseTime: number; // 응답 시간 (ms)
 }
 
-export type WebSocketConnectionStatus = "disconnected" | "connecting" | "connected";
+export type WebSocketConnectionStatus =
+  | "disconnected"
+  | "connecting"
+  | "connected";
 
 export interface WebSocketMessage {
   id: string;
@@ -69,7 +72,7 @@ interface TestingState {
   setMethodList: (methods: TryMethod[] | null) => void;
   totalDurationMs: number | null;
   setTotalDurationMs: (duration: number | null) => void;
-  
+
   // Try ID State
   tryId: string | null;
   setTryId: (tryId: string | null) => void;
@@ -162,7 +165,7 @@ export const useTestingStore = create<TestingState>((set) => ({
   setMethodList: (methods) => set({ methodList: methods }),
   totalDurationMs: null,
   setTotalDurationMs: (duration) => set({ totalDurationMs: duration }),
-  
+
   tryId: null,
   setTryId: (tryId) => set({ tryId }),
 
@@ -188,4 +191,3 @@ export const useTestingStore = create<TestingState>((set) => ({
   wsConnectionStartTime: null,
   setWsConnectionStartTime: (time) => set({ wsConnectionStartTime: time }),
 }));
-
