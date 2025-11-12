@@ -1,6 +1,5 @@
 package kr.co.ouroboros.core.websocket.pipeline;
 
-import java.util.List;
 import java.util.Map;
 import kr.co.ouroboros.core.global.handler.SpecSyncPipeline;
 import kr.co.ouroboros.core.global.spec.OuroApiSpec;
@@ -17,6 +16,8 @@ public class WebSocketSpecSyncPipeline implements SpecSyncPipeline {
         OuroWebSocketApiSpec wsFileSpec = (OuroWebSocketApiSpec) fileSpec;
         OuroWebSocketApiSpec wsScannedSpec = (OuroWebSocketApiSpec) scannedSpec;
 
+        // TODO 채털명으로 메세지 정답지 만들기 [AUTHOR : 방준엽]
+
         Map<String, Operation> scanOpMap = wsScannedSpec.getOperations();
 
         if (scanOpMap == null || scanOpMap.isEmpty()) {
@@ -26,8 +27,11 @@ public class WebSocketSpecSyncPipeline implements SpecSyncPipeline {
         // TODO 파이프라인 구축
         for(String channel :  scanOpMap.keySet()) {
 
-            // tags 확인 (tags 자체가 없거나 progress가 completed가 아닌 경우)
+            // TODO 파일에 없는 채널일 경우 처리 [AUTHOR : 임강범]
 
+            // TODO Tags 비교해서 x-ouroboros-progress 업데이트 [AUTHOR : 임강범]
+
+            // TODO Schema 정답지 비교 COMPLETED인 경우만 여기 로직 실행 [AUTHOR : 임강범]
         }
 
         return null;
