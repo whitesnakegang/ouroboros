@@ -19,12 +19,22 @@ public class TryStompConfig implements WebSocketMessageBrokerConfigurer {
     private final TryStompChannelInterceptor tryStompChannelInterceptor;
     private final TryStompOutboundChannelInterceptor tryStompOutboundChannelInterceptor;
 
+    /**
+     * Registers the Try module's inbound STOMP channel interceptor so inbound messages are processed by it.
+     *
+     * @param registration the inbound channel registration to attach the interceptor to
+     */
     @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {
         log.info("Registering TryStompChannelInterceptor for inbound channel");
         registration.interceptors(tryStompChannelInterceptor);
     }
 
+    /**
+     * Registers the TryStompOutboundChannelInterceptor on the provided client outbound channel registration.
+     *
+     * @param registration the outbound channel registration to which the interceptor will be added
+     */
     @Override
     public void configureClientOutboundChannel(ChannelRegistration registration) {
         log.info("Registering TryStompOutboundChannelInterceptor for outbound channel");
@@ -36,5 +46,4 @@ public class TryStompConfig implements WebSocketMessageBrokerConfigurer {
      */
     // Message broker configuration uses the application's existing settings.
 }
-
 

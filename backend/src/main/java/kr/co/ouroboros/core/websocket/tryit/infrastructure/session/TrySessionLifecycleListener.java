@@ -17,6 +17,13 @@ public class TrySessionLifecycleListener {
 
     private final TrySessionRegistry trySessionRegistry;
 
+    /**
+     * Handle STOMP session disconnect events and remove any Try mappings associated with the session.
+     *
+     * If the event does not contain a STOMP session id, the method returns without performing cleanup.
+     *
+     * @param event the SessionDisconnectEvent carrying the STOMP message and headers
+     */
     @EventListener
     public void handleSessionDisconnect(SessionDisconnectEvent event) {
         StompHeaderAccessor accessor = StompHeaderAccessor.wrap(event.getMessage());
@@ -28,4 +35,3 @@ public class TrySessionLifecycleListener {
         trySessionRegistry.removeBySessionId(sessionId);
     }
 }
-
