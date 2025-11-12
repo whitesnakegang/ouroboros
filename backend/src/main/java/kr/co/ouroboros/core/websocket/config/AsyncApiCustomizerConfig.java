@@ -1,0 +1,61 @@
+package kr.co.ouroboros.core.websocket.config;
+
+import io.github.springwolf.asyncapi.v3.model.Tag;
+import io.github.springwolf.asyncapi.v3.model.operation.Operation;
+import io.github.springwolf.core.asyncapi.scanners.operations.annotations.OperationCustomizer;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import kr.co.ouroboros.core.global.annotation.ApiState;
+import org.springframework.stereotype.Component;
+
+@Component
+public class AsyncApiCustomizerConfig implements OperationCustomizer {
+
+    @Override
+    public void customize(Operation operation, Method method) {
+        ApiState annotation = method.getAnnotation(ApiState.class);
+        if (annotation == null) {
+            return;
+        }
+
+        String progressValue;
+        switch (annotation.state()) {
+            case COMPLETED:
+                progressValue = "completed";
+                break;
+            case BUGFIX:
+                progressValue = "bugfix";
+                break;
+            case IMPLEMENTING:
+                progressValue = "implementing";
+                break;
+            default:
+                return;
+        }
+
+        List<Tag> tags = operation.getTags();
+        if (tags == null) {
+            tags = new ArrayList<>();
+            operation.setTags(tags);
+        }
+
+        final String finalProgressValue = progressValue;
+        boolean already = tags.stream().anyMatch(t -> {
+            Map<String, Object> ext = t.getExtensionFields();
+            return ext != null
+                    && finalProgressValue.equalsIgnoreCase(String.valueOf(ext.get("x-ouroboros-progress")));
+        });
+        if (already) return;
+
+        Tag tag = new Tag();
+        Map<String, Object> ext = new LinkedHashMap<>();
+        ext.put("x-ouroboros-progress", progressValue);
+        tag.setExtensionFields(ext);
+        tags.add(tag);
+    }
+}
+
+
