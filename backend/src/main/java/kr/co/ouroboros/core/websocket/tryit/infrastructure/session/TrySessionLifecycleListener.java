@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.websocket.tryit.identification;
+package kr.co.ouroboros.core.websocket.tryit.infrastructure.session;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

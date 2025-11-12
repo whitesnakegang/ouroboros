@@ -3,6 +3,7 @@ package kr.co.ouroboros.core.websocket.tryit.identification;
 import io.opentelemetry.context.Scope;
 import kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.context.TryContext;
 import kr.co.ouroboros.core.websocket.tryit.common.TryStompHeaders;
+import kr.co.ouroboros.core.websocket.tryit.infrastructure.messaging.TryPublisherNotifier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.messaging.Message;

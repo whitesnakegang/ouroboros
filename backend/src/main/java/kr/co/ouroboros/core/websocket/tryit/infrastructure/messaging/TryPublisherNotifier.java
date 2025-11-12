@@ -1,5 +1,6 @@
-package kr.co.ouroboros.core.websocket.tryit.identification;
+package kr.co.ouroboros.core.websocket.tryit.infrastructure.messaging;
 
+import kr.co.ouroboros.core.websocket.tryit.infrastructure.session.TrySessionRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.messaging.Message;

@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.websocket.tryit.support;
+package kr.co.ouroboros.core.websocket.tryit.infrastructure.instrumentation;
 
 import io.opentelemetry.context.Context;
 import io.opentelemetry.context.Scope;

@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.websocket.tryit.identification;
+package kr.co.ouroboros.core.websocket.tryit.infrastructure.messaging;
 
 import java.util.Map;
 
