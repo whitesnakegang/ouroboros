@@ -90,26 +90,26 @@ public class TryOnlySampler implements Sampler {
                 isTryRequest = TRY_VALUE.equalsIgnoreCase(tryHeader);
 
                 if (isTryRequest) {
-                    log.info("✅ Try request detected via header - sampling span: {}", name);
+                    log.debug("Try request detected via header - sampling span: {}", name);
                 } else {
-                    log.debug("❌ Non-Try request (header check) - dropping span: {}", name);
+                    log.trace("Non-Try request (header check) - dropping span: {}", name);
                 }
 
                 return isTryRequest ? SamplingResult.recordAndSample() : SamplingResult.drop();
             }
         } catch (Exception e) {
-            log.debug("Exception checking HTTP request context: {}", e.getMessage());
+            log.trace("Exception checking HTTP request context: {}", e.getMessage());
         }
 
         // Priority 2: Fallback to TryContext (for internal/child spans)
         isTryRequest = TryContext.hasTryId();
-        log.debug("TryContext.hasTryId(): {}", isTryRequest);
+        log.trace("TryContext.hasTryId(): {}", isTryRequest);
 
         if (isTryRequest) {
-            log.info("✅ Try request detected via TryContext - sampling span: {}", name);
+            log.debug("Try request detected via TryContext - sampling span: {}", name);
             return SamplingResult.recordAndSample();
         } else {
-            log.debug("❌ Non-Try request (TryContext check) - dropping span: {}", name);
+            log.trace("Non-Try request (TryContext check) - dropping span: {}", name);
             return SamplingResult.drop();
         }
     }
