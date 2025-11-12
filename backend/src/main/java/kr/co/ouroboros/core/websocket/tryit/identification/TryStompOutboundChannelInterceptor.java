@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
 import java.util.UUID;
 
 /**
- * 서버에서 클라이언트로 전달되는 STOMP 메시지에 tryId 헤더를 보강하는 인터셉터.
+ * Interceptor that adds tryId header to STOMP messages sent from server to client.
  */
 @Slf4j
 @Component
@@ -35,7 +35,7 @@ public class TryStompOutboundChannelInterceptor implements ChannelInterceptor {
         if (tryId == null) {
             tryId = extractTryIdFromHeaders(accessor);
             if (tryId == null) {
-                log.trace("TryContext와 헤더에서 tryId를 찾지 못했습니다. headers={}", accessor.toMap());
+                log.trace("Could not find tryId in TryContext and headers. headers={}", accessor.toMap());
                 return message;
             }
             Scope scope = TryContext.setTryId(tryId);
@@ -44,23 +44,23 @@ public class TryStompOutboundChannelInterceptor implements ChannelInterceptor {
             }
         }
 
-        // StompCommand가 없으면 MESSAGE로 설정 (StompEncoder에서 필수)
-        // 브로커가 브로드캐스트 메시지를 만들 때 command를 설정하지 않는 경우가 있음
+        // Set to MESSAGE if StompCommand is missing (required by StompEncoder)
+        // Brokers may not set command when creating broadcast messages
         StompCommand command = accessor.getCommand();
         boolean needNewAccessor = (command == null);
         
         if (needNewAccessor) {
-            // command가 없으면 새 accessor를 생성하고 원본 메시지의 모든 헤더를 보존
-            // 특히 Spring 메시징 헤더(simpSubscriptionId, simpDestination 등)를 명시적으로 복사
+            // If command is missing, create new accessor and preserve all headers from original message
+            // Especially copy Spring messaging headers (simpSubscriptionId, simpDestination, etc.) explicitly
             StompHeaderAccessor newAccessor = StompHeaderAccessor.create(StompCommand.MESSAGE);
             newAccessor.setLeaveMutable(true);
             
-            // 원본 메시지의 모든 헤더를 복사 (Spring 메시징 헤더 포함)
-            // copyHeaders()로 기본 헤더를 복사한 후, Spring 메시징 헤더를 명시적으로 설정
+            // Copy all headers from original message (including Spring messaging headers)
+            // Copy basic headers with copyHeaders(), then set Spring messaging headers explicitly
             newAccessor.copyHeaders(message.getHeaders());
             
-            // 원본 accessor에서 중요한 Spring 메시징 헤더를 명시적으로 복사
-            // 이렇게 하면 StompEncoder가 subscription, destination 등을 제대로 인코딩할 수 있음
+            // Copy important Spring messaging headers from original accessor explicitly
+            // This allows StompEncoder to properly encode subscription, destination, etc.
             String subscriptionId = accessor.getSubscriptionId();
             String destination = accessor.getDestination();
             String sessionId = accessor.getSessionId();
@@ -79,34 +79,34 @@ public class TryStompOutboundChannelInterceptor implements ChannelInterceptor {
                 newAccessor.setMessageId(messageId);
             }
             
-            // 원본 메시지의 native 헤더도 복사 (content-type 등)
+            // Copy native headers from original message (content-type, etc.)
             accessor.toNativeHeaderMap().forEach((key, values) -> {
                 if (values != null && !values.isEmpty()) {
                     newAccessor.setNativeHeader(key, values.get(0));
                 }
             });
             
-            // tryId 헤더 추가
+            // Add tryId header
             newAccessor.setNativeHeader(TryStompHeaders.TRY_ID_HEADER, tryId.toString());
             newAccessor.setHeader(TryStompHeaders.TRY_ID_HEADER, tryId.toString());
             
-            log.trace("Outbound STOMP 메시지에 tryId({}) 헤더를 설정했습니다 (command 없음, 새 accessor 생성). subscriptionId={}, destination={}", 
+            log.trace("Set tryId({}) header on outbound STOMP message (no command, new accessor created). subscriptionId={}, destination={}", 
                     tryId, newAccessor.getSubscriptionId(), newAccessor.getDestination());
             
-            // 새 accessor의 헤더로 메시지 재생성
-            // 원본 메시지의 payload는 그대로 유지하고 헤더만 업데이트
+            // Recreate message with new accessor headers
+            // Keep original message payload and only update headers
             return MessageBuilder.createMessage(message.getPayload(), newAccessor.getMessageHeaders());
         }
         
-        // command가 있으면 원본 accessor에 tryId 헤더만 추가
+        // If command exists, only add tryId header to original accessor
         accessor.setNativeHeader(TryStompHeaders.TRY_ID_HEADER, tryId.toString());
         accessor.setHeader(TryStompHeaders.TRY_ID_HEADER, tryId.toString());
         
-        log.trace("Outbound STOMP 메시지에 tryId({}) 헤더를 설정했습니다. command={}, destination={}, subscriptionId={}", 
+        log.trace("Set tryId({}) header on outbound STOMP message. command={}, destination={}, subscriptionId={}", 
                 tryId, accessor.getCommand(), accessor.getDestination(), accessor.getSubscriptionId());
 
-        // 원본 메시지의 모든 헤더를 보존하면서 tryId 헤더만 추가
-        // accessor는 mutable 상태이므로 변경사항이 이미 반영되어 있음
+        // Preserve all headers from original message and only add tryId header
+        // Accessor is mutable, so changes are already reflected
         return MessageBuilder.createMessage(message.getPayload(), accessor.getMessageHeaders());
     }
 
@@ -126,12 +126,12 @@ public class TryStompOutboundChannelInterceptor implements ChannelInterceptor {
             try {
                 scope.close();
             } catch (Exception e) {
-                log.warn("Outbound Try Scope 정리 중 예외가 발생했습니다: {}", e.getMessage());
+                log.warn("Exception while cleaning up Outbound Try Scope: {}", e.getMessage());
             }
         }
 
         if (!sent) {
-            log.warn("STOMP 메시지 전송이 완료되지 않았습니다. simpSessionId={}, headers={}, exception={}", accessor.getSessionId(), accessor.toMap(), ex != null ? ex.getMessage() : "none");
+            log.warn("STOMP message transmission not completed. simpSessionId={}, headers={}, exception={}", accessor.getSessionId(), accessor.toMap(), ex != null ? ex.getMessage() : "none");
         }
     }
 
@@ -141,7 +141,7 @@ public class TryStompOutboundChannelInterceptor implements ChannelInterceptor {
             try {
                 return UUID.fromString(headerTryId);
             } catch (IllegalArgumentException e) {
-                log.warn("Outbound STOMP 헤더의 tryId 값이 UUID 형식이 아닙니다: {}", headerTryId);
+                log.warn("tryId value in outbound STOMP header is not in UUID format: {}", headerTryId);
             }
         }
 

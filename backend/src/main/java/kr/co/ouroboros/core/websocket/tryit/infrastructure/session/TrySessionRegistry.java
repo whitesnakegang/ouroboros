@@ -11,7 +11,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * tryId와 세션 매핑을 관리한다.
+ * Manages mappings between tryId and sessionId.
  */
 @Slf4j
 @Component

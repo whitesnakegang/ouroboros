@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 import java.util.Set;
 
 /**
- * STOMP 채널 Executor에 OpenTelemetry TaskDecorator를 적용한다.
+ * Applies OpenTelemetry TaskDecorator to STOMP channel executors.
  */
 @Slf4j
 @Component

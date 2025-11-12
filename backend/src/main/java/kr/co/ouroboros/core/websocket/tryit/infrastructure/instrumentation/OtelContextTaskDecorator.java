@@ -5,7 +5,7 @@ import io.opentelemetry.context.Scope;
 import org.springframework.core.task.TaskDecorator;
 
 /**
- * OpenTelemetry Context를 비동기 작업 실행 시에도 전파하는 TaskDecorator.
+ * TaskDecorator for propagating OpenTelemetry Context across asynchronous tasks.
  */
 public final class OtelContextTaskDecorator implements TaskDecorator {
 

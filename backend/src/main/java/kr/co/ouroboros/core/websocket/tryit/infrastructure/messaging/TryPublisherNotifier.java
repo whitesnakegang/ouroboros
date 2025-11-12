@@ -17,7 +17,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Try 요청 발행자에게 메타데이터를 전달하는 컴포넌트.
+ * Component for delivering Try request metadata to the publisher.
  */
 @Slf4j
 @Component
@@ -40,13 +40,13 @@ public class TryPublisherNotifier {
 
         String sessionId = accessor.getSessionId();
         if (sessionId == null) {
-            log.debug("세션 ID가 없어 Try 발행자 알림을 보낼 수 없습니다. tryId={}", tryId);
+            log.debug("Cannot send Try publisher notification: session ID is missing. tryId={}", tryId);
             return;
         }
 
         SimpMessagingTemplate messagingTemplate = messagingTemplateProvider.getIfAvailable();
         if (messagingTemplate == null) {
-            log.warn("SimpMessagingTemplate을 가져오지 못해 Try 알림을 전송하지 못했습니다. sessionId={}, tryId={}", sessionId, tryId);
+            log.warn("Failed to send Try notification: could not get SimpMessagingTemplate. sessionId={}, tryId={}", sessionId, tryId);
             return;
         }
 
@@ -55,7 +55,7 @@ public class TryPublisherNotifier {
 
         Map<String, Object> headers = createHeaders(sessionId);
         messagingTemplate.convertAndSendToUser(sessionId, PUBLISHER_DESTINATION, dispatchMessage, headers);
-        log.trace("세션 {}에 Try 알림을 전송했습니다. tryId={}", sessionId, tryId);
+        log.trace("Sent Try notification to session {}. tryId={}", sessionId, tryId);
     }
 
     private TryDispatchMessage buildDispatchMessage(StompHeaderAccessor accessor, Message<?> message) {
@@ -84,8 +84,8 @@ public class TryPublisherNotifier {
                 }
             });
         }
-        // destination이 headers에 없으면 명시적으로 추가
-        // (destination은 STOMP 메시지 헤더에 포함되므로 클라이언트에서 필요할 수 있음)
+        // Explicitly add destination if it's not in headers
+        // (destination is included in STOMP message headers, so client may need it)
         String destination = accessor.getDestination();
         if (destination != null && !flattened.containsKey("destination")) {
             flattened.put("destination", destination);

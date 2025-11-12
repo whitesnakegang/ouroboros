@@ -19,10 +19,10 @@ import org.springframework.stereotype.Component;
 import java.util.UUID;
 
 /**
- * STOMP 인바운드 메시지에서 Try 요청을 식별하고 Try 컨텍스트를 설정하는 인터셉터.
+ * Interceptor that identifies Try requests in STOMP inbound messages and sets Try context.
  * <p>
- * HTTP {@link kr.co.ouroboros.core.rest.tryit.identification.TryFilter}와 동일한 헤더 프로토콜을 사용하여
- * STOMP 메시지에서도 tryId를 발급 및 전파한다.
+ * Uses the same header protocol as {@link kr.co.ouroboros.core.rest.tryit.identification.TryFilter}
+ * to issue and propagate tryId in STOMP messages.
  */
 @Slf4j
 @Component
@@ -37,17 +37,17 @@ public class TryStompChannelInterceptor implements ChannelInterceptor {
 
         StompCommand command = accessor.getCommand();
         if (command == null) {
-            log.trace("STOMP 명령이 없어 Try 검사를 건너뜁니다.");
+            log.trace("Skipping Try check: STOMP command is missing");
             return message;
         }
 
-        // Inbound 채널(클라이언트 -> 서버) 메시지만 처리된다. command 기준으로 추가 필터링 가능.
+        // Only inbound channel (client -> server) messages are processed. Additional filtering by command is possible.
         String tryHeader = getFirstNativeHeader(accessor, TryStompHeaders.TRY_HEADER);
         boolean tryRequested = TryStompHeaders.TRY_HEADER_ENABLED_VALUE.equalsIgnoreCase(tryHeader);
 
         UUID tryId = resolveTryId(accessor, tryRequested);
         if (tryId == null) {
-            // Try 요청이 아니거나, Try 식별자를 발급하지 못한 경우 컨텍스트를 건드리지 않는다.
+            // If it's not a Try request or we couldn't issue a Try identifier, don't touch the context.
             return message;
         }
 
@@ -60,11 +60,11 @@ public class TryStompChannelInterceptor implements ChannelInterceptor {
             tryPublisherNotifier.notifyPublisher(tryId, accessor, message);
         }
 
-        // 프레임 헤더에 tryId를 기록하여 이후 전송 시에도 식별자를 유지한다.
+        // Record tryId in frame header so the identifier is maintained in subsequent transmissions.
         accessor.setNativeHeader(TryStompHeaders.TRY_ID_HEADER, tryId.toString());
         accessor.setHeader(TryStompHeaders.TRY_ID_HEADER, tryId.toString());
 
-        log.trace("STOMP {} 프레임에서 Try 컨텍스트를 설정했습니다. tryId={}", command, tryId);
+        log.trace("Set Try context in STOMP {} frame. tryId={}", command, tryId);
 
         return MessageBuilder.createMessage(message.getPayload(), accessor.getMessageHeaders());
     }
@@ -86,27 +86,27 @@ public class TryStompChannelInterceptor implements ChannelInterceptor {
             try {
                 scope.close();
             } catch (Exception e) {
-                log.warn("Try STOMP Scope 정리 중 예외가 발생했습니다: {}", e.getMessage());
+                log.warn("Exception while cleaning up Try STOMP Scope: {}", e.getMessage());
             }
         }
     }
 
     @Nullable
     private UUID resolveTryId(StompHeaderAccessor accessor, boolean tryRequested) {
-        // 1) 프레임 헤더에 tryId가 포함되어 있다면 그대로 사용
+        // 1) If tryId is included in frame header, use it as is
         String headerTryId = getFirstNativeHeader(accessor, TryStompHeaders.TRY_ID_HEADER);
         if (headerTryId != null) {
             try {
                 return UUID.fromString(headerTryId);
             } catch (IllegalArgumentException e) {
-                log.warn("잘못된 tryId 형식이 STOMP 헤더에 전달되었습니다: {}", headerTryId);
+                log.warn("Invalid tryId format in STOMP header: {}", headerTryId);
             }
         }
 
-        // 2) Try 요청 헤더가 활성화됐으면 새로 생성
+        // 2) If Try request header is enabled, generate a new one
         if (tryRequested) {
             UUID newTryId = UUID.randomUUID();
-            log.debug("STOMP Try 요청을 감지하여 새로운 tryId를 생성했습니다: {}", newTryId);
+            log.debug("Detected STOMP Try request and generated new tryId: {}", newTryId);
             return newTryId;
         }
 

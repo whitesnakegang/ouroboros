@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
 /**
- * STOMP 세션 종료 시 Try 매핑을 정리한다.
+ * Cleans up Try mappings when STOMP session is disconnected.
  */
 @Slf4j
 @Component
@@ -24,7 +24,7 @@ public class TrySessionLifecycleListener {
         if (sessionId == null) {
             return;
         }
-        log.trace("세션 {} 종료 감지. Try 매핑을 정리합니다.", sessionId);
+        log.trace("Session {} disconnected. Cleaning up Try mappings.", sessionId);
         trySessionRegistry.removeBySessionId(sessionId);
     }
 }
