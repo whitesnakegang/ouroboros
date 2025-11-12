@@ -3,6 +3,7 @@ package kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.aspect;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
 import kr.co.ouroboros.core.rest.tryit.config.properties.MethodTracingProperties;
+import kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.context.TryContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aopalliance.intercept.MethodInterceptor;
@@ -68,6 +69,10 @@ public class MethodTracingMethodInterceptor implements MethodInterceptor {
          */
     @Override
     public Object invoke(MethodInvocation invocation) throws Throwable {
+        // Try 요청이 아니면 계측 없이 바로 실행
+        if(!TryContext.hasTryId()){
+            return invocation.proceed();
+        }
         Class<?> declaringType = invocation.getMethod().getDeclaringClass();
         String declaringTypeName = declaringType.getName();
         // Prefer user-defined repository/service/controller interface/class name for className
