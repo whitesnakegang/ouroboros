@@ -17,6 +17,7 @@ import lombok.NoArgsConstructor;
 public class Server {
 
     private String host;
+    private String pathname;
     private String protocol;
     private String description;
 }

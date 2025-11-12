@@ -18,7 +18,7 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
- * Implementation of {@link SchemaService}.
+ * Implementation of {@link RestSchemaService}.
  * <p>
  * Manages schema definitions in the OpenAPI components/schemas section of ourorest.yml.
  * Uses {@link RestApiYamlParser} for all YAML file operations.
@@ -28,7 +28,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class SchemaServiceImpl implements SchemaService {
+public class RestSchemaServiceImpl implements RestSchemaService {
 
     private final RestApiYamlParser yamlParser;
     private final OuroApiSpecManager specManager;

@@ -1,19 +1,19 @@
-package kr.co.ouroboros.core.rest.spec.service;
+package kr.co.ouroboros.core.websocket.spec.service;
 
-import kr.co.ouroboros.ui.rest.spec.dto.CreateSchemaRequest;
-import kr.co.ouroboros.ui.rest.spec.dto.SchemaResponse;
-import kr.co.ouroboros.ui.rest.spec.dto.UpdateSchemaRequest;
+import kr.co.ouroboros.ui.websocket.spec.dto.CreateSchemaRequest;
+import kr.co.ouroboros.ui.websocket.spec.dto.SchemaResponse;
+import kr.co.ouroboros.ui.websocket.spec.dto.UpdateSchemaRequest;
 
 import java.util.List;
 
 /**
- * Service interface for schema management operations.
+ * Service interface for WebSocket schema management operations.
  * <p>
- * Manages reusable schema definitions in the OpenAPI components/schemas section.
+ * Manages reusable schema definitions in the AsyncAPI components/schemas section.
  *
- * @since 0.0.1
+ * @since 0.1.0
  */
-public interface SchemaService {
+public interface WebsocketSchemaService {
 
     /**
      * Creates a new schema definition.
