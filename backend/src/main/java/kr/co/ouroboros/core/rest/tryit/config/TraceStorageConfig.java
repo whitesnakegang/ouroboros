@@ -1,16 +1,21 @@
 package kr.co.ouroboros.core.rest.tryit.config;
 
 import io.opentelemetry.sdk.trace.SpanProcessor;
+import io.opentelemetry.sdk.trace.samplers.Sampler;
 import kr.co.ouroboros.core.rest.tryit.config.properties.TempoProperties;
+import kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.sampler.TryOnlySampler;
 import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.memory.processor.InMemoryTrySpanProcessor;
 import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.tempo.processor.TempoTrySpanProcessor;
 import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.TraceStorage;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.actuate.autoconfigure.tracing.OpenTelemetryTracingAutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.AutoConfigureBefore;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 
 /**
  * Trace storage configuration.
@@ -25,6 +30,7 @@ import org.springframework.context.annotation.Bean;
  * <p>
  * <b>Beans:</b>
  * <ul>
+ *   <li>{@link Sampler} - TryOnlySampler to sample only Try requests</li>
  *   <li>{@link SpanProcessor} - TempoTrySpanProcessor or InMemoryTrySpanProcessor based on Tempo enabled status</li>
  * </ul>
  *
@@ -33,6 +39,7 @@ import org.springframework.context.annotation.Bean;
  */
 @Slf4j
 @AutoConfiguration
+@AutoConfigureBefore(OpenTelemetryTracingAutoConfiguration.class)
 @EnableConfigurationProperties(TempoProperties.class)
 public class TraceStorageConfig {
     
@@ -72,5 +79,26 @@ public class TraceStorageConfig {
         log.info("InMemoryTrySpanProcessor bean created successfully");
         return processor;
     }
-    
+
+    /**
+     * Register TryOnlySampler bean to sample only Try requests.
+     * <p>
+     * This sampler prevents span creation for non-Try requests, reducing
+     * tracing overhead and Tempo storage usage. Only requests with
+     * X-Ouroboros-Try: on header will be traced.
+     * <p>
+     * <b>Important:</b> This bean does NOT use @ConditionalOnMissingBean to ensure
+     * it always overrides Spring Boot's default Sampler. The property
+     * management.tracing.sampling.probability is not needed and will be ignored.
+     *
+     * @return the TryOnlySampler instance
+     */
+    @Bean
+    @Primary
+    public Sampler sampler() {
+        TryOnlySampler sampler = new TryOnlySampler();
+        log.info("TryOnlySampler bean created successfully");
+        return sampler;
+    }
+
 }
