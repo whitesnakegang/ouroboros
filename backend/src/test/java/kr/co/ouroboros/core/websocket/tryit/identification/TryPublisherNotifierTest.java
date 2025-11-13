@@ -55,7 +55,7 @@ class TryPublisherNotifierTest {
         assertThat(dispatchMessage.headers()).doesNotContainKey(TryStompHeaders.TRY_ID_HEADER);
         assertThat(dispatchMessage.payload()).isEqualTo("{}");
 
-        verify(messagingTemplate).convertAndSendToUser(eq("session-123"), eq("/queue/try"), eq(dispatchMessage), anyMap());
+        verify(messagingTemplate).convertAndSendToUser(eq("session-123"), eq("/queue/ouro/try"), eq(dispatchMessage), anyMap());
     }
 }
 

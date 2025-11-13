@@ -23,7 +23,7 @@ import java.util.UUID;
 @Component
 public class TryPublisherNotifier {
 
-    private static final String PUBLISHER_DESTINATION = "/queue/try";
+    private static final String PUBLISHER_DESTINATION = "/queue/ouro/try";
 
     private final ObjectProvider<SimpMessagingTemplate> messagingTemplateProvider;
     private final TrySessionRegistry trySessionRegistry;
@@ -45,7 +45,7 @@ public class TryPublisherNotifier {
      * If the provided `tryId` is null, the session ID is missing, or a messaging template is unavailable,
      * the method returns without sending or registering anything. When successful, it registers a
      * TryDispatchMessage for the `tryId` in the TrySessionRegistry and sends the dispatch to the user
-     * destination "/queue/try" for the originating WebSocket session.
+     * destination "/queue/ouro/try" for the originating WebSocket session.
      *
      * @param tryId    the identifier of the Try request to notify for
      * @param accessor the STOMP header accessor used to extract the originating session ID and headers
