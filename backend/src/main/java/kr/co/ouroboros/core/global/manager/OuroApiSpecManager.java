@@ -81,11 +81,8 @@ public class OuroApiSpecManager {
         // 3. 불일치 검증
         // 비교 후, 최종적으로 저장할 ApiSpec 반환
         OuroApiSpec validationResult = handler.synchronize(fileSpec, scannedSpec);
-        
-        // 4. 스캔한 최신 스펙을 YAML로 직렬화하고 파일에 저장
-        handler.saveYaml(validationResult);
 
-        // 5. 캐시 최신화 (validationResult 사용 - 파일+코드 동기화 결과)
+        // 4. 캐시 최신화 (validationResult 사용 - 파일+코드 동기화 결과)
         apiCache.put(protocol, validationResult);
     }
 
