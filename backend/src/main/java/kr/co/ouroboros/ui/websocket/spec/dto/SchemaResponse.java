@@ -1,7 +1,7 @@
-package kr.co.ouroboros.ui.rest.spec.dto;
+package kr.co.ouroboros.ui.websocket.spec.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import kr.co.ouroboros.core.rest.spec.model.Property;
+import kr.co.ouroboros.core.websocket.spec.model.Property;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -11,11 +11,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Response DTO for schema operations.
+ * Response DTO for AsyncAPI schema operations.
  * <p>
  * Returns the complete schema definition including metadata.
  *
- * @since 0.0.1
+ * @since 0.1.0
  */
 @Data
 @Builder
@@ -58,11 +58,6 @@ public class SchemaResponse {
      * Field ordering (Ouroboros extension)
      */
     private List<String> orders;
-
-    /**
-     * XML root element name
-     */
-    private String xmlName;
 
     /**
      * Array item schema (for type="array")

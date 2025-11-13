@@ -3,7 +3,7 @@ package kr.co.ouroboros.core.rest.mock.service;
 import jakarta.servlet.http.HttpServletRequest;
 import kr.co.ouroboros.core.rest.mock.model.EndpointMeta;
 import kr.co.ouroboros.core.rest.mock.model.RestResponseMeta;
-import kr.co.ouroboros.core.rest.spec.service.SchemaService;
+import kr.co.ouroboros.core.rest.spec.service.RestSchemaService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -37,7 +37,7 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class MockValidationService {
-    private final SchemaService schemaService;
+    private final RestSchemaService restSchemaService;
     /**
      * Validate an HttpServletRequest against the endpoint requirements defined by EndpointMeta.
      *
@@ -408,7 +408,7 @@ public class MockValidationService {
             String schemaName = ref.replace("#/components/schemas/", "");
             
             // SchemaService에서 스키마 조회
-            var schema = schemaService.getSchema(schemaName);
+            var schema = restSchemaService.getSchema(schemaName);
             if (schema == null) {
                 return null;
             }
