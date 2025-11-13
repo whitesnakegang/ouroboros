@@ -176,7 +176,16 @@ public class RestSchemaServiceImpl implements RestSchemaService {
                 existingSchema.put("xml", xml);
             }
             if (request.getItems() != null) {
-                existingSchema.put("items", request.getItems());
+                if (request.getItems() instanceof Property) {
+                    existingSchema.put("items", buildProperty((Property) request.getItems()));
+                } else if (request.getItems() instanceof Map) {
+                    // JSON deserialization creates Map instead of Property
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> itemsMap = (Map<String, Object>) request.getItems();
+                    existingSchema.put("items", itemsMap);
+                } else {
+                    log.warn("Items field is not a Property or Map instance, skipping");
+                }
             }
 
             // Process and cache: writes to file + validates with scanned state + updates cache
@@ -263,7 +272,16 @@ public class RestSchemaServiceImpl implements RestSchemaService {
 
         // Array items 처리 (Array 타입일 때 items 필드 처리)
         if (request.getItems() != null) {
-            schema.put("items", request.getItems());
+            if (request.getItems() instanceof Property) {
+                schema.put("items", buildProperty((Property) request.getItems()));
+            } else if (request.getItems() instanceof Map) {
+                // JSON deserialization creates Map instead of Property
+                @SuppressWarnings("unchecked")
+                Map<String, Object> itemsMap = (Map<String, Object>) request.getItems();
+                schema.put("items", itemsMap);
+            } else {
+                log.warn("Items field is not a Property or Map instance, skipping");
+            }
         }
 
         return schema;
@@ -363,6 +381,14 @@ public class RestSchemaServiceImpl implements RestSchemaService {
             @SuppressWarnings("unchecked")
             Map<String, Object> xml = (Map<String, Object>) xmlObj;
             builder.xmlName(safeGetString(xml, "name"));
+        }
+
+        // Extract items for array type
+        Object itemsObj = schemaDefinition.get("items");
+        if (itemsObj instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> itemsMap = (Map<String, Object>) itemsObj;
+            builder.items(convertToProperty(itemsMap));
         }
 
         return builder.build();

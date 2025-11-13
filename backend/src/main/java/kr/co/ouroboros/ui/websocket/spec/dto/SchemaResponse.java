@@ -58,4 +58,9 @@ public class SchemaResponse {
      * Field ordering (Ouroboros extension)
      */
     private List<String> orders;
+
+    /**
+     * Array item schema (for type="array")
+     */
+    private Property items;
 }

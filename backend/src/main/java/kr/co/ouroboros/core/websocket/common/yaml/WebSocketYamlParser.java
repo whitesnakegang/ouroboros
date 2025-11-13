@@ -146,12 +146,53 @@ public class WebSocketYamlParser {
      * @throws Exception if file operations fail
      */
     public Map<String, Object> readOrCreateDocument() throws Exception {
+        Map<String, Object> doc;
         if (fileExists()) {
-            return readDocument();
+            doc = readDocument();
         } else {
-            return createMinimalDocument();
+            doc = createMinimalDocument();
+        }
+
+        // Ensure required AsyncAPI 3.0.0 fields are present
+        ensureRequiredFields(doc);
+        return doc;
+    }
+
+    // 이 메서드를 추가
+    private void ensureRequiredFields(Map<String, Object> doc) {
+        // Ensure asyncapi version
+        if (!doc.containsKey("asyncapi")) {
+            doc.put("asyncapi", "3.0.0");
+        }
+
+        // Ensure info section
+        if (!doc.containsKey("info")) {
+            Map<String, Object> info = new LinkedHashMap<>();
+            info.put("title", "WebSocket API Documentation");
+            info.put("version", "1.0.0");
+            doc.put("info", info);
+        }
+
+        // Ensure defaultContentType
+        if (!doc.containsKey("defaultContentType")) {
+            doc.put("defaultContentType", "application/json");
+        }
+
+        // Ensure required sections exist
+        if (!doc.containsKey("servers")) {
+            doc.put("servers", new LinkedHashMap<>());
+        }
+        if (!doc.containsKey("channels")) {
+            doc.put("channels", new LinkedHashMap<>());
+        }
+        if (!doc.containsKey("operations")) {
+            doc.put("operations", new LinkedHashMap<>());
+        }
+        if (!doc.containsKey("components")) {
+            doc.put("components", new LinkedHashMap<>());
         }
     }
+
 
     /**
      * Creates a minimal AsyncAPI 3.0.0 document structure.

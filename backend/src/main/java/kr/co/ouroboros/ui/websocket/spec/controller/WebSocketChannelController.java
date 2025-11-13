@@ -38,7 +38,7 @@ public class WebSocketChannelController {
         } catch (Exception e) {
             log.error("Failed to retrieve channels", e);
             return ResponseEntity.status(500).body(
-                    GlobalApiResponse.error(500, "Failed to retrieve channels", "CHANNEL_RETRIEVAL_ERROR", e.getMessage())
+                    GlobalApiResponse.error(500, "Failed to retrieve channels", "CHANNEL_RETRIEVAL_ERROR", "An internal error occurred")
             );
         }
     }
@@ -63,7 +63,7 @@ public class WebSocketChannelController {
         } catch (Exception e) {
             log.error("Failed to retrieve channel: {}", channelName, e);
             return ResponseEntity.status(500).body(
-                    GlobalApiResponse.error(500, "Failed to retrieve channel", "CHANNEL_RETRIEVAL_ERROR", e.getMessage())
+                    GlobalApiResponse.error(500, "Failed to retrieve channel", "CHANNEL_RETRIEVAL_ERROR", "An internal error occurred")
             );
         }
     }

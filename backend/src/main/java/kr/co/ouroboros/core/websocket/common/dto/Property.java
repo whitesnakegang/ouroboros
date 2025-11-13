@@ -10,6 +10,9 @@ import lombok.NoArgsConstructor;
  * AsyncAPI Schema Property Object.
  * <p>
  * Represents a property definition within a schema.
+ * <p>
+ * JSON API uses "ref" field, but YAML storage uses "$ref" (AsyncAPI standard).
+ * Service layer handles conversion between "ref" (JSON) and "$ref" (YAML).
  *
  * @since 1.0.0
  */
@@ -23,7 +26,13 @@ public class Property {
     @JsonProperty("enum")
     private List<String> enumValues;
     
-    @JsonProperty("$ref")
+    /**
+     * Schema reference path.
+     * <p>
+     * In JSON API: "ref" field (e.g., "User" or "#/components/schemas/User")
+     * In YAML storage: "$ref" field (e.g., "#/components/schemas/User")
+     */
+    @JsonProperty("ref")
     private String ref;
 }
 

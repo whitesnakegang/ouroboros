@@ -1,7 +1,6 @@
 package kr.co.ouroboros.core.websocket.common.dto;
 
 import com.fasterxml.jackson.annotation.JsonGetter;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
@@ -33,8 +32,7 @@ public class Operation {
      * Stored in YAML as x-ouroboros-id.
      * Exposed in JSON as "id" (without x-ouroboros- prefix).
      */
-    @JsonProperty("x-ouroboros-id")
-    @JsonIgnore
+    @JsonProperty(value = "x-ouroboros-id", access = JsonProperty.Access.WRITE_ONLY)
     private String xOuroborosId;
 
     /**
@@ -45,8 +43,7 @@ public class Operation {
      * Used to identify which server this operation uses.
      * Example: "/ws", "/stomp/v1"
      */
-    @JsonProperty("x-ouroboros-entrypoint")
-    @JsonIgnore
+    @JsonProperty(value = "x-ouroboros-entrypoint", access = JsonProperty.Access.WRITE_ONLY)
     private String xOuroborosEntrypoint;
 
     /**
@@ -56,8 +53,7 @@ public class Operation {
      * Exposed in JSON as "diff" (without x-ouroboros- prefix).
      * Possible values: "none", "payload", "channel"
      */
-    @JsonProperty("x-ouroboros-diff")
-    @JsonIgnore
+    @JsonProperty(value = "x-ouroboros-diff", access = JsonProperty.Access.WRITE_ONLY)
     private String xOuroborosDiff;
 
     /**
@@ -67,8 +63,7 @@ public class Operation {
      * Exposed in JSON as "progress" (without x-ouroboros- prefix).
      * Possible values: "none", "mock", "completed"
      */
-    @JsonProperty("x-ouroboros-progress")
-    @JsonIgnore
+    @JsonProperty(value = "x-ouroboros-progress", access = JsonProperty.Access.WRITE_ONLY)
     private String xOuroborosProgress;
 
     /**

@@ -7,9 +7,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.List;
-import java.util.Map;
-
 /**
  * Response DTO for AsyncAPI operation operations.
  * <p>
@@ -36,6 +33,18 @@ public class OperationResponse {
      * Includes x-ouroboros-diff and x-ouroboros-progress fields.
      */
     private Operation operation;
+
+    /**
+     * Operation tag indicating the operation type.
+     * <p>
+     * Possible values:
+     * <ul>
+     *   <li>"receive": receive-only operation (no reply)</li>
+     *   <li>"duplicate": receive with reply operation</li>
+     *   <li>"sendto": send-only operation</li>
+     * </ul>
+     */
+    private String tag;
 }
 
 

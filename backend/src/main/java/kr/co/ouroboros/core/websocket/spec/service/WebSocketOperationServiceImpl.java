@@ -192,9 +192,13 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
 
                 Operation operation = convertMapToOperation(operationDefinition);
 
+                // Calculate tag based on operation type
+                String tag = calculateOperationTag(operation);
+
                 responses.add(OperationResponse.builder()
                         .operationName(operationName)
                         .operation(operation)
+                        .tag(tag)
                         .build());
             }
 
@@ -304,26 +308,53 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
             
             // Update reply channel
             if (request.getReply() != null) {
-                Map<String, Object> reply = new LinkedHashMap<>();
+                // Check if this is a send-only operation (action is "send", receive is null, reply is non-null)
+                boolean isSendOnly = ("send".equals(determinedAction) || "send".equals(updatedOperation.get("action")))
+                        && request.getReceive() == null
+                        && request.getReply() != null;
                 
-                String replyChannelName = ensureChannelExists(asyncApiDoc, request.getReply());
-                Map<String, String> replyChannelRef = new LinkedHashMap<>();
-                replyChannelRef.put("$ref", "#/channels/" + replyChannelName);
-                reply.put("channel", replyChannelRef);
-                
-                // Update reply messages if provided
-                if (request.getReply().getMessages() != null && !request.getReply().getMessages().isEmpty()) {
-                    List<Map<String, String>> messageRefs = request.getReply().getMessages().stream()
-                            .map(msgName -> {
-                                Map<String, String> ref = new LinkedHashMap<>();
-                                ref.put("$ref", "#/components/messages/" + msgName);
-                                return ref;
-                            })
-                            .collect(Collectors.toList());
-                    reply.put("messages", messageRefs);
+                if (isSendOnly) {
+                    // For send-only operations, set reply channel as top-level channel
+                    String replyChannelName = ensureChannelExists(asyncApiDoc, request.getReply());
+                    updatedOperation.put("channel", Map.of("$ref", "#/channels/" + replyChannelName));
+                    
+                    // Set top-level messages to reply's messages refs (same mapping logic used for receive)
+                    if (request.getReply().getMessages() != null && !request.getReply().getMessages().isEmpty()) {
+                        List<Map<String, String>> messageRefs = request.getReply().getMessages().stream()
+                                .map(msgName -> {
+                                    Map<String, String> ref = new LinkedHashMap<>();
+                                    ref.put("$ref", "#/components/messages/" + msgName);
+                                    return ref;
+                                })
+                                .collect(Collectors.toList());
+                        updatedOperation.put("messages", messageRefs);
+                    }
+                    
+                    // Remove any "reply" key from updatedOperation (do not create a nested reply block)
+                    updatedOperation.remove("reply");
+                } else {
+                    // Existing behavior for reply-containing updates (receive with reply)
+                    Map<String, Object> reply = new LinkedHashMap<>();
+                    
+                    String replyChannelName = ensureChannelExists(asyncApiDoc, request.getReply());
+                    Map<String, String> replyChannelRef = new LinkedHashMap<>();
+                    replyChannelRef.put("$ref", "#/channels/" + replyChannelName);
+                    reply.put("channel", replyChannelRef);
+                    
+                    // Update reply messages if provided
+                    if (request.getReply().getMessages() != null && !request.getReply().getMessages().isEmpty()) {
+                        List<Map<String, String>> messageRefs = request.getReply().getMessages().stream()
+                                .map(msgName -> {
+                                    Map<String, String> ref = new LinkedHashMap<>();
+                                    ref.put("$ref", "#/components/messages/" + msgName);
+                                    return ref;
+                                })
+                                .collect(Collectors.toList());
+                        reply.put("messages", messageRefs);
+                    }
+                    
+                    updatedOperation.put("reply", reply);
                 }
-                
-                updatedOperation.put("reply", reply);
             }
 
             // Extract new channel references after update
@@ -733,50 +764,75 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
             operation.setXOuroborosDiff((String) operationMap.get("x-ouroboros-diff"));
             operation.setXOuroborosProgress((String) operationMap.get("x-ouroboros-progress"));
 
-            // Channel reference
+            // Channel reference (YAML uses $ref, JSON API uses ref)
             Object channelObj = operationMap.get("channel");
             if (channelObj instanceof Map) {
+                @SuppressWarnings("unchecked")
                 Map<String, String> channelMap = (Map<String, String>) channelObj;
                 ChannelReference channelRef = new ChannelReference();
-                channelRef.setRef(channelMap.get("$ref"));
+                // Handle both $ref (YAML) and ref (JSON)
+                String ref = channelMap.get("$ref");
+                if (ref == null) {
+                    ref = channelMap.get("ref");
+                }
+                channelRef.setRef(ref);
                 operation.setChannel(channelRef);
             }
 
-            // Messages
+            // Messages (YAML uses $ref, JSON API uses ref)
             Object messagesObj = operationMap.get("messages");
             if (messagesObj instanceof List) {
+                @SuppressWarnings("unchecked")
                 List<Map<String, String>> messagesList = (List<Map<String, String>>) messagesObj;
                 List<MessageReference> messageRefs = messagesList.stream()
                         .map(msgMap -> {
                             MessageReference msgRef = new MessageReference();
-                            msgRef.setRef(msgMap.get("$ref"));
+                            // Handle both $ref (YAML) and ref (JSON)
+                            String ref = msgMap.get("$ref");
+                            if (ref == null) {
+                                ref = msgMap.get("ref");
+                            }
+                            msgRef.setRef(ref);
                             return msgRef;
                         })
                         .collect(Collectors.toList());
                 operation.setMessages(messageRefs);
             }
 
-            // Reply
+            // Reply (YAML uses $ref, JSON API uses ref)
             Object replyObj = operationMap.get("reply");
             if (replyObj instanceof Map) {
+                @SuppressWarnings("unchecked")
                 Map<String, Object> replyMap = (Map<String, Object>) replyObj;
                 Reply reply = new Reply();
 
                 Object replyChannelObj = replyMap.get("channel");
                 if (replyChannelObj instanceof Map) {
+                    @SuppressWarnings("unchecked")
                     Map<String, String> replyChannelMap = (Map<String, String>) replyChannelObj;
                     ChannelReference replyChannelRef = new ChannelReference();
-                    replyChannelRef.setRef(replyChannelMap.get("$ref"));
+                    // Handle both $ref (YAML) and ref (JSON)
+                    String ref = replyChannelMap.get("$ref");
+                    if (ref == null) {
+                        ref = replyChannelMap.get("ref");
+                    }
+                    replyChannelRef.setRef(ref);
                     reply.setChannel(replyChannelRef);
                 }
 
                 Object replyMessagesObj = replyMap.get("messages");
                 if (replyMessagesObj instanceof List) {
+                    @SuppressWarnings("unchecked")
                     List<Map<String, String>> replyMessagesList = (List<Map<String, String>>) replyMessagesObj;
                     List<MessageReference> replyMessageRefs = replyMessagesList.stream()
                             .map(msgMap -> {
                                 MessageReference msgRef = new MessageReference();
-                                msgRef.setRef(msgMap.get("$ref"));
+                                // Handle both $ref (YAML) and ref (JSON)
+                                String ref = msgMap.get("$ref");
+                                if (ref == null) {
+                                    ref = msgMap.get("ref");
+                                }
+                                msgRef.setRef(ref);
                                 return msgRef;
                             })
                             .collect(Collectors.toList());
@@ -970,6 +1026,44 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
             return (String) firstServer.get("pathname");
         }
         
+        return null;
+    }
+
+    /**
+     * Calculates the operation tag based on operation type.
+     * <p>
+     * Tag values:
+     * <ul>
+     *   <li>"sendto": action is "send" (send-only operation)</li>
+     *   <li>"receive": action is "receive" and no reply exists (receive-only operation)</li>
+     *   <li>"duplicate": action is "receive" and reply exists (receive with reply operation)</li>
+     * </ul>
+     *
+     * @param operation the operation to calculate tag for
+     * @return operation tag
+     */
+    private String calculateOperationTag(Operation operation) {
+        if (operation == null || operation.getAction() == null) {
+            return null;
+        }
+
+        String action = operation.getAction();
+
+        // Send-only operation
+        if ("send".equals(action)) {
+            return "sendto";
+        }
+
+        // Receive operation
+        if ("receive".equals(action)) {
+            // Check if reply exists
+            if (operation.getReply() != null) {
+                return "duplicate";
+            } else {
+                return "receive";
+            }
+        }
+
         return null;
     }
 }

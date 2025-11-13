@@ -2,6 +2,7 @@ package kr.co.ouroboros.core.websocket.spec.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.co.ouroboros.core.websocket.common.dto.Channel;
+import kr.co.ouroboros.core.websocket.common.dto.MessageReference;
 import kr.co.ouroboros.core.websocket.common.yaml.WebSocketYamlParser;
 import kr.co.ouroboros.ui.websocket.spec.dto.ChannelResponse;
 import lombok.RequiredArgsConstructor;
@@ -9,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -94,12 +96,40 @@ public class WebSocketChannelServiceImpl implements WebSocketChannelService {
 
     /**
      * Converts a Map to a Channel DTO.
+     * <p>
+     * Handles conversion between YAML format ($ref) and JSON format (ref).
      *
-     * @param channelMap channel definition map
+     * @param channelMap channel definition map from YAML
      * @return Channel DTO
      */
     private Channel convertMapToChannel(Map<String, Object> channelMap) {
         try {
+            // Convert $ref to ref in messages for JSON API
+            @SuppressWarnings("unchecked")
+            Map<String, Object> messages = (Map<String, Object>) channelMap.get("messages");
+            if (messages != null) {
+                Map<String, Object> convertedMessages = new LinkedHashMap<>();
+                for (Map.Entry<String, Object> entry : messages.entrySet()) {
+                    Object messageObj = entry.getValue();
+                    if (messageObj instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> messageMap = (Map<String, Object>) messageObj;
+                        // Convert $ref to ref
+                        if (messageMap.containsKey("$ref")) {
+                            Map<String, Object> convertedMessage = new LinkedHashMap<>();
+                            convertedMessage.put("ref", messageMap.get("$ref"));
+                            convertedMessages.put(entry.getKey(), convertedMessage);
+                        } else {
+                            convertedMessages.put(entry.getKey(), messageMap);
+                        }
+                    } else {
+                        convertedMessages.put(entry.getKey(), messageObj);
+                    }
+                }
+                channelMap = new LinkedHashMap<>(channelMap);
+                channelMap.put("messages", convertedMessages);
+            }
+            
             return objectMapper.convertValue(channelMap, Channel.class);
         } catch (Exception e) {
             log.error("Failed to convert channel map to Channel DTO", e);
@@ -110,8 +140,24 @@ public class WebSocketChannelServiceImpl implements WebSocketChannelService {
             @SuppressWarnings("unchecked")
             Map<String, Object> messages = (Map<String, Object>) channelMap.get("messages");
             if (messages != null) {
-                // Messages will be automatically converted by Jackson
-                channel.setMessages((Map) messages);
+                // Convert $ref to ref in messages
+                Map<String, MessageReference> convertedMessages = new LinkedHashMap<>();
+                for (Map.Entry<String, Object> entry : messages.entrySet()) {
+                    Object messageObj = entry.getValue();
+                    if (messageObj instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> messageMap = (Map<String, Object>) messageObj;
+                        MessageReference msgRef = new MessageReference();
+                        // Handle both $ref (YAML) and ref (JSON)
+                        String ref = (String) messageMap.get("$ref");
+                        if (ref == null) {
+                            ref = (String) messageMap.get("ref");
+                        }
+                        msgRef.setRef(ref);
+                        convertedMessages.put(entry.getKey(), msgRef);
+                    }
+                }
+                channel.setMessages(convertedMessages);
             }
 
             @SuppressWarnings("unchecked")

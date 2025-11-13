@@ -161,7 +161,11 @@ public class WebSocketSchemaServiceImpl implements WebsocketSchemaService {
                 existingSchema.put("x-ouroboros-orders", request.getOrders());
             }
             if (request.getItems() != null) {
-                existingSchema.put("items", request.getItems());
+                if (request.getItems() instanceof Property) {
+                    existingSchema.put("items", buildProperty((Property) request.getItems()));
+                } else {
+                    log.warn("Items field is not a Property instance, skipping");
+                }
             }
 
             // Write to file directly (cache update will be done later when handler is implemented)
@@ -236,7 +240,16 @@ public class WebSocketSchemaServiceImpl implements WebsocketSchemaService {
 
         // Array items handling
         if (request.getItems() != null) {
-            schema.put("items", request.getItems());
+            if (request.getItems() instanceof Property) {
+                schema.put("items", buildProperty((Property) request.getItems()));
+            } else if (request.getItems() instanceof Map) {
+                // JSON deserialization creates Map instead of Property
+                @SuppressWarnings("unchecked")
+                Map<String, Object> itemsMap = (Map<String, Object>) request.getItems();
+                schema.put("items", itemsMap);
+            } else {
+                log.warn("Items field is not a Property or Map instance, skipping");
+            }
         }
 
         return schema;
@@ -326,21 +339,32 @@ public class WebSocketSchemaServiceImpl implements WebsocketSchemaService {
             builder.properties(properties);
         }
 
+        // Extract items for array type
+        Object itemsObj = schemaDefinition.get("items");
+        if (itemsObj instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> itemsMap = (Map<String, Object>) itemsObj;
+            builder.items(convertToProperty(itemsMap));
+        }
+
         return builder.build();
     }
 
     private Property convertToProperty(Map<String, Object> propertyDefinition) {
         Property.PropertyBuilder builder = Property.builder();
 
-        // Check for schema reference in YAML ($ref)
+        // Check for schema reference in YAML ($ref) or JSON (ref)
         String dollarRef = safeGetString(propertyDefinition, "$ref");
-        if (dollarRef != null) {
-            // Convert $ref to simplified ref for client
-            if (dollarRef.startsWith("#/components/schemas/")) {
-                String simplifiedRef = dollarRef.substring("#/components/schemas/".length());
+        String ref = safeGetString(propertyDefinition, "ref");
+        String refValue = dollarRef != null ? dollarRef : ref;
+        
+        if (refValue != null) {
+            // Convert $ref or ref to simplified ref for client
+            if (refValue.startsWith("#/components/schemas/")) {
+                String simplifiedRef = refValue.substring("#/components/schemas/".length());
                 builder.ref(simplifiedRef);
             } else {
-                builder.ref(dollarRef);
+                builder.ref(refValue);
             }
             return builder.build(); // Reference mode: return early
         }
