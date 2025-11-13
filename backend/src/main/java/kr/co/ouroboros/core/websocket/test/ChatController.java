@@ -9,9 +9,8 @@ import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
-/**
- * 클라이언트는 /app/chat.send 로 메시지를 보내고 구독은 /topic/rooms/{roomId} 로 받는 형태의 최소 예제
- */
+
+// TODO 삭제
 @Controller
 public class ChatController {
 
@@ -24,22 +23,29 @@ public class ChatController {
     /**
      * 방 입장/퇴장/채팅 공통 처리 (브로드캐스트)
      */
-    @MessageMapping("/chat.send/new_test")  // → /app/chat.send
-    @SendTo("/topic/rooms/public") // 기본방 브로드캐스트 (roomId 없을 때)
-    @ApiState(state = State.BUGFIX)
-    public TestDto broadcastToDefault(@Payload TestDto message) {
-        // roomId가 비어있으면 /topic/rooms/public 으로 뿌림 (@SendTo가 처리)
-        // 아주 간단하게 “에코” 형태로 반환
-        return message;
-    }
+//    @MessageMapping("/chat.send/new_test")  // → /app/chat.send
+//    @SendTo("/topic/rooms/public") // 기본방 브로드캐스트 (roomId 없을 때)
+//    @ApiState(state = State.BUGFIX)
+//    public TestDto broadcastToDefault(@Payload TestDto message) {
+//        // roomId가 비어있으면 /topic/rooms/public 으로 뿌림 (@SendTo가 처리)
+//        // 아주 간단하게 “에코” 형태로 반환
+//        return message;
+//    }
+//
+//    @MessageMapping("/chat.send/test")  // → /app/chat.send
+//    @SendTo("/topic/rooms/public") // 기본방 브로드캐스트 (roomId 없을 때)
+//    @ApiState(state = State.COMPLETED)
+//    public ChatMessage broadcast_To_DefaultTest(@Payload ChatMessage message) {
+//        // roomId가 비어있으면 /topic/rooms/public 으로 뿌림 (@SendTo가 처리)
+//        // 아주 간단하게 “에코” 형태로 반환
+//        return message;
+//    }
 
-    @MessageMapping("/chat.send/test")  // → /app/chat.send
-    @SendTo("/topic/rooms/public") // 기본방 브로드캐스트 (roomId 없을 때)
+    @MessageMapping("/chat.test")      // → 클라이언트 기준: /app/chat.send
+    @SendTo("/topic/chat")            // → 브로커가 /topic/chat 으로 브로드캐스트
     @ApiState(state = State.COMPLETED)
-    public ChatMessage broadcast_To_DefaultTest(@Payload ChatMessage message) {
-        // roomId가 비어있으면 /topic/rooms/public 으로 뿌림 (@SendTo가 처리)
-        // 아주 간단하게 “에코” 형태로 반환
-        return message;
+    public User handleUserChat(@Payload User user) {
+        return user;
     }
 
     /**
