@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.handler;
+package kr.co.ouroboros.core.rest.handler.helper;
 
 import java.util.Map;
 import java.util.UUID;
@@ -6,7 +6,7 @@ import kr.co.ouroboros.core.rest.common.dto.Operation;
 import kr.co.ouroboros.core.rest.common.dto.PathItem;
 import lombok.extern.slf4j.Slf4j;
 
-import static kr.co.ouroboros.core.rest.handler.RequestDiffHelper.*;
+import static kr.co.ouroboros.core.rest.handler.helper.RequestDiffHelper.*;
 
 /**
  * Helper class for comparing and synchronizing endpoint differences between file and scanned API

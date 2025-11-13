@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.handler;
+package kr.co.ouroboros.core.rest.handler.comparator;
 
 import java.util.Map;
 import java.util.Objects;
@@ -6,7 +6,7 @@ import kr.co.ouroboros.core.rest.common.dto.MediaType;
 import kr.co.ouroboros.core.rest.common.dto.Operation;
 import kr.co.ouroboros.core.rest.common.dto.Response;
 import kr.co.ouroboros.core.rest.common.dto.Schema;
-import kr.co.ouroboros.core.rest.handler.RequestDiffHelper.HttpMethod;
+import kr.co.ouroboros.core.rest.handler.helper.RequestDiffHelper.HttpMethod;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
