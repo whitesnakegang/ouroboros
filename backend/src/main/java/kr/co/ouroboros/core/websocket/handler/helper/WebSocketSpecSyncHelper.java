@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.websocket.pipeline;
+package kr.co.ouroboros.core.websocket.handler.helper;
 
 import java.util.ArrayList;
 import java.util.HashMap;

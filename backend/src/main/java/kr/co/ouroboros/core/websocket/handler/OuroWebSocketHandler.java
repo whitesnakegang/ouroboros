@@ -11,7 +11,7 @@ import kr.co.ouroboros.core.global.Protocol;
 import kr.co.ouroboros.core.global.handler.OuroProtocolHandler;
 import kr.co.ouroboros.core.global.spec.OuroApiSpec;
 import kr.co.ouroboros.core.websocket.common.dto.OuroWebSocketApiSpec;
-import kr.co.ouroboros.core.websocket.pipeline.WebSocketSpecSyncPipeline;
+import kr.co.ouroboros.core.websocket.handler.pipeline.WebSocketSpecSyncPipeline;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.yaml.snakeyaml.Yaml;

@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.websocket.pipeline;
+package kr.co.ouroboros.core.websocket.handler.pipeline;
 
 import java.util.List;
 import java.util.Map;
@@ -7,6 +7,7 @@ import kr.co.ouroboros.core.global.spec.OuroApiSpec;
 import kr.co.ouroboros.core.websocket.common.dto.MessageReference;
 import kr.co.ouroboros.core.websocket.common.dto.Operation;
 import kr.co.ouroboros.core.websocket.common.dto.OuroWebSocketApiSpec;
+import kr.co.ouroboros.core.websocket.handler.helper.WebSocketSpecSyncHelper;
 import kr.co.ouroboros.core.websocket.handler.comparator.WebSocketSchemaComparator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

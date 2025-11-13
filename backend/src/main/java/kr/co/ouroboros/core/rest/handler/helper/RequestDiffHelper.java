@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.handler;
+package kr.co.ouroboros.core.rest.handler.helper;
 
 import java.util.*;
 import kr.co.ouroboros.core.rest.common.dto.MediaType;
@@ -6,6 +6,7 @@ import kr.co.ouroboros.core.rest.common.dto.Operation;
 import kr.co.ouroboros.core.rest.common.dto.Parameter;
 import kr.co.ouroboros.core.rest.common.dto.RequestBody;
 import kr.co.ouroboros.core.rest.common.dto.Schema;
+import kr.co.ouroboros.core.rest.handler.comparator.SchemaComparator.TypeCnts;
 
 public final class RequestDiffHelper {
 
@@ -38,8 +39,8 @@ public final class RequestDiffHelper {
      * @param scanFlattenedSchemas flattened schema map for resolving referenced schemas from the scanned specification
      */
     public static void compareAndMarkRequest(String url, Operation fileOp, Operation scanOp, HttpMethod method,
-            Map<String, SchemaComparator.TypeCnts> fileFlattenedSchemas,
-            Map<String, SchemaComparator.TypeCnts> scanFlattenedSchemas
+            Map<String, TypeCnts> fileFlattenedSchemas,
+            Map<String, TypeCnts> scanFlattenedSchemas
     ) {
 
 
@@ -73,7 +74,7 @@ public final class RequestDiffHelper {
      * @param flattenedSchemas map of schema name to flattened type counts
      */
     private static void collectTypeCounts(Operation operation, Map<String, Integer> typeCounts, 
-                                          Map<String, SchemaComparator.TypeCnts> flattenedSchemas) {
+                                          Map<String, TypeCnts> flattenedSchemas) {
         if (operation == null) {
             return;
         }
@@ -97,7 +98,7 @@ public final class RequestDiffHelper {
          * @param flattenedSchemas map of schema name to flattened type counts used to resolve `$ref` schemas
          */
     private static void collectTypeCountsFromParameters(List<Parameter> parameters, Map<String, Integer> typeCounts,
-                                                       Map<String, SchemaComparator.TypeCnts> flattenedSchemas) {
+                                                       Map<String, TypeCnts> flattenedSchemas) {
         if (parameters == null || parameters.isEmpty()) {
             return;
         }
@@ -139,7 +140,7 @@ public final class RequestDiffHelper {
          * @param flattenedSchemas mapping of schema name to precomputed type counts used to resolve `$ref` references
          */
     private static void collectTypeCountsFromRequestBody(RequestBody requestBody, Map<String, Integer> typeCounts,
-                                                        Map<String, SchemaComparator.TypeCnts> flattenedSchemas) {
+                                                        Map<String, TypeCnts> flattenedSchemas) {
         if (requestBody == null) {
             return;
         }
@@ -190,7 +191,7 @@ public final class RequestDiffHelper {
      * @param flattenedSchemas optional map of schema name to precomputed type counts used to resolve $ref entries
      */
     private static void countSchemaType(Schema schema, String name, Map<String, Integer> typeCounts,
-                                       Map<String, SchemaComparator.TypeCnts> flattenedSchemas) {
+                                       Map<String, TypeCnts> flattenedSchemas) {
         if (schema == null || name == null || name.isEmpty()) {
             return;
         }
@@ -202,7 +203,7 @@ public final class RequestDiffHelper {
             
             // flattenedSchemas에서 해당 스키마의 타입 카운트 조회
             if (flattenedSchemas != null && flattenedSchemas.containsKey(refName)) {
-                SchemaComparator.TypeCnts refTypeCnts = flattenedSchemas.get(refName);
+                TypeCnts refTypeCnts = flattenedSchemas.get(refName);
                 if (refTypeCnts != null && refTypeCnts.getTypeCounts() != null) {
                     // 참조된 스키마의 모든 타입 카운트를 현재 typeCounts에 추가
                     for (Map.Entry<String, Integer> entry : refTypeCnts.getTypeCounts().entrySet()) {

@@ -8,6 +8,7 @@ import java.util.Map;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.co.ouroboros.core.rest.common.dto.Components;
 import kr.co.ouroboros.core.rest.common.dto.OuroRestApiSpec;
+import kr.co.ouroboros.core.rest.handler.comparator.SchemaComparator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.yaml.snakeyaml.Yaml;
