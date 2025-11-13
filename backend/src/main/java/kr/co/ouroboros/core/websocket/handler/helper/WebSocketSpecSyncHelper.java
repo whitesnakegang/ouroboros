@@ -25,15 +25,18 @@ import kr.co.ouroboros.core.websocket.common.dto.Schema;
  */
 public class WebSocketSpecSyncHelper {
 
+    /**
+     * Prevents instantiation of this utility class.
+     */
     private WebSocketSpecSyncHelper() {
         // Utility class - 인스턴스 생성 방지
     }
 
     /**
-     * Operation Map을 채널 이름별로 그룹화합니다.
-     * 
-     * @param operationMap operation 키와 Operation 객체를 담은 Map
-     * @return 채널 이름을 키로 하고, 해당 채널 이름을 가진 operation 리스트를 값으로 하는 Map
+     * Group operations by their channel reference.
+     *
+     * @param operationMap map of operation identifiers to Operation objects; entries whose Operation or channel ref is null are ignored
+     * @return a map whose keys are channel reference strings and whose values are lists of Operations that reference that channel
      */
     public static Map<String, List<Operation>> groupOperationsByChannelName(Map<String, Operation> operationMap) {
         Map<String, List<Operation>> channelNameOperationMap = new HashMap<>();
@@ -49,11 +52,10 @@ public class WebSocketSpecSyncHelper {
     }
 
     /**
-     * $ref 문자열에서 마지막 점(.) 뒤의 클래스 이름을 추출합니다.
-     * 예: "#/channels/_chat.sendToRoom/messages/kr.co.ouroboros.core.websocket.test.ChatMessage" -> "ChatMessage"
-     * 
-     * @param ref $ref 문자열 (예: "#/channels/_chat.sendToRoom/messages/kr.co.ouroboros.core.websocket.test.ChatMessage")
-     * @return 클래스 이름 (예: "ChatMessage")
+     * Extracts the simple class name appearing after the last dot in a `$ref` string.
+     *
+     * @param ref the `$ref` containing a dotted fully-qualified name (e.g. "#/channels/.../kr.co.package.ClassName")
+     * @return the substring after the last '.', or the original string if no '.' is present; returns an empty string if `ref` is null or empty
      */
     public static String extractClassNameFromRef(String ref) {
         if (ref == null || ref.isEmpty()) {
@@ -71,6 +73,19 @@ public class WebSocketSpecSyncHelper {
         // 마지막 점 뒤의 부분을 반환
         return ref.substring(lastDotIndex + 1);
     }
+    /**
+     * Ensures the channel referenced by `channelRef` (and any messages/schemas it references)
+     * from `scannedSpec` is present in `fileSpec`.
+     *
+     * The method derives the channel name as the substring after the last '/' in `channelRef`
+     * (or uses the entire string if no '/' exists), adds that channel to `fileSpec` if absent,
+     * and pulls in any referenced messages (and their schemas) from `scannedSpec`.
+     *
+     * @param fileSpec   the target spec to update; channels, messages, and schemas will be added here as needed
+     * @param scannedSpec the source spec to read referenced channel, message, and schema definitions from
+     * @param channelRef a reference string identifying a channel (e.g. "#/channels/_chat.send_new_test"); the name
+     *                   used is the substring after the last '/' or the full string if '/' is not present
+     */
     public static void addReferencedChannel(OuroWebSocketApiSpec fileSpec, OuroWebSocketApiSpec scannedSpec, String channelRef) {
         // channelRef에서 마지막 '/' 뒤의 부분을 파싱하여 channelName에 저장
         // 예: "#/channels/_chat.send_new_test" -> "_chat.send_new_test"
@@ -123,12 +138,16 @@ public class WebSocketSpecSyncHelper {
     }
 
     /**
-     * Operation이 참조하는 Message와 Schema를 fileSpec의 components에 추가합니다.
-     * 이미 존재하는 경우에는 추가하지 않습니다.
-     * 
-     * @param fileSpec 파일에서 로드한 스펙 (대상)
-     * @param scannedSpec 스캔한 스펙 (소스)
-     * @param operation 추가된 Operation
+     * Ensure messages and related schemas referenced by an operation exist in the target spec's components.
+     *
+     * Initializes the target spec's components, messages map, and schemas map if absent, then copies any
+     * referenced messages (from the operation and its reply) from the scanned spec into the target spec;
+     * referenced payload/header schemas are also pulled in when a message is added. Null or missing
+     * components/refs are ignored.
+     *
+     * @param fileSpec    the target OuroWebSocketApiSpec to receive referenced messages and schemas
+     * @param scannedSpec the source OuroWebSocketApiSpec to read referenced messages and schemas from
+     * @param operation   the operation whose message and reply references should be synchronized into fileSpec
      */
     public static void addReferencedMessagesAndSchemas(OuroWebSocketApiSpec fileSpec, OuroWebSocketApiSpec scannedSpec, Operation operation) {
         // Components 초기화 확인
@@ -176,11 +195,13 @@ public class WebSocketSpecSyncHelper {
     }
 
     /**
-     * $ref에서 Message를 추출하여 fileSpec에 추가합니다.
-     * 
-     * @param fileSpec 파일 스펙
-     * @param scannedSpec 스캔된 스펙
-     * @param ref Message reference (예: "#/components/messages/kr.co.ouroboros.core.websocket.test.ChatMessage" 또는 "#/channels/_chat.send/messages/...")
+     * Add the Message referenced by `ref` from `scannedSpec` into `fileSpec`, and ensure any schemas
+     * referenced by that message's payload or headers are also added.
+     *
+     * @param fileSpec   target API spec to receive the referenced message and related schemas
+     * @param scannedSpec source API spec to resolve the referenced message and schemas from
+     * @param ref        message reference string (e.g. "#/components/messages/kr.co.ouroboros...ChatMessage"
+     *                   or a channel-style reference containing "/messages/")
      */
     public static void addMessageFromRef(OuroWebSocketApiSpec fileSpec, OuroWebSocketApiSpec scannedSpec, String ref) {
         // ref에서 message 이름 추출 (전체 패키지 이름)
@@ -233,11 +254,14 @@ public class WebSocketSpecSyncHelper {
     }
 
     /**
-     * $ref에서 Schema를 추출하여 fileSpec에 추가합니다.
-     * 
-     * @param fileSpec 파일 스펙
-     * @param scannedSpec 스캔된 스펙
-     * @param ref Schema reference (예: "#/components/schemas/kr.co.ouroboros.core.websocket.test.ChatMessage")
+     * Add a schema referenced by a $ref from the scanned specification into the target file specification.
+     *
+     * If the reference cannot be resolved, the scanned spec lacks components/schemas, or a schema with the
+     * derived class name already exists in the target spec, the method makes no changes.
+     *
+     * @param fileSpec     the target OuroWebSocketApiSpec to receive the schema
+     * @param scannedSpec  the source OuroWebSocketApiSpec to resolve the referenced schema from
+     * @param ref          the schema reference (e.g. "#/components/schemas/kr.co.ouroboros.core.websocket.test.ChatMessage")
      */
     public static void addSchemaFromRef(OuroWebSocketApiSpec fileSpec, OuroWebSocketApiSpec scannedSpec, String ref) {
         // ref에서 schema 이름 추출 (전체 패키지 이름)
@@ -274,12 +298,12 @@ public class WebSocketSpecSyncHelper {
     }
 
     /**
-     * $ref에서 Message 이름을 추출합니다.
-     * 예: "#/components/messages/kr.co.ouroboros.core.websocket.test.ChatMessage" -> "kr.co.ouroboros.core.websocket.test.ChatMessage"
-     * 예: "#/channels/_chat.send/messages/kr.co.ouroboros.core.websocket.test.ChatMessage" -> "kr.co.ouroboros.core.websocket.test.ChatMessage"
-     * 
-     * @param ref $ref 문자열
-     * @return Message 이름
+     * Extracts the message name referenced by a $ref string.
+     *
+     * Supports refs that start with "#/components/messages/" and refs that contain "/messages/" (for channel-scoped message refs).
+     *
+     * @param ref the $ref string to extract the message name from
+     * @return the message name (the substring after the recognized prefix) or `null` if no message name can be extracted
      */
     public static String extractMessageNameFromRef(String ref) {
         if (ref == null || ref.isEmpty()) {
@@ -303,11 +327,12 @@ public class WebSocketSpecSyncHelper {
     }
 
     /**
-     * $ref에서 Schema 이름을 추출합니다.
-     * 예: "#/components/schemas/kr.co.ouroboros.core.websocket.test.ChatMessage" -> "kr.co.ouroboros.core.websocket.test.ChatMessage"
-     * 
-     * @param ref $ref 문자열
-     * @return Schema 이름
+     * Extracts the schema name portion from a JSON Reference ($ref) that targets components/schemas.
+     *
+     * If `ref` starts with "#/components/schemas/", returns the substring after that prefix; otherwise returns `null`.
+     *
+     * @param ref the $ref string to parse (may be null or empty)
+     * @return the schema name extracted from the ref, or `null` if the ref does not contain a components/schemas reference
      */
     public static String extractSchemaNameFromRef(String ref) {
         if (ref == null || ref.isEmpty()) {
@@ -324,11 +349,10 @@ public class WebSocketSpecSyncHelper {
     }
 
     /**
-     * 전체 패키지 이름에서 마지막 클래스 이름을 추출합니다.
-     * 예: "kr.co.ouroboros.core.websocket.test.ChatMessage" -> "ChatMessage"
-     * 
-     * @param fullName 전체 패키지 이름
-     * @return 클래스 이름
+     * Extracts the simple class name from a package-qualified name.
+     *
+     * @param fullName the package-qualified name (for example, "kr.co.ouroboros.core.websocket.test.ChatMessage")
+     * @return the simple class name (for example, "ChatMessage"), or `null` if `fullName` is null or empty
      */
     public static String extractClassNameFromFullName(String fullName) {
         if (fullName == null || fullName.isEmpty()) {
@@ -347,5 +371,4 @@ public class WebSocketSpecSyncHelper {
         return fullName.substring(lastDotIndex + 1);
     }
 }
-
 

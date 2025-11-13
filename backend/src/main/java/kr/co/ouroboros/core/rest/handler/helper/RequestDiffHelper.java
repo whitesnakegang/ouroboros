@@ -67,11 +67,15 @@ public final class RequestDiffHelper {
     }
 
     /**
-     * Collect type counts from an operation's parameters and request body.
+     * Aggregate request-related type counts from the given Operation into the provided map.
      *
-     * @param operation the operation to analyze
-     * @param typeCounts map to store type counts (will be modified)
-     * @param flattenedSchemas map of schema name to flattened type counts
+     * This inspects the operation's parameters (excluding path parameters) and its request body,
+     * accumulating type occurrences into {@code typeCounts}. When a schema reference is encountered
+     * the corresponding entry from {@code flattenedSchemas} is used.
+     *
+     * @param operation the operation to analyze; if null the method returns without modification
+     * @param typeCounts a mutable map that will be updated with aggregated type-to-count entries
+     * @param flattenedSchemas a map from schema name to precomputed TypeCnts used to resolve `$ref` references
      */
     private static void collectTypeCounts(Operation operation, Map<String, Integer> typeCounts, 
                                           Map<String, TypeCnts> flattenedSchemas) {
@@ -178,17 +182,15 @@ public final class RequestDiffHelper {
     }
 
     /**
-     * Add type information from a schema into the provided typeCounts map, resolving referenced schemas when available.
+     * Updates typeCounts with type occurrences described by schema, resolving $ref references using flattenedSchemas when present.
      *
-     * If the schema is a reference ($ref) and flattenedSchemas contains the referenced entry, this method merges that
-     * referenced schema's type counts into typeCounts. For inline schemas, it increments a count for a key constructed
-     * from the provided name and the schema's type; when the schema's format equals "binary" the key uses "binary"
-     * instead of the schema type.
+     * If schema contains a $ref and flattenedSchemas has a matching entry, merges that entry's type counts into typeCounts.
+     * For inline schemas, increments the count for "name:binary" when format equals "binary", otherwise for "name:type".
      *
      * @param schema the schema to analyze; may be a reference or an inline schema
-     * @param name the field or parameter name to use when constructing type keys (must be non-empty)
-     * @param typeCounts map that will be updated with type count increments
-     * @param flattenedSchemas optional map of schema name to precomputed type counts used to resolve $ref entries
+     * @param name the field or parameter name used to construct type keys; must be non-empty
+     * @param typeCounts map that will be updated with merged or incremented type counts
+     * @param flattenedSchemas optional map of schema name to precomputed TypeCnts used to resolve $ref entries
      */
     private static void countSchemaType(Schema schema, String name, Map<String, Integer> typeCounts,
                                        Map<String, TypeCnts> flattenedSchemas) {

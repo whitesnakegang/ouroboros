@@ -16,6 +16,11 @@ public class ChatController {
 
     private final SimpMessagingTemplate messagingTemplate;
 
+    /**
+     * Creates a ChatController with the provided messaging template used to publish messages to STOMP destinations.
+     *
+     * @param messagingTemplate the Spring SimpMessagingTemplate used to send messages to WebSocket/STOMP destinations
+     */
     public ChatController(SimpMessagingTemplate messagingTemplate) {
         this.messagingTemplate = messagingTemplate;
     }
@@ -39,7 +44,12 @@ public class ChatController {
 //        // roomId가 비어있으면 /topic/rooms/public 으로 뿌림 (@SendTo가 처리)
 //        // 아주 간단하게 “에코” 형태로 반환
 //        return message;
-//    }
+/**
+     * Echoes a received User payload so it can be delivered to subscribers of the chat topic.
+     *
+     * @param user the incoming User payload extracted from the message payload
+     * @return the same User instance that was received
+     */
 
     @MessageMapping("/chat.test")      // → 클라이언트 기준: /app/chat.send
     @SendTo("/topic/chat")            // → 브로커가 /topic/chat 으로 브로드캐스트
