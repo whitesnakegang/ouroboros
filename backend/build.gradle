@@ -16,7 +16,7 @@ description = 'Open Source Project'
 java {
 	toolchain {
 		languageVersion = JavaLanguageVersion.of(17)
-	}
+}
 }
 
 configurations {

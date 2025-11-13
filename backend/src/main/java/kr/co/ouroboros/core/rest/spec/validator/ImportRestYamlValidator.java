@@ -32,7 +32,7 @@ import java.util.*;
  */
 @Slf4j
 @Component
-public class ImportYamlValidator {
+public class ImportRestYamlValidator {
 
     private static final List<String> ALLOWED_EXTENSIONS = Arrays.asList(".yml", ".yaml");
     private static final List<String> HTTP_METHODS = Arrays.asList(

@@ -1,6 +1,7 @@
 package kr.co.ouroboros.core.websocket.spec.service;
 
 import kr.co.ouroboros.ui.websocket.spec.dto.CreateOperationRequest;
+import kr.co.ouroboros.ui.websocket.spec.dto.ImportYamlResponse;
 import kr.co.ouroboros.ui.websocket.spec.dto.OperationResponse;
 import kr.co.ouroboros.ui.websocket.spec.dto.UpdateOperationRequest;
 
@@ -63,6 +64,45 @@ public interface WebSocketOperationService {
      * @throws Exception if operation not found or deletion fails
      */
     void deleteOperation(String id) throws Exception;
+
+    /**
+     * Imports external AsyncAPI 3.0.0 YAML file and merges into ourowebsocket.yml.
+     * <p>
+     * Validates the uploaded YAML file, handles duplicate channels/operations/schemas/messages by auto-renaming,
+     * enriches with Ouroboros custom fields, and updates $ref references accordingly.
+     * <p>
+     * <b>File Requirements:</b>
+     * <ul>
+     *   <li>Extension: .yml or .yaml</li>
+     *   <li>Format: AsyncAPI 3.0.0 specification</li>
+     *   <li>Required fields: asyncapi, info (title, version), channels</li>
+     *   <li>Valid action types: send, receive</li>
+     * </ul>
+     * <p>
+     * <b>Duplicate Handling:</b>
+     * <ul>
+     *   <li>Channels: Duplicate channel names are renamed with "-import" suffix</li>
+     *   <li>Operations: Duplicate operation names are renamed with "-import" suffix</li>
+     *   <li>Schemas: Duplicate schema names are renamed with "-import" suffix</li>
+     *   <li>Messages: Duplicate message names are renamed with "-import" suffix</li>
+     *   <li>$ref references are automatically updated to point to renamed components</li>
+     * </ul>
+     *
+     * @param yamlContent the AsyncAPI YAML content to import
+     * @return import result with counts and renamed items
+     * @throws Exception if validation fails or import operation fails
+     */
+    ImportYamlResponse importYaml(String yamlContent) throws Exception;
+
+    /**
+     * Exports the YAML file content as a string.
+     * <p>
+     * Reads the current saved content from the ourowebsocket.yml file directly.
+     *
+     * @return YAML file content as a string
+     * @throws Exception if file reading fails or file does not exist
+     */
+    String exportYaml() throws Exception;
 }
 
 

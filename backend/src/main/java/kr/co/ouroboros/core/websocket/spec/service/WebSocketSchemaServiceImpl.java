@@ -141,39 +141,131 @@ public class WebSocketSchemaServiceImpl implements WebsocketSchemaService {
                 throw new IllegalArgumentException("Schema '" + schemaName + "' not found");
             }
 
-            // Update only provided fields
-            if (request.getType() != null) {
-                existingSchema.put("type", request.getType());
+            // Handle schema name change (rename) - automatically rename based on title change
+            String finalSchemaName = schemaName;
+            String newSchemaName = null;
+            
+            // Check if title changed and use title as new schema name
+            if (request.getTitle() != null && !request.getTitle().isBlank()) {
+                String currentTitle = safeGetString(existingSchema, "title");
+                String newTitle = request.getTitle();
+                
+                // If title changed, convert title to valid schema name
+                if (!newTitle.equals(currentTitle)) {
+                    // Convert title to valid schema name (remove spaces, special chars, use PascalCase)
+                    newSchemaName = convertTitleToSchemaName(newTitle);
+                    
+                    // If converted name is same as current name, don't rename
+                    if (newSchemaName.equals(schemaName)) {
+                        newSchemaName = null;
+                    }
+                }
             }
+            
+            // Perform rename if newSchemaName is determined
+            if (newSchemaName != null && !newSchemaName.equals(schemaName)) {
+                // Check if new name already exists
+                if (yamlParser.schemaExists(asyncApiDoc, newSchemaName)) {
+                    throw new IllegalArgumentException("Schema '" + newSchemaName + "' already exists");
+                }
+                
+                // Create rename map for reference updates
+                Map<String, String> schemaRenameMap = new HashMap<>();
+                schemaRenameMap.put(schemaName, newSchemaName);
+                
+                // Update all schema references in the document
+                updateAllSchemaReferences(asyncApiDoc, schemaRenameMap);
+                
+                // Create new schema with updated content (will be updated below)
+                // Copy existing schema first
+                @SuppressWarnings("unchecked")
+                Map<String, Object> newSchema = new LinkedHashMap<>((Map<String, Object>) existingSchema);
+                
+                // Remove old schema
+                yamlParser.removeSchema(asyncApiDoc, schemaName);
+                
+                // Add new schema (will be updated with request fields below)
+                yamlParser.putSchema(asyncApiDoc, newSchemaName, newSchema);
+                
+                // Update finalSchemaName for response
+                finalSchemaName = newSchemaName;
+                existingSchema = newSchema;
+                
+                log.info("Renaming schema '{}' to '{}'", schemaName, newSchemaName);
+            }
+
+            // Get current type and new type
+            String currentType = safeGetString(existingSchema, "type");
+            String newType = request.getType();
+            
+            // Update type if provided
+            if (newType != null) {
+                existingSchema.put("type", newType);
+                
+                // If type changed, clean up incompatible fields
+                if (!newType.equals(currentType)) {
+                    if ("object".equals(newType)) {
+                        // Switching to object: remove array-specific fields
+                        existingSchema.remove("items");
+                    } else if ("array".equals(newType)) {
+                        // Switching to array: remove object-specific fields
+                        existingSchema.remove("properties");
+                        existingSchema.remove("required");
+                        existingSchema.remove("x-ouroboros-orders");
+                    }
+                }
+            }
+            
+            // Use the final type (new type if provided, otherwise current type)
+            String finalType = newType != null ? newType : (currentType != null ? currentType : "object");
+            
             if (request.getTitle() != null) {
                 existingSchema.put("title", request.getTitle());
             }
             if (request.getDescription() != null) {
                 existingSchema.put("description", request.getDescription());
             }
-            if (request.getProperties() != null) {
-                existingSchema.put("properties", buildProperties(request.getProperties()));
-            }
-            if (request.getRequired() != null) {
-                existingSchema.put("required", request.getRequired());
-            }
-            if (request.getOrders() != null) {
-                existingSchema.put("x-ouroboros-orders", request.getOrders());
-            }
-            if (request.getItems() != null) {
-                if (request.getItems() instanceof Property) {
-                    existingSchema.put("items", buildProperty((Property) request.getItems()));
-                } else {
-                    log.warn("Items field is not a Property instance, skipping");
+            
+            // Update fields based on final type
+            if ("object".equals(finalType)) {
+                // For object type: remove array-specific fields and update object-specific fields
+                existingSchema.remove("items");
+                
+                if (request.getProperties() != null) {
+                    existingSchema.put("properties", buildProperties(request.getProperties()));
+                }
+                if (request.getRequired() != null) {
+                    existingSchema.put("required", request.getRequired());
+                }
+                if (request.getOrders() != null) {
+                    existingSchema.put("x-ouroboros-orders", request.getOrders());
+                }
+            } else if ("array".equals(finalType)) {
+                // For array type: remove object-specific fields and update items only
+                existingSchema.remove("properties");
+                existingSchema.remove("required");
+                existingSchema.remove("x-ouroboros-orders");
+                
+                if (request.getItems() != null) {
+                    if (request.getItems() instanceof Property) {
+                        existingSchema.put("items", buildProperty((Property) request.getItems()));
+                    } else if (request.getItems() instanceof Map) {
+                        // JSON deserialization creates Map instead of Property
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> itemsMap = (Map<String, Object>) request.getItems();
+                        existingSchema.put("items", itemsMap);
+                    } else {
+                        log.warn("Items field is not a Property or Map instance, skipping");
+                    }
                 }
             }
 
             // Write to file directly (cache update will be done later when handler is implemented)
             yamlParser.writeDocument(asyncApiDoc);
 
-            log.info("Updated WebSocket schema: {}", schemaName);
+            log.info("Updated WebSocket schema: {}", finalSchemaName);
 
-            return convertToResponse(schemaName, existingSchema);
+            return convertToResponse(finalSchemaName, existingSchema);
         } finally {
             lock.writeLock().unlock();
         }
@@ -216,7 +308,8 @@ public class WebSocketSchemaServiceImpl implements WebsocketSchemaService {
     private Map<String, Object> buildSchemaDefinition(CreateSchemaRequest request) {
         Map<String, Object> schema = new LinkedHashMap<>();
 
-        schema.put("type", request.getType());
+        String schemaType = request.getType() != null ? request.getType() : "object";
+        schema.put("type", schemaType);
 
         if (request.getTitle() != null) {
             schema.put("title", request.getTitle());
@@ -226,29 +319,33 @@ public class WebSocketSchemaServiceImpl implements WebsocketSchemaService {
             schema.put("description", request.getDescription());
         }
 
-        if (request.getProperties() != null && !request.getProperties().isEmpty()) {
-            schema.put("properties", buildProperties(request.getProperties()));
-        }
+        // For object type: set properties, required, orders
+        if ("object".equals(schemaType)) {
+            if (request.getProperties() != null && !request.getProperties().isEmpty()) {
+                schema.put("properties", buildProperties(request.getProperties()));
+            }
 
-        if (request.getRequired() != null && !request.getRequired().isEmpty()) {
-            schema.put("required", request.getRequired());
-        }
+            if (request.getRequired() != null && !request.getRequired().isEmpty()) {
+                schema.put("required", request.getRequired());
+            }
 
-        if (request.getOrders() != null && !request.getOrders().isEmpty()) {
-            schema.put("x-ouroboros-orders", request.getOrders());
+            if (request.getOrders() != null && !request.getOrders().isEmpty()) {
+                schema.put("x-ouroboros-orders", request.getOrders());
+            }
         }
-
-        // Array items handling
-        if (request.getItems() != null) {
-            if (request.getItems() instanceof Property) {
-                schema.put("items", buildProperty((Property) request.getItems()));
-            } else if (request.getItems() instanceof Map) {
-                // JSON deserialization creates Map instead of Property
-                @SuppressWarnings("unchecked")
-                Map<String, Object> itemsMap = (Map<String, Object>) request.getItems();
-                schema.put("items", itemsMap);
-            } else {
-                log.warn("Items field is not a Property or Map instance, skipping");
+        // For array type: set items only
+        else if ("array".equals(schemaType)) {
+            if (request.getItems() != null) {
+                if (request.getItems() instanceof Property) {
+                    schema.put("items", buildProperty((Property) request.getItems()));
+                } else if (request.getItems() instanceof Map) {
+                    // JSON deserialization creates Map instead of Property
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> itemsMap = (Map<String, Object>) request.getItems();
+                    schema.put("items", itemsMap);
+                } else {
+                    log.warn("Items field is not a Property or Map instance, skipping");
+                }
             }
         }
 
@@ -481,5 +578,150 @@ public class WebSocketSchemaServiceImpl implements WebsocketSchemaService {
             log.warn("Expected List for key '{}' but got {}", key, value.getClass().getSimpleName());
         }
         return null;
+    }
+
+    /**
+     * Converts a title string to a valid schema name.
+     * <p>
+     * Removes spaces and special characters, converts to PascalCase.
+     * Examples:
+     * <ul>
+     *   <li>"Message Item" -> "MessageItem"</li>
+     *   <li>"chat message" -> "ChatMessage"</li>
+     *   <li>"User-Profile" -> "UserProfile"</li>
+     * </ul>
+     *
+     * @param title the title to convert
+     * @return valid schema name in PascalCase
+     */
+    private String convertTitleToSchemaName(String title) {
+        if (title == null || title.isBlank()) {
+            return title;
+        }
+        
+        // Remove leading/trailing whitespace
+        String trimmed = title.trim();
+        
+        // Split by spaces, hyphens, underscores, and other non-alphanumeric characters
+        String[] words = trimmed.split("[\\s\\-_]+");
+        
+        StringBuilder result = new StringBuilder();
+        for (String word : words) {
+            if (word.isEmpty()) {
+                continue;
+            }
+            
+            // Remove non-alphanumeric characters from word
+            String cleaned = word.replaceAll("[^a-zA-Z0-9]", "");
+            if (cleaned.isEmpty()) {
+                continue;
+            }
+            
+            // Convert to PascalCase: first letter uppercase, rest lowercase
+            if (cleaned.length() == 1) {
+                result.append(cleaned.toUpperCase());
+            } else {
+                result.append(Character.toUpperCase(cleaned.charAt(0)))
+                      .append(cleaned.substring(1).toLowerCase());
+            }
+        }
+        
+        // If result is empty after processing, use original title (sanitized)
+        if (result.length() == 0) {
+            String sanitized = trimmed.replaceAll("[^a-zA-Z0-9]", "");
+            if (sanitized.isEmpty()) {
+                return "Schema"; // Fallback
+            }
+            return sanitized.substring(0, 1).toUpperCase() + 
+                   (sanitized.length() > 1 ? sanitized.substring(1).toLowerCase() : "");
+        }
+        
+        return result.toString();
+    }
+
+    /**
+     * Updates all schema references in the AsyncAPI document when a schema is renamed.
+     * <p>
+     * Updates references in:
+     * <ul>
+     *   <li>All schemas (nested schema references)</li>
+     *   <li>All messages (message payload schema references)</li>
+     * </ul>
+     *
+     * @param asyncApiDoc the AsyncAPI document
+     * @param schemaRenameMap map of old schema names to new names
+     */
+    @SuppressWarnings("unchecked")
+    private void updateAllSchemaReferences(Map<String, Object> asyncApiDoc, Map<String, String> schemaRenameMap) {
+        if (schemaRenameMap.isEmpty()) {
+            return;
+        }
+
+        // Update references in all schemas (for nested schema references)
+        Map<String, Object> schemas = yamlParser.getSchemas(asyncApiDoc);
+        if (schemas != null && !schemas.isEmpty()) {
+            for (Map.Entry<String, Object> entry : schemas.entrySet()) {
+                Object schemaObj = entry.getValue();
+                if (schemaObj instanceof Map) {
+                    updateSchemaReferences(schemaObj, schemaRenameMap);
+                }
+            }
+        }
+
+        // Update references in all messages (for message payload schema references)
+        Map<String, Object> components = yamlParser.getOrCreateComponents(asyncApiDoc);
+        if (components != null) {
+            Map<String, Object> messages = yamlParser.getMessages(asyncApiDoc);
+            if (messages != null && !messages.isEmpty()) {
+                for (Map.Entry<String, Object> entry : messages.entrySet()) {
+                    Object messageObj = entry.getValue();
+                    if (messageObj instanceof Map) {
+                        updateSchemaReferences(messageObj, schemaRenameMap);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Recursively updates all $ref references according to schema rename map.
+     * Similar to REST API import logic.
+     *
+     * @param obj the object to scan for $ref (can be Map, List, or primitive)
+     * @param schemaRenameMap map of old schema names to new names
+     */
+    @SuppressWarnings("unchecked")
+    private void updateSchemaReferences(Object obj, Map<String, String> schemaRenameMap) {
+        if (schemaRenameMap.isEmpty()) {
+            return;
+        }
+
+        if (obj instanceof Map) {
+            Map<String, Object> map = (Map<String, Object>) obj;
+
+            // Check if this map has a $ref field
+            if (map.containsKey("$ref")) {
+                String ref = (String) map.get("$ref");
+                if (ref != null && ref.startsWith("#/components/schemas/")) {
+                    String schemaName = ref.substring("#/components/schemas/".length());
+                    if (schemaRenameMap.containsKey(schemaName)) {
+                        String newSchemaName = schemaRenameMap.get(schemaName);
+                        map.put("$ref", "#/components/schemas/" + newSchemaName);
+                        log.debug("🔗 Updated schema $ref: {} -> {}", schemaName, newSchemaName);
+                    }
+                }
+            }
+
+            // Recursively scan all values
+            for (Object value : map.values()) {
+                updateSchemaReferences(value, schemaRenameMap);
+            }
+
+        } else if (obj instanceof List) {
+            List<Object> list = (List<Object>) obj;
+            for (Object item : list) {
+                updateSchemaReferences(item, schemaRenameMap);
+            }
+        }
     }
 }

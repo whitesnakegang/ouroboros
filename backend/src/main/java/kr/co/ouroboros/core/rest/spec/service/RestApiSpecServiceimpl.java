@@ -7,7 +7,7 @@ import kr.co.ouroboros.core.rest.mock.model.EndpointMeta;
 import kr.co.ouroboros.core.rest.mock.registry.RestMockRegistry;
 import kr.co.ouroboros.core.rest.mock.service.RestMockLoaderService;
 import kr.co.ouroboros.core.rest.spec.model.*;
-import kr.co.ouroboros.core.rest.spec.validator.SchemaValidator;
+import kr.co.ouroboros.core.rest.spec.validator.RestSchemaValidator;
 import kr.co.ouroboros.ui.rest.spec.dto.CreateRestApiRequest;
 import kr.co.ouroboros.ui.rest.spec.dto.ImportYamlResponse;
 import kr.co.ouroboros.ui.rest.spec.dto.RenamedItem;
@@ -38,7 +38,7 @@ import java.util.stream.Collectors;
 public class RestApiSpecServiceimpl implements RestApiSpecService {
 
     private final RestApiYamlParser yamlParser;
-    private final SchemaValidator schemaValidator;
+    private final RestSchemaValidator restSchemaValidator;
     private final OuroApiSpecManager specManager;
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
     private final RestMockRegistry mockRegistry;
@@ -102,7 +102,7 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
             }
 
             // Validate and auto-create missing schema references
-            int createdSchemas = schemaValidator.validateAndCreateMissingSchemas(openApiDoc);
+            int createdSchemas = restSchemaValidator.validateAndCreateMissingSchemas(openApiDoc);
             if (createdSchemas > 0) {
                 log.info("Auto-created {} missing schema(s)", createdSchemas);
             }
@@ -284,7 +284,7 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
             }
 
             // Validate and auto-create missing schema references
-            int createdSchemas = schemaValidator.validateAndCreateMissingSchemas(openApiDoc);
+            int createdSchemas = restSchemaValidator.validateAndCreateMissingSchemas(openApiDoc);
             if (createdSchemas > 0) {
                 log.info("Auto-created {} missing schema(s)", createdSchemas);
             }
@@ -557,7 +557,7 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         }
 
         // Validate schema constraints before conversion
-        schemaValidator.validateAndCorrect(schema);
+        restSchemaValidator.validateAndCorrect(schema);
 
         // Inline mode
         if (schema.getType() != null) {
@@ -942,7 +942,7 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
             int importedApis = importApis(importedDoc, existingDoc, renamedList, schemaRenameMap);
 
             // Step 6: Validate and auto-create missing schema references
-            int createdSchemas = schemaValidator.validateAndCreateMissingSchemas(existingDoc);
+            int createdSchemas = restSchemaValidator.validateAndCreateMissingSchemas(existingDoc);
             if (createdSchemas > 0) {
                 log.info("📦 Auto-created {} missing schema(s)", createdSchemas);
             }
@@ -1178,7 +1178,7 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
         }
 
         // Validate schema constraints (minItems/maxItems, etc.)
-        schemaValidator.validateAndCorrectSchemaMap(schema);
+        restSchemaValidator.validateAndCorrectSchemaMap(schema);
 
         // Process properties if present
         if (schema.containsKey("properties")) {

@@ -92,6 +92,26 @@ public class WebSocketYamlParser {
     }
 
     /**
+     * Reads the YAML file content as a plain string.
+     * <p>
+     * Used for exporting the current YAML file without any processing or caching.
+     *
+     * @return YAML file content as string
+     * @throws Exception if file reading fails or file does not exist
+     */
+    public String readYamlContent() throws Exception {
+        Path filePath = getYamlFilePath();
+        if (!Files.exists(filePath)) {
+            throw new IllegalStateException("YAML file does not exist: " + filePath);
+        }
+
+        try (InputStream is = Files.newInputStream(filePath)) {
+            byte[] bytes = is.readAllBytes();
+            return new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+        }
+    }
+
+    /**
      * Reads the AsyncAPI document from OuroApiSpecManager cache.
      * Falls back to direct file reading if cache is not available (e.g., during initialization).
      * Returns a deep copy to prevent cache pollution.
