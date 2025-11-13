@@ -1,6 +1,5 @@
 package kr.co.ouroboros.core.websocket.tryit.identification;
 
-import io.opentelemetry.context.Scope;
 import kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.context.TryContext;
 import kr.co.ouroboros.core.websocket.tryit.common.TryStompHeaders;
 import lombok.extern.slf4j.Slf4j;
@@ -23,20 +22,6 @@ import java.util.UUID;
 @Component
 public class TryStompOutboundChannelInterceptor implements ChannelInterceptor {
 
-    /**
-     * Ensures an outbound STOMP message carries a tryId and establishes a per-message try scope when present.
-     *
-     * If a tryId is already present in TryContext it is propagated; otherwise the method attempts to extract a tryId
-     * from the message headers and, if found, sets it in TryContext and stores the resulting Scope in an internal header.
-     * When the STOMP command is missing, a new MESSAGE accessor is created and all original headers (including native and
-     * important Spring messaging headers) are preserved so the message can be encoded correctly. The tryId is added as
-     * both a native header and a regular header before returning a message with the updated headers.
-     *
-     * @param message the outbound message to inspect and possibly modify
-     * @param channel the message channel the message will be sent to
-     * @return the original message if no tryId is found; otherwise a message with the tryId added (and with a rebuilt
-     *         accessor if the original STOMP command was missing)
-     */
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
         StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
@@ -45,17 +30,12 @@ public class TryStompOutboundChannelInterceptor implements ChannelInterceptor {
             log.trace("Outbound preSend invoked. simpSessionId={}, simpUser={}, headers={}", accessor.getSessionId(), accessor.getUser(), accessor.toMap());
         }
 
+        // TryId is managed in Baggage context, which is automatically propagated across threads and async boundaries.
+        // We only need to read from Baggage and add it to the STOMP message header for client propagation.
         UUID tryId = TryContext.getTryId();
         if (tryId == null) {
-            tryId = extractTryIdFromHeaders(accessor);
-            if (tryId == null) {
-                log.trace("Could not find tryId in TryContext and headers. headers={}", accessor.toMap());
-                return message;
-            }
-            Scope scope = TryContext.setTryId(tryId);
-            if (scope != null) {
-                accessor.setHeader(TryStompHeaders.INTERNAL_OUTBOUND_SCOPE_HEADER, scope);
-            }
+            log.trace("No tryId in TryContext, skipping tryId header addition. headers={}", accessor.toMap());
+            return message;
         }
 
         // Set to MESSAGE if StompCommand is missing (required by StompEncoder)
@@ -124,18 +104,6 @@ public class TryStompOutboundChannelInterceptor implements ChannelInterceptor {
         return MessageBuilder.createMessage(message.getPayload(), accessor.getMessageHeaders());
     }
 
-    /**
-     * Cleans up any outbound try scope stored on the message and logs transmission failures.
-     *
-     * <p>If the message contains a Scope under {@code TryStompHeaders.INTERNAL_OUTBOUND_SCOPE_HEADER},
-     * that scope is closed; exceptions thrown while closing are caught and logged. If the message
-     * transmission was not completed, a warning with session and header information is logged.</p>
-     *
-     * @param message the outbound message that may carry an internal outbound scope and STOMP headers
-     * @param channel the channel the message was sent to
-     * @param sent    `true` if the message transmission completed successfully, `false` otherwise
-     * @param ex      the exception thrown during send, or {@code null} if none
-     */
     @Override
     public void afterSendCompletion(
             Message<?> message,
@@ -147,37 +115,11 @@ public class TryStompOutboundChannelInterceptor implements ChannelInterceptor {
         if (accessor == null) {
             return;
         }
-        Object scopeObject = accessor.getHeader(TryStompHeaders.INTERNAL_OUTBOUND_SCOPE_HEADER);
-        if (scopeObject instanceof Scope scope) {
-            try {
-                scope.close();
-            } catch (Exception e) {
-                log.warn("Exception while cleaning up Outbound Try Scope: {}", e.getMessage());
-            }
-        }
 
         if (!sent) {
             log.warn("STOMP message transmission not completed. simpSessionId={}, headers={}, exception={}", accessor.getSessionId(), accessor.toMap(), ex != null ? ex.getMessage() : "none");
         }
     }
-
-    /**
-     * Extracts a tryId UUID from the accessor's native STOMP headers.
-     *
-     * @param accessor the STOMP header accessor to read native headers from
-     * @return the UUID parsed from the TRY_ID header, or null if the header is missing or not a valid UUID
-     */
-    private UUID extractTryIdFromHeaders(StompHeaderAccessor accessor) {
-        String headerTryId = accessor.getFirstNativeHeader(TryStompHeaders.TRY_ID_HEADER);
-        if (headerTryId != null) {
-            try {
-                return UUID.fromString(headerTryId);
-            } catch (IllegalArgumentException e) {
-                log.warn("tryId value in outbound STOMP header is not in UUID format: {}", headerTryId);
-            }
-        }
-
-        return null;
-    }
 }
+
 
