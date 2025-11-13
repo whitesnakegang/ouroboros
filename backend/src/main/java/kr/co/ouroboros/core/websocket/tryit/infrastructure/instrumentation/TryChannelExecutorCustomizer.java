@@ -15,6 +15,22 @@ import java.util.Set;
  * <p>
  * If an executor already has a TaskDecorator, it composes the decorators
  * instead of replacing the existing one to avoid breaking other functionality.
+ * <p>
+ * This implementation:
+ * <ul>
+ *   <li>Prefers the public {@code getTaskDecorator()} method (Spring Framework 4.3+)</li>
+ *   <li>Falls back to field access for older Spring versions (prior to 4.3)</li>
+ *   <li>Handles security restrictions gracefully (SecurityManager/module system)</li>
+ * </ul>
+ * <p>
+ * Security considerations:
+ * <ul>
+ *   <li>Public API is always preferred when available</li>
+ *   <li>Field access is only used as a fallback for backward compatibility</li>
+ *   <li>Security exceptions are caught and handled gracefully</li>
+ *   <li>In restricted environments where field access fails, the decorator is set anyway
+ *       (preserving functionality while potentially overwriting existing decorators)</li>
+ * </ul>
  */
 @Slf4j
 @Component
@@ -25,6 +41,9 @@ public class TryChannelExecutorCustomizer implements BeanPostProcessor {
             "clientOutboundChannelExecutor",
             "brokerChannelExecutor"
     );
+
+    // Cache the getTaskDecorator method if available (Spring Framework 4.3+)
+    private static final Method GET_TASK_DECORATOR_METHOD = findGetTaskDecoratorMethod();
 
     @Override
     public Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
@@ -52,66 +71,82 @@ public class TryChannelExecutorCustomizer implements BeanPostProcessor {
     }
 
     /**
-     * Attempts to retrieve the existing TaskDecorator from a ThreadPoolTaskExecutor.
+     * Finds the public getTaskDecorator() method if available in the Spring Framework version.
      * <p>
-     * Uses reflection to safely check if a TaskDecorator is already set, as
-     * ThreadPoolTaskExecutor may not expose a public getter method in all Spring versions.
+     * This method is available in Spring Framework 4.3+ as part of the public API.
+     * If not available, returns null and we'll use field access as a fallback.
+     *
+     * @return the Method object for getTaskDecorator(), or null if not available
+     */
+    private static Method findGetTaskDecoratorMethod() {
+        try {
+            return ThreadPoolTaskExecutor.class.getMethod("getTaskDecorator");
+        } catch (NoSuchMethodException e) {
+            // Method not available in this Spring Framework version
+            return null;
+        }
+    }
+
+    /**
+     * Retrieves the existing TaskDecorator from a ThreadPoolTaskExecutor.
      * <p>
-     * This method tries multiple approaches:
+     * This method tries multiple approaches in order of preference:
      * <ol>
-     *   <li>First, attempts to call getTaskDecorator() method if it exists</li>
-     *   <li>If method doesn't exist, tries to access the taskDecorator field directly</li>
-     *   <li>If field access fails, searches all fields for a TaskDecorator type</li>
+     *   <li>Uses the public {@code getTaskDecorator()} method (Spring Framework 4.3+)</li>
+     *   <li>Falls back to accessing the {@code taskDecorator} field directly (for older Spring versions)</li>
      * </ol>
+     * <p>
+     * The field access fallback is necessary for Spring Framework versions prior to 4.3
+     * where the public getter method is not available. Field access is attempted only when
+     * the public API is unavailable, and exceptions are caught and logged at trace level.
+     * <p>
+     * Security considerations:
+     * <ul>
+     *   <li>Public API is preferred and always used when available (Spring 4.3+)</li>
+     *   <li>Field access is only used as a fallback for older Spring versions</li>
+     *   <li>Field access failures are gracefully handled without breaking functionality</li>
+     *   <li>In restricted environments (SecurityManager/modules), field access may fail,
+     *       but this is acceptable as the primary goal is to add OpenTelemetry context propagation</li>
+     * </ul>
      *
      * @param executor the ThreadPoolTaskExecutor to check
-     * @return the existing TaskDecorator if present, or null if not found or not accessible
+     * @return the existing TaskDecorator if present and accessible, or null if not found or not accessible
      */
     private TaskDecorator getExistingTaskDecorator(ThreadPoolTaskExecutor executor) {
-        // Try 1: Check if getTaskDecorator() method exists
+        // Try 1: Use public API (Spring Framework 4.3+)
+        if (GET_TASK_DECORATOR_METHOD != null) {
+            try {
+                TaskDecorator decorator = (TaskDecorator) GET_TASK_DECORATOR_METHOD.invoke(executor);
+                return decorator;
+            } catch (Exception e) {
+                log.trace("Could not retrieve existing TaskDecorator using public API: {}", e.getMessage());
+                // Fall through to field access
+            }
+        }
+
+        // Try 2: Fallback to field access (for Spring Framework < 4.3)
+        // This is necessary to support older Spring versions where getTaskDecorator() doesn't exist
         try {
-            Method getTaskDecorator = ThreadPoolTaskExecutor.class.getMethod("getTaskDecorator");
-            TaskDecorator decorator = (TaskDecorator) getTaskDecorator.invoke(executor);
-            if (decorator != null) {
+            var field = ThreadPoolTaskExecutor.class.getDeclaredField("taskDecorator");
+            // Attempt to make accessible - may fail in SecurityManager/module environments
+            try {
+                field.setAccessible(true);
+            } catch (SecurityException e) {
+                // In restricted environments, we can't access the field
+                // This is acceptable - we'll set the decorator anyway
+                log.trace("Cannot access taskDecorator field due to security restrictions: {}", e.getMessage());
+                return null;
+            }
+            Object value = field.get(executor);
+            if (value instanceof TaskDecorator decorator) {
                 return decorator;
             }
-        } catch (NoSuchMethodException e) {
-            // Method doesn't exist, continue to field access
+        } catch (NoSuchFieldException e) {
+            // Field doesn't exist (unlikely but possible in future Spring versions)
+            log.trace("taskDecorator field not found: {}", e.getMessage());
         } catch (Exception e) {
-            log.trace("Could not invoke getTaskDecorator() method: {}", e.getMessage());
-        }
-
-        // Try 2: Direct field access with common field names
-        String[] possibleFieldNames = {"taskDecorator", "decorator"};
-        for (String fieldName : possibleFieldNames) {
-            try {
-                var field = ThreadPoolTaskExecutor.class.getDeclaredField(fieldName);
-                field.setAccessible(true);
-                Object value = field.get(executor);
-                if (value instanceof TaskDecorator decorator) {
-                    return decorator;
-                }
-            } catch (NoSuchFieldException e) {
-                // Field doesn't exist with this name, try next
-            } catch (Exception e) {
-                log.trace("Could not access field '{}': {}", fieldName, e.getMessage());
-            }
-        }
-
-        // Try 3: Search all fields for TaskDecorator type
-        try {
-            var fields = ThreadPoolTaskExecutor.class.getDeclaredFields();
-            for (var field : fields) {
-                if (TaskDecorator.class.isAssignableFrom(field.getType())) {
-                    field.setAccessible(true);
-                    Object value = field.get(executor);
-                    if (value instanceof TaskDecorator decorator) {
-                        return decorator;
-                    }
-                }
-            }
-        } catch (Exception e) {
-            log.trace("Could not search fields for TaskDecorator: {}", e.getMessage());
+            // Any other exception (IllegalAccessException, etc.)
+            log.trace("Could not access taskDecorator field: {}", e.getMessage());
         }
 
         return null;
