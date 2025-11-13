@@ -179,10 +179,26 @@ public class TraceTreeBuilder {
             return formatHttpDisplayName(span, methodInfo);
         } else if (methodInfo.getClassName() != null && !methodInfo.getClassName().isEmpty()
                 && methodInfo.getMethodName() != null && !methodInfo.getMethodName().isEmpty()) {
-            return methodInfo.getClassName() + "." + methodInfo.getMethodName();
+            // Extract simple class name (without package path) for display name
+            String simpleClassName = extractSimpleClassName(methodInfo.getClassName());
+            return simpleClassName + "." + methodInfo.getMethodName();
         } else {
             return span.getName();
         }
+    }
+    
+    /**
+     * Returns the simple class name extracted from a fully qualified class name.
+     *
+     * @param fqcn the fully qualified class name (may be null or empty), e.g. "kr.co.ouroboros.service.DataProcessingService"
+     * @return the simple class name (e.g. "DataProcessingService"), or the original {@code fqcn} if it is null or empty
+     */
+    private String extractSimpleClassName(String fqcn) {
+        if (fqcn == null || fqcn.isEmpty()) {
+            return fqcn;
+        }
+        int lastDot = fqcn.lastIndexOf('.');
+        return lastDot >= 0 ? fqcn.substring(lastDot + 1) : fqcn;
     }
     
     /**
