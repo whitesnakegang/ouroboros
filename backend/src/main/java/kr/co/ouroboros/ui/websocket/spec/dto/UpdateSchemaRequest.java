@@ -1,7 +1,6 @@
-package kr.co.ouroboros.ui.rest.spec.dto;
+package kr.co.ouroboros.ui.websocket.spec.dto;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import kr.co.ouroboros.core.rest.spec.model.Property;
+import kr.co.ouroboros.core.websocket.spec.model.Property;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -11,23 +10,17 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Response DTO for schema operations.
+ * Request DTO for updating an existing AsyncAPI schema definition.
  * <p>
- * Returns the complete schema definition including metadata.
+ * Only provided fields will be updated. Null fields are ignored.
  *
- * @since 0.0.1
+ * @since 0.1.0
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@JsonInclude(JsonInclude.Include.NON_NULL)
-public class SchemaResponse {
-
-    /**
-     * Schema name (identifier)
-     */
-    private String schemaName;
+public class UpdateSchemaRequest {
 
     /**
      * Schema type
@@ -60,12 +53,7 @@ public class SchemaResponse {
     private List<String> orders;
 
     /**
-     * XML root element name
-     */
-    private String xmlName;
-
-    /**
      * Array item schema (for type="array")
      */
-    private Property items;
+    private Object items;
 }
