@@ -34,7 +34,6 @@ public class WebSocketSpecSyncPipeline implements SpecSyncPipeline {
         OuroWebSocketApiSpec wsFileSpec = (OuroWebSocketApiSpec) fileSpec;
         OuroWebSocketApiSpec wsScannedSpec = (OuroWebSocketApiSpec) scannedSpec;
 
-        // TODO 채털명으로 메세지 정답지 만들기 [AUTHOR : 방준엽]
         Map<String, Boolean> schemaMap = schemaComparator.compareSchemas(wsFileSpec, wsScannedSpec);
         
         Map<String, Operation> fileOpMap = wsFileSpec.getOperations();
@@ -48,13 +47,11 @@ public class WebSocketSpecSyncPipeline implements SpecSyncPipeline {
         // 키: 채널 이름, 값: 해당 채널 이름을 가진 operation 리스트
         Map<String, List<Operation>> fileChannelNameOperationMap = WebSocketSpecSyncHelper.groupOperationsByChannelName(fileOpMap);
 
-        // TODO 파이프라인 구축
         for(String operationKey :  scanOpMap.keySet()) {
 
-            Operation scanOp = scanOpMap.get(operationKey); // TODO: 나중에 Tags 비교 및 Schema 비교 로직에서 사용 예정
+            Operation scanOp = scanOpMap.get(operationKey);
             String channelRef = scanOp.getChannel().getRef();
 
-            // TODO : scanOp에서 progress == null 건너 뜀
             if(scanOp.getXOuroborosProgress() == null) continue;
             
             // 파일에 없는 경우 추가
@@ -71,7 +68,6 @@ public class WebSocketSpecSyncPipeline implements SpecSyncPipeline {
                 continue;
             }
             
-            // TODO Tags 비교해서 x-ouroboros-progress 업데이트 [AUTHOR : 임강범]
             if(!scanOp.getXOuroborosProgress().equals("completed")) {
                 for (Operation operation : fileChannelNameOperationMap.get(channelRef)) {
                     operation.setXOuroborosProgress(scanOp.getXOuroborosProgress());
@@ -79,7 +75,6 @@ public class WebSocketSpecSyncPipeline implements SpecSyncPipeline {
                 continue;
             }
 
-            // TODO Schema 정답지 비교 COMPLETED인 경우만 여기 로직 실행 [AUTHOR : 임강범]
             Operation fileOp = fileChannelNameOperationMap.get(channelRef)
                     .get(0);
             MessageReference fileMessage = fileOp.getMessages().get(0);
