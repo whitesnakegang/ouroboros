@@ -41,7 +41,6 @@ dependencies {
 	implementation "org.springdoc:springdoc-openapi-starter-webmvc-api:2.8.13"
 
 	// spring wolf
-	// TODO spring wolf ui 말고 다른걸로 바꿔야 함
 	implementation 'io.github.springwolf:springwolf-stomp:1.17.0'
 	runtimeOnly 'io.github.springwolf:springwolf-ui:1.17.0'
 
