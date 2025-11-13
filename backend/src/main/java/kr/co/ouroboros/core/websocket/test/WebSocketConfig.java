@@ -8,7 +8,13 @@ import org.springframework.web.socket.config.annotation.*;
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
-    // 클라이언트가 실제로 접속하는 엔드포인트 (SockJS fallback 포함)
+    /**
+     * Registers the STOMP WebSocket endpoint used by clients.
+     *
+     * Registers "/ws" as the WebSocket/STOMP endpoint, permits all origin patterns ("*") and enables SockJS fallback support.
+     *
+     * @param registry the StompEndpointRegistry used to add and configure STOMP endpoints
+     */
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws")              // ws://localhost:8080/ws
@@ -16,7 +22,12 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 .withSockJS();                   // 프론트에서 SockJS 사용 시
     }
 
-    // STOMP 목적지 프리픽스 구성
+    /**
+     * Configure STOMP broker destinations for server-to-client broadcasts and the application
+     * prefix used for routing client messages to @MessageMapping handlers.
+     *
+     * @param registry the MessageBrokerRegistry used to enable broker destinations and set application prefixes
+     */
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
         // 서버 → 클라이언트로 브로드캐스트할 때 쓰는 prefix (구독 대상)

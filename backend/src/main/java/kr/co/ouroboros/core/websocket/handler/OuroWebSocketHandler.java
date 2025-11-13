@@ -25,16 +25,32 @@ public class OuroWebSocketHandler implements OuroProtocolHandler {
     private static final ObjectMapper mapper = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
 
+    /**
+     * Indicates that this handler targets the WebSocket protocol.
+     *
+     * @return the WebSocket protocol
+     */
     @Override
     public Protocol getProtocol() {
         return Protocol.WEB_SOCKET;
     }
     
+    /**
+     * Provide the relative path to the WebSocket AsyncAPI specification file.
+     *
+     * @return the relative classpath location "ouroboros/websocket/ourowebsocket.yml"
+     */
     @Override
     public String getSpecFilePath() {
         return "ouroboros/websocket/ourowebsocket.yml";
     }
     
+    /**
+     * Creates an OuroApiSpec that represents the current AsyncAPI state.
+     *
+     * @return an OuroApiSpec representing the current AsyncAPI state
+     * @throws RuntimeException if the AsyncAPI cannot be serialized or converted to the websocket spec
+     */
     @Override
     public OuroApiSpec scanCurrentState() {
         try {
@@ -46,6 +62,12 @@ public class OuroWebSocketHandler implements OuroProtocolHandler {
         }
     }
     
+    /**
+     * Parse YAML content describing a WebSocket API specification.
+     *
+     * @param yamlContent YAML document text containing the WebSocket API spec
+     * @return an OuroWebSocketApiSpec representing the parsed specification
+     */
     @Override
     public OuroApiSpec loadFromFile(String yamlContent) {
         Yaml yaml = new Yaml();
@@ -54,11 +76,23 @@ public class OuroWebSocketHandler implements OuroProtocolHandler {
         return mapper.convertValue(map, OuroWebSocketApiSpec.class);
     }
     
+    /**
+     * Validates and reconciles a file-based API specification against the currently scanned specification.
+     *
+     * @param fileSpec    the specification loaded from the file to validate
+     * @param scannedSpec the specification discovered from the running system to validate against
+     * @return the resulting validated and reconciled {@code OuroApiSpec}
+     */
     @Override
     public OuroApiSpec synchronize(OuroApiSpec fileSpec, OuroApiSpec scannedSpec) {
         return pipeline.validate(fileSpec, scannedSpec);
     }
     
+    /**
+     * Persists the given OuroApiSpec as YAML to the handler's configured spec file location.
+     *
+     * @param specToSave the API specification to serialize and save; must not be null
+     */
     @Override
     public void saveYaml(OuroApiSpec specToSave) {
     

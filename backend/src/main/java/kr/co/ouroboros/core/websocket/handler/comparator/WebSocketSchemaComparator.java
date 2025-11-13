@@ -14,6 +14,17 @@ import java.util.Set;
 @Component
 public class WebSocketSchemaComparator {
 
+    /**
+     * Compare schemas between a file-based WebSocket API spec and a scanned spec and report per-schema equality.
+     *
+     * Compares schema definitions from the provided fileSpec and scanSpec (scan spec keys are normalized to simple
+     * class names). For each schema name present in either spec, records whether the two schemas are structurally equal.
+     * If a schema is missing from either spec, it is considered unequal.
+     *
+     * @param fileSpec the WebSocket API specification loaded from the file (may be null)
+     * @param scanSpec the WebSocket API specification obtained from scanning (may be null); keys are normalized before comparison
+     * @return a map from schema name to `true` if the schema in fileSpec and scanSpec are equal, `false` otherwise
+     */
     public Map<String, Boolean> compareSchemas(OuroWebSocketApiSpec fileSpec, OuroWebSocketApiSpec scanSpec) {
         Map<String, Boolean> result = new HashMap<>();
 
@@ -44,6 +55,13 @@ public class WebSocketSchemaComparator {
         return result;
     }
 
+    /**
+     * Retrieve the components' schemas from the given WebSocket API specification.
+     *
+     * @param spec the OuroWebSocketApiSpec to extract schemas from; may be null
+     * @return a map of schema name to Schema from spec.getComponents().getSchemas(), or an empty map if
+     *         the spec, its components, or its schemas are null
+     */
     private Map<String, Schema> extractSchemas(OuroWebSocketApiSpec spec) {
         if (spec == null) {
             return new HashMap<>();
@@ -58,6 +76,13 @@ public class WebSocketSchemaComparator {
         return schemas != null ? schemas : new HashMap<>();
     }
 
+    /**
+     * Extracts schemas from the given WebSocket API spec and normalizes each schema's key to its simple class name.
+     *
+     * @param spec the WebSocket API specification to extract schemas from; may be null
+     * @return a map whose keys are simple class names (substring after the last '.') corresponding to the original schema names
+     *         (or `null` if an original name was null) and whose values are the original Schema instances; returns an empty map if the spec contains no schemas
+     */
     private Map<String, Schema> extractAndNormalizeSchemas(OuroWebSocketApiSpec spec) {
         Map<String, Schema> originalSchemas = extractSchemas(spec);
         Map<String, Schema> normalizedSchemas = new HashMap<>();
@@ -71,6 +96,12 @@ public class WebSocketSchemaComparator {
         return normalizedSchemas;
     }
 
+    /**
+     * Extracts the simple class name from a fully-qualified class name.
+     *
+     * @param fullClassName the fully-qualified class name (may be null)
+     * @return the substring after the last '.' if present, the original string if it contains no '.', or {@code null} if {@code fullClassName} is {@code null}
+     */
     private String extractSimpleClassName(String fullClassName) {
         if (fullClassName == null) {
             return null;
@@ -82,6 +113,16 @@ public class WebSocketSchemaComparator {
         return fullClassName.substring(lastDotIndex + 1);
     }
 
+    /**
+     * Determines whether two schema reference strings refer to the same schema after normalization.
+     *
+     * Normalization will canonicalize component schema references (for example converting
+     * "#/components/schemas/com.example.Foo" to "#/components/schemas/Foo"). Null references are treated as unequal.
+     *
+     * @param fileRef the reference string from the file specification, or null
+     * @param scanRef the reference string from the scanned specification, or null
+     * @return `true` if the normalized references are equal, `false` otherwise
+     */
     private boolean refsEqual(String fileRef, String scanRef) {
         if (fileRef == scanRef) {
             return true;
@@ -96,6 +137,16 @@ public class WebSocketSchemaComparator {
         return normalizedFileRef.equals(normalizedScanRef);
     }
 
+    /**
+     * Normalize a component schema reference to use the canonical components/schemas prefix with a simple class name.
+     *
+     * If `ref` is null, returns null. If `ref` does not start with "#/components/schemas/", returns `ref` unchanged.
+     * When `ref` uses the components schemas prefix, the substring after the prefix is reduced to its simple class name
+     * (text after the last dot) and returned prefixed with "#/components/schemas/".
+     *
+     * @param ref the reference string to normalize, may be a full component reference or any other string
+     * @return the normalized component schema reference, the original `ref` if not a component schema reference, or null if `ref` is null
+     */
     private String normalizeRef(String ref) {
         if (ref == null) {
             return null;
@@ -111,6 +162,16 @@ public class WebSocketSchemaComparator {
         return prefix + simpleSchemaName;
     }
 
+    /**
+     * Determine whether two Schema objects represent the same schema structure.
+     *
+     * Compares title, type, format, `$ref` (after normalization), enum values, required fields,
+     * items (recursively), and properties (recursively).
+     *
+     * @param fileSchema the schema from the file specification to compare
+     * @param scanSchema the schema from the scanned specification to compare
+     * @return `true` if the two schemas are equivalent across the compared fields, `false` otherwise
+     */
     private boolean schemasEqual(Schema fileSchema, Schema scanSchema) {
         if (fileSchema == scanSchema) {
             return true;
@@ -158,6 +219,17 @@ public class WebSocketSchemaComparator {
         return propertiesEqual(fileSchema.getProperties(), scanSchema.getProperties());
     }
 
+    /**
+     * Compare two property maps for deep structural equality of their Schema values.
+     *
+     * The maps are considered equal only if they are the same object, or if both are non-null,
+     * have the same size, contain identical key sets, and each corresponding Schema is equal
+     * according to {@code schemasEqual}.
+     *
+     * @param fileProp property name to Schema map from the file specification
+     * @param scanProp property name to Schema map from the scanned specification
+     * @return `true` if both maps have identical keys and corresponding Schema values are deeply equal, `false` otherwise
+     */
     private boolean propertiesEqual(Map<String, Schema> fileProp, Map<String, Schema> scanProp) {
         if (fileProp == scanProp) {
             return true;

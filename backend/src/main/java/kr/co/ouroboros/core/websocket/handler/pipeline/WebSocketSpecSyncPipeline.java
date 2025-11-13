@@ -18,6 +18,16 @@ public class WebSocketSpecSyncPipeline implements SpecSyncPipeline {
 
     private final WebSocketSchemaComparator schemaComparator;
 
+    /**
+     * Synchronizes and validates WebSocket API information from a scanned specification into a file specification.
+     *
+     * Compares schemas and operations between the provided specs, merges referenced channels/messages/schemas
+     * that are missing from the file spec, and updates per-operation progress and diff flags based on comparison results.
+     *
+     * @param fileSpec    the existing file-side API specification to update
+     * @param scannedSpec the incoming scanned API specification to compare against
+     * @return the file-side API specification after applying synchronization and validation updates
+     */
     @Override
     public OuroApiSpec validate(OuroApiSpec fileSpec, OuroApiSpec scannedSpec) {
 

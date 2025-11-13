@@ -11,6 +11,13 @@ import org.springframework.stereotype.Component;
 @Component
 public class AsyncApiCustomizerConfig implements OperationCustomizer {
 
+    /**
+     * Adds an `x-ouroboros-progress` operation extension based on the method's ApiState when that state is
+     * one of COMPLETED, BUGFIX, or IMPLEMENTING.
+     *
+     * @param operation the OpenAPI/AsyncAPI operation to update with the progress extension
+     * @param method the Java reflection Method to inspect for an @ApiState annotation
+     */
     @Override
     public void customize(Operation operation, Method method) {
         ApiState annotation = method.getAnnotation(ApiState.class);
@@ -28,6 +35,15 @@ public class AsyncApiCustomizerConfig implements OperationCustomizer {
         putExt(operation, "x-ouroboros-progress",   progressValue);
     }
 
+    /**
+     * Ensures the operation has an extension-fields map and adds the given extension only if the key is not already present.
+     *
+     * Initializes the operation's extension fields map when absent and inserts the specified key/value pair using a non-overwriting put.
+     *
+     * @param op the Operation to update
+     * @param key the extension field name to add (e.g. "x-ouroboros-progress")
+     * @param value the extension value to set when the key is not already present
+     */
     private static void putExt(Operation op, String key, Object value) {
         Map<String, Object> ext = op.getExtensionFields();
         if (ext == null) {
