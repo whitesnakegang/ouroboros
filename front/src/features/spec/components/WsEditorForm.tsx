@@ -696,7 +696,7 @@ export function WsEditorForm({
 
       {/* Schema Card - Schema 관리 */}
       <div className="mt-6">
-        <SchemaCard isReadOnly={isReadOnly} />
+        <SchemaCard isReadOnly={isReadOnly} protocol="WebSocket" />
       </div>
     </div>
   );

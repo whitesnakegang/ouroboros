@@ -21,7 +21,7 @@ const JsonHighlighter = ({
     }
   };
 
-  const highlightJson = (jsonStr: string): JSX.Element => {
+  const highlightJson = (jsonStr: string): React.ReactElement => {
     const formatted = formatJson(jsonStr);
     const lines = formatted.split('\n');
     
@@ -29,7 +29,7 @@ const JsonHighlighter = ({
       <>
         {lines.map((line, lineIndex) => {
           // 간단한 JSON 하이라이팅
-          const parts: (string | JSX.Element)[] = [];
+          const parts: (string | React.ReactElement)[] = [];
           let lastIndex = 0;
           
           // 키 (따옴표로 감싸진 문자열 뒤에 콜론)
@@ -216,17 +216,6 @@ export function WsTestResponseTabs() {
     return `${hours}:${minutes}:${seconds}.${milliseconds}`;
   };
 
-  // JSON 포맷팅
-  const formatContent = (content: string): string => {
-    if (!isJsonFormatted) return content;
-    try {
-      const parsed = JSON.parse(content);
-      return JSON.stringify(parsed, null, 2);
-    } catch {
-      return content;
-    }
-  };
-
   // 메시지 로그 내보내기
   const exportMessages = (format: "json" | "csv") => {
     if (format === "json") {
@@ -337,19 +326,18 @@ export function WsTestResponseTabs() {
       {/* Tab Content */}
       <div className="p-4">
         {activeTab === "response" ? (
-          <ResponseContent
-            messages={filteredMessages}
-            messageFilter={messageFilter}
-            setMessageFilter={setMessageFilter}
-            searchQuery={searchQuery}
-            setSearchQuery={setSearchQuery}
-            isJsonFormatted={isJsonFormatted}
-            setIsJsonFormatted={setIsJsonFormatted}
-            formatTimestamp={formatTimestamp}
-            formatContent={formatContent}
-            exportMessages={exportMessages}
-            messagesEndRef={messagesEndRef}
-          />
+              <ResponseContent
+                messages={filteredMessages}
+                messageFilter={messageFilter}
+                setMessageFilter={setMessageFilter}
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+                isJsonFormatted={isJsonFormatted}
+                setIsJsonFormatted={setIsJsonFormatted}
+                formatTimestamp={formatTimestamp}
+                exportMessages={exportMessages}
+                messagesEndRef={messagesEndRef}
+              />
         ) : (
           <TestContent
             methodList={methodList}
@@ -403,7 +391,6 @@ function ResponseContent({
   isJsonFormatted,
   setIsJsonFormatted,
   formatTimestamp,
-  formatContent,
   exportMessages,
   messagesEndRef,
 }: {
@@ -415,9 +402,8 @@ function ResponseContent({
   isJsonFormatted: boolean;
   setIsJsonFormatted: (formatted: boolean) => void;
   formatTimestamp: (timestamp: number) => string;
-  formatContent: (content: string) => string;
   exportMessages: (format: "json" | "csv") => void;
-  messagesEndRef: React.RefObject<HTMLDivElement>;
+  messagesEndRef: React.RefObject<HTMLDivElement | null>;
 }) {
   if (messages.length === 0) {
     return (
@@ -542,12 +528,11 @@ function ResponseContent({
       {/* Message Log */}
       <div className="space-y-3 max-h-[600px] overflow-y-auto">
         {messages.map((message) => (
-          <MessageBubble
-            key={message.id}
-            message={message}
-            formatTimestamp={formatTimestamp}
-            formatContent={formatContent}
-          />
+            <MessageBubble
+              key={message.id}
+              message={message}
+              formatTimestamp={formatTimestamp}
+            />
         ))}
         <div ref={messagesEndRef} />
       </div>
@@ -558,11 +543,9 @@ function ResponseContent({
 function MessageBubble({
   message,
   formatTimestamp,
-  formatContent,
 }: {
   message: WebSocketMessage;
   formatTimestamp: (timestamp: number) => string;
-  formatContent: (content: string) => string;
 }) {
   const isSent = message.direction === "sent";
   const isJson = (() => {

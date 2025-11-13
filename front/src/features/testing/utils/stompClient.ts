@@ -17,8 +17,11 @@ export class StompClient {
   private onConnectCallback?: () => void;
   private onErrorCallback?: (error: Error) => void;
   private onDisconnectCallback?: () => void;
+  private url: string;
 
-  constructor(private url: string) {}
+  constructor(url: string) {
+    this.url = url;
+  }
 
   connect(headers: StompHeaders = {}, onConnect?: () => void, onError?: (error: Error) => void) {
     this.onConnectCallback = onConnect;
@@ -58,7 +61,7 @@ export class StompClient {
         }
       };
 
-      this.ws.onerror = (error) => {
+      this.ws.onerror = (_error) => {
         if (this.onErrorCallback) {
           this.onErrorCallback(new Error("WebSocket error"));
         }

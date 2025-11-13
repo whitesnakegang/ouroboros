@@ -2061,7 +2061,7 @@ export function ApiEditorLayout() {
             {/* Schema Card */}
             {protocol === "REST" && (selectedEndpoint !== null || isNewFormMode) && (
               <div className="mt-6">
-                <SchemaCard isReadOnly={!!(selectedEndpoint && !isEditMode)} />
+                <SchemaCard isReadOnly={!!(selectedEndpoint && !isEditMode)} protocol="REST" />
               </div>
             )}
 

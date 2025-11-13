@@ -1,3 +1,4 @@
+import { deleteSchema, deleteWebSocketSchema } from "../services/api";
 import type { SchemaResponse } from "../services/api";
 import type { SchemaField } from "../types/schema.types";
 import { parseOpenAPISchemaToSchemaField } from "../utils/schemaConverter";
@@ -17,6 +18,7 @@ interface SchemaModalProps {
   onSelect: (schema: Schema) => void;
   schemas: SchemaResponse[];
   setSchemas: (schemas: SchemaResponse[]) => void;
+  protocol?: "REST" | "WebSocket";
 }
 
 export function SchemaModal({
@@ -25,11 +27,29 @@ export function SchemaModal({
   onSelect,
   schemas,
   setSchemas,
+  protocol = "REST",
 }: SchemaModalProps) {
   if (!isOpen) return null;
 
-  const handleDeleteSchema = (schemaName: string) => {
-    setSchemas(schemas.filter((s) => s.schemaName !== schemaName));
+  const handleDeleteSchema = async (schemaName: string) => {
+    if (!confirm(`"${schemaName}" 스키마를 삭제하시겠습니까?`)) {
+      return;
+    }
+
+    try {
+      if (protocol === "WebSocket") {
+        await deleteWebSocketSchema(schemaName);
+      } else {
+        await deleteSchema(schemaName);
+      }
+      setSchemas(schemas.filter((s) => s.schemaName !== schemaName));
+      alert(`"${schemaName}" 스키마가 삭제되었습니다.`);
+    } catch (err) {
+      console.error("스키마 삭제 실패:", err);
+      alert(
+        `스키마 삭제에 실패했습니다: ${err instanceof Error ? err.message : "알 수 없는 오류"}`
+      );
+    }
   };
 
   const handleSelectSchema = (schema: SchemaResponse) => {

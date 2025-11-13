@@ -1,7 +1,14 @@
 import { useState, useEffect } from "react";
 import { SchemaModal } from "./SchemaModal";
 import { SchemaFieldEditor } from "./SchemaFieldEditor";
-import { getAllSchemas, createSchema, updateSchema } from "../services/api";
+import { 
+  getAllSchemas, 
+  createSchema, 
+  updateSchema,
+  getAllWebSocketSchemas,
+  createWebSocketSchema,
+  updateWebSocketSchema
+} from "../services/api";
 import type {
   SchemaResponse,
   CreateSchemaRequest,
@@ -13,9 +20,10 @@ import { convertSchemaFieldToOpenAPI } from "../utils/schemaConverter";
 
 interface SchemaCardProps {
   isReadOnly?: boolean;
+  protocol?: "REST" | "WebSocket";
 }
 
-export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
+export function SchemaCard({ isReadOnly = false, protocol = "REST" }: SchemaCardProps) {
   const [schemas, setSchemas] = useState<SchemaResponse[]>([]);
   const [isSchemaModalOpen, setIsSchemaModalOpen] = useState(false);
   const [schemaFields, setSchemaFields] = useState<SchemaField[]>([]);
@@ -46,17 +54,19 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
     return "알 수 없는 오류가 발생했습니다.";
   };
 
-  // 컴포넌트 마운트 시 스키마 목록 로드
+  // 컴포넌트 마운트 시 및 프로토콜 변경 시 스키마 목록 로드
   useEffect(() => {
     loadSchemas();
-  }, []);
+  }, [protocol]);
 
   // 스키마 목록 로드
   const loadSchemas = async () => {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await getAllSchemas();
+      const response = protocol === "WebSocket" 
+        ? await getAllWebSocketSchemas() 
+        : await getAllSchemas();
       setSchemas(response.data);
     } catch (err) {
       console.error("스키마 로드 실패:", err);
@@ -130,7 +140,11 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
           "🔍 Update Request:",
           JSON.stringify(updateRequest, null, 2)
         );
-        await updateSchema(currentSchemaName, updateRequest);
+        if (protocol === "WebSocket") {
+          await updateWebSocketSchema(currentSchemaName, updateRequest);
+        } else {
+          await updateSchema(currentSchemaName, updateRequest);
+        }
         alert(`"${currentSchemaName}" 스키마가 수정되었습니다.`);
       } else {
         // 생성
@@ -138,7 +152,11 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
           "🔍 Create Request:",
           JSON.stringify(schemaRequest, null, 2)
         );
-        await createSchema(schemaRequest);
+        if (protocol === "WebSocket") {
+          await createWebSocketSchema(schemaRequest);
+        } else {
+          await createSchema(schemaRequest);
+        }
         alert(`"${currentSchemaName}" 스키마가 생성되었습니다.`);
       }
 
@@ -361,6 +379,7 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
         }}
         schemas={schemas}
         setSchemas={setSchemas}
+        protocol={protocol}
       />
     </div>
   );

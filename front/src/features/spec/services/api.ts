@@ -110,7 +110,7 @@ export interface SchemaResponse {
   properties?: Record<string, SchemaField>;
   required?: string[];
   orders?: string[];
-  items?: any;  // array 타입일 경우
+  items?: any; // array 타입일 경우
   xmlName?: string;
 }
 
@@ -344,8 +344,11 @@ export async function deleteRestApiSpec(
   return response.json();
 }
 
-// Schema 관련 API 함수들
+// REST Schema 관련 API 함수들
 const SCHEMA_API_BASE_URL = "/ouro/rest-specs/schemas";
+
+// WebSocket Schema 관련 API 함수들
+const WS_SCHEMA_API_BASE_URL = "/ouro/websocket-specs/schemas";
 
 /**
  * 전체 Schema 조회
@@ -692,6 +695,150 @@ export async function getTryTrace(tryId: string): Promise<TryTraceResponse> {
     );
     console.error("Try Trace 조회 실패:", {
       tryId,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+// ========== WebSocket Schema API 함수들 ==========
+
+/**
+ * 전체 WebSocket Schema 조회
+ */
+export async function getAllWebSocketSchemas(): Promise<GetAllSchemasResponse> {
+  const response = await fetch(WS_SCHEMA_API_BASE_URL, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Schema 조회 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WebSocket Schema API 호출 실패:", {
+      url: WS_SCHEMA_API_BASE_URL,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+/**
+ * 특정 WebSocket Schema 조회
+ */
+export async function getWebSocketSchema(
+  schemaName: string
+): Promise<GetSchemaResponse> {
+  const response = await fetch(`${WS_SCHEMA_API_BASE_URL}/${schemaName}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Schema 조회 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WebSocket Schema 조회 실패:", {
+      schemaName,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+/**
+ * 새로운 WebSocket Schema 생성
+ */
+export async function createWebSocketSchema(
+  request: CreateSchemaRequest
+): Promise<CreateSchemaResponse> {
+  const response = await fetch(WS_SCHEMA_API_BASE_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Schema 생성 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WebSocket Schema 생성 실패:", {
+      request,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+/**
+ * WebSocket Schema 수정
+ */
+export async function updateWebSocketSchema(
+  schemaName: string,
+  request: UpdateSchemaRequest
+): Promise<UpdateSchemaResponse> {
+  const response = await fetch(`${WS_SCHEMA_API_BASE_URL}/${schemaName}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Schema 수정 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WebSocket Schema 수정 실패:", {
+      schemaName,
+      request,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+/**
+ * WebSocket Schema 삭제
+ */
+export async function deleteWebSocketSchema(
+  schemaName: string
+): Promise<DeleteSchemaResponse> {
+  const response = await fetch(`${WS_SCHEMA_API_BASE_URL}/${schemaName}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Schema 삭제 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WebSocket Schema 삭제 실패:", {
+      schemaName,
       status: response.status,
     });
     throw new Error(errorMessage);
