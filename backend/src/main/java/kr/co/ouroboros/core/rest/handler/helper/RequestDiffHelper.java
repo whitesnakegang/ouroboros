@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.handler;
+package kr.co.ouroboros.core.rest.handler.helper;
 
 import java.util.*;
 import kr.co.ouroboros.core.rest.common.dto.MediaType;
@@ -6,6 +6,7 @@ import kr.co.ouroboros.core.rest.common.dto.Operation;
 import kr.co.ouroboros.core.rest.common.dto.Parameter;
 import kr.co.ouroboros.core.rest.common.dto.RequestBody;
 import kr.co.ouroboros.core.rest.common.dto.Schema;
+import kr.co.ouroboros.core.rest.handler.comparator.SchemaComparator.TypeCnts;
 
 public final class RequestDiffHelper {
 
@@ -38,8 +39,8 @@ public final class RequestDiffHelper {
      * @param scanFlattenedSchemas flattened schema map for resolving referenced schemas from the scanned specification
      */
     public static void compareAndMarkRequest(String url, Operation fileOp, Operation scanOp, HttpMethod method,
-            Map<String, SchemaComparator.TypeCnts> fileFlattenedSchemas,
-            Map<String, SchemaComparator.TypeCnts> scanFlattenedSchemas
+            Map<String, TypeCnts> fileFlattenedSchemas,
+            Map<String, TypeCnts> scanFlattenedSchemas
     ) {
 
 
@@ -66,14 +67,18 @@ public final class RequestDiffHelper {
     }
 
     /**
-     * Collect type counts from an operation's parameters and request body.
+     * Aggregate request-related type counts from the given Operation into the provided map.
      *
-     * @param operation the operation to analyze
-     * @param typeCounts map to store type counts (will be modified)
-     * @param flattenedSchemas map of schema name to flattened type counts
+     * This inspects the operation's parameters (excluding path parameters) and its request body,
+     * accumulating type occurrences into {@code typeCounts}. When a schema reference is encountered
+     * the corresponding entry from {@code flattenedSchemas} is used.
+     *
+     * @param operation the operation to analyze; if null the method returns without modification
+     * @param typeCounts a mutable map that will be updated with aggregated type-to-count entries
+     * @param flattenedSchemas a map from schema name to precomputed TypeCnts used to resolve `$ref` references
      */
     private static void collectTypeCounts(Operation operation, Map<String, Integer> typeCounts, 
-                                          Map<String, SchemaComparator.TypeCnts> flattenedSchemas) {
+                                          Map<String, TypeCnts> flattenedSchemas) {
         if (operation == null) {
             return;
         }
@@ -97,7 +102,7 @@ public final class RequestDiffHelper {
          * @param flattenedSchemas map of schema name to flattened type counts used to resolve `$ref` schemas
          */
     private static void collectTypeCountsFromParameters(List<Parameter> parameters, Map<String, Integer> typeCounts,
-                                                       Map<String, SchemaComparator.TypeCnts> flattenedSchemas) {
+                                                       Map<String, TypeCnts> flattenedSchemas) {
         if (parameters == null || parameters.isEmpty()) {
             return;
         }
@@ -139,7 +144,7 @@ public final class RequestDiffHelper {
          * @param flattenedSchemas mapping of schema name to precomputed type counts used to resolve `$ref` references
          */
     private static void collectTypeCountsFromRequestBody(RequestBody requestBody, Map<String, Integer> typeCounts,
-                                                        Map<String, SchemaComparator.TypeCnts> flattenedSchemas) {
+                                                        Map<String, TypeCnts> flattenedSchemas) {
         if (requestBody == null) {
             return;
         }
@@ -177,20 +182,18 @@ public final class RequestDiffHelper {
     }
 
     /**
-     * Add type information from a schema into the provided typeCounts map, resolving referenced schemas when available.
+     * Updates typeCounts with type occurrences described by schema, resolving $ref references using flattenedSchemas when present.
      *
-     * If the schema is a reference ($ref) and flattenedSchemas contains the referenced entry, this method merges that
-     * referenced schema's type counts into typeCounts. For inline schemas, it increments a count for a key constructed
-     * from the provided name and the schema's type; when the schema's format equals "binary" the key uses "binary"
-     * instead of the schema type.
+     * If schema contains a $ref and flattenedSchemas has a matching entry, merges that entry's type counts into typeCounts.
+     * For inline schemas, increments the count for "name:binary" when format equals "binary", otherwise for "name:type".
      *
      * @param schema the schema to analyze; may be a reference or an inline schema
-     * @param name the field or parameter name to use when constructing type keys (must be non-empty)
-     * @param typeCounts map that will be updated with type count increments
-     * @param flattenedSchemas optional map of schema name to precomputed type counts used to resolve $ref entries
+     * @param name the field or parameter name used to construct type keys; must be non-empty
+     * @param typeCounts map that will be updated with merged or incremented type counts
+     * @param flattenedSchemas optional map of schema name to precomputed TypeCnts used to resolve $ref entries
      */
     private static void countSchemaType(Schema schema, String name, Map<String, Integer> typeCounts,
-                                       Map<String, SchemaComparator.TypeCnts> flattenedSchemas) {
+                                       Map<String, TypeCnts> flattenedSchemas) {
         if (schema == null || name == null || name.isEmpty()) {
             return;
         }
@@ -202,7 +205,7 @@ public final class RequestDiffHelper {
             
             // flattenedSchemas에서 해당 스키마의 타입 카운트 조회
             if (flattenedSchemas != null && flattenedSchemas.containsKey(refName)) {
-                SchemaComparator.TypeCnts refTypeCnts = flattenedSchemas.get(refName);
+                TypeCnts refTypeCnts = flattenedSchemas.get(refName);
                 if (refTypeCnts != null && refTypeCnts.getTypeCounts() != null) {
                     // 참조된 스키마의 모든 타입 카운트를 현재 typeCounts에 추가
                     for (Map.Entry<String, Integer> entry : refTypeCnts.getTypeCounts().entrySet()) {

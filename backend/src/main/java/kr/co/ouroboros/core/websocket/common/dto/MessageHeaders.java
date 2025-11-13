@@ -26,7 +26,7 @@ public class MessageHeaders {
      * In JSON API: "ref" field (e.g., "MessageHeaders" or "#/components/schemas/MessageHeaders")
      * In YAML storage: "$ref" field (e.g., "#/components/schemas/MessageHeaders")
      */
-    @JsonProperty("ref")
+    @JsonProperty("$ref")
     private String ref;
 }
 

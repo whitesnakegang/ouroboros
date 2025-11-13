@@ -1,11 +1,11 @@
-package kr.co.ouroboros.core.rest.handler;
+package kr.co.ouroboros.core.rest.handler.pipeline;
 
-import static kr.co.ouroboros.core.rest.handler.EndpointDiffHelper.isDiffStatusEndpoint;
-import static kr.co.ouroboros.core.rest.handler.EndpointDiffHelper.isDiffUrl;
-import static kr.co.ouroboros.core.rest.handler.EndpointDiffHelper.markDiffEndpoint;
-import static kr.co.ouroboros.core.rest.handler.MockApiHelper.isMockApi;
-import static kr.co.ouroboros.core.rest.handler.RequestDiffHelper.HttpMethod;
-import static kr.co.ouroboros.core.rest.handler.RequestDiffHelper.compareAndMarkRequest;
+import static kr.co.ouroboros.core.rest.handler.helper.EndpointDiffHelper.isDiffStatusEndpoint;
+import static kr.co.ouroboros.core.rest.handler.helper.EndpointDiffHelper.isDiffUrl;
+import static kr.co.ouroboros.core.rest.handler.helper.EndpointDiffHelper.markDiffEndpoint;
+import static kr.co.ouroboros.core.rest.handler.helper.MockApiHelper.isMockApi;
+import static kr.co.ouroboros.core.rest.handler.helper.RequestDiffHelper.HttpMethod;
+import static kr.co.ouroboros.core.rest.handler.helper.RequestDiffHelper.compareAndMarkRequest;
 
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -16,6 +16,8 @@ import kr.co.ouroboros.core.global.spec.OuroApiSpec;
 import kr.co.ouroboros.core.rest.common.dto.Operation;
 import kr.co.ouroboros.core.rest.common.dto.OuroRestApiSpec;
 import kr.co.ouroboros.core.rest.common.dto.PathItem;
+import kr.co.ouroboros.core.rest.handler.comparator.ResponseComparator;
+import kr.co.ouroboros.core.rest.handler.comparator.SchemaComparator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;

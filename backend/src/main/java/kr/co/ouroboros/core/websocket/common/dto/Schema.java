@@ -1,6 +1,7 @@
 package kr.co.ouroboros.core.websocket.common.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 import java.util.Map;
 import lombok.Data;
@@ -20,7 +21,17 @@ public class Schema {
 
     private String title;
     private String type;
-    private Map<String, Property> properties;
+    private String format;
+    private Map<String, Schema> properties;
+
+    @JsonProperty("enum")
+    private List<String> enumValues;
+    
+    @JsonProperty("$ref")
+    private String ref;
+    
+    private Schema items;
+    private List<String> required;
     private List<Object> examples;
 }
 
