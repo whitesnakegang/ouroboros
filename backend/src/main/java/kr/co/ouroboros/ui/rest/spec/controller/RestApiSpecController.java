@@ -8,7 +8,7 @@ import kr.co.ouroboros.ui.rest.spec.dto.RestApiSpecResponse;
 import kr.co.ouroboros.ui.rest.spec.dto.UpdateRestApiRequest;
 import kr.co.ouroboros.ui.rest.spec.dto.ValidationError;
 import kr.co.ouroboros.core.rest.spec.service.RestApiSpecService;
-import kr.co.ouroboros.core.rest.spec.validator.ImportYamlValidator;
+import kr.co.ouroboros.core.rest.spec.validator.ImportRestYamlValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -35,7 +35,7 @@ import java.util.List;
 public class RestApiSpecController {
 
     private final RestApiSpecService restApiSpecService;
-    private final ImportYamlValidator importYamlValidator;
+    private final ImportRestYamlValidator importRestYamlValidator;
 
     /**
      * Creates a new REST API specification.
@@ -189,7 +189,7 @@ public class RestApiSpecController {
 
         // Step 1: Validate file extension
         String filename = file.getOriginalFilename();
-        List<ValidationError> fileErrors = importYamlValidator.validateFileExtension(filename);
+        List<ValidationError> fileErrors = importRestYamlValidator.validateFileExtension(filename);
         if (!fileErrors.isEmpty()) {
             ValidationError error = fileErrors.get(0);
             GlobalApiResponse<ImportYamlResponse> response = GlobalApiResponse.error(
@@ -203,7 +203,7 @@ public class RestApiSpecController {
         String yamlContent = new String(file.getBytes(), StandardCharsets.UTF_8);
 
         // Step 3: Validate YAML content
-        List<ValidationError> contentErrors = importYamlValidator.validate(yamlContent);
+        List<ValidationError> contentErrors = importRestYamlValidator.validate(yamlContent);
         if (!contentErrors.isEmpty()) {
             // Build error response with validation errors in data field
             ImportValidationErrorData errorData = ImportValidationErrorData.builder()
