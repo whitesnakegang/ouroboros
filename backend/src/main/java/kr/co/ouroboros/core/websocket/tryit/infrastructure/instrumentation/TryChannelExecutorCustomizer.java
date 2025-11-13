@@ -34,7 +34,8 @@ public class TryChannelExecutorCustomizer implements BeanPostProcessor {
                 log.warn("Executor bean '{}' already has a TaskDecorator ({}). " +
                         "Composing decorators to preserve existing functionality.",
                         beanName, existingDecorator.getClass().getName());
-                // Compose decorators: existing decorator runs first, then OtelContextTaskDecorator
+                // Compose decorators: OtelContextTaskDecorator wraps the existing decorator
+                // The composed decorator sets OpenTelemetry context first, then executes the existing decorator's wrapped runnable
                 threadPool.setTaskDecorator(composeDecorators(existingDecorator, OtelContextTaskDecorator.INSTANCE));
                 log.info("Composed OtelContextTaskDecorator with existing decorator for executor bean '{}'", beanName);
             } else {
@@ -119,12 +120,24 @@ public class TryChannelExecutorCustomizer implements BeanPostProcessor {
     /**
      * Composes two TaskDecorators into a single decorator.
      * <p>
-     * The first decorator is applied first, then the second decorator.
-     * This ensures both decorators are executed in sequence.
+     * The composition applies decorators in the following order:
+     * <ol>
+     *   <li>The first decorator decorates the original runnable</li>
+     *   <li>The second decorator decorates the result from the first decorator</li>
+     * </ol>
+     * <p>
+     * When the composed Runnable is executed, the second decorator's wrapper runs first
+     * (as the outer wrapper), then the first decorator's wrapped runnable runs inside it.
+     * <p>
+     * Example: When composing (existingDecorator, OtelContextTaskDecorator):
+     * <ul>
+     *   <li>OtelContextTaskDecorator becomes the outer wrapper (sets OpenTelemetry context)</li>
+     *   <li>existingDecorator's wrapped runnable runs inside the context</li>
+     * </ul>
      *
-     * @param first  the first decorator to apply
-     * @param second the second decorator to apply
-     * @return a composed TaskDecorator that applies both decorators in sequence
+     * @param first  the first decorator to apply (runs inside the second decorator's wrapper)
+     * @param second the second decorator to apply (becomes the outer wrapper)
+     * @return a composed TaskDecorator where second wraps first
      */
     private TaskDecorator composeDecorators(TaskDecorator first, TaskDecorator second) {
         return runnable -> second.decorate(first.decorate(runnable));
