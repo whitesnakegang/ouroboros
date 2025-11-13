@@ -130,7 +130,7 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
         for (String url : pathsScanned.keySet()) {
 
             // url이 다른가 먼저 봄
-            if(isDiffUrl(url, pathsFile, pathsScanned)) continue;
+            if(isDiffUrl(url, pathsFile, pathsScanned, fileFlattenedSchemas, restFileSpec, restScannedSpec)) continue;
 
             PathItem fileItem = pathsFile.get(url);
             PathItem scanItem = pathsScanned.get(url);
