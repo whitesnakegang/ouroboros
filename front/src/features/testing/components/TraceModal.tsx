@@ -45,8 +45,9 @@ export function TraceModal({ isOpen, onClose, traceData, initialExpandedSpanId }
     if (initialExpandedSpanId && traceData.spans.length > 0) {
       const path = findSpanPath(traceData.spans, initialExpandedSpanId);
       if (path) {
-        // 해당 span까지의 모든 부모를 확장
-        setExpandedSpans(new Set(path));
+        // 해당 span까지의 부모들만 확장 (해당 span 자체는 제외)
+        const pathWithoutTarget = path.slice(0, -1);
+        setExpandedSpans(new Set(pathWithoutTarget));
         // 해당 span을 하이라이트
         setHighlightedSpanId(initialExpandedSpanId);
         
