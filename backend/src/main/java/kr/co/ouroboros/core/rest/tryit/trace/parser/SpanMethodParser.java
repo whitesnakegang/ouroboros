@@ -75,9 +75,10 @@ public class SpanMethodParser {
      * @param function the `code.function` attribute value used as the resulting methodName
      * @return a SpanMethodInfo whose className and methodName reflect the provided
      *         attributes and whose parameters list contains entries for each index
-     *         with a `code.parameter.{i}.type` or `code.parameter.{i}.name` attribute;
+     *         with a `code.parameter.{i}x.type` or `code.parameter.{i}.name` attribute;
      *         missing type or name for an index is represented as an empty string in
      *         the corresponding Parameter field.
+     */
     private SpanMethodInfo parseFromAttributes(TraceSpanInfo span, String namespace, String function) {
         String className = null;
         String methodName = null;
