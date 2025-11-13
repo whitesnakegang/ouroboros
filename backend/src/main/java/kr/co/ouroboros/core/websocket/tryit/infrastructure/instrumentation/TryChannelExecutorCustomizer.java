@@ -7,6 +7,7 @@ import org.springframework.core.task.TaskDecorator;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Set;
 
@@ -126,29 +127,52 @@ public class TryChannelExecutorCustomizer implements BeanPostProcessor {
 
         // Try 2: Fallback to field access (for Spring Framework < 4.3)
         // This is necessary to support older Spring versions where getTaskDecorator() doesn't exist
+        Field field = findTaskDecoratorField(ThreadPoolTaskExecutor.class);
+        if (field == null) {
+            log.trace("taskDecorator field not found on {} or its superclasses", ThreadPoolTaskExecutor.class.getName());
+            return null;
+        }
+        // Attempt to make accessible - may fail in SecurityManager/module environments
         try {
-            var field = ThreadPoolTaskExecutor.class.getDeclaredField("taskDecorator");
-            // Attempt to make accessible - may fail in SecurityManager/module environments
-            try {
-                field.setAccessible(true);
-            } catch (SecurityException e) {
-                // In restricted environments, we can't access the field
-                // This is acceptable - we'll set the decorator anyway
-                log.trace("Cannot access taskDecorator field due to security restrictions: {}", e.getMessage());
-                return null;
-            }
+            field.setAccessible(true);
+        } catch (SecurityException e) {
+            // In restricted environments, we can't access the field
+            // This is acceptable - we'll set the decorator anyway
+            log.trace("Cannot access taskDecorator field due to security restrictions: {}", e.getMessage());
+            return null;
+        }
+        try {
             Object value = field.get(executor);
             if (value instanceof TaskDecorator decorator) {
                 return decorator;
             }
-        } catch (NoSuchFieldException e) {
-            // Field doesn't exist (unlikely but possible in future Spring versions)
-            log.trace("taskDecorator field not found: {}", e.getMessage());
         } catch (Exception e) {
             // Any other exception (IllegalAccessException, etc.)
             log.trace("Could not access taskDecorator field: {}", e.getMessage());
         }
 
+        return null;
+    }
+
+    /**
+     * Finds the taskDecorator field by traversing the class hierarchy.
+     * <p>
+     * The taskDecorator field is declared in ExecutorConfigurationSupport,
+     * which is a superclass of ThreadPoolTaskExecutor. This method searches
+     * up the class hierarchy to find the field.
+     *
+     * @param type the class to start searching from
+     * @return the Field object for taskDecorator, or null if not found
+     */
+    private Field findTaskDecoratorField(Class<?> type) {
+        Class<?> current = type;
+        while (current != null) {
+            try {
+                return current.getDeclaredField("taskDecorator");
+            } catch (NoSuchFieldException ignored) {
+                current = current.getSuperclass();
+            }
+        }
         return null;
     }
 
