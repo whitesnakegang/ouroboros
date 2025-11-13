@@ -1,0 +1,13 @@
+openapi: 3.1.0
+info:
+  title: API Documentation
+  version: 1.0.0
+paths: {
+  }
+components:
+  schemas: {
+    }
+servers:
+- description: Local Mock
+security: [
+  ]
