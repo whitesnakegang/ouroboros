@@ -43,4 +43,7 @@ public class Operation {
 
     @JsonProperty("x-ouroboros-response")
     private String xOuroborosResponse;
+    
+    @JsonProperty("x-ouroboros-diff-log")
+    private String xOuroborosDiffLog;
 }
