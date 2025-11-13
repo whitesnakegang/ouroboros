@@ -1,5 +1,6 @@
 import type { SchemaResponse } from "../services/api";
 import type { SchemaField } from "../types/schema.types";
+import { deleteSchema } from "../services/api";
 import { parseOpenAPISchemaToSchemaField } from "../utils/schemaConverter";
 
 interface Schema {
@@ -28,8 +29,19 @@ export function SchemaModal({
 }: SchemaModalProps) {
   if (!isOpen) return null;
 
-  const handleDeleteSchema = (schemaName: string) => {
-    setSchemas(schemas.filter((s) => s.schemaName !== schemaName));
+  const handleDeleteSchema = async (schemaName: string) => {
+    if (!confirm(`'${schemaName}' 스키마를 삭제하시겠습니까?\n\n이 스키마를 참조하는 API 명세가 있다면 문제가 발생할 수 있습니다.\n이 작업은 되돌릴 수 없습니다.`)) {
+      return;
+    }
+
+    try {
+      await deleteSchema(schemaName);
+      // 성공 시 로컬 상태에서 제거
+      setSchemas(schemas.filter((s) => s.schemaName !== schemaName));
+    } catch (error) {
+      console.error("스키마 삭제 실패:", error);
+      alert(error instanceof Error ? error.message : "스키마 삭제에 실패했습니다.");
+    }
   };
 
   const handleSelectSchema = (schema: SchemaResponse) => {

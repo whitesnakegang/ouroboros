@@ -10,7 +10,9 @@ import kr.co.ouroboros.ui.websocket.spec.dto.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 import java.util.*;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -1123,7 +1125,9 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
             log.info("📥 Starting AsyncAPI YAML import...");
 
             // Step 1: Parse imported YAML (validation already done in controller)
-            Yaml yaml = new Yaml();
+            // Use SafeConstructor to prevent arbitrary object deserialization
+            LoaderOptions loaderOptions = new LoaderOptions();
+            Yaml yaml = new Yaml(new SafeConstructor(loaderOptions));
             @SuppressWarnings("unchecked")
             Map<String, Object> importedDoc = (Map<String, Object>) yaml.load(yamlContent);
 

@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.Locale;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -230,7 +231,7 @@ public class WebSocketSchemaServiceImpl implements WebsocketSchemaService {
             if ("object".equals(finalType)) {
                 // For object type: remove array-specific fields and update object-specific fields
                 existingSchema.remove("items");
-                
+
                 if (request.getProperties() != null) {
                     existingSchema.put("properties", buildProperties(request.getProperties()));
                 }
@@ -245,7 +246,7 @@ public class WebSocketSchemaServiceImpl implements WebsocketSchemaService {
                 existingSchema.remove("properties");
                 existingSchema.remove("required");
                 existingSchema.remove("x-ouroboros-orders");
-                
+
                 if (request.getItems() != null) {
                     if (request.getItems() instanceof Property) {
                         existingSchema.put("items", buildProperty((Property) request.getItems()));
@@ -258,6 +259,13 @@ public class WebSocketSchemaServiceImpl implements WebsocketSchemaService {
                         log.warn("Items field is not a Property or Map instance, skipping");
                     }
                 }
+            } else {
+                // For primitive types (string, number, integer, boolean, etc.):
+                // remove all object/array-specific fields to prevent stale data
+                existingSchema.remove("properties");
+                existingSchema.remove("required");
+                existingSchema.remove("x-ouroboros-orders");
+                existingSchema.remove("items");
             }
 
             // Write to file directly (cache update will be done later when handler is implemented)
@@ -584,11 +592,14 @@ public class WebSocketSchemaServiceImpl implements WebsocketSchemaService {
      * Converts a title string to a valid schema name.
      * <p>
      * Removes spaces and special characters, converts to PascalCase.
+     * Supports Unicode characters (including non-Latin scripts like Korean, Japanese, Chinese).
      * Examples:
      * <ul>
      *   <li>"Message Item" -> "MessageItem"</li>
      *   <li>"chat message" -> "ChatMessage"</li>
      *   <li>"User-Profile" -> "UserProfile"</li>
+     *   <li>"사용자 메시지" -> "사용자메시지"</li>
+     *   <li>"ユーザー情報" -> "ユーザー情報"</li>
      * </ul>
      *
      * @param title the title to convert
@@ -598,44 +609,57 @@ public class WebSocketSchemaServiceImpl implements WebsocketSchemaService {
         if (title == null || title.isBlank()) {
             return title;
         }
-        
+
         // Remove leading/trailing whitespace
         String trimmed = title.trim();
-        
-        // Split by spaces, hyphens, underscores, and other non-alphanumeric characters
+
+        // Split by spaces, hyphens, underscores, and other non-word characters
+        // \p{L} matches any Unicode letter, \p{N} matches any Unicode number
         String[] words = trimmed.split("[\\s\\-_]+");
-        
+
         StringBuilder result = new StringBuilder();
         for (String word : words) {
             if (word.isEmpty()) {
                 continue;
             }
-            
-            // Remove non-alphanumeric characters from word
-            String cleaned = word.replaceAll("[^a-zA-Z0-9]", "");
+
+            // Remove non-letter/non-digit characters (supports Unicode)
+            // \p{L} = any Unicode letter, \p{N} = any Unicode digit
+            String cleaned = word.replaceAll("[^\\p{L}\\p{N}]", "");
             if (cleaned.isEmpty()) {
                 continue;
             }
-            
-            // Convert to PascalCase: first letter uppercase, rest lowercase
+
+            // Convert to PascalCase: first letter uppercase, rest lowercase (locale-aware)
             if (cleaned.length() == 1) {
-                result.append(cleaned.toUpperCase());
+                result.append(cleaned.toUpperCase(Locale.ROOT));
             } else {
-                result.append(Character.toUpperCase(cleaned.charAt(0)))
-                      .append(cleaned.substring(1).toLowerCase());
+                // Use codePointAt for proper Unicode handling
+                int firstCodePoint = cleaned.codePointAt(0);
+                int upperCaseCodePoint = Character.toUpperCase(firstCodePoint);
+                result.append(Character.toChars(upperCaseCodePoint))
+                      .append(cleaned.substring(Character.charCount(firstCodePoint))
+                              .toLowerCase(Locale.ROOT));
             }
         }
-        
+
         // If result is empty after processing, use original title (sanitized)
         if (result.length() == 0) {
-            String sanitized = trimmed.replaceAll("[^a-zA-Z0-9]", "");
+            String sanitized = trimmed.replaceAll("[^\\p{L}\\p{N}]", "");
             if (sanitized.isEmpty()) {
                 return "Schema"; // Fallback
             }
-            return sanitized.substring(0, 1).toUpperCase() + 
-                   (sanitized.length() > 1 ? sanitized.substring(1).toLowerCase() : "");
+
+            if (sanitized.length() == 1) {
+                return sanitized.toUpperCase(Locale.ROOT);
+            }
+
+            int firstCodePoint = sanitized.codePointAt(0);
+            int upperCaseCodePoint = Character.toUpperCase(firstCodePoint);
+            return new String(Character.toChars(upperCaseCodePoint)) +
+                   sanitized.substring(Character.charCount(firstCodePoint)).toLowerCase(Locale.ROOT);
         }
-        
+
         return result.toString();
     }
 
