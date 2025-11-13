@@ -1,6 +1,7 @@
 package kr.co.ouroboros.ui.websocket.spec.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import kr.co.ouroboros.core.websocket.common.dto.Operation;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -30,7 +31,7 @@ public class OperationResponse {
     /**
      * Operation definition (from common DTO)
      * <p>
-     * Includes x-ouroboros-diff and x-ouroboros-progress fields.
+     * x-ouroboros-* fields are excluded from JSON serialization (use top-level id, entrypoint, diff, progress instead).
      */
     private Operation operation;
 
