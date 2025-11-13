@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.handler;
+package kr.co.ouroboros.core.rest.handler.comparator;
 
 import java.util.HashMap;
 import java.util.HashSet;

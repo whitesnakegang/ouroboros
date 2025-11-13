@@ -26,7 +26,7 @@ public class PayloadSchema {
      * In JSON API: "ref" field (e.g., "User" or "#/components/schemas/User")
      * In YAML storage: "$ref" field (e.g., "#/components/schemas/User")
      */
-    @JsonProperty("ref")
+    @JsonProperty("$ref")
     private String ref;
 }
 

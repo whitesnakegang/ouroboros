@@ -26,7 +26,7 @@ public class ChannelReference {
      * In JSON API: "ref" field (e.g., "_chat.send" or "#/channels/_chat.send")
      * In YAML storage: "$ref" field (e.g., "#/channels/_chat.send")
      */
-    @JsonProperty("ref")
+    @JsonProperty("$ref")
     private String ref;
 }
 

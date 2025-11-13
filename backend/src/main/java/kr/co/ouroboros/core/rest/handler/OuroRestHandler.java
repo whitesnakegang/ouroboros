@@ -17,6 +17,7 @@ import kr.co.ouroboros.core.global.handler.OuroProtocolHandler;
 import kr.co.ouroboros.core.global.spec.OuroApiSpec;
 import kr.co.ouroboros.core.rest.common.dto.OuroRestApiSpec;
 import kr.co.ouroboros.core.rest.common.dto.PathItem;
+import kr.co.ouroboros.core.rest.handler.pipeline.RestSpecSyncPipeline;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springdoc.core.service.OpenAPIService;

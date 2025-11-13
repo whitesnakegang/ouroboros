@@ -1,5 +1,6 @@
 package kr.co.ouroboros.core.websocket.common.dto;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -18,6 +19,11 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
+@JsonAutoDetect(
+        fieldVisibility = JsonAutoDetect.Visibility.ANY,
+        getterVisibility = JsonAutoDetect.Visibility.NONE,
+        isGetterVisibility = JsonAutoDetect.Visibility.NONE
+)
 public class Operation {
 
     private String action;
@@ -66,44 +72,5 @@ public class Operation {
     @JsonProperty(value = "x-ouroboros-progress", access = JsonProperty.Access.WRITE_ONLY)
     private String xOuroborosProgress;
 
-    /**
-     * Simplified field name for id (maps to x-ouroboros-id).
-     * <p>
-     * Returns the same value as xOuroborosId but with simple field name "id".
-     */
-    @JsonGetter("id")
-    public String getId() {
-        return xOuroborosId;
-    }
-
-    /**
-     * Simplified field name for entrypoint (maps to x-ouroboros-entrypoint).
-     * <p>
-     * Returns the same value as xOuroborosEntrypoint but with simple field name "entrypoint".
-     */
-    @JsonGetter("entrypoint")
-    public String getEntrypoint() {
-        return xOuroborosEntrypoint;
-    }
-
-    /**
-     * Simplified field name for diff (maps to x-ouroboros-diff).
-     * <p>
-     * Returns the same value as xOuroborosDiff but with simple field name "diff".
-     */
-    @JsonGetter("diff")
-    public String getDiff() {
-        return xOuroborosDiff;
-    }
-
-    /**
-     * Simplified field name for progress (maps to x-ouroboros-progress).
-     * <p>
-     * Returns the same value as xOuroborosProgress but with simple field name "progress".
-     */
-    @JsonGetter("progress")
-    public String getProgress() {
-        return xOuroborosProgress;
-    }
-}
+   }
 

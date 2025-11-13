@@ -26,7 +26,7 @@ public class MessageReference {
      * In JSON API: "ref" field (e.g., "ChatMessage" or "#/components/messages/ChatMessage")
      * In YAML storage: "$ref" field (e.g., "#/components/messages/ChatMessage")
      */
-    @JsonProperty("ref")
+    @JsonProperty("$ref")
     private String ref;
 }
 
