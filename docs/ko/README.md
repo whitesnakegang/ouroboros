@@ -162,7 +162,7 @@ dependencies {
 </dependency>
 ```
 
-> **참고**: Lombok을 사용하는 경우 반드시 <code>annotationProcessor 'org.projectlombok:lombok'</code>를 추가해야 <code>@ApiState</code> 기반 자동 스캔이 정상 동작합니다.
+> **참고**: Lombok을 사용하는 경우 반드시 <code>annotationProcessor 'org.projectlombok:lombok'</code>를 추가해야 <code>lombok</code> 기반 자동 스캔이 정상 동작합니다.
 
 ### 설정 (선택 사항)
 
