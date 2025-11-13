@@ -2,72 +2,57 @@ asyncapi: 3.0.0
 info:
   title: WebSocket API
   version: 1.0.0
+  description: WebSocket api spec test
   x-generator: springwolf
 defaultContentType: application/json
-
 servers:
   websocket:
     host: localhost:8080
     protocol: ws
-    description: WebSocket info
-
+    description: WebSocket ingo
 channels:
   _chat.send:
     address: /chat.send
     messages:
       ChatMessage:
-        $ref: '#/components/messages/ChatMessage'
+        $ref: "#/components/messages/ChatMessage"
     bindings:
       stomp: {}
-
+  _chat.sendToRoom:
+    address: /chat.sendToRoom
+    messages:
+      ChatMessage:
+        $ref: "#/components/messages/ChatMessage"
+    bindings:
+      stomp: {}
   _chat.send_test:
     address: /chat.send/test
     messages:
       ChatMessage:
-        $ref: '#/components/messages/ChatMessage'
+        $ref: "#/components/messages/ChatMessage"
     bindings:
       stomp: {}
-
-  _notice.send:
-    address: /notice.send
-    messages:
-      NoticeMessage:
-        $ref: '#/components/messages/NoticeMessage'
-    bindings:
-      stomp: {}
-
-  _notice.sendToDestination:
-    address: /notice.sendToDestination
-    messages:
-      NoticeMessage:
-        $ref: '#/components/messages/NoticeMessage'
-    bindings:
-      stomp: {}
-
-  _topic_notices_public:
-    address: /topic/notices/public
-    messages:
-      NoticeMessage:
-        $ref: '#/components/messages/NoticeMessage'
-    bindings:
-      stomp: {}
-
   _topic_rooms_announcement:
     address: /topic/rooms/announcement
     messages:
       ChatMessage:
-        $ref: '#/components/messages/ChatMessage'
+        $ref: "#/components/messages/ChatMessage"
     bindings:
       stomp: {}
-
-  _topic_rooms_public:
+  _topic_rooms_public111:
     address: /topic/rooms/public
     messages:
       ChatMessage:
-        $ref: '#/components/messages/ChatMessage'
+        $ref: "#/components/messages/ChatMessage"
     bindings:
       stomp: {}
-
+  _topic_rooms_public222:
+    address: /topic/rooms/public
+    messages:
+      ChatMessage:
+        $ref: "#/components/messages/ChatMessage"
+    bindings:
+      stomp: {}
 components:
   schemas:
     SpringStompDefaultHeaders:
@@ -76,7 +61,6 @@ components:
       properties: {}
       examples:
         - {}
-
     ChatMessage:
       title: ChatMessage
       type: object
@@ -93,34 +77,22 @@ components:
           type: string
         type:
           type: string
-          enum: [ENTER, CHAT, LEAVE]
+          enum:
+            - ENTER
+            - CHAT
+            - LEAVE
         user:
-          $ref: '#/components/schemas/User'
+          $ref: "#/components/schemas/User"
       examples:
         - content: string
-          list: [string]
+          list:
+            - string
           roomId: string
           sender: string
           type: ENTER
           user:
             age: 0
             name: string
-
-    NoticeMessage:
-      title: NoticeMessage
-      type: object
-      properties:
-        content:
-          type: string
-        destination:
-          type: string
-        title:
-          type: string
-      examples:
-        - content: string
-          destination: string
-          title: string
-
     User:
       title: User
       type: object
@@ -133,80 +105,71 @@ components:
       examples:
         - age: 0
           name: string
-
   messages:
     ChatMessage:
       headers:
-        $ref: '#/components/schemas/SpringStompDefaultHeaders'
+        $ref: "#/components/schemas/SpringStompDefaultHeaders"
       payload:
         schemaFormat: application/vnd.aai.asyncapi+json;version=3.0.0
         schema:
-          $ref: '#/components/schemas/ChatMessage'
+          $ref: "#/components/schemas/ChatMessage"
       name: ChatMessage
       title: ChatMessage
       bindings:
         stomp: {}
-
-    NoticeMessage:
-      headers:
-        $ref: '#/components/schemas/SpringStompDefaultHeaders'
-      payload:
-        schemaFormat: application/vnd.aai.asyncapi+json;version=3.0.0
-        schema:
-          $ref: '#/components/schemas/NoticeMessage'
-      name: NoticeMessage
-      title: NoticeMessage
-      bindings:
-        stomp: {}
-
 operations:
-  _chat.send_receive_broadcastToDefault:
+  _chat.sendToRoom_receive_sendToRoom:
     action: receive
     channel:
-      $ref: '#/channels/_chat.send'
+      $ref: "#/channels/_chat.sendToRoom"
     bindings:
       stomp: {}
     messages:
-      - $ref: '#/channels/_chat.send/messages/ChatMessage'
+      - $ref: "#/channels/_chat.sendToRoom/messages/ChatMessage"
+    x-ouroboros-progress: none
+    x-ouroboros-diff: none
+  _chat.send_receive_public111:
+    action: receive
+    channel:
+      $ref: "#/channels/_chat.send"
+    bindings:
+      stomp: {}
+    messages:
+      - $ref: "#/channels/_chat.send/messages/ChatMessage"
     reply:
       channel:
-        $ref: '#/channels/_topic_rooms_public'
+        $ref: "#/channels/_topic_rooms_public111"
       messages:
-        - $ref: '#/channels/_topic_rooms_public/messages/ChatMessage'
-
+        - $ref: "#/channels/_topic_rooms_public/messages/ChatMessage"
+    x-ouroboros-progress: none
+    x-ouroboros-diff: none
+  _chat.send_receive_public222:
+    action: receive
+    channel:
+      $ref: "#/channels/_chat.send"
+    bindings:
+      stomp: {}
+    messages:
+      - $ref: "#/channels/_chat.send/messages/ChatMessage"
+    reply:
+      channel:
+        $ref: "#/channels/_topic_rooms_public222"
+      messages:
+        - $ref: "#/channels/_topic_rooms_public/messages/ChatMessage"
+    x-ouroboros-progress: none
+    x-ouroboros-diff: none
   _chat.send_test_receive_broadcastToDefaultTest:
     action: receive
     channel:
-      $ref: '#/channels/_chat.send_test'
+      $ref: "#/channels/_chat.send_test"
     bindings:
       stomp: {}
     messages:
-      - $ref: '#/channels/_chat.send_test/messages/ChatMessage'
+      - $ref: "#/channels/_chat.send_test/messages/ChatMessage"
     reply:
       channel:
-        $ref: '#/channels/_topic_rooms_public'
+        $ref: "#/channels/_topic_rooms_public"
       messages:
-        - $ref: '#/channels/_topic_rooms_public/messages/ChatMessage'
-
-  _notice.sendToDestination_receive_sendToDestination:
-    action: receive
-    channel:
-      $ref: '#/channels/_notice.sendToDestination'
-    bindings:
-      stomp: {}
-    messages:
-      - $ref: '#/channels/_notice.sendToDestination/messages/NoticeMessage'
-
-  _notice.send_receive_broadcast:
-    action: receive
-    channel:
-      $ref: '#/channels/_notice.send'
-    bindings:
-      stomp: {}
-    messages:
-      - $ref: '#/channels/_notice.send/messages/NoticeMessage'
-    reply:
-      channel:
-        $ref: '#/channels/_topic_notices_public'
-      messages:
-        - $ref: '#/channels/_topic_notices_public/messages/NoticeMessage'
+        - $ref: "#/channels/_topic_rooms_public/messages/ChatMessage"
+    x-ouroboros-progress: none
+    x-ouroboros-diff: none
