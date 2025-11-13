@@ -774,6 +774,7 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                 @SuppressWarnings("unchecked")
                 Map<String, String> channelMap = (Map<String, String>) channelObj;
                 ChannelReference channelRef = new ChannelReference();
+                // convertDollarRefToRef converts "$ref" to "ref"
                 String ref = channelMap.get("ref");
                 channelRef.setRef(ref);
                 operation.setChannel(channelRef);
@@ -787,6 +788,7 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                 List<MessageReference> messageRefs = messagesList.stream()
                         .map(msgMap -> {
                             MessageReference msgRef = new MessageReference();
+                            // convertDollarRefToRef converts "$ref" to "ref"
                             String ref = msgMap.get("ref");
                             msgRef.setRef(ref);
                             return msgRef;
@@ -807,6 +809,7 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                     @SuppressWarnings("unchecked")
                     Map<String, String> replyChannelMap = (Map<String, String>) replyChannelObj;
                     ChannelReference replyChannelRef = new ChannelReference();
+                    // convertDollarRefToRef converts "$ref" to "ref"
                     String ref = replyChannelMap.get("ref");
                     replyChannelRef.setRef(ref);
                     reply.setChannel(replyChannelRef);
@@ -819,6 +822,7 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                     List<MessageReference> replyMessageRefs = replyMessagesList.stream()
                             .map(msgMap -> {
                                 MessageReference msgRef = new MessageReference();
+                                // convertDollarRefToRef converts "$ref" to "ref"
                                 String ref = msgMap.get("ref");
                                 msgRef.setRef(ref);
                                 return msgRef;
