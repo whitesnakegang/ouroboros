@@ -114,10 +114,12 @@ public class WebSocketChannelServiceImpl implements WebSocketChannelService {
                     if (messageObj instanceof Map) {
                         @SuppressWarnings("unchecked")
                         Map<String, Object> messageMap = (Map<String, Object>) messageObj;
-                        // Convert $ref to ref
+                        // Convert $ref to ref while preserving all other metadata
                         if (messageMap.containsKey("$ref")) {
-                            Map<String, Object> convertedMessage = new LinkedHashMap<>();
-                            convertedMessage.put("ref", messageMap.get("$ref"));
+                            // Shallow-copy the original map to preserve all existing keys
+                            Map<String, Object> convertedMessage = new LinkedHashMap<>(messageMap);
+                            // Replace "$ref" with "ref"
+                            convertedMessage.put("ref", convertedMessage.remove("$ref"));
                             convertedMessages.put(entry.getKey(), convertedMessage);
                         } else {
                             convertedMessages.put(entry.getKey(), messageMap);
