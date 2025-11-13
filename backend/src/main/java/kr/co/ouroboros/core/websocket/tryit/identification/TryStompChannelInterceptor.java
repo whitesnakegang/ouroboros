@@ -1,0 +1,124 @@
+package kr.co.ouroboros.core.websocket.tryit.identification;
+
+import io.opentelemetry.context.Scope;
+import kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.context.TryContext;
+import kr.co.ouroboros.core.websocket.tryit.common.TryStompHeaders;
+import kr.co.ouroboros.core.websocket.tryit.infrastructure.messaging.TryPublisherNotifier;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.Nullable;
+import org.springframework.messaging.Message;
+import org.springframework.messaging.MessageChannel;
+import org.springframework.messaging.simp.stomp.StompCommand;
+import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
+import org.springframework.messaging.support.ChannelInterceptor;
+import org.springframework.messaging.support.MessageBuilder;
+import org.springframework.messaging.support.MessageHeaderAccessor;
+import org.springframework.stereotype.Component;
+
+import java.util.UUID;
+
+/**
+ * Interceptor that identifies Try requests in STOMP inbound messages and sets Try context.
+ * <p>
+ * Uses the same header protocol as {@link kr.co.ouroboros.core.rest.tryit.identification.TryFilter}
+ * to issue and propagate tryId in STOMP messages.
+ */
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class TryStompChannelInterceptor implements ChannelInterceptor {
+
+    private final TryPublisherNotifier tryPublisherNotifier;
+
+    @Override
+    public Message<?> preSend(Message<?> message, MessageChannel channel) {
+        StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
+
+        StompCommand command = accessor.getCommand();
+        if (command == null) {
+            log.trace("Skipping Try check: STOMP command is missing");
+            return message;
+        }
+
+        // Only inbound channel (client -> server) messages are processed. Additional filtering by command is possible.
+        String tryHeader = getFirstNativeHeader(accessor, TryStompHeaders.TRY_HEADER);
+        boolean tryRequested = TryStompHeaders.TRY_HEADER_ENABLED_VALUE.equalsIgnoreCase(tryHeader);
+
+        UUID tryId = resolveTryId(accessor, tryRequested);
+        if (tryId == null) {
+            // If it's not a Try request or we couldn't issue a Try identifier, don't touch the context.
+            return message;
+        }
+
+        Scope scope = TryContext.setTryId(tryId);
+        if (scope != null) {
+            accessor.setHeader(TryStompHeaders.INTERNAL_SCOPE_HEADER, scope);
+        }
+
+        if (tryRequested && StompCommand.SEND.equals(command)) {
+            tryPublisherNotifier.notifyPublisher(tryId, accessor, message);
+        }
+
+        // TryId is now set in Baggage context, which will be automatically propagated across threads and async boundaries.
+        // Outbound messages will read from Baggage and add tryId to headers for client propagation.
+        // No need to set tryId in headers here - it's already in Baggage for server-side propagation.
+        log.trace("Set Try context in STOMP {} frame. tryId={}", command, tryId);
+
+        return MessageBuilder.createMessage(message.getPayload(), accessor.getMessageHeaders());
+    }
+
+    @Override
+    public void afterSendCompletion(
+            Message<?> message,
+            MessageChannel channel,
+            boolean sent,
+            @Nullable Exception ex
+    ) {
+        StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
+        if (accessor == null) {
+            return;
+        }
+
+        Scope scope = (Scope) accessor.getHeader(TryStompHeaders.INTERNAL_SCOPE_HEADER);
+        if (scope != null) {
+            try {
+                scope.close();
+            } catch (Exception e) {
+                log.warn("Exception while cleaning up Try STOMP Scope: {}", e.getMessage());
+            }
+        }
+    }
+
+    @Nullable
+    private UUID resolveTryId(StompHeaderAccessor accessor, boolean tryRequested) {
+        // 1) If tryId is included in frame header, use it as is
+        String headerTryId = getFirstNativeHeader(accessor, TryStompHeaders.TRY_ID_HEADER);
+        if (headerTryId != null) {
+            try {
+                return UUID.fromString(headerTryId);
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid tryId format in STOMP header: {}", headerTryId);
+            }
+        }
+
+        // 2) If Try request header is enabled, generate a new one
+        if (tryRequested) {
+            UUID newTryId = UUID.randomUUID();
+            log.debug("Detected STOMP Try request and generated new tryId: {}", newTryId);
+            return newTryId;
+        }
+
+        return null;
+    }
+
+    @Nullable
+    private String getFirstNativeHeader(StompHeaderAccessor accessor, String headerName) {
+        if (accessor.getNativeHeader(headerName) == null || accessor.getNativeHeader(headerName).isEmpty()) {
+            return null;
+        }
+        return accessor.getFirstNativeHeader(headerName);
+    }
+}
+
+

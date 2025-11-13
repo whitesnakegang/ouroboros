@@ -42,6 +42,8 @@ dependencies {
 
 	// 사용자 앱 쪽 Boot 버전에 '기생'하고 싶다면 compileOnly 유지 (라이브러리 자체는 Boot에 종속 X)
 	compileOnly "org.springframework.boot:spring-boot-starter-web"
+    implementation "org.springframework:spring-messaging"
+    implementation "org.springframework:spring-websocket"
     compileOnly 'org.springframework.boot:spring-boot-autoconfigure'
 
 	// YAML
