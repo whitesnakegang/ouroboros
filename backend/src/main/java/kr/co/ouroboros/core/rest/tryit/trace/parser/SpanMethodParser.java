@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -63,28 +64,24 @@ public class SpanMethodParser {
     }
     
     /**
-     * Build a SpanMethodInfo from OpenTelemetry `code.*` span attributes.
+     * Create a SpanMethodInfo from OpenTelemetry "code.*" attributes.
      *
-     * <p>Uses the provided `namespace` as the full className (package path preserved),
-     * uses `function` as the methodName, and collects ordered parameters from
-     * `code.parameter.{index}.type` and `code.parameter.{index}.name` attribute pairs.
+     * <p>Derives the className from the last segment of `code.namespace`, uses
+     * `code.function` as the methodName, and builds parameters from
+     * `code.parameter.{index}.type` and `code.parameter.{index}.name` pairs.
      *
-     * @param span the trace span whose attributes are read (may be non-null)
-     * @param namespace the `code.namespace` attribute value; when non-null it is used
-     *                  verbatim as the resulting className
-     * @param function the `code.function` attribute value used as the resulting methodName
-     * @return a SpanMethodInfo whose className and methodName reflect the provided
-     *         attributes and whose parameters list contains entries for each index
-     *         with a `code.parameter.{i}.type` or `code.parameter.{i}.name` attribute;
-     *         missing type or name for an index is represented as an empty string in
-     *         the corresponding Parameter field.
+     * @param span the trace span containing attributes to read
+     * @param namespace the value of `code.namespace` (may be null)
+     * @param function the value of `code.function` (may be null)
+     * @return a SpanMethodInfo populated from the provided attributes (className, methodName, and parameters)
+     */
     private SpanMethodInfo parseFromAttributes(TraceSpanInfo span, String namespace, String function) {
         String className = null;
         String methodName = null;
         
         if (namespace != null) {
-            // Use full package path as className (e.g., com.ourotest.controller.CompareController)
-            className = namespace;
+            int lastDot = namespace.lastIndexOf('.');
+            className = lastDot >= 0 ? namespace.substring(lastDot + 1) : namespace;
         }
         
         if (function != null) {
