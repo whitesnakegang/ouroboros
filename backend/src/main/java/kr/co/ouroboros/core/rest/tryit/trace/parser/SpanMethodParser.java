@@ -6,7 +6,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -80,8 +79,8 @@ public class SpanMethodParser {
         String methodName = null;
         
         if (namespace != null) {
-            int lastDot = namespace.lastIndexOf('.');
-            className = lastDot >= 0 ? namespace.substring(lastDot + 1) : namespace;
+            // Use full package path as className (e.g., com.ourotest.controller.CompareController)
+            className = namespace;
         }
         
         if (function != null) {
