@@ -188,13 +188,10 @@ public class TraceTreeBuilder {
     }
     
     /**
-     * Extracts simple class name from fully qualified class name.
-     * <p>
-     * Returns the substring after the last '.' character.
-     * If no '.' is present, returns the original string.
+     * Returns the simple class name extracted from a fully qualified class name.
      *
-     * @param fqcn fully qualified class name (e.g., "kr.co.ouroboros.service.DataProcessingService")
-     * @return simple class name (e.g., "DataProcessingService")
+     * @param fqcn the fully qualified class name (may be null or empty), e.g. "kr.co.ouroboros.service.DataProcessingService"
+     * @return the simple class name (e.g. "DataProcessingService"), or the original {@code fqcn} if it is null or empty
      */
     private String extractSimpleClassName(String fqcn) {
         if (fqcn == null || fqcn.isEmpty()) {
