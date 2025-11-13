@@ -703,6 +703,167 @@ export async function getTryTrace(tryId: string): Promise<TryTraceResponse> {
   return response.json();
 }
 
+// ========== WebSocket Types ==========
+
+// WebSocket Operation 관련 인터페이스
+export interface ChannelReference {
+  ref: string;
+}
+
+export interface MessageReference {
+  ref: string;
+}
+
+export interface ReplyInfo {
+  channel: ChannelReference;
+  messages: MessageReference[];
+}
+
+export interface Operation {
+  action: "receive" | "send";
+  channel: ChannelReference;
+  messages: MessageReference[];
+  reply?: ReplyInfo | null;
+  bindings?: { stomp?: {} };
+  id?: string;
+  entrypoint?: string;
+  diff?: string;
+  progress?: string;
+}
+
+export interface OperationResponse {
+  operationName: string;
+  tag?: string;
+  operation: Operation;
+}
+
+export interface ChannelMessageInfo {
+  address?: string | null;
+  channelRef?: string | null;
+  messages?: string[];
+}
+
+export interface CreateOperationRequest {
+  protocol: string;
+  pathname: string;
+  receives?: ChannelMessageInfo[] | null;
+  replies?: ChannelMessageInfo[] | null;
+}
+
+export interface UpdateOperationRequest {
+  action?: "receive" | "send";
+  channel?: ChannelReference;
+  messages?: MessageReference[];
+  reply?: ReplyInfo | null;
+}
+
+export interface GetAllOperationsResponse {
+  status: number;
+  data: OperationResponse[];
+  message: string;
+}
+
+export interface GetOperationResponse {
+  status: number;
+  data: OperationResponse;
+  message: string;
+}
+
+export interface CreateOperationResponse {
+  status: number;
+  data: OperationResponse[];
+  message: string;
+}
+
+export interface UpdateOperationResponse {
+  status: number;
+  data: OperationResponse;
+  message: string;
+}
+
+export interface DeleteOperationResponse {
+  status: number;
+  message: string;
+}
+
+// WebSocket Message 관련 인터페이스
+export interface MessageResponse {
+  messageName: string;
+  name?: string;
+  contentType?: string;
+  description?: string;
+  headers?: any;
+  payload?: any;
+}
+
+export interface CreateMessageRequest {
+  messageName: string;
+  name?: string;
+  contentType?: string;
+  description?: string;
+  headers?: any;
+  payload?: any;
+}
+
+export interface UpdateMessageRequest {
+  name?: string;
+  contentType?: string;
+  description?: string;
+  headers?: any;
+  payload?: any;
+}
+
+export interface GetAllMessagesResponse {
+  status: number;
+  data: MessageResponse[];
+  message: string;
+}
+
+export interface GetMessageResponse {
+  status: number;
+  data: MessageResponse;
+  message: string;
+}
+
+export interface CreateMessageResponse {
+  status: number;
+  data: MessageResponse;
+  message: string;
+}
+
+export interface UpdateMessageResponse {
+  status: number;
+  data: MessageResponse;
+  message: string;
+}
+
+export interface DeleteMessageResponse {
+  status: number;
+  message: string;
+}
+
+// WebSocket Channel 관련 인터페이스
+export interface ChannelResponse {
+  channelName: string;
+  channel: {
+    address: string;
+    messages: Record<string, MessageReference>;
+    bindings?: { stomp?: {} };
+  };
+}
+
+export interface GetAllChannelsResponse {
+  status: number;
+  data: ChannelResponse[];
+  message: string;
+}
+
+export interface GetChannelResponse {
+  status: number;
+  data: ChannelResponse;
+  message: string;
+}
+
 // ========== WebSocket Schema API 함수들 ==========
 
 /**
@@ -839,6 +1000,356 @@ export async function deleteWebSocketSchema(
     );
     console.error("WebSocket Schema 삭제 실패:", {
       schemaName,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+// ========== WebSocket Operation API 함수들 ==========
+
+const WS_OPERATION_API_BASE_URL = "/ouro/websocket-specs/operations";
+
+/**
+ * 전체 WebSocket Operation 조회
+ */
+export async function getAllWebSocketOperations(): Promise<GetAllOperationsResponse> {
+  const response = await fetch(WS_OPERATION_API_BASE_URL, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Operation 조회 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WebSocket Operation API 호출 실패:", {
+      url: WS_OPERATION_API_BASE_URL,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+/**
+ * 특정 WebSocket Operation 조회
+ */
+export async function getWebSocketOperation(
+  operationName: string
+): Promise<GetOperationResponse> {
+  const response = await fetch(`${WS_OPERATION_API_BASE_URL}/${operationName}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Operation 조회 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WebSocket Operation 조회 실패:", {
+      operationName,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+/**
+ * 새로운 WebSocket Operation 생성
+ */
+export async function createWebSocketOperation(
+  request: CreateOperationRequest
+): Promise<CreateOperationResponse> {
+  const response = await fetch(WS_OPERATION_API_BASE_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Operation 생성 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WebSocket Operation 생성 실패:", {
+      request,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+/**
+ * WebSocket Operation 수정
+ */
+export async function updateWebSocketOperation(
+  operationName: string,
+  request: UpdateOperationRequest
+): Promise<UpdateOperationResponse> {
+  const response = await fetch(`${WS_OPERATION_API_BASE_URL}/${operationName}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Operation 수정 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WebSocket Operation 수정 실패:", {
+      operationName,
+      request,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+/**
+ * WebSocket Operation 삭제
+ */
+export async function deleteWebSocketOperation(
+  operationName: string
+): Promise<DeleteOperationResponse> {
+  const response = await fetch(`${WS_OPERATION_API_BASE_URL}/${operationName}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Operation 삭제 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WebSocket Operation 삭제 실패:", {
+      operationName,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+// ========== WebSocket Message API 함수들 ==========
+
+const WS_MESSAGE_API_BASE_URL = "/ouro/websocket-specs/messages";
+
+/**
+ * 전체 WebSocket Message 조회
+ */
+export async function getAllWebSocketMessages(): Promise<GetAllMessagesResponse> {
+  const response = await fetch(WS_MESSAGE_API_BASE_URL, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Message 조회 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WebSocket Message API 호출 실패:", {
+      url: WS_MESSAGE_API_BASE_URL,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+/**
+ * 특정 WebSocket Message 조회
+ */
+export async function getWebSocketMessage(
+  messageName: string
+): Promise<GetMessageResponse> {
+  const response = await fetch(`${WS_MESSAGE_API_BASE_URL}/${messageName}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Message 조회 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WebSocket Message 조회 실패:", {
+      messageName,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+/**
+ * 새로운 WebSocket Message 생성
+ */
+export async function createWebSocketMessage(
+  request: CreateMessageRequest
+): Promise<CreateMessageResponse> {
+  const response = await fetch(WS_MESSAGE_API_BASE_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Message 생성 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WebSocket Message 생성 실패:", {
+      request,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+/**
+ * WebSocket Message 수정
+ */
+export async function updateWebSocketMessage(
+  messageName: string,
+  request: UpdateMessageRequest
+): Promise<UpdateMessageResponse> {
+  const response = await fetch(`${WS_MESSAGE_API_BASE_URL}/${messageName}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Message 수정 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WebSocket Message 수정 실패:", {
+      messageName,
+      request,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+/**
+ * WebSocket Message 삭제
+ */
+export async function deleteWebSocketMessage(
+  messageName: string
+): Promise<DeleteMessageResponse> {
+  const response = await fetch(`${WS_MESSAGE_API_BASE_URL}/${messageName}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Message 삭제 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WebSocket Message 삭제 실패:", {
+      messageName,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+// ========== WebSocket Channel API 함수들 ==========
+
+const WS_CHANNEL_API_BASE_URL = "/ouro/websocket-specs/channels";
+
+/**
+ * 전체 WebSocket Channel 조회
+ */
+export async function getAllWebSocketChannels(): Promise<GetAllChannelsResponse> {
+  const response = await fetch(WS_CHANNEL_API_BASE_URL, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Channel 조회 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WebSocket Channel API 호출 실패:", {
+      url: WS_CHANNEL_API_BASE_URL,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+/**
+ * 특정 WebSocket Channel 조회
+ */
+export async function getWebSocketChannel(
+  channelName: string
+): Promise<GetChannelResponse> {
+  const response = await fetch(`${WS_CHANNEL_API_BASE_URL}/${channelName}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Channel 조회 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WebSocket Channel 조회 실패:", {
+      channelName,
       status: response.status,
     });
     throw new Error(errorMessage);

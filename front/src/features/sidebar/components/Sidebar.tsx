@@ -54,6 +54,7 @@ export function Sidebar({ onAddNew }: SidebarProps) {
           }
         }
 
+        // 검색 필터링
         if (searchQuery) {
           const query = searchQuery.toLowerCase();
           const matchesSearch =
@@ -63,15 +64,20 @@ export function Sidebar({ onAddNew }: SidebarProps) {
           if (!matchesSearch) return false;
         }
 
-        const ep = endpoint as {
-          progress?: string;
-        };
-        const progressLower = ep.progress?.toLowerCase();
-        if (activeFilter === "mock") {
-          return progressLower !== "completed";
-        } else {
-          return progressLower === "completed";
+        // REST: Mock/Completed 필터 적용
+        // WebSocket: 필터 적용 안 함 (모두 표시)
+        const isWebSocket = endpoint.protocol === "WebSocket";
+        if (!isWebSocket) {
+          const ep = endpoint as { progress?: string };
+          const progressLower = ep.progress?.toLowerCase();
+          if (activeFilter === "mock") {
+            return progressLower !== "completed";
+          } else {
+            return progressLower === "completed";
+          }
         }
+
+        return true; // WebSocket은 모두 통과
       });
 
       if (filteredGroupEndpoints.length > 0) {
@@ -195,10 +201,13 @@ export function Sidebar({ onAddNew }: SidebarProps) {
           )}
         </div>
 
-        <StatusFilter
-          activeFilter={activeFilter}
-          onFilterChange={setActiveFilter}
-        />
+        {/* REST일 때만 Mock/Completed 필터 표시 */}
+        {protocol === "REST" && (
+          <StatusFilter
+            activeFilter={activeFilter}
+            onFilterChange={setActiveFilter}
+          />
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto">

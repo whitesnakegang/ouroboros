@@ -24,6 +24,8 @@ import {
   deleteRestApiSpec,
   getRestApiSpec,
   getSchema,
+  getWebSocketOperation,
+  getWebSocketChannel,
   type RestApiSpecResponse,
 } from "../services/api";
 import {
@@ -208,12 +210,12 @@ export function ApiEditorLayout() {
       setIsEditMode(false); // 항목 선택 시 읽기 전용 모드로 시작
       setIsNewFormMode(false); // 엔드포인트 선택 시 새 폼 모드 해제
 
-      // WebSocket 엔드포인트인 경우 프로토콜 설정 및 테스트 탭으로 이동
+      // WebSocket 엔드포인트인 경우 프로토콜 설정 및 operation 데이터 로드
       if (selectedEndpoint.protocol === "WebSocket") {
         setProtocol("WebSocket");
         setTestingProtocol("WebSocket");
-        setActiveTab("test");
-        // WebSocket은 REST API 스펙이 없으므로 loadEndpointData 호출하지 않음
+        setActiveTab("form"); // 명세서 상세보기를 위해 form 탭으로
+        loadWebSocketOperationData(selectedEndpoint.id);
       } else {
         // REST 엔드포인트인 경우 프로토콜 설정 및 데이터 로드
         setProtocol("REST");
@@ -698,6 +700,108 @@ export function ApiEditorLayout() {
       if (errorMessage) {
         console.error("상세 에러:", errorMessage);
       }
+    }
+  };
+
+  // Load WebSocket operation data from backend
+  const loadWebSocketOperationData = async (operationId: string) => {
+    if (!operationId || operationId.trim() === "") {
+      alert("유효하지 않은 Operation ID입니다.");
+      setSelectedEndpoint(null);
+      return;
+    }
+
+    try {
+      // operationId는 UUID (x-ouroboros-id)
+      const response = await getWebSocketOperation(operationId);
+      const operationData = response.data;
+
+      console.log("✅ Loaded WebSocket operation:", operationData);
+
+      // WebSocket form state 설정
+      setWsEntryPoint(operationData.operation.entrypoint || "/ws");
+      setWsSummary(""); // Operation에는 summary가 없음
+      setWsDescription(operationData.operationName || ""); // operationName을 description으로
+      setWsTags(""); // 필요시 추가
+
+      // Receiver 설정
+      if (operationData.operation.action === "receive" && operationData.operation.channel) {
+        const channelRef = operationData.operation.channel.ref || "";
+        const channelName = channelRef.replace("#/channels/", "");
+        
+        // Channel 정보 조회하여 실제 address 사용
+        let actualAddress = channelName;
+        try {
+          const channelResponse = await getWebSocketChannel(channelName);
+          actualAddress = channelResponse.data.channel?.address || channelName;
+        } catch (e) {
+          console.warn("Channel 조회 실패, channel name 사용:", channelName);
+        }
+
+        setWsReceiver({
+          address: actualAddress,
+          headers: [
+            {
+              key: "accept-version",
+              value: "1.1",
+              required: true,
+              description: "STOMP 프로토콜 버전 (필수)",
+            },
+          ],
+          schema: { type: "json", fields: [] },
+        });
+      } else if (operationData.operation.action === "send" && operationData.operation.channel) {
+        // Send-only operation의 경우도 channel을 receiver로 설정
+        const channelRef = operationData.operation.channel.ref || "";
+        const channelName = channelRef.replace("#/channels/", "");
+        
+        let actualAddress = channelName;
+        try {
+          const channelResponse = await getWebSocketChannel(channelName);
+          actualAddress = channelResponse.data.channel?.address || channelName;
+        } catch (e) {
+          console.warn("Channel 조회 실패, channel name 사용:", channelName);
+        }
+
+        setWsReceiver({
+          address: actualAddress,
+          headers: [],
+          schema: { type: "json", fields: [] },
+        });
+      } else {
+        setWsReceiver(null);
+      }
+
+      // Reply 설정 (reply가 있는 경우)
+      if (operationData.operation.reply && operationData.operation.reply.channel) {
+        const replyChannelRef = operationData.operation.reply.channel.ref || "";
+        const replyChannelName = replyChannelRef.replace("#/channels/", "");
+        
+        // Channel 정보 조회하여 실제 address 사용
+        let actualReplyAddress = replyChannelName;
+        try {
+          const channelResponse = await getWebSocketChannel(replyChannelName);
+          actualReplyAddress = channelResponse.data.channel?.address || replyChannelName;
+        } catch (e) {
+          console.warn("Reply channel 조회 실패, channel name 사용:", replyChannelName);
+        }
+
+        setWsReply({
+          address: actualReplyAddress,
+          schema: { type: "json", fields: [] },
+        });
+      } else {
+        setWsReply(null);
+      }
+
+      console.log("✅ WebSocket form state 설정 완료");
+    } catch (error) {
+      console.error("WebSocket Operation 로드 실패:", error);
+      alert(
+        `Operation을 불러오는데 실패했습니다: ${
+          error instanceof Error ? error.message : "알 수 없는 오류"
+        }`
+      );
     }
   };
 
@@ -1846,6 +1950,7 @@ export function ApiEditorLayout() {
                   reply={wsReply}
                   setReply={setWsReply}
                   isReadOnly={!!(selectedEndpoint && !isEditMode)}
+                  diff={selectedEndpoint?.diff}
                 />
               )}
             {protocol !== null &&
