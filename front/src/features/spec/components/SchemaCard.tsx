@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { SchemaModal } from "./SchemaModal";
 import { SchemaFieldEditor } from "./SchemaFieldEditor";
-import { 
-  getAllSchemas, 
-  createSchema, 
+import {
+  getAllSchemas,
+  createSchema,
   updateSchema,
   getAllWebSocketSchemas,
   createWebSocketSchema,
-  updateWebSocketSchema
+  updateWebSocketSchema,
 } from "../services/api";
 import type {
   SchemaResponse,
@@ -23,12 +23,18 @@ interface SchemaCardProps {
   protocol?: "REST" | "WebSocket";
 }
 
-export function SchemaCard({ isReadOnly = false, protocol = "REST" }: SchemaCardProps) {
+export function SchemaCard({
+  isReadOnly = false,
+  protocol = "REST",
+}: SchemaCardProps) {
   const [schemas, setSchemas] = useState<SchemaResponse[]>([]);
   const [isSchemaModalOpen, setIsSchemaModalOpen] = useState(false);
   const [schemaFields, setSchemaFields] = useState<SchemaField[]>([]);
   const [currentSchemaName, setCurrentSchemaName] = useState("");
   const [currentSchemaDescription, setCurrentSchemaDescription] = useState("");
+  const [originalSchemaName, setOriginalSchemaName] = useState<string | null>(
+    null
+  ); // 편집 중인 원래 스키마 이름
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(false); // 기본적으로 접힌 상태
@@ -64,9 +70,10 @@ export function SchemaCard({ isReadOnly = false, protocol = "REST" }: SchemaCard
     try {
       setIsLoading(true);
       setError(null);
-      const response = protocol === "WebSocket" 
-        ? await getAllWebSocketSchemas() 
-        : await getAllSchemas();
+      const response =
+        protocol === "WebSocket"
+          ? await getAllWebSocketSchemas()
+          : await getAllSchemas();
       setSchemas(response.data);
     } catch (err) {
       console.error("스키마 로드 실패:", err);
@@ -119,15 +126,18 @@ export function SchemaCard({ isReadOnly = false, protocol = "REST" }: SchemaCard
         orders: schemaFields.map((f) => f.key),
       };
 
-      // 기존 스키마가 있는지 확인
+      // 기존 스키마가 있는지 확인 (원래 이름 또는 현재 이름으로 확인)
+      const schemaNameToCheck = originalSchemaName || currentSchemaName;
       const existingSchema = schemas.find(
-        (s) => s.schemaName === currentSchemaName
+        (s) => s.schemaName === schemaNameToCheck
       );
 
       console.log("🔍 Schema Request:", JSON.stringify(schemaRequest, null, 2));
+      console.log("🔍 Original Schema Name:", originalSchemaName);
+      console.log("🔍 Current Schema Name:", currentSchemaName);
 
       if (existingSchema) {
-        // 수정
+        // 수정 모드: 원래 이름으로 업데이트
         const updateRequest: UpdateSchemaRequest = {
           type: schemaRequest.type,
           title: schemaRequest.title,
@@ -147,7 +157,7 @@ export function SchemaCard({ isReadOnly = false, protocol = "REST" }: SchemaCard
         }
         alert(`"${currentSchemaName}" 스키마가 수정되었습니다.`);
       } else {
-        // 생성
+        // 생성 모드
         console.log(
           "🔍 Create Request:",
           JSON.stringify(schemaRequest, null, 2)
@@ -167,6 +177,7 @@ export function SchemaCard({ isReadOnly = false, protocol = "REST" }: SchemaCard
       setSchemaFields([]);
       setCurrentSchemaName("");
       setCurrentSchemaDescription("");
+      setOriginalSchemaName(null);
     } catch (err) {
       console.error("스키마 저장 실패:", err);
       const errorMessage = getErrorMessage(err);
@@ -261,16 +272,52 @@ export function SchemaCard({ isReadOnly = false, protocol = "REST" }: SchemaCard
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Schema 이름
                 </label>
-                <input
-                  type="text"
-                  value={currentSchemaName}
-                  onChange={(e) => setCurrentSchemaName(e.target.value)}
-                  placeholder="Schema 이름을 입력하세요 (예: UserInfo, ProductData)"
-                  disabled={isReadOnly}
-                  className={`w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] ${
-                    isReadOnly ? "opacity-60 cursor-not-allowed" : ""
-                  }`}
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={currentSchemaName}
+                    onChange={(e) => {
+                      const newName = e.target.value;
+                      setCurrentSchemaName(newName);
+                      // 이름이 비어있으면 편집 모드 해제 (새 스키마 생성 모드)
+                      if (!newName.trim() && originalSchemaName !== null) {
+                        setOriginalSchemaName(null);
+                        setSchemaFields([]);
+                        setCurrentSchemaDescription("");
+                      }
+                    }}
+                    placeholder="Schema 이름을 입력하세요 (예: UserInfo, ProductData)"
+                    disabled={isReadOnly || originalSchemaName !== null}
+                    className={`flex-1 px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] ${
+                      isReadOnly || originalSchemaName !== null
+                        ? "opacity-60 cursor-not-allowed"
+                        : ""
+                    }`}
+                  />
+                  {originalSchemaName !== null && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCurrentSchemaName("");
+                        setOriginalSchemaName(null);
+                        setSchemaFields([]);
+                        setCurrentSchemaDescription("");
+                      }}
+                      disabled={isReadOnly}
+                      className={`px-3 py-2 text-sm text-gray-600 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 font-medium border border-gray-300 dark:border-[#2D333B] rounded-md hover:bg-gray-50 dark:hover:bg-[#161B22] ${
+                        isReadOnly ? "opacity-50 cursor-not-allowed" : ""
+                      }`}
+                    >
+                      새로 만들기
+                    </button>
+                  )}
+                </div>
+                {originalSchemaName !== null && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    편집 모드: "{originalSchemaName}" 스키마를 편집 중입니다.
+                    이름은 변경할 수 없습니다.
+                  </p>
+                )}
               </div>
 
               <div className="mb-4">
@@ -371,8 +418,10 @@ export function SchemaCard({ isReadOnly = false, protocol = "REST" }: SchemaCard
           // SchemaModal에서 재귀적 변환 완료된 필드 사용 (object 타입만)
           if (schema.type === "object") {
             setCurrentSchemaName(schema.name);
+            setOriginalSchemaName(schema.name); // 원래 이름 저장 (편집 모드)
             setCurrentSchemaDescription(schema.description || "");
             setSchemaFields(schema.fields);
+            setIsSchemaModalOpen(false);
           } else {
             alert("스키마는 object 타입만 지원됩니다.");
           }

@@ -27,7 +27,7 @@ import java.util.*;
  */
 @Slf4j
 @Component
-public class SchemaValidator {
+public class RestSchemaValidator {
 
     /**
      * Validates and auto-corrects schema constraints.

@@ -9,7 +9,7 @@ interface Schema {
   description?: string;
   type: string;
   fields: SchemaField[];
-  items?: any;  // array 타입일 경우
+  items?: any; // array 타입일 경우
 }
 
 interface SchemaModalProps {
@@ -47,7 +47,9 @@ export function SchemaModal({
     } catch (err) {
       console.error("스키마 삭제 실패:", err);
       alert(
-        `스키마 삭제에 실패했습니다: ${err instanceof Error ? err.message : "알 수 없는 오류"}`
+        `스키마 삭제에 실패했습니다: ${
+          err instanceof Error ? err.message : "알 수 없는 오류"
+        }`
       );
     }
   };
@@ -69,7 +71,7 @@ export function SchemaModal({
             return field;
           })
         : [],
-      items: schema.items,  // array 타입일 경우
+      items: schema.items, // array 타입일 경우
     };
     onSelect(convertedSchema);
     onClose();

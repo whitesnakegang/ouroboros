@@ -175,12 +175,13 @@ public class TraceTreeBuilder {
      * @return Display name for the span
      */
     private String buildDisplayName(TraceSpanInfo span, SpanMethodInfo methodInfo) {
-        if ("HTTP".equals(methodInfo.getClassName())) {
+        // Extract simple class name for comparison (handles FQCN)
+        String simpleClassName = extractSimpleClassName(methodInfo.getClassName());
+        if ("HTTP".equals(simpleClassName)) {
             return formatHttpDisplayName(span, methodInfo);
         } else if (methodInfo.getClassName() != null && !methodInfo.getClassName().isEmpty()
                 && methodInfo.getMethodName() != null && !methodInfo.getMethodName().isEmpty()) {
-            // Extract simple class name (without package path) for display name
-            String simpleClassName = extractSimpleClassName(methodInfo.getClassName());
+            // Use simple class name (without package path) for display name
             return simpleClassName + "." + methodInfo.getMethodName();
         } else {
             return span.getName();

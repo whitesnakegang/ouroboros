@@ -43,7 +43,7 @@ import java.util.*;
 public class OurorestYamlValidator {
 
     private final RestApiYamlParser yamlParser;
-    private final SchemaValidator schemaValidator;
+    private final RestSchemaValidator restSchemaValidator;
 
     // HTTP methods to check for operations
     private static final List<String> HTTP_METHODS = Arrays.asList(
@@ -106,7 +106,7 @@ public class OurorestYamlValidator {
             int schemaCount = enrichSchemas(document);
 
             // Step 6: Validate and auto-create missing schema references
-            int createdSchemas = schemaValidator.validateAndCreateMissingSchemas(document);
+            int createdSchemas = restSchemaValidator.validateAndCreateMissingSchemas(document);
 
             // Step 7: Save enriched file
             if (hasFixedFields || operationCount > 0 || schemaCount > 0 || createdSchemas > 0) {
@@ -510,7 +510,7 @@ public class OurorestYamlValidator {
         boolean modified = false;
 
         // Validate schema constraints (minItems/maxItems, etc.)
-        if (schemaValidator.validateAndCorrectSchemaMap(schema)) {
+        if (restSchemaValidator.validateAndCorrectSchemaMap(schema)) {
             modified = true;
         }
 
