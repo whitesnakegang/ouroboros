@@ -725,16 +725,19 @@ export function ApiEditorLayout() {
       setWsTags(""); // 필요시 추가
 
       // Receiver 설정
-      if (operationData.operation.action === "receive" && operationData.operation.channel) {
+      if (
+        operationData.operation.action === "receive" &&
+        operationData.operation.channel
+      ) {
         const channelRef = operationData.operation.channel.ref || "";
         const channelName = channelRef.replace("#/channels/", "");
-        
+
         // Channel 정보 조회하여 실제 address 사용
         let actualAddress = channelName;
         try {
           const channelResponse = await getWebSocketChannel(channelName);
           actualAddress = channelResponse.data.channel?.address || channelName;
-        } catch (e) {
+        } catch {
           console.warn("Channel 조회 실패, channel name 사용:", channelName);
         }
 
@@ -750,16 +753,19 @@ export function ApiEditorLayout() {
           ],
           schema: { type: "json", fields: [] },
         });
-      } else if (operationData.operation.action === "send" && operationData.operation.channel) {
+      } else if (
+        operationData.operation.action === "send" &&
+        operationData.operation.channel
+      ) {
         // Send-only operation의 경우도 channel을 receiver로 설정
         const channelRef = operationData.operation.channel.ref || "";
         const channelName = channelRef.replace("#/channels/", "");
-        
+
         let actualAddress = channelName;
         try {
           const channelResponse = await getWebSocketChannel(channelName);
           actualAddress = channelResponse.data.channel?.address || channelName;
-        } catch (e) {
+        } catch {
           console.warn("Channel 조회 실패, channel name 사용:", channelName);
         }
 
@@ -773,17 +779,24 @@ export function ApiEditorLayout() {
       }
 
       // Reply 설정 (reply가 있는 경우)
-      if (operationData.operation.reply && operationData.operation.reply.channel) {
+      if (
+        operationData.operation.reply &&
+        operationData.operation.reply.channel
+      ) {
         const replyChannelRef = operationData.operation.reply.channel.ref || "";
         const replyChannelName = replyChannelRef.replace("#/channels/", "");
-        
+
         // Channel 정보 조회하여 실제 address 사용
         let actualReplyAddress = replyChannelName;
         try {
           const channelResponse = await getWebSocketChannel(replyChannelName);
-          actualReplyAddress = channelResponse.data.channel?.address || replyChannelName;
-        } catch (e) {
-          console.warn("Reply channel 조회 실패, channel name 사용:", replyChannelName);
+          actualReplyAddress =
+            channelResponse.data.channel?.address || replyChannelName;
+        } catch {
+          console.warn(
+            "Reply channel 조회 실패, channel name 사용:",
+            replyChannelName
+          );
         }
 
         setWsReply({

@@ -39,9 +39,9 @@ export function EndpointGroup({
           </div>
         ) : (
           // REST: 기존 방식
-          <span className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] uppercase tracking-wide">
-            {groupName}
-          </span>
+        <span className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] uppercase tracking-wide">
+          {groupName}
+        </span>
         )}
         <svg
           className={`w-3.5 h-3.5 text-gray-500 dark:text-[#8B949E] transform transition-transform ${

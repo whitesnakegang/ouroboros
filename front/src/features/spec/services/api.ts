@@ -1012,6 +1012,62 @@ export async function deleteWebSocketSchema(
 
 const WS_OPERATION_API_BASE_URL = "/ouro/websocket-specs/operations";
 
+// $ref를 ref로 변환하는 헬퍼 함수
+function transformOperationResponse(data: any): any {
+  if (!data) return data;
+  
+  // operation 객체 변환
+  if (data.operation) {
+    const op = data.operation;
+    
+    // x-ouroboros-* 필드를 간단한 이름으로 매핑
+    if (op['x-ouroboros-id']) {
+      op.id = op['x-ouroboros-id'];
+    }
+    if (op['x-ouroboros-entrypoint']) {
+      op.entrypoint = op['x-ouroboros-entrypoint'];
+    }
+    if (op['x-ouroboros-diff']) {
+      op.diff = op['x-ouroboros-diff'];
+    }
+    if (op['x-ouroboros-progress']) {
+      op.progress = op['x-ouroboros-progress'];
+    }
+    
+    // channel.$ref → channel.ref 변환
+    if (op.channel && op.channel['$ref']) {
+      op.channel.ref = op.channel['$ref'];
+    }
+    
+    // reply.channel.$ref → reply.channel.ref 변환
+    if (op.reply && op.reply.channel && op.reply.channel['$ref']) {
+      op.reply.channel.ref = op.reply.channel['$ref'];
+    }
+    
+    // messages.$ref → messages.ref 변환
+    if (Array.isArray(op.messages)) {
+      op.messages = op.messages.map((msg: any) => {
+        if (msg['$ref']) {
+          return { ref: msg['$ref'] };
+        }
+        return msg;
+      });
+    }
+    
+    // reply.messages.$ref → reply.messages.ref 변환
+    if (op.reply && Array.isArray(op.reply.messages)) {
+      op.reply.messages = op.reply.messages.map((msg: any) => {
+        if (msg['$ref']) {
+          return { ref: msg['$ref'] };
+        }
+        return msg;
+      });
+    }
+  }
+  
+  return data;
+}
+
 /**
  * 전체 WebSocket Operation 조회
  */
@@ -1035,16 +1091,23 @@ export async function getAllWebSocketOperations(): Promise<GetAllOperationsRespo
     throw new Error(errorMessage);
   }
 
-  return response.json();
+  const result = await response.json();
+  
+  // 각 operation 데이터를 변환
+  if (result.data && Array.isArray(result.data)) {
+    result.data = result.data.map(transformOperationResponse);
+  }
+  
+  return result;
 }
 
 /**
  * 특정 WebSocket Operation 조회
  */
 export async function getWebSocketOperation(
-  operationName: string
+  operationId: string
 ): Promise<GetOperationResponse> {
-  const response = await fetch(`${WS_OPERATION_API_BASE_URL}/${operationName}`, {
+  const response = await fetch(`${WS_OPERATION_API_BASE_URL}/${operationId}`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -1057,13 +1120,20 @@ export async function getWebSocketOperation(
       `WebSocket Operation 조회 실패: ${response.status} ${response.statusText}`
     );
     console.error("WebSocket Operation 조회 실패:", {
-      operationName,
+      operationId,
       status: response.status,
     });
     throw new Error(errorMessage);
   }
 
-  return response.json();
+  const result = await response.json();
+  
+  // operation 데이터 변환
+  if (result.data) {
+    result.data = transformOperationResponse(result.data);
+  }
+  
+  return result;
 }
 
 /**
@@ -1092,17 +1162,24 @@ export async function createWebSocketOperation(
     throw new Error(errorMessage);
   }
 
-  return response.json();
+  const result = await response.json();
+  
+  // 생성된 operation 데이터들 변환
+  if (result.data && Array.isArray(result.data)) {
+    result.data = result.data.map(transformOperationResponse);
+  }
+  
+  return result;
 }
 
 /**
  * WebSocket Operation 수정
  */
 export async function updateWebSocketOperation(
-  operationName: string,
+  operationId: string,
   request: UpdateOperationRequest
 ): Promise<UpdateOperationResponse> {
-  const response = await fetch(`${WS_OPERATION_API_BASE_URL}/${operationName}`, {
+  const response = await fetch(`${WS_OPERATION_API_BASE_URL}/${operationId}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -1116,23 +1193,30 @@ export async function updateWebSocketOperation(
       `WebSocket Operation 수정 실패: ${response.status} ${response.statusText}`
     );
     console.error("WebSocket Operation 수정 실패:", {
-      operationName,
+      operationId,
       request,
       status: response.status,
     });
     throw new Error(errorMessage);
   }
 
-  return response.json();
+  const result = await response.json();
+  
+  // 수정된 operation 데이터 변환
+  if (result.data) {
+    result.data = transformOperationResponse(result.data);
+  }
+  
+  return result;
 }
 
 /**
  * WebSocket Operation 삭제
  */
 export async function deleteWebSocketOperation(
-  operationName: string
+  operationId: string
 ): Promise<DeleteOperationResponse> {
-  const response = await fetch(`${WS_OPERATION_API_BASE_URL}/${operationName}`, {
+  const response = await fetch(`${WS_OPERATION_API_BASE_URL}/${operationId}`, {
     method: "DELETE",
     headers: {
       "Content-Type": "application/json",
@@ -1145,7 +1229,7 @@ export async function deleteWebSocketOperation(
       `WebSocket Operation 삭제 실패: ${response.status} ${response.statusText}`
     );
     console.error("WebSocket Operation 삭제 실패:", {
-      operationName,
+      operationId,
       status: response.status,
     });
     throw new Error(errorMessage);

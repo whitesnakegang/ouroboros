@@ -25,11 +25,18 @@ const mockStatusColors = {
   modifying: "bg-orange-500",
 };
 
-// Progress 뱃지 색상 및 라벨
-const progressBadgeConfig = {
-  none: { bg: "bg-gray-100 dark:bg-gray-800", text: "text-gray-600 dark:text-gray-400", label: "미구현" },
-  mock: { bg: "bg-yellow-100 dark:bg-yellow-900/30", text: "text-yellow-700 dark:text-yellow-400", label: "Mock" },
-  completed: { bg: "bg-green-100 dark:bg-green-900/30", text: "text-green-700 dark:text-green-400", label: "완료" },
+// WebSocket Progress 상태 표시 색상 (점 스타일)
+const wsProgressColors = {
+  none: "bg-gray-400 dark:bg-gray-600",
+  mock: "bg-yellow-500 dark:bg-yellow-400",
+  completed: "bg-green-500 dark:bg-green-400",
+};
+
+// Progress 상태별 툴팁 텍스트
+const wsProgressLabels = {
+  none: "미구현",
+  mock: "Mock",
+  completed: "완료",
 };
 
 export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
@@ -72,6 +79,16 @@ export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
           />
         )}
 
+        {/* WebSocket: Progress 상태 표시 점 */}
+        {isWebSocket && endpoint.progress && wsProgressColors[endpoint.progress as keyof typeof wsProgressColors] && (
+          <div
+            className={`w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0 ${
+              wsProgressColors[endpoint.progress as keyof typeof wsProgressColors]
+            }`}
+            title={wsProgressLabels[endpoint.progress as keyof typeof wsProgressLabels]}
+          />
+        )}
+
         <div className="flex-1 min-w-0">
           {/* Method 배지와 Path */}
           <div className="flex items-center gap-2 mb-1">
@@ -83,17 +100,6 @@ export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
             <span className="text-sm text-gray-900 dark:text-[#E6EDF3] truncate font-mono flex-1 min-w-0">
               {endpoint.path}
             </span>
-            
-            {/* WebSocket: Progress 뱃지 표시 */}
-            {isWebSocket && endpoint.progress && progressBadgeConfig[endpoint.progress as keyof typeof progressBadgeConfig] && (
-              <span
-                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                  progressBadgeConfig[endpoint.progress as keyof typeof progressBadgeConfig].bg
-                } ${progressBadgeConfig[endpoint.progress as keyof typeof progressBadgeConfig].text}`}
-              >
-                {progressBadgeConfig[endpoint.progress as keyof typeof progressBadgeConfig].label}
-              </span>
-            )}
             
             {/* Diff 주의 표시 아이콘 */}
             {(endpoint.diff && endpoint.diff !== "none") || endpoint.hasSpecError ? (
@@ -115,7 +121,7 @@ export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
             ) : null}
           </div>
 
-          {/* Description */}
+          {/* Summary (두 번째 줄) */}
           <p className="text-xs text-gray-600 dark:text-[#8B949E] line-clamp-1">
             {endpoint.description}
           </p>

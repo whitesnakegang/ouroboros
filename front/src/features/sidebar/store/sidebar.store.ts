@@ -130,24 +130,21 @@ function convertOperationToEndpoint(
     path = `${receiverAddress} - ${replyAddress}`;
   }
 
-  // Description 생성
-  let description = "";
-  if (tag === "sendto") {
-    description = `Send to ${receiverAddress}`;
-  } else if (tag === "duplicate") {
-    description = `Duplex: ${receiverAddress} ⇄ ${replyAddress}`;
-  } else {
-    description = `Receive from ${receiverAddress}`;
-  }
+  // Summary 생성 (operation name을 읽기 쉽게)
+  let summary = operationName
+    .replace(/^_/, '')
+    .replace(/_to_/g, ' → ')
+    .replace(/_/g, ' ')
+    .replace(/\./g, '.');
 
   return {
     id: operation.id || operationName,
     method: method,
     path: path,
-    description: description,
+    description: summary, // summary로 사용
     implementationStatus: mapTagToStatus(tag, operation.progress),
     hasSpecError: operation.diff && operation.diff !== "none" ? true : undefined,
-    tags: [entrypoint, receiverAddress], // [entrypoint, receiverAddress] 저장 (그룹화용)
+    tags: [entrypoint, receiverAddress, tag || ""], // [entrypoint, receiverAddress, tag] 저장
     progress: operation.progress,
     tag: tag,
     diff: operation.diff,
@@ -254,21 +251,7 @@ export const useSidebarStore = create<SidebarState>()(
 
             // 3. WebSocket Operations를 Entry Point > Receiver Address 계층으로 그룹화
             wsOperations.forEach((operation) => {
-              console.log("🔍 Processing operation:", {
-                operationName: operation.operationName,
-                operationId: operation.operation?.id,
-                action: operation.operation?.action,
-                tag: operation.tag
-              });
-              
               const endpoint = convertOperationToEndpoint(operation, channelMap);
-              
-              console.log("✅ Converted endpoint:", {
-                id: endpoint.id,
-                method: endpoint.method,
-                path: endpoint.path,
-                operationName: endpoint.operationName
-              });
               
               // tags[0] = entrypoint, tags[1] = receiverAddress
               const entrypoint = endpoint.tags?.[0] || "/ws";
@@ -282,6 +265,8 @@ export const useSidebarStore = create<SidebarState>()(
               }
               grouped[wsGroup].push(endpoint);
             });
+            
+            console.log("✅ WebSocket operations loaded successfully");
           } catch (wsError) {
             console.warn("WebSocket Operations 로드 실패:", wsError);
             // WebSocket 로드 실패 시 에러만 로그
