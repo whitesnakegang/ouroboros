@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { TryMethod } from "@/features/spec/services/api";
 
-export type Protocol = "REST" | "WebSocket" | "GraphQL";
+export type Protocol = "REST" | "WebSocket";
 
 export interface TestRequest {
   method: string;
@@ -185,9 +185,12 @@ export const useTestingStore = create<TestingState>((set) => ({
     connectionDuration: null,
   },
   updateWsStats: (stats) =>
-    set((state) => ({
-      wsStats: { ...state.wsStats, ...stats },
-    })),
+    set((state) => {
+      const statsUpdate = typeof stats === "function" ? stats(state.wsStats) : stats;
+      return {
+        wsStats: { ...state.wsStats, ...statsUpdate },
+      };
+    }),
   wsConnectionStartTime: null,
   setWsConnectionStartTime: (time) => set({ wsConnectionStartTime: time }),
 }));

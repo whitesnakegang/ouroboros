@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useTestingStore } from "../store/testing.store";
 import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
 import { StompClient, buildWebSocketUrl } from "../utils/stompClient";
@@ -6,21 +6,10 @@ import { StompClient, buildWebSocketUrl } from "../utils/stompClient";
 interface Subscription {
   id: string;
   destination: string;
-  subscriptionId: string;
+  subscriptionId: string | null; // null이면 구독 해제 상태
 }
 
-interface SavedMessage {
-  id: string;
-  name: string;
-  destination: string;
-  headers: Array<{ key: string; value: string }>;
-  body: string;
-  timestamp: number;
-}
 
-type MessageTab = "message" | "saved";
-type StompCommand = "SEND" | "SUBSCRIBE" | "UNSUBSCRIBE";
-type InputMode = "structured" | "raw";
 
 export function WsTestRequestPanel() {
   const {
@@ -32,35 +21,95 @@ export function WsTestRequestPanel() {
     setWsConnectionStartTime,
     wsConnectionStartTime,
     wsStats,
+    setTryId,
   } = useTestingStore();
-  const { selectedEndpoint } = useSidebarStore();
+  const { selectedEndpoint, endpoints } = useSidebarStore();
 
   const [entryPoint, setEntryPoint] = useState("");
+  const [roomId, setRoomId] = useState("room1");
   const [connectHeaders, setConnectHeaders] = useState<Array<{ key: string; value: string }>>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [newTopic, setNewTopic] = useState("");
   
-  // STOMP Frame 구조
-  const [stompCommand, setStompCommand] = useState<StompCommand>("SEND");
-  const [stompHeaders, setStompHeaders] = useState<Array<{ key: string; value: string }>>([
-    { key: "destination", value: "" },
-  ]);
-  const [stompBody, setStompBody] = useState("");
-  
-  // UI State
-  const [activeTab, setActiveTab] = useState<MessageTab>("message");
-  const [inputMode, setInputMode] = useState<InputMode>("structured");
-  const [rawStompFrame, setRawStompFrame] = useState("");
-  const [savedMessages, setSavedMessages] = useState<SavedMessage[]>([]);
+  // 간단한 모드 상태
+  const [sender, setSender] = useState("tester");
+  const [content, setContent] = useState("");
+  const [messageType, setMessageType] = useState<"TALK" | "ENTER" | "LEAVE">("TALK");
+  const [enableTryHeader, setEnableTryHeader] = useState(true);
 
   const stompClientRef = useRef<StompClient | null>(null);
+
+  // 주소에서 도메인 추출 (첫 번째 경로 세그먼트)
+  const extractDomainFromAddress = (address: string): string => {
+    if (!address || address === "/unknown") {
+      return "OTHERS";
+    }
+    
+    // "/"로 시작하는 주소에서 첫 번째 경로 세그먼트 추출
+    const parts = address.split("/").filter((part) => part.length > 0);
+    
+    if (parts.length === 0) {
+      return "OTHERS";
+    }
+    
+    // 첫 번째 경로 세그먼트를 도메인으로 사용 (대문자로 변환)
+    const domain = parts[0];
+    return domain.charAt(0).toUpperCase() + domain.slice(1).toLowerCase();
+  };
+
+  // 도메인별 구독 경로 계산
+  const domainSubscriptionPaths = useMemo(() => {
+    if (!selectedEndpoint || selectedEndpoint.protocol !== "WebSocket") {
+      return [];
+    }
+
+    // 현재 엔드포인트의 receiver address에서 도메인 추출
+    const receiverAddress = selectedEndpoint.tags?.[1] || "";
+    if (!receiverAddress) {
+      return [];
+    }
+
+    const currentDomain = extractDomainFromAddress(receiverAddress);
+
+    // 모든 WebSocket 엔드포인트에서 같은 도메인을 가진 엔드포인트 찾기
+    const paths: Array<{ path: string; description: string; isSubscribed: boolean }> = [];
+    
+    Object.values(endpoints).forEach((groupEndpoints) => {
+      groupEndpoints.forEach((endpoint) => {
+        if (
+          endpoint.protocol === "WebSocket" &&
+          endpoint.id !== selectedEndpoint.id
+        ) {
+          const endpointReceiverAddress = endpoint.tags?.[1] || "";
+          if (endpointReceiverAddress) {
+            const endpointDomain = extractDomainFromAddress(endpointReceiverAddress);
+            if (endpointDomain === currentDomain) {
+              // 구독 상태 확인 (subscriptionId가 null이 아니면 활성 상태)
+              const subscription = subscriptions.find(
+                (sub) => sub.destination === endpointReceiverAddress
+              );
+              const isSubscribed = subscription?.subscriptionId !== null && subscription?.subscriptionId !== undefined;
+              paths.push({
+                path: endpointReceiverAddress,
+                description: endpoint.description || endpointReceiverAddress,
+                isSubscribed,
+              });
+            }
+          }
+        }
+      });
+    });
+
+    return paths;
+  }, [selectedEndpoint, endpoints, subscriptions]);
 
   // 엔드포인트 선택 시 Entry Point 로드
   useEffect(() => {
     if (selectedEndpoint && selectedEndpoint.protocol === "WebSocket") {
-      // WebSocket 엔드포인트의 path를 기반으로 Entry Point 생성
-      // https 환경에서는 wss://, http 환경에서는 ws:// 사용
-      const wsUrl = buildWebSocketUrl(selectedEndpoint.path);
+      // WebSocket 엔드포인트의 entrypoint는 tags[0]에 저장되어 있음
+      // convertOperationToEndpoint에서 tags: [entrypoint, receiverAddress, tag] 형태로 저장
+      const entrypoint = selectedEndpoint.tags?.[0] || "/ws";
+      const wsUrl = buildWebSocketUrl(entrypoint);
       setEntryPoint(wsUrl);
     } else {
       setEntryPoint("");
@@ -96,6 +145,13 @@ export function WsTestRequestPanel() {
       });
 
       const headers: Record<string, string> = {};
+      
+      // 기본 STOMP 헤더 추가 (없는 경우)
+      if (!connectHeaders.some(h => h.key && h.key.toLowerCase() === "accept-version")) {
+        headers["accept-version"] = "1.1,1.2";
+      }
+      
+      // 사용자 정의 헤더 추가
       connectHeaders.forEach((h) => {
         if (h.key && h.value) {
           headers[h.key] = h.value;
@@ -108,6 +164,8 @@ export function WsTestRequestPanel() {
       client.connect(
         headers,
         () => {
+          if (!stompClientRef.current) return;
+          
           setWsConnectionStatus("connected");
           setWsConnectionStartTime(Date.now());
           
@@ -117,18 +175,100 @@ export function WsTestRequestPanel() {
             timestamp: Date.now(),
             direction: "received" as const,
             address: "CONNECTED",
-            content: JSON.stringify({ status: "Connected to STOMP server" }, null, 2),
+            content: JSON.stringify({ status: "Connected to STOMP server", url: entryPoint }, null, 2),
           };
           addWsMessage(message);
+
+          // Room ID가 있으면 자동으로 구독
+          if (roomId && roomId.trim() !== "") {
+            const destination = `/topic/chat/${roomId}`;
+            handleSubscribe(destination);
+          }
+
+          // Try 알림 구독 (백엔드: /user/queue/ouro/try)
+          const tryNotificationDestination = "/user/queue/ouro/try";
+          try {
+            if (stompClientRef.current) {
+              stompClientRef.current.subscribe(tryNotificationDestination, (frame) => {
+                // Try 알림 메시지에서 tryId 추출
+                const tryIdHeader = frame.headers["X-Ouroboros-Try-Id"] || 
+                                   frame.headers["x-ouroboros-try-id"];
+                
+                if (tryIdHeader) {
+                  setTryId(tryIdHeader);
+                }
+                
+                // Try 알림 메시지 본문 파싱 (payload, headers 포함)
+                try {
+                  const dispatchMessage = JSON.parse(frame.body);
+                  
+                  // payload가 문자열이면 파싱해서 객체로 변환 (일반 메시지처럼 깔끔하게 표시)
+                  let parsedPayload = dispatchMessage.payload;
+                  if (typeof dispatchMessage.payload === "string") {
+                    try {
+                      parsedPayload = JSON.parse(dispatchMessage.payload);
+                    } catch (e) {
+                      // 파싱 실패 시 원본 문자열 유지
+                      parsedPayload = dispatchMessage.payload;
+                    }
+                  }
+                  
+                  const tryMessage = {
+                    id: `msg-${Date.now()}-${Math.random()}`,
+                    timestamp: Date.now(),
+                    direction: "received" as const,
+                    address: tryNotificationDestination,
+                    content: JSON.stringify({
+                      tryId: tryIdHeader,
+                      payload: parsedPayload,
+                      headers: dispatchMessage.headers,
+                    }, null, 2),
+                    tryId: tryIdHeader,
+                  };
+                  addWsMessage(tryMessage);
+                  updateWsStats((currentStats) => ({
+                    totalReceived: currentStats.totalReceived + 1,
+                  }));
+                } catch (parseError) {
+                  // 파싱 실패 시 원본 body 그대로 표시
+                  const tryMessage = {
+                    id: `msg-${Date.now()}-${Math.random()}`,
+                    timestamp: Date.now(),
+                    direction: "received" as const,
+                    address: tryNotificationDestination,
+                    content: frame.body,
+                    tryId: tryIdHeader,
+                  };
+                  addWsMessage(tryMessage);
+                  updateWsStats((currentStats) => ({
+                    totalReceived: currentStats.totalReceived + 1,
+                  }));
+                }
+              });
+            }
+          } catch (error) {
+            // Try 알림 구독 실패
+          }
         },
         (error) => {
-          console.error("STOMP 연결 에러:", error);
           setWsConnectionStatus("disconnected");
-          alert(`STOMP 연결 중 오류가 발생했습니다: ${error.message}`);
+          setWsConnectionStartTime(null);
+          updateWsStats({ connectionDuration: null });
+          const errorMessage = error.message || "알 수 없는 오류";
+          alert(`STOMP 연결 중 오류가 발생했습니다:\n\n${errorMessage}\n\nURL: ${entryPoint}`);
+          
+          // 에러 메시지도 로그에 추가
+          const errorMsg = {
+            id: `msg-${Date.now()}-${Math.random()}`,
+            timestamp: Date.now(),
+            direction: "received" as const,
+            address: "ERROR",
+            content: JSON.stringify({ error: errorMessage, url: entryPoint }, null, 2),
+          };
+          addWsMessage(errorMsg);
         }
       );
     } catch (error) {
-      console.error("연결 실패:", error);
       setWsConnectionStatus("disconnected");
       alert("연결에 실패했습니다.");
     }
@@ -159,42 +299,68 @@ export function WsTestRequestPanel() {
       return;
     }
 
+    // 이미 구독 해제된 항목이 있는지 확인
+    const existingSubscription = subscriptions.find(
+      (sub) => sub.destination === destination && sub.subscriptionId === null
+    );
+
     try {
       const subscriptionId = stompClientRef.current.subscribe(destination, (frame) => {
+        // 응답 메시지에서 X-Ouroboros-Try-Id 헤더 추출
+        const tryIdHeader = frame.headers["X-Ouroboros-Try-Id"] || 
+                           frame.headers["x-ouroboros-try-id"];
+        
+        // tryId가 있으면 store에 저장
+        if (tryIdHeader) {
+          setTryId(tryIdHeader);
+        }
+
         const message = {
           id: `msg-${Date.now()}-${Math.random()}`,
           timestamp: Date.now(),
           direction: "received" as const,
-          address: frame.headers.destination || newTopic,
+          address: frame.headers.destination || destination,
           content: frame.body,
+          tryId: tryIdHeader || undefined,
         };
         addWsMessage(message);
-        updateWsStats({
-          totalReceived: wsStats.totalReceived + 1,
-        });
+        updateWsStats((currentStats) => ({
+          totalReceived: currentStats.totalReceived + 1,
+        }));
       });
 
-      const subscription: Subscription = {
-        id: `sub-${Date.now()}`,
-        destination: newTopic,
-        subscriptionId,
-      };
+      if (existingSubscription) {
+        // 기존 구독 해제된 항목을 다시 활성화
+        setSubscriptions(subscriptions.map((s) =>
+          s.id === existingSubscription.id
+            ? { ...s, subscriptionId }
+            : s
+        ));
+      } else {
+        // 새로운 구독 추가
+        const subscription: Subscription = {
+          id: `sub-${Date.now()}`,
+          destination: destination,
+          subscriptionId,
+        };
+        setSubscriptions([...subscriptions, subscription]);
+      }
 
-      setSubscriptions([...subscriptions, subscription]);
-      setNewTopic("");
+      if (!topic) {
+        setNewTopic("");
+      }
 
       // 구독 메시지 로그
       const message = {
         id: `msg-${Date.now()}-${Math.random()}`,
         timestamp: Date.now(),
         direction: "sent" as const,
-        address: newTopic,
-        content: JSON.stringify({ action: "SUBSCRIBE", destination: newTopic }, null, 2),
+        address: destination,
+        content: JSON.stringify({ action: "SUBSCRIBE", destination: destination }, null, 2),
       };
       addWsMessage(message);
-    } catch (error) {
-      console.error("구독 실패:", error);
-      alert("구독에 실패했습니다.");
+      } catch (error) {
+        alert("구독에 실패했습니다.");
     }
   };
 
@@ -203,9 +369,19 @@ export function WsTestRequestPanel() {
       return;
     }
 
+    if (!subscription.subscriptionId) {
+      // 이미 구독 해제된 상태면 아무것도 하지 않음
+      return;
+    }
+
     try {
       stompClientRef.current.unsubscribe(subscription.subscriptionId);
-      setSubscriptions(subscriptions.filter((s) => s.id !== subscription.id));
+      // 구독 해제하되 목록에서 제거하지 않고 subscriptionId를 null로 설정
+      setSubscriptions(subscriptions.map((s) => 
+        s.id === subscription.id 
+          ? { ...s, subscriptionId: null }
+          : s
+      ));
 
       // 구독 해제 메시지 로그
       const message = {
@@ -217,92 +393,77 @@ export function WsTestRequestPanel() {
       };
       addWsMessage(message);
     } catch (error) {
-      console.error("구독 해제 실패:", error);
+      // 구독 해제 실패
     }
   };
 
-  const handleSendMessage = () => {
-    if (!stompClientRef.current || !stompClientRef.current.isConnected()) {
+  // 간단한 모드 메시지 전송
+  const handleSimpleSend = () => {
+    if (wsConnectionStatus !== "connected") {
       alert("먼저 연결을 시도해주세요.");
       return;
     }
 
+    if (!stompClientRef.current) {
+      alert("STOMP 클라이언트가 초기화되지 않았습니다.");
+      return;
+    }
+
+    if (!stompClientRef.current.isConnected()) {
+      alert("연결이 끊어진 것 같습니다. 다시 연결해주세요.");
+      setWsConnectionStatus("disconnected");
+      return;
+    }
+
+    if (!roomId || roomId.trim() === "") {
+      alert("Room ID를 입력해주세요.");
+      return;
+    }
+
+    if (!content || content.trim() === "") {
+      alert("메시지 내용을 입력해주세요.");
+      return;
+    }
+
     try {
-      // Raw 모드면 먼저 파싱
-      if (inputMode === "raw") {
-        const parsed = parseRawStompFrame(rawStompFrame);
-        if (!parsed) {
-          alert("❌ 유효하지 않은 STOMP 프레임입니다.");
-          return;
-        }
-        setStompCommand(parsed.command);
-        setStompHeaders(parsed.headers);
-        setStompBody(parsed.body);
+      const destination = `/app/chat/${roomId}`;
+      const messageBody = JSON.stringify({
+        roomId: roomId,
+        sender: sender || "tester",
+        content: content,
+        type: messageType,
+        sentAt: new Date().toISOString(),
+      });
+
+      const headers: Record<string, string> = {
+        "content-type": "application/json",
+      };
+
+      // X-Ouroboros-Try 헤더는 체크박스로 선택
+      if (enableTryHeader) {
+        headers["X-Ouroboros-Try"] = "on";
       }
 
-      // SEND 커맨드 처리
-      if (stompCommand === "SEND") {
-        const destinationHeader = stompHeaders.find(h => h.key === "destination");
-        if (!destinationHeader || !destinationHeader.value) {
-          alert("destination 헤더를 입력해주세요.");
-          return;
-        }
+      stompClientRef.current.send(destination, headers, messageBody);
 
-        const headers: Record<string, string> = {};
-        stompHeaders.forEach((h) => {
-          if (h.key && h.value && h.key !== "destination") {
-            headers[h.key] = h.value;
-          }
-        });
+      // 전송된 메시지 로그
+      const message = {
+        id: `msg-${Date.now()}-${Math.random()}`,
+        timestamp: Date.now(),
+        direction: "sent" as const,
+        address: destination,
+        content: messageBody,
+      };
+      addWsMessage(message);
+      updateWsStats((currentStats) => ({
+        totalSent: currentStats.totalSent + 1,
+      }));
 
-        stompClientRef.current.send(destinationHeader.value, headers, stompBody);
-
-        // 전송된 메시지 로그
-        const message = {
-          id: `msg-${Date.now()}-${Math.random()}`,
-          timestamp: Date.now(),
-          direction: "sent" as const,
-          address: destinationHeader.value,
-          content: stompBody || "(empty)",
-        };
-        addWsMessage(message);
-        updateWsStats({
-          totalSent: wsStats.totalSent + 1,
-        });
-
-        // Body만 초기화
-        if (inputMode === "structured") {
-          setStompBody("");
-        } else {
-          const frameLines = rawStompFrame.split('\n');
-          const emptyLineIndex = frameLines.findIndex(line => line.trim() === '');
-          if (emptyLineIndex > -1) {
-            setRawStompFrame(frameLines.slice(0, emptyLineIndex + 1).join('\n'));
-          }
-        }
-      }
-      // SUBSCRIBE 커맨드 처리
-      else if (stompCommand === "SUBSCRIBE") {
-        const destinationHeader = stompHeaders.find(h => h.key === "destination");
-        if (!destinationHeader || !destinationHeader.value) {
-          alert("destination 헤더를 입력해주세요.");
-          return;
-        }
-        handleSubscribe(destinationHeader.value);
-      }
-      // UNSUBSCRIBE 커맨드 처리
-      else if (stompCommand === "UNSUBSCRIBE") {
-        const idHeader = stompHeaders.find(h => h.key === "id");
-        if (idHeader && idHeader.value) {
-          const subscription = subscriptions.find(s => s.subscriptionId === idHeader.value);
-          if (subscription) {
-            handleUnsubscribe(subscription);
-          }
-        }
-      }
+      // Content 초기화
+      setContent("");
     } catch (error) {
-      console.error("메시지 전송 실패:", error);
-      alert("메시지 전송에 실패했습니다.");
+      const errorMessage = error instanceof Error ? error.message : "알 수 없는 오류";
+      alert(`메시지 전송에 실패했습니다:\n\n${errorMessage}`);
     }
   };
 
@@ -319,142 +480,6 @@ export function WsTestRequestPanel() {
   const removeConnectHeader = (index: number) => {
     setConnectHeaders(connectHeaders.filter((_, i) => i !== index));
   };
-
-  // STOMP Headers 관리
-  const addStompHeader = () => {
-    setStompHeaders([...stompHeaders, { key: "", value: "" }]);
-  };
-
-  const updateStompHeader = (index: number, key: string, value: string) => {
-    const newHeaders = [...stompHeaders];
-    newHeaders[index] = { key, value };
-    setStompHeaders(newHeaders);
-  };
-
-  const removeStompHeader = (index: number) => {
-    setStompHeaders(stompHeaders.filter((_, i) => i !== index));
-  };
-
-  // Raw STOMP 프레임 파싱
-  const parseRawStompFrame = (raw: string): { command: StompCommand; headers: Array<{ key: string; value: string }>; body: string } | null => {
-    try {
-      const lines = raw.trim().split('\n');
-      if (lines.length === 0) return null;
-
-      const command = lines[0].trim() as StompCommand;
-      if (!["SEND", "SUBSCRIBE", "UNSUBSCRIBE"].includes(command)) {
-        return null;
-      }
-
-      const headers: Array<{ key: string; value: string }> = [];
-      let bodyStartIndex = -1;
-
-      // 헤더 파싱
-      for (let i = 1; i < lines.length; i++) {
-        const line = lines[i];
-        
-        // 빈 줄이 나오면 다음부터 body
-        if (line.trim() === "") {
-          bodyStartIndex = i + 1;
-          break;
-        }
-
-        const colonIndex = line.indexOf(':');
-        if (colonIndex > -1) {
-          const key = line.substring(0, colonIndex).trim();
-          const value = line.substring(colonIndex + 1).trim();
-          headers.push({ key, value });
-        }
-      }
-
-      // Body 추출
-      const body = bodyStartIndex > -1 && bodyStartIndex < lines.length
-        ? lines.slice(bodyStartIndex).join('\n').trim()
-        : "";
-
-      return { command, headers, body };
-    } catch (error) {
-      console.error("STOMP 프레임 파싱 실패:", error);
-      return null;
-    }
-  };
-
-  // Structured → Raw 변환
-  const generateStompFrameFromStructured = (): string => {
-    let frame = `${stompCommand}\n`;
-    
-    stompHeaders.forEach((h) => {
-      if (h.key && h.value) {
-        frame += `${h.key}:${h.value}\n`;
-      }
-    });
-    
-    frame += `\n${stompBody}`;
-    return frame;
-  };
-
-  // Raw → Structured 적용
-  const applyRawFrame = () => {
-    const parsed = parseRawStompFrame(rawStompFrame);
-    if (parsed) {
-      setStompCommand(parsed.command);
-      setStompHeaders(parsed.headers.length > 0 ? parsed.headers : [{ key: "destination", value: "" }]);
-      setStompBody(parsed.body);
-      alert("✅ STOMP 프레임이 적용되었습니다!");
-    } else {
-      alert("❌ 유효하지 않은 STOMP 프레임입니다. 형식을 확인해주세요.");
-    }
-  };
-
-  // Structured → Raw 동기화
-  const syncToRawMode = () => {
-    setRawStompFrame(generateStompFrameFromStructured());
-    setInputMode("raw");
-  };
-
-  // 저장된 메시지 관리
-  const saveCurrentMessage = () => {
-    const name = prompt("메시지 이름을 입력하세요:");
-    if (!name) return;
-
-    const newSavedMessage: SavedMessage = {
-      id: `saved-${Date.now()}`,
-      name,
-      destination: stompHeaders.find(h => h.key === "destination")?.value || "",
-      headers: stompHeaders,
-      body: stompBody,
-      timestamp: Date.now(),
-    };
-
-    const updated = [...savedMessages, newSavedMessage];
-    setSavedMessages(updated);
-    localStorage.setItem("stomp-saved-messages", JSON.stringify(updated));
-  };
-
-  const loadSavedMessage = (message: SavedMessage) => {
-    setStompHeaders(message.headers);
-    setStompBody(message.body);
-    setActiveTab("message");
-    setInputMode("structured");
-  };
-
-  const deleteSavedMessage = (id: string) => {
-    const updated = savedMessages.filter((m) => m.id !== id);
-    setSavedMessages(updated);
-    localStorage.setItem("stomp-saved-messages", JSON.stringify(updated));
-  };
-
-  // 로컬 스토리지에서 저장된 메시지 불러오기
-  useEffect(() => {
-    const saved = localStorage.getItem("stomp-saved-messages");
-    if (saved) {
-      try {
-        setSavedMessages(JSON.parse(saved));
-      } catch (e) {
-        console.error("저장된 메시지 로드 실패:", e);
-      }
-    }
-  }, []);
 
   // 로컬 스토리지에서 저장된 메시지 불러오기 (deprecated 함수 제거)
 
@@ -503,37 +528,57 @@ export function WsTestRequestPanel() {
       </div>
 
       <div className="p-4">
-        {/* Connection Section */}
-        <div className="mb-4">
-          <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-            WebSocket URL
-          </label>
-          <div className="flex gap-2">
+        {/* 연결 설정 Section */}
+        <div className="mb-6 space-y-4">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">연결 설정</h3>
+          
+          <div>
+            <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
+              WS Endpoint
+            </label>
             <input
               type="text"
               value={entryPoint}
               onChange={(e) => setEntryPoint(e.target.value)}
               placeholder="ws://localhost:8080/ws"
               disabled={wsConnectionStatus === "connected"}
-              className="flex-1 px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm font-mono disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm font-mono disabled:opacity-50 disabled:cursor-not-allowed"
             />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
+              Room ID
+            </label>
+            <input
+              type="text"
+              value={roomId}
+              onChange={(e) => setRoomId(e.target.value)}
+              placeholder="room1"
+              disabled={wsConnectionStatus === "connected"}
+              className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            />
+          </div>
+
+          <div className="flex gap-2">
             {wsConnectionStatus === "disconnected" ? (
               <button
                 onClick={handleConnect}
-                className="px-6 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-colors text-sm font-semibold"
+                className="flex-1 px-4 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-colors text-sm font-semibold"
               >
                 Connect
               </button>
             ) : (
               <button
                 onClick={handleDisconnect}
-                className="px-6 py-2 bg-red-500 hover:bg-red-600 text-white rounded-md transition-colors text-sm font-semibold"
+                className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-md transition-colors text-sm font-semibold"
               >
                 Disconnect
               </button>
             )}
           </div>
         </div>
+
 
         {/* STOMP CONNECT Headers - Collapsible */}
         {wsConnectionStatus === "disconnected" && (
@@ -593,274 +638,124 @@ export function WsTestRequestPanel() {
 
       {/* Main Content - Connected State */}
       {wsConnectionStatus === "connected" && (
-        <div className="border-t border-gray-200 dark:border-[#2D333B]">
-          {/* Tabs */}
-          <div className="flex border-b border-gray-200 dark:border-[#2D333B] bg-gray-50 dark:bg-[#0D1117]">
+        <div className="border-t border-gray-200 dark:border-[#2D333B] p-4">
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">메시지 전송</h3>
+            
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
+                Sender
+              </label>
+              <input
+                type="text"
+                value={sender}
+                onChange={(e) => setSender(e.target.value)}
+                placeholder="tester"
+                className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
+                Content
+              </label>
+              <input
+                type="text"
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="메시지 내용을 입력하세요"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleSimpleSend();
+                  }
+                }}
+                className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
+                Type
+              </label>
+              <select
+                value={messageType}
+                onChange={(e) => setMessageType(e.target.value as "TALK" | "ENTER" | "LEAVE")}
+                className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm"
+              >
+                <option value="TALK">TALK</option>
+                <option value="ENTER">ENTER</option>
+                <option value="LEAVE">LEAVE</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="enableTryHeader"
+                checked={enableTryHeader}
+                onChange={(e) => setEnableTryHeader(e.target.checked)}
+                className="w-4 h-4 text-[#2563EB] bg-gray-100 border-gray-300 rounded focus:ring-[#2563EB]"
+              />
+              <label htmlFor="enableTryHeader" className="text-xs font-medium text-gray-700 dark:text-[#E6EDF3]">
+                X-Ouroboros-Try
+              </label>
+              <span className="text-xs text-gray-500 dark:text-[#8B949E]">추적 헤더 추가</span>
+            </div>
+
             <button
-              onClick={() => setActiveTab("message")}
-              className={`px-4 py-2 text-sm font-medium transition-colors ${
-                activeTab === "message"
-                  ? "text-[#F97316] border-b-2 border-[#F97316] bg-white dark:bg-[#161B22]"
-                  : "text-gray-600 dark:text-[#8B949E] hover:text-gray-900 dark:hover:text-[#E6EDF3]"
-              }`}
+              onClick={handleSimpleSend}
+              className="w-full px-4 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-colors text-sm font-semibold"
             >
-              STOMP Frame
+              Send STOMP
             </button>
-            <button
-              onClick={() => setActiveTab("saved")}
-              className={`px-4 py-2 text-sm font-medium transition-colors ${
-                activeTab === "saved"
-                  ? "text-[#F97316] border-b-2 border-[#F97316] bg-white dark:bg-[#161B22]"
-                  : "text-gray-600 dark:text-[#8B949E] hover:text-gray-900 dark:hover:text-[#E6EDF3]"
-              }`}
-            >
-              Saved Messages ({savedMessages.length})
-            </button>
-          </div>
 
-          {/* Tab Content */}
-          <div className="p-4">
-            {activeTab === "message" && (
-              <div className="space-y-4">
-                {/* Mode Toggle */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 bg-gray-100 dark:bg-[#0D1117] rounded-md p-1 border border-gray-300 dark:border-[#2D333B]">
-                    <button
-                      onClick={() => setInputMode("structured")}
-                      className={`px-3 py-1.5 text-xs font-medium rounded transition-colors flex items-center gap-1.5 ${
-                        inputMode === "structured"
-                          ? "bg-white dark:bg-[#161B22] text-[#2563EB] shadow-sm"
-                          : "text-gray-600 dark:text-[#8B949E]"
-                      }`}
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                      </svg>
-                      Structured
-                    </button>
-                    <button
-                      onClick={syncToRawMode}
-                      className={`px-3 py-1.5 text-xs font-medium rounded transition-colors flex items-center gap-1.5 ${
-                        inputMode === "raw"
-                          ? "bg-white dark:bg-[#161B22] text-[#2563EB] shadow-sm"
-                          : "text-gray-600 dark:text-[#8B949E]"
-                      }`}
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                      </svg>
-                      Raw
-                    </button>
-                  </div>
-
-                  {inputMode === "raw" && (
-                    <button
-                      onClick={applyRawFrame}
-                      className="text-xs px-3 py-1.5 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-colors font-medium flex items-center gap-1.5"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                      Parse & Apply
-                    </button>
-                  )}
-                </div>
-
-                {/* Structured Mode */}
-                {inputMode === "structured" && (
-                  <div className="space-y-4">
-                    <div className="bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] rounded-md overflow-hidden">
-                      {/* COMMAND Section */}
-                      <div className="border-b border-gray-300 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4">
-                        <label className="block text-xs font-semibold text-gray-700 dark:text-[#8B949E] mb-2 uppercase tracking-wide">
-                          Command
-                        </label>
-                        <div className="flex gap-2">
-                          {(["SEND", "SUBSCRIBE", "UNSUBSCRIBE"] as StompCommand[]).map((cmd) => (
-                            <button
-                              key={cmd}
-                              onClick={() => setStompCommand(cmd)}
-                              className={`px-4 py-2 text-sm font-bold rounded-md transition-colors ${
-                                stompCommand === cmd
-                                  ? "bg-[#F97316] text-white shadow-md"
-                                  : "bg-gray-100 dark:bg-[#0D1117] text-gray-600 dark:text-[#8B949E] hover:bg-gray-200 dark:hover:bg-[#161B22]"
-                              }`}
-                            >
-                              {cmd}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* HEADERS Section */}
-                      <div className="border-b border-gray-300 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <label className="text-xs font-semibold text-gray-700 dark:text-[#8B949E] uppercase tracking-wide">
-                            Headers
-                          </label>
-                          <button
-                            onClick={addStompHeader}
-                            className="text-xs px-2 py-1 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-colors font-medium"
-                          >
-                            + Add Header
-                          </button>
-                        </div>
-                        <div className="space-y-2">
-                          {stompHeaders.map((header, index) => (
-                            <div key={index} className="flex gap-2 font-mono text-sm">
-                              <input
-                                type="text"
-                                value={header.key}
-                                onChange={(e) => updateStompHeader(index, e.target.value, header.value)}
-                                placeholder="header-name"
-                                className="flex-1 px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
-                              />
-                              <span className="text-gray-400 flex items-center">:</span>
-                              <input
-                                type="text"
-                                value={header.value}
-                                onChange={(e) => updateStompHeader(index, header.key, e.target.value)}
-                                placeholder="value"
-                                className="flex-1 px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
-                              />
-                              <button
-                                onClick={() => removeStompHeader(index)}
-                                className="px-3 py-2 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* BODY Section */}
-                      <div className="bg-white dark:bg-[#161B22] p-4">
-                        <label className="block text-xs font-semibold text-gray-700 dark:text-[#8B949E] mb-2 uppercase tracking-wide">
-                          Body
-                        </label>
-                        <textarea
-                          value={stompBody}
-                          onChange={(e) => setStompBody(e.target.value)}
-                          placeholder='{"message": "Hello, STOMP!"}'
-                          rows={10}
-                          className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-2 focus:ring-[#2563EB] text-sm font-mono resize-none"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Raw Mode */}
-                {inputMode === "raw" && (
-                  <div className="space-y-3">
-                    <div className="relative">
-                      <div className="absolute top-3 right-3 text-xs text-green-400 bg-black px-3 py-1.5 rounded font-mono z-10">
-                        💡 Paste from Postman
-                      </div>
-                      <textarea
-                        value={rawStompFrame}
-                        onChange={(e) => setRawStompFrame(e.target.value)}
-                        placeholder="SEND&#10;destination:/app/chat&#10;content-type:application/json&#10;&#10;{&quot;message&quot;:&quot;Hello, STOMP!&quot;}"
-                        rows={20}
-                        className="w-full px-4 py-3 rounded-md bg-black text-green-400 border-2 border-green-500/30 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 resize-none"
-                        style={{ fontFamily: 'Consolas, Monaco, "Courier New", monospace' }}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Action Buttons */}
-                <div className="flex gap-2 pt-2">
-                  <button
-                    onClick={handleSendMessage}
-                    className="flex-1 px-4 py-3 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-colors text-sm font-semibold flex items-center justify-center gap-2 shadow-md"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                    </svg>
-                    Send Message
-                  </button>
-                  <button
-                    onClick={saveCurrentMessage}
-                    className="px-4 py-3 bg-gray-500 hover:bg-gray-600 text-white rounded-md transition-colors text-sm font-semibold shadow-md"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                    </svg>
-                  </button>
-                </div>
-
-                {/* Quick Subscribe */}
-                <div className="border-t border-gray-200 dark:border-[#2D333B] pt-4 mt-2">
-                  <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                    💡 Quick Subscribe to Topic
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newTopic}
-                      onChange={(e) => setNewTopic(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          handleSubscribe();
-                        }
-                      }}
-                      placeholder="/topic/chat"
-                      className="flex-1 px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-2 focus:ring-[#2563EB] text-sm font-mono"
-                    />
-                    <button
-                      onClick={() => handleSubscribe()}
-                      className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-md transition-colors text-sm font-medium"
-                    >
-                      Subscribe
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === "saved" && (
-              <div className="space-y-3">
-                {savedMessages.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                    <p className="text-sm">저장된 메시지가 없습니다</p>
-                    <p className="text-xs mt-1">Message 탭에서 "Save" 버튼을 클릭하여 메시지를 저장하세요</p>
-                  </div>
-                ) : (
-                  savedMessages.map((msg) => (
+            {/* 도메인별 구독 경로 섹션 */}
+            {domainSubscriptionPaths.length > 0 && (
+              <div className="mt-6 pt-6 border-t border-gray-200 dark:border-[#2D333B]">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3] mb-3">
+                  도메인별 구독 경로
+                </h3>
+                <div className="space-y-2">
+                  {domainSubscriptionPaths.map((item, index) => (
                     <div
-                      key={msg.id}
-                      className="p-3 bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] rounded-md hover:border-[#2563EB] transition-colors cursor-pointer"
-                      onClick={() => loadSavedMessage(msg)}
+                      key={index}
+                      className="flex items-center justify-between p-3 bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] rounded-md"
                     >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-gray-900 dark:text-[#E6EDF3]">
-                          {msg.name}
-                        </span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteSavedMessage(msg.id);
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-gray-900 dark:text-[#E6EDF3] truncate">
+                          {item.path}
+                        </div>
+                        {item.description && (
+                          <div className="text-xs text-gray-500 dark:text-[#8B949E] truncate mt-1">
+                            {item.description}
+                          </div>
+                        )}
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer ml-4">
+                        <input
+                          type="checkbox"
+                          checked={item.isSubscribed}
+                          onChange={() => {
+                            if (item.isSubscribed) {
+                              // 구독 해제
+                              const subscription = subscriptions.find(
+                                (sub) => sub.destination === item.path
+                              );
+                              if (subscription) {
+                                handleUnsubscribe(subscription);
+                              }
+                            } else {
+                              // 구독
+                              handleSubscribe(item.path);
+                            }
                           }}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      </div>
-                      <div className="text-xs text-gray-600 dark:text-[#8B949E] font-mono">
-                        {msg.destination}
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                        {new Date(msg.timestamp).toLocaleString()}
-                      </div>
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                      </label>
                     </div>
-                  ))
-                )}
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -874,25 +769,47 @@ export function WsTestRequestPanel() {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
-            Active Subscriptions ({subscriptions.length})
+            Subscriptions ({subscriptions.filter(s => s.subscriptionId !== null).length} active / {subscriptions.length} total)
           </label>
           <div className="space-y-2">
-            {subscriptions.map((subscription) => (
-              <div
-                key={subscription.id}
-                className="flex items-center justify-between px-3 py-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md"
-              >
-                <span className="text-sm font-mono text-gray-900 dark:text-[#E6EDF3]">
-                  {subscription.destination}
-                </span>
-                <button
-                  onClick={() => handleUnsubscribe(subscription)}
-                  className="px-3 py-1 text-xs bg-red-500 hover:bg-red-600 text-white rounded transition-colors font-medium"
+            {subscriptions.map((subscription) => {
+              const isActive = subscription.subscriptionId !== null;
+              return (
+                <div
+                  key={subscription.id}
+                  className={`flex items-center justify-between p-3 rounded-md ${
+                    isActive
+                      ? "bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B]"
+                      : "bg-gray-100 dark:bg-[#161B22] border border-gray-200 dark:border-[#2D333B] opacity-60"
+                  }`}
                 >
-                  Unsubscribe
-                </button>
-              </div>
-            ))}
+                  <div className="flex-1 min-w-0">
+                    <span className={`text-sm font-mono ${
+                      isActive
+                        ? "text-gray-900 dark:text-[#E6EDF3]"
+                        : "text-gray-500 dark:text-[#8B949E]"
+                    }`}>
+                      {subscription.destination}
+                    </span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer ml-4">
+                    <input
+                      type="checkbox"
+                      checked={isActive}
+                      onChange={() => {
+                        if (isActive) {
+                          handleUnsubscribe(subscription);
+                        } else {
+                          handleSubscribe(subscription.destination);
+                        }
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                  </label>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
