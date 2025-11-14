@@ -60,12 +60,12 @@ public final class RequestDiffHelper {
             fileOp.setXOuroborosDiff(DIFF_REQUEST);
             fileOp.setXOuroborosProgress(DIFF_MOCK);
             fileOp.setXOuroborosTag(DIFF_NONE);
-            fileOp.setXOuroborosDiffLog(diffLog);
+            fileOp.setXOuroborosReqLog(diffLog);
         } else {
             fileOp.setXOuroborosDiff(DIFF_NONE);
             fileOp.setXOuroborosProgress(DIFF_COMPLETED);
             fileOp.setXOuroborosTag(DIFF_NONE);
-            fileOp.setXOuroborosDiffLog(null);
+            fileOp.setXOuroborosReqLog(null);
         }
     }
 
