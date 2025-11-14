@@ -32,16 +32,16 @@ export function ProtocolTabs({
   if (compact) {
     // 사이드바용 작은 사이즈
     return (
-      <div className="mt-3">
-        <div className="flex gap-1 border-b border-gray-200 dark:border-[#2D333B]">
+      <div className="mb-3">
+        <div className="flex gap-2 p-1 bg-gray-100 dark:bg-[#161B22] rounded-lg">
           {protocols.map((protocol) => (
             <button
               key={protocol}
               onClick={() => handleProtocolChange(protocol)}
-              className={`px-3 py-1.5 text-xs font-medium transition-colors border-b-2 ${
+              className={`flex-1 py-2 px-3 text-xs font-medium rounded-md transition-colors ${
                 selectedProtocol === protocol
-                  ? "text-gray-900 dark:text-[#E6EDF3] border-[#2563EB]"
-                  : "text-gray-600 dark:text-[#8B949E] border-transparent hover:text-gray-900 dark:hover:text-[#E6EDF3]"
+                  ? "bg-white dark:bg-[#0D1117] text-[#2563EB] shadow-sm"
+                  : "text-gray-600 dark:text-[#8B949E] hover:text-gray-900 dark:hover:text-[#E6EDF3]"
               }`}
             >
               {protocol}
