@@ -16,6 +16,7 @@ import kr.co.ouroboros.core.global.Protocol;
 import kr.co.ouroboros.core.global.handler.OuroProtocolHandler;
 import kr.co.ouroboros.core.global.spec.OuroApiSpec;
 import kr.co.ouroboros.core.rest.common.dto.OuroRestApiSpec;
+import kr.co.ouroboros.core.websocket.common.dto.OuroWebSocketApiSpec;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
@@ -71,6 +72,7 @@ public class OuroApiSpecManager {
         // 2. 코드 스캔
         OuroApiSpec scannedSpec = handler.scanCurrentState();
 
+        // Early return if both file and scanned specs are empty (avoid unnecessary validation)
         if (scannedSpec instanceof OuroRestApiSpec restApiSpec) {
             if (fileSpec == null && restApiSpec.getPaths()
                     .isEmpty()) {
@@ -78,14 +80,17 @@ public class OuroApiSpecManager {
             }
         }
 
+        if (scannedSpec instanceof OuroWebSocketApiSpec wsApiSpec) {
+            if (fileSpec == null && (wsApiSpec.getOperations() == null || wsApiSpec.getOperations().isEmpty())) {
+                return;
+            }
+        }
+
         // 3. 불일치 검증
         // 비교 후, 최종적으로 저장할 ApiSpec 반환
         OuroApiSpec validationResult = handler.synchronize(fileSpec, scannedSpec);
-        
-        // 4. 스캔한 최신 스펙을 YAML로 직렬화하고 파일에 저장
-        handler.saveYaml(validationResult);
 
-        // 5. 캐시 최신화 (validationResult 사용 - 파일+코드 동기화 결과)
+        // 4. 캐시 최신화 (validationResult 사용 - 파일+코드 동기화 결과)
         apiCache.put(protocol, validationResult);
     }
 
