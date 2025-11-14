@@ -1,18 +1,19 @@
 package kr.co.ouroboros.core.websocket.spec.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import kr.co.ouroboros.core.global.Protocol;
+import kr.co.ouroboros.core.global.manager.OuroApiSpecManager;
 import kr.co.ouroboros.core.websocket.common.dto.ChannelReference;
 import kr.co.ouroboros.core.websocket.common.dto.MessageReference;
 import kr.co.ouroboros.core.websocket.common.dto.Operation;
 import kr.co.ouroboros.core.websocket.common.dto.Reply;
 import kr.co.ouroboros.core.websocket.common.yaml.WebSocketYamlParser;
+import kr.co.ouroboros.core.websocket.spec.util.ReferenceConverter;
 import kr.co.ouroboros.ui.websocket.spec.dto.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.yaml.snakeyaml.LoaderOptions;
-import org.yaml.snakeyaml.Yaml;
-import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 import java.util.*;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -35,12 +36,17 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
 
     private final WebSocketYamlParser yamlParser;
     private final ObjectMapper objectMapper;
+    private final WebSocketChannelManager channelManager;
+    private final WebSocketServerManager serverManager;
+    private final WebSocketYamlImportService yamlImportService;
+    private final OuroApiSpecManager specManager;
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
     @Override
     public List<OperationResponse> createOperations(CreateOperationRequest request) throws Exception {
         lock.writeLock().lock();
         try {
+            // Read existing document or create new one (from file, not cache)
             Map<String, Object> asyncApiDoc = yamlParser.readOrCreateDocument();
 
             List<OperationResponse> createdOperations = new ArrayList<>();
@@ -57,7 +63,7 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
             }
 
             // Ensure server entry point exists
-            ensureServerExists(asyncApiDoc, request.getProtocol(), request.getPathname());
+            serverManager.ensureServerExists(asyncApiDoc, request.getProtocol(), request.getPathname());
 
             // At least one of receives or replies must be provided
             boolean hasReceives = request.getReceives() != null && !request.getReceives().isEmpty();
@@ -70,7 +76,7 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
             // Reply-only operations
             if (!hasReceives && hasReplies) {
                 for (ChannelMessageInfo reply : request.getReplies()) {
-                    String replyChannelName = ensureChannelExists(asyncApiDoc, reply);
+                    String replyChannelName = channelManager.ensureChannelExists(asyncApiDoc, reply);
 
                     // Generate unique operation name
                     String operationName = generateOperationName(null, replyChannelName, asyncApiDoc);
@@ -99,7 +105,7 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
             } else {
                 // Generate all combinations of receives × replies (or just receives if no replies)
                 for (ChannelMessageInfo receive : request.getReceives()) {
-                    String receiveChannelName = ensureChannelExists(asyncApiDoc, receive);
+                    String receiveChannelName = channelManager.ensureChannelExists(asyncApiDoc, receive);
 
                     if (!hasReplies) {
                         // No reply - create receive-only operation
@@ -128,7 +134,7 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                     } else {
                         // With replies - create all combinations
                         for (ChannelMessageInfo reply : request.getReplies()) {
-                            String replyChannelName = ensureChannelExists(asyncApiDoc, reply);
+                            String replyChannelName = channelManager.ensureChannelExists(asyncApiDoc, reply);
 
                             // Generate unique operation name
                             String operationName = generateOperationName(receiveChannelName, replyChannelName, asyncApiDoc);
@@ -158,8 +164,37 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                 }
             }
 
-            // Write to file
+            // Sync missing schemas and messages from cache to file and update $ref references to use class names
+            Map<String, Object> cacheDoc = specManager.convertSpecToMap(specManager.getApiSpec(Protocol.WEB_SOCKET));
+            if (cacheDoc != null) {
+                syncMissingSchemasAndMessagesFromCache(cacheDoc, asyncApiDoc);
+                
+                // Update all $ref references in created operations to use class names instead of full package names
+                Map<String, Object> cacheSchemas = yamlParser.getSchemas(cacheDoc);
+                Map<String, Object> cacheMessages = yamlParser.getMessages(cacheDoc);
+                if ((cacheSchemas != null && !cacheSchemas.isEmpty()) || (cacheMessages != null && !cacheMessages.isEmpty())) {
+                    Map<String, String> packageToClassNameMap = buildPackageToClassNameMap(cacheSchemas, cacheMessages);
+                    
+                    // Update all operations in the document
+                    Map<String, Object> operations = yamlParser.getOperations(asyncApiDoc);
+                    if (operations != null) {
+                        for (Map.Entry<String, Object> opEntry : operations.entrySet()) {
+                            Object opObj = opEntry.getValue();
+                            if (opObj instanceof Map) {
+                                @SuppressWarnings("unchecked")
+                                Map<String, Object> opMap = (Map<String, Object>) opObj;
+                                updateSchemaAndMessageReferences(opMap, packageToClassNameMap);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Write document directly
             yamlParser.writeDocument(asyncApiDoc);
+
+            // Update cache (validates with scanned state + updates cache, but does not write file)
+            specManager.processAndCacheSpec(Protocol.WEB_SOCKET, asyncApiDoc);
 
             log.info("Created {} WebSocket operations", createdOperations.size());
 
@@ -173,11 +208,12 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
     public List<OperationResponse> getAllOperations() throws Exception {
         lock.readLock().lock();
         try {
-            if (!yamlParser.fileExists()) {
+            // Read from cache
+            Map<String, Object> asyncApiDoc = specManager.convertSpecToMap(specManager.getApiSpec(Protocol.WEB_SOCKET));
+            if (asyncApiDoc == null) {
                 return new ArrayList<>();
             }
 
-            Map<String, Object> asyncApiDoc = yamlParser.readDocument();
             Map<String, Object> operations = yamlParser.getOperations(asyncApiDoc);
 
             if (operations == null || operations.isEmpty()) {
@@ -212,11 +248,12 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
     public OperationResponse getOperation(String id) throws Exception {
         lock.readLock().lock();
         try {
-            if (!yamlParser.fileExists()) {
+            // Read from cache
+            Map<String, Object> asyncApiDoc = specManager.convertSpecToMap(specManager.getApiSpec(Protocol.WEB_SOCKET));
+            if (asyncApiDoc == null) {
                 throw new IllegalArgumentException("No operations found. The specification file does not exist.");
             }
 
-            Map<String, Object> asyncApiDoc = yamlParser.readDocument();
             Map.Entry<String, Map<String, Object>> operationEntry = yamlParser.findOperationById(asyncApiDoc, id);
 
             if (operationEntry == null) {
@@ -245,7 +282,8 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                 throw new IllegalArgumentException("No operations found. The specification file does not exist.");
             }
 
-            Map<String, Object> asyncApiDoc = yamlParser.readDocument();
+            // Read from file directly (not cache) for CUD operations
+            Map<String, Object> asyncApiDoc = yamlParser.readDocumentFromFile();
             Map.Entry<String, Map<String, Object>> operationEntry = yamlParser.findOperationById(asyncApiDoc, id);
 
             if (operationEntry == null) {
@@ -259,18 +297,18 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
             String updatedPathname = null;
             if (request.getProtocol() != null || request.getPathname() != null) {
                 String protocol = request.getProtocol() != null ? request.getProtocol() :
-                        extractProtocolFromExistingServer(asyncApiDoc);
+                        serverManager.extractProtocol(asyncApiDoc);
                 String pathname = request.getPathname() != null ? request.getPathname() :
-                        extractPathnameFromExistingServer(asyncApiDoc);
+                        serverManager.extractPathname(asyncApiDoc);
 
                 if (protocol != null && pathname != null) {
-                    ensureServerExists(asyncApiDoc, protocol, pathname);
+                    serverManager.ensureServerExists(asyncApiDoc, protocol, pathname);
                     updatedPathname = pathname;
                 }
             }
 
             // Extract old channel references before update
-            Set<String> oldChannelRefs = extractChannelReferences(existingOperation);
+            Set<String> oldChannelRefs = channelManager.extractChannelReferences(existingOperation);
 
             // Create a copy of existing operation for comparison
             Map<String, Object> updatedOperation = new LinkedHashMap<>(existingOperation);
@@ -288,7 +326,7 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
             
             // Update receive channel (main channel)
             if (request.getReceive() != null) {
-                String channelName = ensureChannelExists(asyncApiDoc, request.getReceive());
+                String channelName = channelManager.ensureChannelExists(asyncApiDoc, request.getReceive());
                 Map<String, String> channelRef = new LinkedHashMap<>();
                 channelRef.put("$ref", "#/channels/" + channelName);
                 updatedOperation.put("channel", channelRef);
@@ -315,7 +353,7 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                 
                 if (isSendOnly) {
                     // For send-only operations, set reply channel as top-level channel
-                    String replyChannelName = ensureChannelExists(asyncApiDoc, request.getReply());
+                    String replyChannelName = channelManager.ensureChannelExists(asyncApiDoc, request.getReply());
                     updatedOperation.put("channel", Map.of("$ref", "#/channels/" + replyChannelName));
                     
                     // Set top-level messages to reply's messages refs - reference channel's messages, not components directly
@@ -336,7 +374,7 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                     // Existing behavior for reply-containing updates (receive with reply)
                     Map<String, Object> reply = new LinkedHashMap<>();
                     
-                    String replyChannelName = ensureChannelExists(asyncApiDoc, request.getReply());
+                    String replyChannelName = channelManager.ensureChannelExists(asyncApiDoc, request.getReply());
                     Map<String, String> replyChannelRef = new LinkedHashMap<>();
                     replyChannelRef.put("$ref", "#/channels/" + replyChannelName);
                     reply.put("channel", replyChannelRef);
@@ -358,7 +396,7 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
             }
 
             // Extract new channel references after update
-            Set<String> newChannelRefs = extractChannelReferences(updatedOperation);
+            Set<String> newChannelRefs = channelManager.extractChannelReferences(updatedOperation);
 
             // Find channels that were removed (in old but not in new)
             Set<String> removedChannels = new HashSet<>(oldChannelRefs);
@@ -368,19 +406,28 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
             existingOperation.clear();
             existingOperation.putAll(updatedOperation);
 
-            // Check and delete channels that are no longer referenced
-            for (String channelName : removedChannels) {
-                if (!isChannelUsedByOtherOperations(asyncApiDoc, channelName)) {
-                    // Channel is not used by any other operation, delete it
-                    boolean channelRemoved = removeChannel(asyncApiDoc, channelName);
-                    if (channelRemoved) {
-                        log.info("Deleted unused channel: {} (no longer referenced after operation update)", channelName);
-                    }
+            // Sync missing schemas and messages from cache to file and update $ref references to use class names
+            Map<String, Object> cacheDoc = specManager.convertSpecToMap(specManager.getApiSpec(Protocol.WEB_SOCKET));
+            if (cacheDoc != null) {
+                syncMissingSchemasAndMessagesFromCache(cacheDoc, asyncApiDoc);
+                
+                // Update all $ref references in operation to use class names instead of full package names
+                Map<String, Object> cacheSchemas = yamlParser.getSchemas(cacheDoc);
+                Map<String, Object> cacheMessages = yamlParser.getMessages(cacheDoc);
+                if ((cacheSchemas != null && !cacheSchemas.isEmpty()) || (cacheMessages != null && !cacheMessages.isEmpty())) {
+                    Map<String, String> packageToClassNameMap = buildPackageToClassNameMap(cacheSchemas, cacheMessages);
+                    updateSchemaAndMessageReferences(existingOperation, packageToClassNameMap);
                 }
             }
 
-            // Write to file
+            // Check and delete channels that are no longer referenced
+            channelManager.cleanupUnusedChannels(asyncApiDoc, removedChannels);
+
+            // Write document directly
             yamlParser.writeDocument(asyncApiDoc);
+
+            // Update cache (validates with scanned state + updates cache, but does not write file)
+            specManager.processAndCacheSpec(Protocol.WEB_SOCKET, asyncApiDoc);
 
             log.info("Updated WebSocket operation: {}", operationName);
 
@@ -403,7 +450,8 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                 throw new IllegalArgumentException("No operations found. The specification file does not exist.");
             }
 
-            Map<String, Object> asyncApiDoc = yamlParser.readDocument();
+            // Read from file directly (not cache) for CUD operations
+            Map<String, Object> asyncApiDoc = yamlParser.readDocumentFromFile();
 
             // Find operation by id before deletion
             Map.Entry<String, Map<String, Object>> operationEntry = yamlParser.findOperationById(asyncApiDoc, id);
@@ -415,7 +463,7 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
             Map<String, Object> operationToDelete = operationEntry.getValue();
 
             // Extract channel names from operation
-            Set<String> referencedChannels = extractChannelReferences(operationToDelete);
+            Set<String> referencedChannels = channelManager.extractChannelReferences(operationToDelete);
 
             // Delete the operation
             boolean removed = yamlParser.removeOperation(asyncApiDoc, operationName);
@@ -423,191 +471,19 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                 throw new IllegalArgumentException("Operation with id '" + id + "' not found");
             }
 
-            // Check if referenced channels are used by other operations
-            for (String channelName : referencedChannels) {
-                if (!isChannelUsedByOtherOperations(asyncApiDoc, channelName)) {
-                    // Channel is not used by any other operation, delete it
-                    boolean channelRemoved = removeChannel(asyncApiDoc, channelName);
-                    if (channelRemoved) {
-                        log.info("Deleted unused channel: {} (no longer referenced by any operation)", channelName);
-                    }
-                }
-            }
+            // Check and delete channels that are no longer referenced
+            channelManager.cleanupUnusedChannels(asyncApiDoc, referencedChannels);
 
-            // Write to file
+            // Write document directly
             yamlParser.writeDocument(asyncApiDoc);
+
+            // Update cache (validates with scanned state + updates cache, but does not write file)
+            specManager.processAndCacheSpec(Protocol.WEB_SOCKET, asyncApiDoc);
 
             log.info("Deleted WebSocket operation: {}", operationName);
         } finally {
             lock.writeLock().unlock();
         }
-    }
-
-    /**
-     * Ensures a server entry point exists, creating it if necessary.
-     * Server name is generated from protocol and pathname (e.g., "ws-ws", "wss-stomp_v1").
-     * Host is automatically set to "localhost:8080".
-     * If a server with the same protocol and pathname already exists, reuses it.
-     *
-     * @param asyncApiDoc AsyncAPI document
-     * @param protocol WebSocket protocol (ws or wss)
-     * @param pathname WebSocket pathname (entry point)
-     */
-    private void ensureServerExists(Map<String, Object> asyncApiDoc, String protocol, String pathname) {
-        // Generate server name from protocol + pathname
-        String serverName = generateServerName(protocol, pathname);
-
-        // Check if server already exists
-        Map<String, Object> existingServer = yamlParser.getServer(asyncApiDoc, serverName);
-        if (existingServer != null) {
-            // Server already exists, no action needed
-            log.debug("Reusing existing server: {} (protocol: {}, pathname: {})", serverName, protocol, pathname);
-            return;
-        }
-
-        // Create new server
-        Map<String, Object> serverDefinition = new LinkedHashMap<>();
-        serverDefinition.put("host", "localhost:8080");
-        serverDefinition.put("pathname", pathname);
-        serverDefinition.put("protocol", protocol);
-        serverDefinition.put("description", protocol.toUpperCase() + " WebSocket server at " + pathname);
-
-        yamlParser.putServer(asyncApiDoc, serverName, serverDefinition);
-        log.debug("Auto-created server: {} (protocol: {}, pathname: {})", serverName, protocol, pathname);
-    }
-
-    /**
-     * Generates a server name from protocol and pathname.
-     * Pattern: protocol-pathname_sanitized (e.g., "ws-ws", "wss-stomp_v1")
-     *
-     * @param protocol WebSocket protocol (ws or wss)
-     * @param pathname WebSocket pathname
-     * @return sanitized server name
-     */
-    private String generateServerName(String protocol, String pathname) {
-        // Sanitize pathname: remove leading slash, replace remaining slashes with underscores
-        String sanitizedPathname = pathname.startsWith("/") ? pathname.substring(1) : pathname;
-        sanitizedPathname = sanitizedPathname.replace("/", "_");
-
-        return protocol + "-" + sanitizedPathname;
-    }
-
-    /**
-     * Ensures a channel exists, creating it if necessary.
-     * Returns the channel name (either existing or newly created).
-     *
-     * @param asyncApiDoc AsyncAPI document
-     * @param channelInfo channel information (address or channelRef + messages)
-     * @return channel name
-     */
-    private String ensureChannelExists(Map<String, Object> asyncApiDoc, ChannelMessageInfo channelInfo) {
-        String channelName;
-        String address;
-
-        if (channelInfo.getChannelRef() != null) {
-            // Use existing channel
-            channelName = channelInfo.getChannelRef();
-            Map<String, Object> existingChannel = yamlParser.getChannel(asyncApiDoc, channelName);
-            if (existingChannel == null) {
-                throw new IllegalArgumentException("Channel '" + channelName + "' not found");
-            }
-            // Update messages if provided
-            if (channelInfo.getMessages() != null && !channelInfo.getMessages().isEmpty()) {
-                updateChannelMessages(asyncApiDoc, channelName, channelInfo.getMessages());
-            }
-        } else if (channelInfo.getAddress() != null) {
-            // Create new channel from address
-            address = channelInfo.getAddress();
-            channelName = addressToChannelName(address);
-
-            if (!yamlParser.channelExists(asyncApiDoc, channelName)) {
-                Map<String, Object> channelDefinition = buildChannelDefinition(address, channelInfo.getMessages());
-                yamlParser.putChannel(asyncApiDoc, channelName, channelDefinition);
-                log.debug("Auto-created channel: {} (address: {})", channelName, address);
-            } else {
-                // Update messages if provided
-                if (channelInfo.getMessages() != null && !channelInfo.getMessages().isEmpty()) {
-                    updateChannelMessages(asyncApiDoc, channelName, channelInfo.getMessages());
-                }
-            }
-        } else {
-            throw new IllegalArgumentException("Either address or channelRef must be provided");
-        }
-
-        return channelName;
-    }
-
-    /**
-     * Updates messages in an existing channel.
-     *
-     * @param asyncApiDoc AsyncAPI document
-     * @param channelName channel name
-     * @param messageNames list of message names
-     */
-    @SuppressWarnings("unchecked")
-    private void updateChannelMessages(Map<String, Object> asyncApiDoc, String channelName, List<String> messageNames) {
-        Map<String, Object> channel = yamlParser.getChannel(asyncApiDoc, channelName);
-        if (channel == null) {
-            return;
-        }
-
-        Map<String, Object> messages = (Map<String, Object>) channel.get("messages");
-        if (messages == null) {
-            messages = new LinkedHashMap<>();
-            channel.put("messages", messages);
-        }
-
-        // Add or update message references
-        for (String messageName : messageNames) {
-            Map<String, String> messageRef = new LinkedHashMap<>();
-            messageRef.put("$ref", "#/components/messages/" + messageName);
-            messages.put(messageName, messageRef);
-        }
-    }
-
-    /**
-     * Converts an address to a channel name.
-     * Pattern: "/chat.send" -> "_chat.send", "/topic/rooms" -> "_topic_rooms"
-     *
-     * @param address channel address
-     * @return channel name
-     */
-    private String addressToChannelName(String address) {
-        if (address == null || address.isEmpty()) {
-            throw new IllegalArgumentException("Address cannot be null or empty");
-        }
-        // Remove leading slash and replace remaining slashes with underscores
-        String name = address.startsWith("/") ? address.substring(1) : address;
-        return "_" + name.replace("/", "_");
-    }
-
-    /**
-     * Builds a channel definition from address and messages.
-     *
-     * @param address channel address
-     * @param messageNames list of message names
-     * @return channel definition map
-     */
-    private Map<String, Object> buildChannelDefinition(String address, List<String> messageNames) {
-        Map<String, Object> channel = new LinkedHashMap<>();
-        channel.put("address", address);
-
-        if (messageNames != null && !messageNames.isEmpty()) {
-            Map<String, Object> messages = new LinkedHashMap<>();
-            for (String messageName : messageNames) {
-                Map<String, String> messageRef = new LinkedHashMap<>();
-                messageRef.put("$ref", "#/components/messages/" + messageName);
-                messages.put(messageName, messageRef);
-            }
-            channel.put("messages", messages);
-        }
-
-        // Add default STOMP bindings
-        Map<String, Object> bindings = new LinkedHashMap<>();
-        bindings.put("stomp", new LinkedHashMap<>());
-        channel.put("bindings", bindings);
-
-        return channel;
     }
 
     /**
@@ -754,7 +630,7 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
     @SuppressWarnings("unchecked")
     private Operation convertMapToOperation(Map<String, Object> operationMap) {
         // Preprocess: convert $ref to ref for Jackson deserialization
-        Map<String, Object> processedMap = convertDollarRefToRef(operationMap);
+        Map<String, Object> processedMap = ReferenceConverter.convertDollarRefToRef(operationMap);
         
         try {
             return objectMapper.convertValue(processedMap, Operation.class);
@@ -768,27 +644,25 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
             operation.setXOuroborosDiff((String) processedMap.get("x-ouroboros-diff"));
             operation.setXOuroborosProgress((String) processedMap.get("x-ouroboros-progress"));
 
-            // Channel reference (already converted to ref by convertDollarRefToRef)
+            // Channel reference (already converted to ref by ReferenceConverter)
             Object channelObj = processedMap.get("channel");
-            if (channelObj instanceof Map) {
-                @SuppressWarnings("unchecked")
-                Map<String, String> channelMap = (Map<String, String>) channelObj;
+            if (channelObj instanceof Map<?, ?> channelMapObj) {
+                Map<String, String> channelMap = (Map<String, String>) channelMapObj;
                 ChannelReference channelRef = new ChannelReference();
-                // convertDollarRefToRef converts "$ref" to "ref"
+                // ReferenceConverter converts "$ref" to "ref"
                 String ref = channelMap.get("ref");
                 channelRef.setRef(ref);
                 operation.setChannel(channelRef);
             }
 
-            // Messages (already converted to ref by convertDollarRefToRef)
+            // Messages (already converted to ref by ReferenceConverter)
             Object messagesObj = processedMap.get("messages");
-            if (messagesObj instanceof List) {
-                @SuppressWarnings("unchecked")
-                List<Map<String, String>> messagesList = (List<Map<String, String>>) messagesObj;
+            if (messagesObj instanceof List<?> messagesListObj) {
+                List<Map<String, String>> messagesList = (List<Map<String, String>>) messagesListObj;
                 List<MessageReference> messageRefs = messagesList.stream()
                         .map(msgMap -> {
                             MessageReference msgRef = new MessageReference();
-                            // convertDollarRefToRef converts "$ref" to "ref"
+                            // ReferenceConverter converts "$ref" to "ref"
                             String ref = msgMap.get("ref");
                             msgRef.setRef(ref);
                             return msgRef;
@@ -797,32 +671,29 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                 operation.setMessages(messageRefs);
             }
 
-            // Reply (already converted to ref by convertDollarRefToRef)
+            // Reply (already converted to ref by ReferenceConverter)
             Object replyObj = processedMap.get("reply");
-            if (replyObj instanceof Map) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> replyMap = (Map<String, Object>) replyObj;
+            if (replyObj instanceof Map<?, ?> replyMapObj) {
+                Map<String, Object> replyMap = (Map<String, Object>) replyMapObj;
                 Reply reply = new Reply();
 
                 Object replyChannelObj = replyMap.get("channel");
-                if (replyChannelObj instanceof Map) {
-                    @SuppressWarnings("unchecked")
-                    Map<String, String> replyChannelMap = (Map<String, String>) replyChannelObj;
+                if (replyChannelObj instanceof Map<?, ?> replyChannelMapObj) {
+                    Map<String, String> replyChannelMap = (Map<String, String>) replyChannelMapObj;
                     ChannelReference replyChannelRef = new ChannelReference();
-                    // convertDollarRefToRef converts "$ref" to "ref"
+                    // ReferenceConverter converts "$ref" to "ref"
                     String ref = replyChannelMap.get("ref");
                     replyChannelRef.setRef(ref);
                     reply.setChannel(replyChannelRef);
                 }
 
                 Object replyMessagesObj = replyMap.get("messages");
-                if (replyMessagesObj instanceof List) {
-                    @SuppressWarnings("unchecked")
-                    List<Map<String, String>> replyMessagesList = (List<Map<String, String>>) replyMessagesObj;
+                if (replyMessagesObj instanceof List<?> replyMessagesListObj) {
+                    List<Map<String, String>> replyMessagesList = (List<Map<String, String>>) replyMessagesListObj;
                     List<MessageReference> replyMessageRefs = replyMessagesList.stream()
                             .map(msgMap -> {
                                 MessageReference msgRef = new MessageReference();
-                                // convertDollarRefToRef converts "$ref" to "ref"
+                                // ReferenceConverter converts "$ref" to "ref"
                                 String ref = msgMap.get("ref");
                                 msgRef.setRef(ref);
                                 return msgRef;
@@ -836,167 +707,6 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
 
             return operation;
         }
-    }
-
-    /**
-     * Recursively converts $ref fields to ref fields in a Map for Jackson deserialization.
-     * <p>
-     * YAML uses $ref (AsyncAPI standard), but JSON API uses ref.
-     * This method converts $ref to ref so that Jackson can properly deserialize to DTOs.
-     *
-     * @param map the map to process
-     * @return new map with $ref converted to ref (deep copy)
-     */
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> convertDollarRefToRef(Map<String, Object> map) {
-        if (map == null) {
-            return null;
-        }
-        
-        Map<String, Object> result = new LinkedHashMap<>();
-        for (Map.Entry<String, Object> entry : map.entrySet()) {
-            String key = entry.getKey();
-            Object value = entry.getValue();
-            
-            // Convert $ref key to ref
-            if ("$ref".equals(key) && value instanceof String) {
-                result.put("ref", value);
-            } else if (value instanceof Map) {
-                // Recursively process nested maps
-                result.put(key, convertDollarRefToRef((Map<String, Object>) value));
-            } else if (value instanceof List) {
-                // Recursively process lists
-                result.put(key, convertDollarRefToRefInList((List<Object>) value));
-            } else {
-                // Keep other fields as-is
-                result.put(key, value);
-            }
-        }
-        return result;
-    }
-
-    /**
-     * Recursively converts $ref fields to ref fields in a List.
-     *
-     * @param list the list to process
-     * @return new list with $ref converted to ref (deep copy)
-     */
-    @SuppressWarnings("unchecked")
-    private List<Object> convertDollarRefToRefInList(List<Object> list) {
-        if (list == null) {
-            return null;
-        }
-        
-        List<Object> result = new ArrayList<>();
-        for (Object item : list) {
-            if (item instanceof Map) {
-                result.add(convertDollarRefToRef((Map<String, Object>) item));
-            } else if (item instanceof List) {
-                result.add(convertDollarRefToRefInList((List<Object>) item));
-            } else {
-                result.add(item);
-            }
-        }
-        return result;
-    }
-
-    /**
-     * Extracts channel names referenced by an operation.
-     * Includes both the main channel and reply channel.
-     *
-     * @param operation operation definition map
-     * @return set of channel names referenced by the operation
-     */
-    @SuppressWarnings("unchecked")
-    private Set<String> extractChannelReferences(Map<String, Object> operation) {
-        Set<String> channelNames = new HashSet<>();
-
-        // Extract main channel reference
-        Object channelObj = operation.get("channel");
-        if (channelObj instanceof Map) {
-            Map<String, String> channelMap = (Map<String, String>) channelObj;
-            String ref = channelMap.get("$ref");
-            if (ref != null && ref.startsWith("#/channels/")) {
-                String channelName = ref.substring("#/channels/".length());
-                channelNames.add(channelName);
-            }
-        }
-
-        // Extract reply channel reference
-        Object replyObj = operation.get("reply");
-        if (replyObj instanceof Map) {
-            Map<String, Object> replyMap = (Map<String, Object>) replyObj;
-            Object replyChannelObj = replyMap.get("channel");
-            if (replyChannelObj instanceof Map) {
-                Map<String, String> replyChannelMap = (Map<String, String>) replyChannelObj;
-                String ref = replyChannelMap.get("$ref");
-                if (ref != null && ref.startsWith("#/channels/")) {
-                    String channelName = ref.substring("#/channels/".length());
-                    channelNames.add(channelName);
-                }
-            }
-        }
-
-        return channelNames;
-    }
-
-    /**
-     * Checks if a channel is used by any operation (excluding the operation being deleted).
-     *
-     * @param asyncApiDoc AsyncAPI document
-     * @param channelName channel name to check
-     * @return true if channel is used by any operation, false otherwise
-     */
-    @SuppressWarnings("unchecked")
-    private boolean isChannelUsedByOtherOperations(Map<String, Object> asyncApiDoc, String channelName) {
-        Map<String, Object> operations = yamlParser.getOperations(asyncApiDoc);
-        if (operations == null || operations.isEmpty()) {
-            return false;
-        }
-
-        String channelRef = "#/channels/" + channelName;
-
-        // Check all operations
-        for (Map.Entry<String, Object> entry : operations.entrySet()) {
-            Map<String, Object> operation = (Map<String, Object>) entry.getValue();
-
-            // Check main channel
-            Object channelObj = operation.get("channel");
-            if (channelObj instanceof Map) {
-                Map<String, String> channelMap = (Map<String, String>) channelObj;
-                String ref = channelMap.get("$ref");
-                if (channelRef.equals(ref)) {
-                    return true;
-                }
-            }
-
-            // Check reply channel
-            Object replyObj = operation.get("reply");
-            if (replyObj instanceof Map) {
-                Map<String, Object> replyMap = (Map<String, Object>) replyObj;
-                Object replyChannelObj = replyMap.get("channel");
-                if (replyChannelObj instanceof Map) {
-                    Map<String, String> replyChannelMap = (Map<String, String>) replyChannelObj;
-                    String ref = replyChannelMap.get("$ref");
-                    if (channelRef.equals(ref)) {
-                        return true;
-                    }
-                }
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Removes a channel from the AsyncAPI document.
-     *
-     * @param asyncApiDoc AsyncAPI document
-     * @param channelName channel name to remove
-     * @return true if channel was removed, false if it didn't exist
-     */
-    private boolean removeChannel(Map<String, Object> asyncApiDoc, String channelName) {
-        return yamlParser.removeChannel(asyncApiDoc, channelName);
     }
 
     /**
@@ -1022,64 +732,6 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
             return "send";
         }
         // Neither provided, no change
-        return null;
-    }
-
-    /**
-     * Extracts protocol from existing server in the document.
-     * <p>
-     * Looks for the first server and returns its protocol.
-     *
-     * @param asyncApiDoc AsyncAPI document
-     * @return protocol (ws or wss), or null if not found
-     */
-    @SuppressWarnings("unchecked")
-    private String extractProtocolFromExistingServer(Map<String, Object> asyncApiDoc) {
-        Map<String, Object> servers = yamlParser.getServers(asyncApiDoc);
-        if (servers == null || servers.isEmpty()) {
-            return null;
-        }
-        
-        // Get first server
-        Map<String, Object> firstServer = servers.values().stream()
-                .filter(server -> server instanceof Map)
-                .map(server -> (Map<String, Object>) server)
-                .findFirst()
-                .orElse(null);
-        
-        if (firstServer != null) {
-            return (String) firstServer.get("protocol");
-        }
-        
-        return null;
-    }
-
-    /**
-     * Extracts pathname from existing server in the document.
-     * <p>
-     * Looks for the first server and returns its pathname.
-     *
-     * @param asyncApiDoc AsyncAPI document
-     * @return pathname, or null if not found
-     */
-    @SuppressWarnings("unchecked")
-    private String extractPathnameFromExistingServer(Map<String, Object> asyncApiDoc) {
-        Map<String, Object> servers = yamlParser.getServers(asyncApiDoc);
-        if (servers == null || servers.isEmpty()) {
-            return null;
-        }
-        
-        // Get first server
-        Map<String, Object> firstServer = servers.values().stream()
-                .filter(server -> server instanceof Map)
-                .map(server -> (Map<String, Object>) server)
-                .findFirst()
-                .orElse(null);
-        
-        if (firstServer != null) {
-            return (String) firstServer.get("pathname");
-        }
-        
         return null;
     }
 
@@ -1125,611 +777,18 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
     public ImportYamlResponse importYaml(String yamlContent) throws Exception {
         lock.writeLock().lock();
         try {
-            log.info("========================================");
-            log.info("📥 Starting AsyncAPI YAML import...");
-
-            // Step 1: Parse imported YAML (validation already done in controller)
-            // Use SafeConstructor to prevent arbitrary object deserialization
-            LoaderOptions loaderOptions = new LoaderOptions();
-            Yaml yaml = new Yaml(new SafeConstructor(loaderOptions));
-            @SuppressWarnings("unchecked")
-            Map<String, Object> importedDoc = (Map<String, Object>) yaml.load(yamlContent);
-
-            // Step 2: Read existing document or create new one
-            Map<String, Object> existingDoc = yamlParser.readOrCreateDocument();
-
-            // Step 3: Prepare renamed tracking
-            List<RenamedItem> renamedList = new ArrayList<>();
-            Map<String, String> schemaRenameMap = new HashMap<>();  // old name -> new name
-            Map<String, String> messageRenameMap = new HashMap<>(); // old name -> new name
-
-            // Step 4: Process schemas first
-            int importedSchemas = importSchemas(importedDoc, existingDoc, renamedList, schemaRenameMap);
-
-            // Step 5: Process messages (with schema reference updates)
-            int importedMessages = importMessages(importedDoc, existingDoc, renamedList, messageRenameMap, schemaRenameMap);
-
-            // Step 5.5: Process servers
-            int importedServers = importServers(importedDoc, existingDoc, renamedList);
-
-            // Step 5.6: Extract entrypoint from imported servers for operations
-            String entrypoint = extractFirstServerPathname(importedDoc);
-
-            // Step 6: Process channels (with message reference updates)
-            int importedChannels = importChannels(importedDoc, existingDoc, renamedList, messageRenameMap);
-
-            // Step 7: Process operations (with message reference updates)
-            int importedOperations = importOperations(importedDoc, existingDoc, renamedList, messageRenameMap, entrypoint);
-
-            // Step 7.5: Update schema references in messages (after all messages are imported)
-            updateSchemaReferencesInMessages(existingDoc, schemaRenameMap);
-
-            // Step 8: Save to file
-            yamlParser.writeDocument(existingDoc);
-
-            // Step 9: Build response
-            String summary = String.format("Successfully imported %d channels, %d operations, %d schemas, %d messages%s",
-                    importedChannels, importedOperations, importedSchemas, importedMessages,
-                    !renamedList.isEmpty() ? ", renamed " + renamedList.size() + " items due to duplicates" : "");
-
-            log.info("========================================");
-            log.info("✅ AsyncAPI YAML Import Completed");
-            log.info("   📊 Servers imported: {}", importedServers);
-            log.info("   📊 Channels imported: {}", importedChannels);
-            log.info("   📊 Operations imported: {}", importedOperations);
-            log.info("   📊 Schemas imported: {}", importedSchemas);
-            log.info("   📊 Messages imported: {}", importedMessages);
-            log.info("   📊 Items renamed: {}", renamedList.size());
-            log.info("========================================");
-
-            return ImportYamlResponse.builder()
-                    .importedChannels(importedChannels)
-                    .importedOperations(importedOperations)
-                    .renamed(renamedList.size())
-                    .summary(summary)
-                    .renamedList(renamedList)
-                    .build();
-
+            ImportYamlResponse response = yamlImportService.importYaml(yamlContent);
+            
+            // After import, read the document from file and update cache
+            Map<String, Object> asyncApiDoc = yamlParser.readDocumentFromFile();
+            specManager.processAndCacheSpec(Protocol.WEB_SOCKET, asyncApiDoc);
+            
+            return response;
         } finally {
             lock.writeLock().unlock();
         }
     }
 
-    /**
-     * Imports schemas from imported document into existing document.
-     * Handles duplicate schema names by auto-renaming with "-import" suffix.
-     */
-    @SuppressWarnings("unchecked")
-    private int importSchemas(Map<String, Object> importedDoc, Map<String, Object> existingDoc,
-                              List<RenamedItem> renamedList, Map<String, String> schemaRenameMap) {
-        int count = 0;
-
-        Map<String, Object> existingComponents = yamlParser.getOrCreateComponents(existingDoc);
-        Map<String, Object> existingSchemas = yamlParser.getOrCreateSchemas(existingComponents);
-
-        Map<String, Object> importedComponents = (Map<String, Object>) importedDoc.get("components");
-        if (importedComponents == null) {
-            return 0;
-        }
-
-        Map<String, Object> importedSchemas = (Map<String, Object>) importedComponents.get("schemas");
-        if (importedSchemas == null || importedSchemas.isEmpty()) {
-            return 0;
-        }
-
-        for (Map.Entry<String, Object> entry : importedSchemas.entrySet()) {
-            String originalName = entry.getKey();
-            String finalName = originalName;
-
-            // Check for duplicate and rename if necessary
-            if (existingSchemas.containsKey(originalName)) {
-                finalName = originalName + "-import";
-                int counter = 1;
-                while (existingSchemas.containsKey(finalName)) {
-                    finalName = originalName + "-import" + counter;
-                    counter++;
-                }
-
-                renamedList.add(RenamedItem.builder()
-                        .type("schema")
-                        .original(originalName)
-                        .renamed(finalName)
-                        .build());
-
-                schemaRenameMap.put(originalName, finalName);
-                log.info("🔄 Schema '{}' renamed to '{}' due to duplicate", originalName, finalName);
-            }
-
-            existingSchemas.put(finalName, entry.getValue());
-            count++;
-        }
-
-        return count;
-    }
-
-    /**
-     * Imports messages from imported document into existing document.
-     * Handles duplicate message names by auto-renaming with "-import" suffix.
-     * Updates schema references in message payloads according to schema rename map.
-     */
-    @SuppressWarnings("unchecked")
-    private int importMessages(Map<String, Object> importedDoc, Map<String, Object> existingDoc,
-                               List<RenamedItem> renamedList, Map<String, String> messageRenameMap,
-                               Map<String, String> schemaRenameMap) {
-        int count = 0;
-
-        Map<String, Object> existingComponents = yamlParser.getOrCreateComponents(existingDoc);
-        Map<String, Object> existingMessages = yamlParser.getOrCreateMessages(existingComponents);
-
-        Map<String, Object> importedComponents = (Map<String, Object>) importedDoc.get("components");
-        if (importedComponents == null) {
-            return 0;
-        }
-
-        Map<String, Object> importedMessages = (Map<String, Object>) importedComponents.get("messages");
-        if (importedMessages == null || importedMessages.isEmpty()) {
-            return 0;
-        }
-
-        for (Map.Entry<String, Object> entry : importedMessages.entrySet()) {
-            String originalName = entry.getKey();
-            String finalName = originalName;
-
-            if (existingMessages.containsKey(originalName)) {
-                finalName = originalName + "-import";
-                int counter = 1;
-                while (existingMessages.containsKey(finalName)) {
-                    finalName = originalName + "-import" + counter;
-                    counter++;
-                }
-
-                renamedList.add(RenamedItem.builder()
-                        .type("message")
-                        .original(originalName)
-                        .renamed(finalName)
-                        .build());
-
-                messageRenameMap.put(originalName, finalName);
-                log.info("🔄 Message '{}' renamed to '{}' due to duplicate", originalName, finalName);
-            }
-
-            // Update message references in the message itself (for payload schema refs)
-            Map<String, Object> message = (Map<String, Object>) entry.getValue();
-            updateSchemaReferences(message, schemaRenameMap);
-
-            existingMessages.put(finalName, message);
-            count++;
-        }
-
-        return count;
-    }
-
-    /**
-     * Imports channels from imported document into existing document.
-     * Handles duplicate channel names by auto-renaming with "-import" suffix.
-     * Updates message references according to message rename map.
-     */
-    @SuppressWarnings("unchecked")
-    private int importChannels(Map<String, Object> importedDoc, Map<String, Object> existingDoc,
-                               List<RenamedItem> renamedList, Map<String, String> messageRenameMap) {
-        int count = 0;
-
-        Map<String, Object> existingChannels = yamlParser.getOrCreateChannels(existingDoc);
-
-        Map<String, Object> importedChannels = (Map<String, Object>) importedDoc.get("channels");
-        if (importedChannels == null || importedChannels.isEmpty()) {
-            return 0;
-        }
-
-        for (Map.Entry<String, Object> entry : importedChannels.entrySet()) {
-            String originalName = entry.getKey();
-            String finalName = originalName;
-
-            if (existingChannels.containsKey(originalName)) {
-                finalName = originalName + "-import";
-                int counter = 1;
-                while (existingChannels.containsKey(finalName)) {
-                    finalName = originalName + "-import" + counter;
-                    counter++;
-                }
-
-                renamedList.add(RenamedItem.builder()
-                        .type("channel")
-                        .original(originalName)
-                        .renamed(finalName)
-                        .build());
-
-                log.info("🔄 Channel '{}' renamed to '{}' due to duplicate", originalName, finalName);
-            }
-
-            // Enrich channel with Ouroboros fields
-            Map<String, Object> channel = (Map<String, Object>) entry.getValue();
-            enrichChannelWithOuroborosFields(channel);
-
-            // Update message references in channel messages
-            updateMessageReferencesInChannel(channel, messageRenameMap);
-
-            existingChannels.put(finalName, channel);
-            count++;
-        }
-
-        return count;
-    }
-
-    /**
-     * Imports servers from imported document into existing document.
-     * Handles duplicate server names by auto-renaming with "-import" suffix.
-     *
-     * @param importedDoc the imported AsyncAPI document
-     * @param existingDoc the existing document to merge into
-     * @param renamedList list to track renamed items
-     * @return number of servers imported
-     */
-    @SuppressWarnings("unchecked")
-    private int importServers(Map<String, Object> importedDoc, Map<String, Object> existingDoc,
-                              List<RenamedItem> renamedList) {
-        int count = 0;
-
-        // Get or create servers section
-        Map<String, Object> existingServers = (Map<String, Object>) existingDoc.get("servers");
-        if (existingServers == null) {
-            existingServers = new LinkedHashMap<>();
-            existingDoc.put("servers", existingServers);
-        }
-
-        Map<String, Object> importedServers = (Map<String, Object>) importedDoc.get("servers");
-        if (importedServers == null || importedServers.isEmpty()) {
-            return 0;
-        }
-
-        for (Map.Entry<String, Object> entry : importedServers.entrySet()) {
-            String originalName = entry.getKey();
-            String finalName = originalName;
-
-            if (existingServers.containsKey(originalName)) {
-                finalName = originalName + "-import";
-                int counter = 1;
-                while (existingServers.containsKey(finalName)) {
-                    finalName = originalName + "-import" + counter;
-                    counter++;
-                }
-
-                renamedList.add(RenamedItem.builder()
-                        .type("server")
-                        .original(originalName)
-                        .renamed(finalName)
-                        .build());
-
-                log.info("🔄 Server '{}' renamed to '{}' due to duplicate", originalName, finalName);
-            }
-
-            existingServers.put(finalName, entry.getValue());
-            count++;
-        }
-
-        return count;
-    }
-
-    /**
-     * Imports operations from imported document into existing document.
-     * Handles duplicate operation names by auto-renaming with "-import" suffix.
-     * Updates message references according to message rename map.
-     */
-    @SuppressWarnings("unchecked")
-    private int importOperations(Map<String, Object> importedDoc, Map<String, Object> existingDoc,
-                                 List<RenamedItem> renamedList, Map<String, String> messageRenameMap, String entrypoint) {
-        int count = 0;
-
-        Map<String, Object> existingOperations = yamlParser.getOrCreateOperations(existingDoc);
-
-        Map<String, Object> importedOperations = (Map<String, Object>) importedDoc.get("operations");
-        if (importedOperations == null || importedOperations.isEmpty()) {
-            return 0;
-        }
-
-        for (Map.Entry<String, Object> entry : importedOperations.entrySet()) {
-            String originalName = entry.getKey();
-            String finalName = originalName;
-
-            if (existingOperations.containsKey(originalName)) {
-                finalName = originalName + "-import";
-                int counter = 1;
-                while (existingOperations.containsKey(finalName)) {
-                    finalName = originalName + "-import" + counter;
-                    counter++;
-                }
-
-                Map<String, Object> operation = (Map<String, Object>) entry.getValue();
-                String action = (String) operation.get("action");
-
-                renamedList.add(RenamedItem.builder()
-                        .type("operation")
-                        .original(originalName)
-                        .renamed(finalName)
-                        .action(action)
-                        .build());
-
-                log.info("🔄 Operation '{}' ({}) renamed to '{}' due to duplicate",
-                        originalName, action, finalName);
-            }
-
-            // Enrich operation with Ouroboros fields
-            Map<String, Object> operation = (Map<String, Object>) entry.getValue();
-            enrichOperationWithOuroborosFields(operation, entrypoint);
-
-            // Update message references in operation
-            updateMessageReferencesInOperation(operation, messageRenameMap);
-
-            existingOperations.put(finalName, operation);
-            count++;
-        }
-
-        return count;
-    }
-
-    /**
-     * Updates message references in a channel's messages section.
-     * When a message is renamed, updates the $ref in channel.messages.
-     *
-     * @param channel channel definition
-     * @param messageRenameMap map of old message names to new names
-     */
-    @SuppressWarnings("unchecked")
-    private void updateMessageReferencesInChannel(Map<String, Object> channel, Map<String, String> messageRenameMap) {
-        if (messageRenameMap.isEmpty()) {
-            return;
-        }
-
-        Object messagesObj = channel.get("messages");
-        if (!(messagesObj instanceof Map)) {
-            return;
-        }
-
-        Map<String, Object> messages = (Map<String, Object>) messagesObj;
-        for (Map.Entry<String, Object> entry : new ArrayList<>(messages.entrySet())) {
-            String messageName = entry.getKey();
-            if (messageRenameMap.containsKey(messageName)) {
-                // Message was renamed, update the key
-                String newMessageName = messageRenameMap.get(messageName);
-                Object messageRef = messages.remove(messageName);
-                messages.put(newMessageName, messageRef);
-                log.debug("🔗 Updated channel message reference: {} -> {}", messageName, newMessageName);
-            }
-
-            // Update $ref if it's a reference
-            if (entry.getValue() instanceof Map) {
-                Map<String, Object> messageRef = (Map<String, Object>) entry.getValue();
-                Object refObj = messageRef.get("$ref");
-                if (refObj instanceof String) {
-                    String ref = (String) refObj;
-                    if (ref.startsWith("#/components/messages/")) {
-                        String refMessageName = ref.substring("#/components/messages/".length());
-                        if (messageRenameMap.containsKey(refMessageName)) {
-                            String newRefMessageName = messageRenameMap.get(refMessageName);
-                            messageRef.put("$ref", "#/components/messages/" + newRefMessageName);
-                            log.debug("🔗 Updated channel message $ref: {} -> {}", refMessageName, newRefMessageName);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    /**
-     * Updates message references in an operation.
-     * When a message is renamed, updates the $ref in operation.messages and operation.reply.messages.
-     *
-     * @param operation operation definition
-     * @param messageRenameMap map of old message names to new names
-     */
-    @SuppressWarnings("unchecked")
-    private void updateMessageReferencesInOperation(Map<String, Object> operation, Map<String, String> messageRenameMap) {
-        if (messageRenameMap.isEmpty()) {
-            return;
-        }
-
-        // Update top-level messages
-        Object messagesObj = operation.get("messages");
-        if (messagesObj instanceof List) {
-            List<Map<String, String>> messages = (List<Map<String, String>>) messagesObj;
-            for (Map<String, String> messageRef : messages) {
-                String ref = messageRef.get("$ref");
-                if (ref != null) {
-                    // Handle channel message references: #/channels/{channelName}/messages/{messageName}
-                    if (ref.startsWith("#/channels/") && ref.contains("/messages/")) {
-                        String[] parts = ref.split("/messages/");
-                        if (parts.length == 2) {
-                            String messageName = parts[1];
-                            if (messageRenameMap.containsKey(messageName)) {
-                                String newMessageName = messageRenameMap.get(messageName);
-                                messageRef.put("$ref", parts[0] + "/messages/" + newMessageName);
-                                log.debug("🔗 Updated operation message $ref: {} -> {}", messageName, newMessageName);
-                            }
-                        }
-                    }
-                    // Handle component message references: #/components/messages/{messageName}
-                    else if (ref.startsWith("#/components/messages/")) {
-                        String messageName = ref.substring("#/components/messages/".length());
-                        if (messageRenameMap.containsKey(messageName)) {
-                            String newMessageName = messageRenameMap.get(messageName);
-                            messageRef.put("$ref", "#/components/messages/" + newMessageName);
-                            log.debug("🔗 Updated operation message $ref: {} -> {}", messageName, newMessageName);
-                        }
-                    }
-                }
-            }
-        }
-
-        // Update reply messages
-        Object replyObj = operation.get("reply");
-        if (replyObj instanceof Map) {
-            Map<String, Object> reply = (Map<String, Object>) replyObj;
-            Object replyMessagesObj = reply.get("messages");
-            if (replyMessagesObj instanceof List) {
-                List<Map<String, String>> replyMessages = (List<Map<String, String>>) replyMessagesObj;
-                for (Map<String, String> messageRef : replyMessages) {
-                    String ref = messageRef.get("$ref");
-                    if (ref != null) {
-                        // Handle channel message references: #/channels/{channelName}/messages/{messageName}
-                        if (ref.startsWith("#/channels/") && ref.contains("/messages/")) {
-                            String[] parts = ref.split("/messages/");
-                            if (parts.length == 2) {
-                                String messageName = parts[1];
-                                if (messageRenameMap.containsKey(messageName)) {
-                                    String newMessageName = messageRenameMap.get(messageName);
-                                    messageRef.put("$ref", parts[0] + "/messages/" + newMessageName);
-                                    log.debug("🔗 Updated reply message $ref: {} -> {}", messageName, newMessageName);
-                                }
-                            }
-                        }
-                        // Handle component message references: #/components/messages/{messageName}
-                        else if (ref.startsWith("#/components/messages/")) {
-                            String messageName = ref.substring("#/components/messages/".length());
-                            if (messageRenameMap.containsKey(messageName)) {
-                                String newMessageName = messageRenameMap.get(messageName);
-                                messageRef.put("$ref", "#/components/messages/" + newMessageName);
-                                log.debug("🔗 Updated reply message $ref: {} -> {}", messageName, newMessageName);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    /**
-     * Recursively updates all schema $ref references in messages according to schema rename map.
-     * This updates message payload schema references.
-     *
-     * @param existingDoc the existing AsyncAPI document
-     * @param schemaRenameMap map of old schema names to new names
-     */
-    @SuppressWarnings("unchecked")
-    private void updateSchemaReferencesInMessages(Map<String, Object> existingDoc, Map<String, String> schemaRenameMap) {
-        if (schemaRenameMap.isEmpty()) {
-            return;
-        }
-
-        Map<String, Object> components = yamlParser.getOrCreateComponents(existingDoc);
-        if (components == null) {
-            return;
-        }
-
-        Map<String, Object> messages = yamlParser.getMessages(existingDoc);
-        if (messages == null || messages.isEmpty()) {
-            return;
-        }
-
-        for (Map.Entry<String, Object> entry : messages.entrySet()) {
-            Object messageObj = entry.getValue();
-            if (messageObj instanceof Map) {
-                updateSchemaReferences(messageObj, schemaRenameMap);
-            }
-        }
-    }
-
-    /**
-     * Recursively updates all $ref references according to schema rename map.
-     * Similar to REST API import logic.
-     *
-     * @param obj the object to scan for $ref (can be Map, List, or primitive)
-     * @param schemaRenameMap map of old schema names to new names
-     */
-    @SuppressWarnings("unchecked")
-    private void updateSchemaReferences(Object obj, Map<String, String> schemaRenameMap) {
-        if (schemaRenameMap.isEmpty()) {
-            return;
-        }
-
-        if (obj instanceof Map) {
-            Map<String, Object> map = (Map<String, Object>) obj;
-
-            // Check if this map has a $ref field
-            if (map.containsKey("$ref")) {
-                String ref = (String) map.get("$ref");
-                if (ref != null && ref.startsWith("#/components/schemas/")) {
-                    String schemaName = ref.substring("#/components/schemas/".length());
-                    if (schemaRenameMap.containsKey(schemaName)) {
-                        String newSchemaName = schemaRenameMap.get(schemaName);
-                        map.put("$ref", "#/components/schemas/" + newSchemaName);
-                        log.debug("🔗 Updated schema $ref: {} -> {}", schemaName, newSchemaName);
-                    }
-                }
-            }
-
-            // Recursively scan all values
-            for (Object value : map.values()) {
-                updateSchemaReferences(value, schemaRenameMap);
-            }
-
-        } else if (obj instanceof List) {
-            List<Object> list = (List<Object>) obj;
-            for (Object item : list) {
-                updateSchemaReferences(item, schemaRenameMap);
-            }
-        }
-    }
-
-    /**
-     * Extracts the pathname from the first server in the imported document.
-     *
-     * @param importedDoc the imported AsyncAPI document
-     * @return the pathname of the first server, or null if not found
-     */
-    @SuppressWarnings("unchecked")
-    private String extractFirstServerPathname(Map<String, Object> importedDoc) {
-        Object serversObj = importedDoc.get("servers");
-        if (!(serversObj instanceof Map)) {
-            return null;
-        }
-
-        Map<String, Object> servers = (Map<String, Object>) serversObj;
-        if (servers.isEmpty()) {
-            return null;
-        }
-
-        // Get first server
-        Map.Entry<String, Object> firstServerEntry = servers.entrySet().iterator().next();
-        Object serverObj = firstServerEntry.getValue();
-        if (!(serverObj instanceof Map)) {
-            return null;
-        }
-
-        Map<String, Object> server = (Map<String, Object>) serverObj;
-        Object pathnameObj = server.get("pathname");
-        return pathnameObj instanceof String ? (String) pathnameObj : null;
-    }
-
-    /**
-     * Enriches a channel with missing x-ouroboros-* fields.
-     * For import operations, channels are not enriched with Ouroboros fields.
-     */
-    private void enrichChannelWithOuroborosFields(Map<String, Object> channel) {
-        // No enrichment for imported channels
-    }
-
-    /**
-     * Enriches an operation with missing x-ouroboros-* fields.
-     * Adds x-ouroboros-id (UUID), x-ouroboros-progress ("none"),
-     * x-ouroboros-diff ("none"), and x-ouroboros-entrypoint (server pathname).
-     *
-     * @param operation the operation to enrich
-     * @param entrypoint the server pathname to use as entrypoint
-     */
-    private void enrichOperationWithOuroborosFields(Map<String, Object> operation, String entrypoint) {
-        if (!operation.containsKey("x-ouroboros-id")) {
-            operation.put("x-ouroboros-id", UUID.randomUUID().toString());
-        }
-        if (!operation.containsKey("x-ouroboros-progress")) {
-            operation.put("x-ouroboros-progress", "none");
-        }
-        if (!operation.containsKey("x-ouroboros-diff")) {
-            operation.put("x-ouroboros-diff", "none");
-        }
-        if (!operation.containsKey("x-ouroboros-entrypoint") && entrypoint != null) {
-            operation.put("x-ouroboros-entrypoint", entrypoint);
-        }
-    }
 
     @Override
     public String exportYaml() throws Exception {
@@ -1738,6 +797,601 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
             return yamlParser.readYamlContent();
         } finally {
             lock.readLock().unlock();
+        }
+    }
+
+    /**
+     * Syncs a cache-only operation to the YAML file.
+     * <p>
+     * This method is used when an operation exists only in the cache (from code scanning)
+     * but not in the YAML file. It adds the operation to the file so it can be edited via
+     * the update endpoint.
+     * <p>
+     * If the operation already exists in the file, this operation is a no-op.
+     *
+     * @param id operation UUID (x-ouroboros-id)
+     * @return synced operation details
+     * @throws IllegalArgumentException if operation not found in cache
+     * @throws Exception if sync fails
+     */
+    @Override
+    public OperationResponse syncToFile(String id) throws Exception {
+        lock.writeLock().lock();
+        try {
+            // Step 1: Find operation in cache
+            Map<String, Object> cacheDoc = specManager.convertSpecToMap(specManager.getApiSpec(Protocol.WEB_SOCKET));
+            if (cacheDoc == null) {
+                throw new IllegalArgumentException("No operations found in cache.");
+            }
+
+            Map.Entry<String, Map<String, Object>> cacheOperationEntry = yamlParser.findOperationById(cacheDoc, id);
+            if (cacheOperationEntry == null) {
+                throw new IllegalArgumentException("Operation with id '" + id + "' not found in cache.");
+            }
+
+            String operationName = cacheOperationEntry.getKey();
+            Map<String, Object> cacheOperation = cacheOperationEntry.getValue();
+
+            // Step 2: Read or create file document
+            Map<String, Object> fileDoc = yamlParser.readOrCreateDocument();
+
+            // Step 3: Check if operation already exists in file
+            Map.Entry<String, Map<String, Object>> fileOperationEntry = yamlParser.findOperationById(fileDoc, id);
+            if (fileOperationEntry != null) {
+                // Already exists in file, just return it
+                log.info("Operation '{}' already exists in file (ID: {}), no sync needed", operationName, id);
+                Operation operation = convertMapToOperation(fileOperationEntry.getValue());
+                return OperationResponse.builder()
+                        .operationName(fileOperationEntry.getKey())
+                        .operation(operation)
+                        .build();
+            }
+
+            // Step 4: Sync missing schemas and messages from cache to file first
+            syncMissingSchemasAndMessagesFromCache(cacheDoc, fileDoc);
+
+            // Step 5: Deep copy operation from cache
+            Map<String, Object> operationToAdd = deepCopyOperation(cacheOperation);
+
+            // Step 5.1: Reset Ouroboros custom fields to default values when syncing to file
+            // WebSocket operations use: x-ouroboros-progress, x-ouroboros-diff (no x-ouroboros-tag)
+            operationToAdd.put("x-ouroboros-progress", "none");
+            operationToAdd.put("x-ouroboros-diff", "none");
+            
+            // Step 5.1.1: Set x-ouroboros-entrypoint from the first server's pathname in file document
+            // (Deep copy already contains cache operation's entrypoint, but we override with file's server value)
+            String entrypoint = serverManager.extractPathname(fileDoc);
+            if (entrypoint != null) {
+                operationToAdd.put("x-ouroboros-entrypoint", entrypoint);
+            }
+            // If file has no server, keep the existing entrypoint from cache operation (already in operationToAdd)
+
+            // Step 5.2: Update all $ref references in operation to use class names instead of full package names
+            Map<String, Object> cacheSchemas = yamlParser.getSchemas(cacheDoc);
+            Map<String, Object> cacheMessages = yamlParser.getMessages(cacheDoc);
+            Map<String, String> packageToClassNameMap = new HashMap<>();
+            if ((cacheSchemas != null && !cacheSchemas.isEmpty()) || (cacheMessages != null && !cacheMessages.isEmpty())) {
+                packageToClassNameMap = buildPackageToClassNameMap(cacheSchemas, cacheMessages);
+                updateSchemaAndMessageReferences(operationToAdd, packageToClassNameMap);
+            }
+
+            // Step 5.3: Ensure referenced channels exist in file
+            @SuppressWarnings("unchecked")
+            Map<String, Object> channelRef = (Map<String, Object>) operationToAdd.get("channel");
+            if (channelRef != null) {
+                String channelRefStr = (String) channelRef.get("$ref");
+                if (channelRefStr != null && channelRefStr.startsWith("#/channels/")) {
+                    String channelName = channelRefStr.substring("#/channels/".length());
+                    // Extract class name if channel name has package prefix
+                    String className = extractClassNameFromFullName(channelName);
+                    if (className != null && !className.equals(channelName)) {
+                        // Update channel reference to use class name
+                        channelRef.put("$ref", "#/channels/" + className);
+                        channelName = className;
+                    }
+                    
+                    // Ensure channel exists in file (will be created if missing)
+                    Map<String, Object> cacheChannels = yamlParser.getChannels(cacheDoc);
+                    if (cacheChannels != null) {
+                        // Check both full name and class name in cache channels
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> cacheChannel = (Map<String, Object>) cacheChannels.get(channelName);
+                        if (cacheChannel == null && !channelName.equals(extractClassNameFromFullName(channelName))) {
+                            // Try to find by full package name
+                            for (String key : cacheChannels.keySet()) {
+                                if (extractClassNameFromFullName(key).equals(channelName)) {
+                                    @SuppressWarnings("unchecked")
+                                    Map<String, Object> foundChannel = (Map<String, Object>) cacheChannels.get(key);
+                                    cacheChannel = foundChannel;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        if (cacheChannel != null) {
+                            Map<String, Object> fileChannels = yamlParser.getOrCreateChannels(fileDoc);
+                            if (!fileChannels.containsKey(channelName)) {
+                                Map<String, Object> channelToAdd = deepCopyChannel(cacheChannel);
+                                
+                                // Update messages map keys to use class names instead of full package names
+                                @SuppressWarnings("unchecked")
+                                Map<String, Object> messagesMap = (Map<String, Object>) channelToAdd.get("messages");
+                                if (messagesMap != null && !messagesMap.isEmpty()) {
+                                    Map<String, Object> updatedMessagesMap = new LinkedHashMap<>();
+                                    for (Map.Entry<String, Object> messageEntry : messagesMap.entrySet()) {
+                                        String fullMessageKey = messageEntry.getKey();
+                                        String messageClassName = extractClassNameFromFullName(fullMessageKey);
+                                        Object messageValue = messageEntry.getValue();
+                                        
+                                        // Update $ref in message value if it exists
+                                        if (messageValue instanceof Map) {
+                                            @SuppressWarnings("unchecked")
+                                            Map<String, Object> messageMap = (Map<String, Object>) messageValue;
+                                            updateSchemaAndMessageReferences(messageMap, packageToClassNameMap);
+                                        }
+                                        
+                                        updatedMessagesMap.put(messageClassName, messageValue);
+                                    }
+                                    channelToAdd.put("messages", updatedMessagesMap);
+                                }
+                                
+                                // Update other $ref references in channel
+                                updateSchemaAndMessageReferences(channelToAdd, packageToClassNameMap);
+                                
+                                fileChannels.put(channelName, channelToAdd);
+                                log.debug("Synced channel '{}' from cache to file", channelName);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Step 6: Add operation to file
+            yamlParser.putOperation(fileDoc, operationName, operationToAdd);
+
+            // Step 7: Write document to file
+            yamlParser.writeDocument(fileDoc);
+
+            // Step 8: Update cache (validates with scanned state + updates cache)
+            specManager.processAndCacheSpec(Protocol.WEB_SOCKET, fileDoc);
+
+            log.info("Synced cache-only operation '{}' to file (ID: {})", operationName, id);
+
+            Operation operation = convertMapToOperation(operationToAdd);
+            return OperationResponse.builder()
+                    .operationName(operationName)
+                    .operation(operation)
+                    .build();
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    /**
+     * Syncs missing schemas and messages from cache to file document.
+     * <p>
+     * This method checks all schemas and messages in the cache and adds any that don't exist
+     * in the file document to ensure consistency during operation sync.
+     *
+     * @param cacheDoc the cached document containing all schemas and messages
+     * @param fileDoc the file document to sync into
+     */
+    @SuppressWarnings("unchecked")
+    private void syncMissingSchemasAndMessagesFromCache(Map<String, Object> cacheDoc, Map<String, Object> fileDoc) {
+        Map<String, Object> cacheSchemas = yamlParser.getSchemas(cacheDoc);
+        Map<String, Object> cacheMessages = yamlParser.getMessages(cacheDoc);
+
+        // Sync schemas
+        if (cacheSchemas != null && !cacheSchemas.isEmpty()) {
+            Map<String, Object> fileSchemas = yamlParser.getSchemas(fileDoc);
+            if (fileSchemas == null) {
+                Map<String, Object> components = yamlParser.getOrCreateComponents(fileDoc);
+                fileSchemas = yamlParser.getOrCreateSchemas(components);
+            }
+
+            int syncedCount = 0;
+            for (Map.Entry<String, Object> cacheEntry : cacheSchemas.entrySet()) {
+                String cacheSchemaName = cacheEntry.getKey();
+                String className = extractClassNameFromFullName(cacheSchemaName);
+                if (className == null || className.isEmpty()) {
+                    className = cacheSchemaName;
+                }
+
+                if (fileSchemas.containsKey(className)) {
+                    continue;
+                }
+
+                try {
+                    Map<String, Object> cacheSchema = (Map<String, Object>) cacheEntry.getValue();
+                    Map<String, Object> schemaToAdd = deepCopySchema(cacheSchema);
+                    updateSchemaReferencesToClassName(schemaToAdd, cacheSchemas);
+                    fileSchemas.put(className, schemaToAdd);
+                    syncedCount++;
+                    log.debug("Synced schema '{}' (as '{}') from cache to file", cacheSchemaName, className);
+                } catch (Exception e) {
+                    log.warn("Failed to sync schema '{}' from cache to file: {}", cacheSchemaName, e.getMessage());
+                }
+            }
+
+            if (syncedCount > 0) {
+                log.info("Synced {} missing schema(s) from cache to file", syncedCount);
+            }
+        }
+
+        // Sync messages
+        if (cacheMessages != null && !cacheMessages.isEmpty()) {
+            Map<String, Object> fileMessages = yamlParser.getMessages(fileDoc);
+            if (fileMessages == null) {
+                Map<String, Object> components = yamlParser.getOrCreateComponents(fileDoc);
+                fileMessages = yamlParser.getOrCreateMessages(components);
+            }
+
+            int syncedCount = 0;
+            for (Map.Entry<String, Object> cacheEntry : cacheMessages.entrySet()) {
+                String cacheMessageName = cacheEntry.getKey();
+                String className = extractClassNameFromFullName(cacheMessageName);
+                if (className == null || className.isEmpty()) {
+                    className = cacheMessageName;
+                }
+
+                if (fileMessages.containsKey(className)) {
+                    continue;
+                }
+
+                try {
+                    Map<String, Object> cacheMessage = (Map<String, Object>) cacheEntry.getValue();
+                    Map<String, Object> messageToAdd = deepCopyMessage(cacheMessage);
+                    
+                    // Update message's internal 'name' field to use class name if it exists
+                    if (messageToAdd.containsKey("name")) {
+                        Object nameObj = messageToAdd.get("name");
+                        if (nameObj instanceof String) {
+                            String fullName = (String) nameObj;
+                            String nameClassName = extractClassNameFromFullName(fullName);
+                            if (nameClassName != null && !nameClassName.equals(fullName)) {
+                                messageToAdd.put("name", nameClassName);
+                            }
+                        }
+                    }
+                    
+                    updateMessageSchemaReferences(messageToAdd, cacheSchemas);
+                    fileMessages.put(className, messageToAdd);
+                    syncedCount++;
+                    log.debug("Synced message '{}' (as '{}') from cache to file", cacheMessageName, className);
+                } catch (Exception e) {
+                    log.warn("Failed to sync message '{}' from cache to file: {}", cacheMessageName, e.getMessage());
+                }
+            }
+
+            if (syncedCount > 0) {
+                log.info("Synced {} missing message(s) from cache to file", syncedCount);
+            }
+        }
+    }
+
+    /**
+     * Builds a map from package-qualified names to class names for both schemas and messages.
+     *
+     * @param cacheSchemas map of cache schemas (can be null)
+     * @param cacheMessages map of cache messages (can be null)
+     * @return map from package-qualified names to class names
+     */
+    private Map<String, String> buildPackageToClassNameMap(Map<String, Object> cacheSchemas, Map<String, Object> cacheMessages) {
+        Map<String, String> map = new HashMap<>();
+        
+        if (cacheSchemas != null) {
+            for (String fullName : cacheSchemas.keySet()) {
+                String className = extractClassNameFromFullName(fullName);
+                if (className != null && !className.equals(fullName)) {
+                    map.put(fullName, className);
+                }
+            }
+        }
+        
+        if (cacheMessages != null) {
+            for (String fullName : cacheMessages.keySet()) {
+                String className = extractClassNameFromFullName(fullName);
+                if (className != null && !className.equals(fullName)) {
+                    map.put(fullName, className);
+                }
+            }
+        }
+        
+        return map;
+    }
+
+    /**
+     * Extracts the simple class name from a package-qualified name.
+     * <p>
+     * Example: "com.c102.ourotest.dto.User" -> "User"
+     *
+     * @param fullName the package-qualified name
+     * @return the simple class name, or the original string if no '.' is present
+     */
+    private String extractClassNameFromFullName(String fullName) {
+        if (fullName == null || fullName.isEmpty()) {
+            return fullName;
+        }
+        
+        int lastDotIndex = fullName.lastIndexOf('.');
+        if (lastDotIndex == -1) {
+            return fullName;
+        }
+        
+        return fullName.substring(lastDotIndex + 1);
+    }
+
+    /**
+     * Recursively updates all $ref references in an operation to use class names instead of full package names.
+     * Updates both schema references and message references.
+     *
+     * @param operation the operation map to update
+     * @param packageToClassNameMap map of package-qualified names to class names
+     */
+    @SuppressWarnings("unchecked")
+    private void updateSchemaAndMessageReferences(Object operation, Map<String, String> packageToClassNameMap) {
+        if (operation == null || !(operation instanceof Map)) {
+            return;
+        }
+        
+        Map<String, Object> operationMap = (Map<String, Object>) operation;
+        
+        // Update $ref if present (can be schema or message reference)
+        if (operationMap.containsKey("$ref")) {
+            Object refObj = operationMap.get("$ref");
+            if (refObj instanceof String) {
+                String ref = (String) refObj;
+                String updatedRef = updateRefToClassName(ref, packageToClassNameMap);
+                if (updatedRef != null && !updatedRef.equals(ref)) {
+                    operationMap.put("$ref", updatedRef);
+                }
+            }
+        }
+        
+        // Recursively process all values
+        for (Object value : operationMap.values()) {
+            if (value instanceof Map) {
+                updateSchemaAndMessageReferences(value, packageToClassNameMap);
+            } else if (value instanceof List) {
+                List<Object> list = (List<Object>) value;
+                for (Object item : list) {
+                    updateSchemaAndMessageReferences(item, packageToClassNameMap);
+                }
+            }
+        }
+    }
+
+    /**
+     * Updates a $ref string to use class name instead of full package name.
+     *
+     * @param ref the $ref string to update
+     * @param packageToClassNameMap map of package-qualified names to class names (can be empty)
+     * @return updated $ref string, or original if no update needed
+     */
+    private String updateRefToClassName(String ref, Map<String, String> packageToClassNameMap) {
+        if (ref == null || ref.isEmpty()) {
+            return ref;
+        }
+
+        // Handle schema references: "#/components/schemas/package.name.ClassName"
+        if (ref.startsWith("#/components/schemas/")) {
+            String fullSchemaName = ref.substring("#/components/schemas/".length());
+            String className = null;
+            if (packageToClassNameMap != null && !packageToClassNameMap.isEmpty()) {
+                className = packageToClassNameMap.get(fullSchemaName);
+            }
+            if (className == null) {
+                // Fallback: extract class name directly from ref
+                className = extractClassNameFromFullName(fullSchemaName);
+            }
+            if (className != null && !className.equals(fullSchemaName)) {
+                return "#/components/schemas/" + className;
+            }
+        }
+
+        // Handle message references: "#/components/messages/package.name.MessageName"
+        if (ref.startsWith("#/components/messages/")) {
+            String fullMessageName = ref.substring("#/components/messages/".length());
+            String className = null;
+            if (packageToClassNameMap != null && !packageToClassNameMap.isEmpty()) {
+                className = packageToClassNameMap.get(fullMessageName);
+            }
+            if (className == null) {
+                // Fallback: extract class name directly from ref
+                className = extractClassNameFromFullName(fullMessageName);
+            }
+            if (className != null && !className.equals(fullMessageName)) {
+                return "#/components/messages/" + className;
+            }
+        }
+
+        // Handle channel-scoped message references: "#/channels/channelName/messages/package.name.MessageName"
+        if (ref.contains("/messages/")) {
+            int messagesIndex = ref.indexOf("/messages/");
+            String prefix = ref.substring(0, messagesIndex + "/messages/".length());
+            String fullMessageName = ref.substring(prefix.length());
+            String className = null;
+            if (packageToClassNameMap != null && !packageToClassNameMap.isEmpty()) {
+                className = packageToClassNameMap.get(fullMessageName);
+            }
+            if (className == null) {
+                // Fallback: extract class name directly from ref
+                className = extractClassNameFromFullName(fullMessageName);
+            }
+            if (className != null && !className.equals(fullMessageName)) {
+                return prefix + className;
+            }
+        }
+
+        return ref;
+    }
+
+    /**
+     * Recursively updates all schema references in a message to use class names instead of full package names.
+     *
+     * @param message the message map to update
+     * @param cacheSchemas map of all cache schemas to resolve full names to class names
+     */
+    @SuppressWarnings("unchecked")
+    private void updateMessageSchemaReferences(Object message, Map<String, Object> cacheSchemas) {
+        if (message == null || !(message instanceof Map)) {
+            return;
+        }
+        
+        Map<String, Object> messageMap = (Map<String, Object>) message;
+        
+        // Update payload schema references
+        Object payloadObj = messageMap.get("payload");
+        if (payloadObj instanceof Map) {
+            Map<String, Object> payload = (Map<String, Object>) payloadObj;
+            Object schemaObj = payload.get("schema");
+            if (schemaObj instanceof Map) {
+                updateSchemaReferencesToClassName(schemaObj, cacheSchemas);
+            }
+        }
+        
+        // Update headers schema references
+        Object headersObj = messageMap.get("headers");
+        if (headersObj instanceof Map) {
+            Map<String, Object> headers = (Map<String, Object>) headersObj;
+            if (headers.containsKey("$ref")) {
+                Object refObj = headers.get("$ref");
+                if (refObj instanceof String) {
+                    String ref = (String) refObj;
+                    if (ref.startsWith("#/components/schemas/")) {
+                        String fullSchemaName = ref.substring("#/components/schemas/".length());
+                        String className = extractClassNameFromFullName(fullSchemaName);
+                        if (className != null && !className.equals(fullSchemaName)) {
+                            headers.put("$ref", "#/components/schemas/" + className);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Recursively updates all $ref references in a schema to use class names instead of full package names.
+     *
+     * @param schema the schema map to update
+     * @param cacheSchemas map of all cache schemas to resolve full names to class names
+     */
+    @SuppressWarnings("unchecked")
+    private void updateSchemaReferencesToClassName(Object schema, Map<String, Object> cacheSchemas) {
+        if (schema == null || !(schema instanceof Map)) {
+            return;
+        }
+        
+        Map<String, Object> schemaMap = (Map<String, Object>) schema;
+        
+        // Update $ref if present
+        if (schemaMap.containsKey("$ref")) {
+            Object refObj = schemaMap.get("$ref");
+            if (refObj instanceof String) {
+                String ref = (String) refObj;
+                if (ref.startsWith("#/components/schemas/")) {
+                    String fullSchemaName = ref.substring("#/components/schemas/".length());
+                    String className = extractClassNameFromFullName(fullSchemaName);
+                    if (className != null && !className.equals(fullSchemaName)) {
+                        schemaMap.put("$ref", "#/components/schemas/" + className);
+                    }
+                }
+            }
+        }
+        
+        // Recursively process properties
+        Object propertiesObj = schemaMap.get("properties");
+        if (propertiesObj instanceof Map) {
+            Map<String, Object> properties = (Map<String, Object>) propertiesObj;
+            for (Object property : properties.values()) {
+                updateSchemaReferencesToClassName(property, cacheSchemas);
+            }
+        }
+        
+        // Recursively process items (for array types)
+        Object itemsObj = schemaMap.get("items");
+        if (itemsObj instanceof Map) {
+            updateSchemaReferencesToClassName(itemsObj, cacheSchemas);
+        }
+    }
+
+    /**
+     * Deep copies an operation map to prevent cache pollution.
+     * <p>
+     * Uses ObjectMapper for safe deep copying. Throws exception on failure to prevent
+     * cache contamination from shallow copies.
+     *
+     * @param operation the operation map to deep copy
+     * @return deep copied operation map
+     * @throws RuntimeException if deep copy fails
+     */
+    private Map<String, Object> deepCopyOperation(Map<String, Object> operation) {
+        try {
+            byte[] bytes = objectMapper.writeValueAsBytes(operation);
+            return objectMapper.readValue(bytes, new TypeReference<Map<String, Object>>() {});
+        } catch (Exception e) {
+            log.error("Failed to deep copy operation", e);
+            throw new RuntimeException("Operation deep copy failed, cannot proceed safely", e);
+        }
+    }
+
+    /**
+     * Deep copies a schema map to prevent cache pollution.
+     * <p>
+     * Uses ObjectMapper for safe deep copying. Throws exception on failure to prevent
+     * cache contamination from shallow copies.
+     *
+     * @param schema the schema map to deep copy
+     * @return deep copied schema map
+     * @throws RuntimeException if deep copy fails
+     */
+    private Map<String, Object> deepCopySchema(Map<String, Object> schema) {
+        try {
+            byte[] bytes = objectMapper.writeValueAsBytes(schema);
+            return objectMapper.readValue(bytes, new TypeReference<Map<String, Object>>() {});
+        } catch (Exception e) {
+            log.error("Failed to deep copy schema", e);
+            throw new RuntimeException("Schema deep copy failed, cannot proceed safely", e);
+        }
+    }
+
+    /**
+     * Deep copies a message map to prevent cache pollution.
+     * <p>
+     * Uses ObjectMapper for safe deep copying. Throws exception on failure to prevent
+     * cache contamination from shallow copies.
+     *
+     * @param message the message map to deep copy
+     * @return deep copied message map
+     * @throws RuntimeException if deep copy fails
+     */
+    private Map<String, Object> deepCopyMessage(Map<String, Object> message) {
+        try {
+            byte[] bytes = objectMapper.writeValueAsBytes(message);
+            return objectMapper.readValue(bytes, new TypeReference<Map<String, Object>>() {});
+        } catch (Exception e) {
+            log.error("Failed to deep copy message", e);
+            throw new RuntimeException("Message deep copy failed, cannot proceed safely", e);
+        }
+    }
+
+    /**
+     * Deep copies a channel map to prevent cache pollution.
+     * <p>
+     * Uses ObjectMapper for safe deep copying. Throws exception on failure to prevent
+     * cache contamination from shallow copies.
+     *
+     * @param channel the channel map to deep copy
+     * @return deep copied channel map
+     * @throws RuntimeException if deep copy fails
+     */
+    private Map<String, Object> deepCopyChannel(Map<String, Object> channel) {
+        try {
+            byte[] bytes = objectMapper.writeValueAsBytes(channel);
+            return objectMapper.readValue(bytes, new TypeReference<Map<String, Object>>() {});
+        } catch (Exception e) {
+            log.error("Failed to deep copy channel", e);
+            throw new RuntimeException("Channel deep copy failed, cannot proceed safely", e);
         }
     }
 }

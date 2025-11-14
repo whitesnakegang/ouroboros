@@ -155,6 +155,33 @@ public class RestApiSpecController {
     }
 
     /**
+     * Syncs a cache-only API specification to the YAML file.
+     * <p>
+     * This endpoint is used when an API specification exists only in the cache (from code scanning)
+     * but not in the YAML file. It adds the specification to the file so it can be edited via
+     * the update endpoint.
+     * <p>
+     * If the specification already exists in the file, this operation is a no-op and returns
+     * the existing specification.
+     * <p>
+     * Exceptions are handled by {@link kr.co.ouroboros.core.rest.spec.exception.RestSpecExceptionHandler}.
+     *
+     * @param id specification UUID
+     * @return synced specification details
+     * @throws Exception if specification not found in cache or sync fails
+     */
+    @PostMapping("/{id}/sync")
+    public ResponseEntity<GlobalApiResponse<RestApiSpecResponse>> syncToFile(
+            @PathVariable("id") String id) throws Exception {
+        RestApiSpecResponse data = restApiSpecService.syncToFile(id);
+        GlobalApiResponse<RestApiSpecResponse> response = GlobalApiResponse.success(
+                data,
+                "REST API specification synced to file successfully"
+        );
+        return ResponseEntity.ok(response);
+    }
+
+    /**
      * Imports external OpenAPI 3.1.0 YAML file and merges into ourorest.yml.
      * <p>
      * Validates the uploaded YAML file, handles duplicate APIs and schemas by auto-renaming,

@@ -1,9 +1,12 @@
 package kr.co.ouroboros.core.websocket.spec.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import kr.co.ouroboros.core.global.Protocol;
+import kr.co.ouroboros.core.global.manager.OuroApiSpecManager;
 import kr.co.ouroboros.core.websocket.common.dto.Channel;
 import kr.co.ouroboros.core.websocket.common.dto.MessageReference;
 import kr.co.ouroboros.core.websocket.common.yaml.WebSocketYamlParser;
+import kr.co.ouroboros.core.websocket.spec.util.ReferenceConverter;
 import kr.co.ouroboros.ui.websocket.spec.dto.ChannelResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,17 +34,19 @@ public class WebSocketChannelServiceImpl implements WebSocketChannelService {
 
     private final WebSocketYamlParser yamlParser;
     private final ObjectMapper objectMapper;
+    private final OuroApiSpecManager specManager;
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
     @Override
     public List<ChannelResponse> getAllChannels() throws Exception {
         lock.readLock().lock();
         try {
-            if (!yamlParser.fileExists()) {
+            // Read from cache
+            Map<String, Object> asyncApiDoc = specManager.convertSpecToMap(specManager.getApiSpec(Protocol.WEB_SOCKET));
+            if (asyncApiDoc == null) {
                 return new ArrayList<>();
             }
 
-            Map<String, Object> asyncApiDoc = yamlParser.readDocument();
             Map<String, Object> channels = yamlParser.getChannels(asyncApiDoc);
 
             if (channels == null || channels.isEmpty()) {
@@ -72,11 +77,12 @@ public class WebSocketChannelServiceImpl implements WebSocketChannelService {
     public ChannelResponse getChannel(String channelName) throws Exception {
         lock.readLock().lock();
         try {
-            if (!yamlParser.fileExists()) {
+            // Read from cache
+            Map<String, Object> asyncApiDoc = specManager.convertSpecToMap(specManager.getApiSpec(Protocol.WEB_SOCKET));
+            if (asyncApiDoc == null) {
                 throw new IllegalArgumentException("No channels found. The specification file does not exist.");
             }
 
-            Map<String, Object> asyncApiDoc = yamlParser.readDocument();
             Map<String, Object> channelDefinition = yamlParser.getChannel(asyncApiDoc, channelName);
 
             if (channelDefinition == null) {
@@ -104,7 +110,7 @@ public class WebSocketChannelServiceImpl implements WebSocketChannelService {
      */
     private Channel convertMapToChannel(Map<String, Object> channelMap) {
         try {
-            // Convert $ref to ref in messages for JSON API
+            // Convert $ref to ref in messages for JSON API using ReferenceConverter
             @SuppressWarnings("unchecked")
             Map<String, Object> messages = (Map<String, Object>) channelMap.get("messages");
             if (messages != null) {
@@ -114,16 +120,9 @@ public class WebSocketChannelServiceImpl implements WebSocketChannelService {
                     if (messageObj instanceof Map) {
                         @SuppressWarnings("unchecked")
                         Map<String, Object> messageMap = (Map<String, Object>) messageObj;
-                        // Convert $ref to ref while preserving all other metadata
-                        if (messageMap.containsKey("$ref")) {
-                            // Shallow-copy the original map to preserve all existing keys
-                            Map<String, Object> convertedMessage = new LinkedHashMap<>(messageMap);
-                            // Replace "$ref" with "ref"
-                            convertedMessage.put("ref", convertedMessage.remove("$ref"));
-                            convertedMessages.put(entry.getKey(), convertedMessage);
-                        } else {
-                            convertedMessages.put(entry.getKey(), messageMap);
-                        }
+                        // Convert $ref to ref using ReferenceConverter
+                        Map<String, Object> convertedMessage = ReferenceConverter.convertDollarRefToRef(messageMap);
+                        convertedMessages.put(entry.getKey(), convertedMessage);
                     } else {
                         convertedMessages.put(entry.getKey(), messageObj);
                     }
@@ -142,18 +141,20 @@ public class WebSocketChannelServiceImpl implements WebSocketChannelService {
             @SuppressWarnings("unchecked")
             Map<String, Object> messages = (Map<String, Object>) channelMap.get("messages");
             if (messages != null) {
-                // Convert $ref to ref in messages
+                // Convert $ref to ref in messages using ReferenceConverter
                 Map<String, MessageReference> convertedMessages = new LinkedHashMap<>();
                 for (Map.Entry<String, Object> entry : messages.entrySet()) {
                     Object messageObj = entry.getValue();
                     if (messageObj instanceof Map) {
                         @SuppressWarnings("unchecked")
                         Map<String, Object> messageMap = (Map<String, Object>) messageObj;
+                        // Convert using ReferenceConverter
+                        Map<String, Object> convertedMap = ReferenceConverter.convertDollarRefToRef(messageMap);
                         MessageReference msgRef = new MessageReference();
                         // Handle both $ref (YAML) and ref (JSON)
-                        String ref = (String) messageMap.get("$ref");
+                        String ref = (String) convertedMap.get("ref");
                         if (ref == null) {
-                            ref = (String) messageMap.get("ref");
+                            ref = (String) messageMap.get("$ref");
                         }
                         msgRef.setRef(ref);
                         convertedMessages.put(entry.getKey(), msgRef);

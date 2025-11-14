@@ -3,6 +3,7 @@ package kr.co.ouroboros.core.websocket.spec.service;
 import kr.co.ouroboros.core.global.Protocol;
 import kr.co.ouroboros.core.global.manager.OuroApiSpecManager;
 import kr.co.ouroboros.core.websocket.common.yaml.WebSocketYamlParser;
+import kr.co.ouroboros.core.websocket.spec.util.ReferenceConverter;
 import kr.co.ouroboros.ui.websocket.spec.dto.CreateMessageRequest;
 import kr.co.ouroboros.ui.websocket.spec.dto.MessageResponse;
 import kr.co.ouroboros.ui.websocket.spec.dto.UpdateMessageRequest;
@@ -41,7 +42,7 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
     public MessageResponse createMessage(CreateMessageRequest request) throws Exception {
         lock.writeLock().lock();
         try {
-            // Read existing document or create new one
+            // Read existing document or create new one (from file, not cache)
             Map<String, Object> asyncApiDoc = yamlParser.readOrCreateDocument();
 
             // Check for duplicate message name
@@ -55,8 +56,11 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
             // Add message to document
             yamlParser.putMessage(asyncApiDoc, request.getMessageName(), messageDefinition);
 
-            // Process and cache: writes to file + validates with scanned state + updates cache
+            // Write document directly
             yamlParser.writeDocument(asyncApiDoc);
+
+            // Update cache (validates with scanned state + updates cache, but does not write file)
+            specManager.processAndCacheSpec(Protocol.WEB_SOCKET, asyncApiDoc);
 
             log.info("Created WebSocket message: {}", request.getMessageName());
 
@@ -70,11 +74,12 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
     public List<MessageResponse> getAllMessages() throws Exception {
         lock.readLock().lock();
         try {
-            if (!yamlParser.fileExists()) {
+            // Read from cache
+            Map<String, Object> asyncApiDoc = specManager.convertSpecToMap(specManager.getApiSpec(Protocol.WEB_SOCKET));
+            if (asyncApiDoc == null) {
                 return new ArrayList<>();
             }
 
-            Map<String, Object> asyncApiDoc = yamlParser.readDocument();
             Map<String, Object> messages = yamlParser.getMessages(asyncApiDoc);
 
             if (messages == null || messages.isEmpty()) {
@@ -99,11 +104,12 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
     public MessageResponse getMessage(String messageName) throws Exception {
         lock.readLock().lock();
         try {
-            if (!yamlParser.fileExists()) {
+            // Read from cache
+            Map<String, Object> asyncApiDoc = specManager.convertSpecToMap(specManager.getApiSpec(Protocol.WEB_SOCKET));
+            if (asyncApiDoc == null) {
                 throw new IllegalArgumentException("No messages found. The specification file does not exist.");
             }
 
-            Map<String, Object> asyncApiDoc = yamlParser.readDocument();
             Map<String, Object> messageDefinition = yamlParser.getMessage(asyncApiDoc, messageName);
 
             if (messageDefinition == null) {
@@ -133,7 +139,8 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
                 throw new IllegalArgumentException("No messages found. The specification file does not exist.");
             }
 
-            Map<String, Object> asyncApiDoc = yamlParser.readDocument();
+            // Read from file directly (not cache) for CUD operations
+            Map<String, Object> asyncApiDoc = yamlParser.readDocumentFromFile();
             Map<String, Object> existingMessage = yamlParser.getMessage(asyncApiDoc, messageName);
 
             if (existingMessage == null) {
@@ -152,15 +159,18 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
             }
             if (request.getHeaders() != null) {
                 // Convert ref to $ref for YAML storage
-                existingMessage.put("headers", convertRefToDollarRef(request.getHeaders()));
+                existingMessage.put("headers", ReferenceConverter.convertRefToDollarRef(request.getHeaders()));
             }
             if (request.getPayload() != null) {
                 // Convert ref to $ref for YAML storage
-                existingMessage.put("payload", convertRefToDollarRef(request.getPayload()));
+                existingMessage.put("payload", ReferenceConverter.convertRefToDollarRef(request.getPayload()));
             }
 
-            // Process and cache: writes to file + validates with scanned state + updates cache
+            // Write document directly
             yamlParser.writeDocument(asyncApiDoc);
+
+            // Update cache (validates with scanned state + updates cache, but does not write file)
+            specManager.processAndCacheSpec(Protocol.WEB_SOCKET, asyncApiDoc);
 
             log.info("Updated WebSocket message: {}", messageName);
 
@@ -185,7 +195,8 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
                 throw new IllegalArgumentException("No messages found. The specification file does not exist.");
             }
 
-            Map<String, Object> asyncApiDoc = yamlParser.readDocument();
+            // Read from file directly (not cache) for CUD operations
+            Map<String, Object> asyncApiDoc = yamlParser.readDocumentFromFile();
 
             boolean removed = yamlParser.removeMessage(asyncApiDoc, messageName);
 
@@ -193,8 +204,11 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
                 throw new IllegalArgumentException("Message '" + messageName + "' not found");
             }
 
-            // Process and cache: writes to file + validates with scanned state + updates cache
+            // Write document directly
             yamlParser.writeDocument(asyncApiDoc);
+
+            // Update cache (validates with scanned state + updates cache, but does not write file)
+            specManager.processAndCacheSpec(Protocol.WEB_SOCKET, asyncApiDoc);
 
             log.info("Deleted WebSocket message: {}", messageName);
         } finally {
@@ -219,12 +233,12 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
 
         if (request.getHeaders() != null && !request.getHeaders().isEmpty()) {
             // Convert ref to $ref for YAML storage
-            message.put("headers", convertRefToDollarRef(request.getHeaders()));
+            message.put("headers", ReferenceConverter.convertRefToDollarRef(request.getHeaders()));
         }
 
         if (request.getPayload() != null && !request.getPayload().isEmpty()) {
             // Convert ref to $ref for YAML storage
-            message.put("payload", convertRefToDollarRef(request.getPayload()));
+            message.put("payload", ReferenceConverter.convertRefToDollarRef(request.getPayload()));
         }
 
         return message;
@@ -240,8 +254,8 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
                 .name(safeGetString(messageDefinition, "name"))
                 .contentType(safeGetString(messageDefinition, "contentType"))
                 .description(safeGetString(messageDefinition, "description"))
-                .headers(headers != null ? convertDollarRefToRef(headers) : null)
-                .payload(payload != null ? convertDollarRefToRef(payload) : null)
+                .headers(headers != null ? ReferenceConverter.convertDollarRefToRef(headers) : null)
+                .payload(payload != null ? ReferenceConverter.convertDollarRefToRef(payload) : null)
                 .build();
     }
 
@@ -282,121 +296,4 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
         return null;
     }
 
-    /**
-     * Converts "ref" field to "$ref" field in a Map (for YAML storage).
-     * Recursively processes nested Maps and Arrays.
-     *
-     * @param map the source map (may contain "ref" fields)
-     * @return new map with "ref" converted to "$ref"
-     */
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> convertRefToDollarRef(Map<String, Object> map) {
-        if (map == null) {
-            return null;
-        }
-        
-        Map<String, Object> result = new LinkedHashMap<>();
-        for (Map.Entry<String, Object> entry : map.entrySet()) {
-            String key = entry.getKey();
-            Object value = entry.getValue();
-
-            // Convert "ref" key to "$ref" with full path
-            if ("ref".equals(key) && value instanceof String) {
-                String refValue = (String) value;
-                // Convert simple schema name to full AsyncAPI path
-                if (!refValue.startsWith("#")) {
-                    refValue = "#/components/schemas/" + refValue;
-                }
-                result.put("$ref", refValue);
-            } else if (value instanceof Map) {
-                // Recursively process nested maps
-                result.put(key, convertRefToDollarRef((Map<String, Object>) value));
-            } else if (value instanceof List) {
-                // Recursively process lists
-                result.put(key, convertRefToDollarRefInList((List<Object>) value));
-            } else {
-                // Keep other fields as-is
-                result.put(key, value);
-            }
-        }
-        return result;
-    }
-
-    /**
-     * Converts "$ref" field to "ref" field in a Map (for JSON API).
-     * Recursively processes nested Maps and Arrays.
-     *
-     * @param map the source map (may contain "$ref" fields)
-     * @return new map with "$ref" converted to "ref"
-     */
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> convertDollarRefToRef(Map<String, Object> map) {
-        if (map == null) {
-            return null;
-        }
-        
-        Map<String, Object> result = new LinkedHashMap<>();
-        for (Map.Entry<String, Object> entry : map.entrySet()) {
-            String key = entry.getKey();
-            Object value = entry.getValue();
-            
-            // Convert "$ref" key to "ref"
-            if ("$ref".equals(key)) {
-                result.put("ref", value);
-            } else if (value instanceof Map) {
-                // Recursively process nested maps
-                result.put(key, convertDollarRefToRef((Map<String, Object>) value));
-            } else if (value instanceof List) {
-                // Recursively process lists
-                result.put(key, convertDollarRefToRefInList((List<Object>) value));
-            } else {
-                result.put(key, value);
-            }
-        }
-        return result;
-    }
-
-    /**
-     * Recursively converts "ref" to "$ref" in a List.
-     */
-    @SuppressWarnings("unchecked")
-    private List<Object> convertRefToDollarRefInList(List<Object> list) {
-        if (list == null) {
-            return null;
-        }
-        
-        List<Object> result = new ArrayList<>();
-        for (Object item : list) {
-            if (item instanceof Map) {
-                result.add(convertRefToDollarRef((Map<String, Object>) item));
-            } else if (item instanceof List) {
-                result.add(convertRefToDollarRefInList((List<Object>) item));
-            } else {
-                result.add(item);
-            }
-        }
-        return result;
-    }
-
-    /**
-     * Recursively converts "$ref" to "ref" in a List.
-     */
-    @SuppressWarnings("unchecked")
-    private List<Object> convertDollarRefToRefInList(List<Object> list) {
-        if (list == null) {
-            return null;
-        }
-        
-        List<Object> result = new ArrayList<>();
-        for (Object item : list) {
-            if (item instanceof Map) {
-                result.add(convertDollarRefToRef((Map<String, Object>) item));
-            } else if (item instanceof List) {
-                result.add(convertDollarRefToRefInList((List<Object>) item));
-            } else {
-                result.add(item);
-            }
-        }
-        return result;
-    }
 }

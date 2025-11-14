@@ -141,6 +141,33 @@ public class WebSocketOperationController {
         );
         return ResponseEntity.ok(response);
     }
+
+    /**
+     * Syncs a cache-only operation to the YAML file.
+     * <p>
+     * This endpoint is used when an operation exists only in the cache (from code scanning)
+     * but not in the YAML file. It adds the operation to the file so it can be edited via
+     * the update endpoint.
+     * <p>
+     * If the operation already exists in the file, this operation is a no-op and returns
+     * the existing operation.
+     * <p>
+     * Exceptions are handled by a global exception handler.
+     *
+     * @param id operation UUID (x-ouroboros-id)
+     * @return synced operation details
+     * @throws Exception if operation not found in cache or sync fails
+     */
+    @PostMapping("/{id}/sync")
+    public ResponseEntity<GlobalApiResponse<OperationResponse>> syncToFile(
+            @PathVariable("id") String id) throws Exception {
+        OperationResponse data = operationService.syncToFile(id);
+        GlobalApiResponse<OperationResponse> response = GlobalApiResponse.success(
+                data,
+                "Operation synced to file successfully"
+        );
+        return ResponseEntity.ok(response);
+    }
 }
 
 

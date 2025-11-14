@@ -46,7 +46,7 @@ public class RestSchemaServiceImpl implements RestSchemaService {
     public SchemaResponse createSchema(CreateSchemaRequest request) throws Exception {
         lock.writeLock().lock();
         try {
-            // Read existing document or create new one
+            // Read existing document or create new one (from file, not cache)
             Map<String, Object> openApiDoc = yamlParser.readOrCreateDocument();
 
             // Check for duplicate schema name
@@ -60,7 +60,10 @@ public class RestSchemaServiceImpl implements RestSchemaService {
             // Add schema to document
             yamlParser.putSchema(openApiDoc, request.getSchemaName(), schemaDefinition);
 
-            // Process and cache: writes to file + validates with scanned state + updates cache
+            // Write document directly
+            yamlParser.writeDocument(openApiDoc);
+
+            // Update cache (validates with scanned state + updates cache, but does not write file)
             specManager.processAndCacheSpec(Protocol.REST, openApiDoc);
 
             // registry 초기화 후 재등록 (전체 읽기)
@@ -78,11 +81,12 @@ public class RestSchemaServiceImpl implements RestSchemaService {
     public List<SchemaResponse> getAllSchemas() throws Exception {
         lock.readLock().lock();
         try {
-            if (!yamlParser.fileExists()) {
+            // Read from cache
+            Map<String, Object> openApiDoc = specManager.convertSpecToMap(specManager.getApiSpec(Protocol.REST));
+            if (openApiDoc == null) {
                 return new ArrayList<>();
             }
 
-            Map<String, Object> openApiDoc = yamlParser.readDocument();
             Map<String, Object> schemas = yamlParser.getSchemas(openApiDoc);
 
             if (schemas == null || schemas.isEmpty()) {
@@ -107,11 +111,12 @@ public class RestSchemaServiceImpl implements RestSchemaService {
     public SchemaResponse getSchema(String schemaName) throws Exception {
         lock.readLock().lock();
         try {
-            if (!yamlParser.fileExists()) {
+            // Read from cache
+            Map<String, Object> openApiDoc = specManager.convertSpecToMap(specManager.getApiSpec(Protocol.REST));
+            if (openApiDoc == null) {
                 throw new IllegalArgumentException("No schemas found. The specification file does not exist.");
             }
 
-            Map<String, Object> openApiDoc = yamlParser.readDocument();
             Map<String, Object> schemaDefinition = yamlParser.getSchema(openApiDoc, schemaName);
 
             if (schemaDefinition == null) {
@@ -144,7 +149,8 @@ public class RestSchemaServiceImpl implements RestSchemaService {
                 throw new IllegalArgumentException("No schemas found. The specification file does not exist.");
             }
 
-            Map<String, Object> openApiDoc = yamlParser.readDocument();
+            // Read from file directly (not cache) for CUD operations
+            Map<String, Object> openApiDoc = yamlParser.readDocumentFromFile();
             Map<String, Object> existingSchema = yamlParser.getSchema(openApiDoc, schemaName);
 
             if (existingSchema == null) {
@@ -188,7 +194,10 @@ public class RestSchemaServiceImpl implements RestSchemaService {
                 }
             }
 
-            // Process and cache: writes to file + validates with scanned state + updates cache
+            // Write document directly
+            yamlParser.writeDocument(openApiDoc);
+
+            // Update cache (validates with scanned state + updates cache, but does not write file)
             specManager.processAndCacheSpec(Protocol.REST, openApiDoc);
 
             // registry 초기화 후 재등록 (전체 읽기)
@@ -217,7 +226,8 @@ public class RestSchemaServiceImpl implements RestSchemaService {
                 throw new IllegalArgumentException("No schemas found. The specification file does not exist.");
             }
 
-            Map<String, Object> openApiDoc = yamlParser.readDocument();
+            // Read from file directly (not cache) for CUD operations
+            Map<String, Object> openApiDoc = yamlParser.readDocumentFromFile();
 
             boolean removed = yamlParser.removeSchema(openApiDoc, schemaName);
 
@@ -225,7 +235,10 @@ public class RestSchemaServiceImpl implements RestSchemaService {
                 throw new IllegalArgumentException("Schema '" + schemaName + "' not found");
             }
 
-            // Process and cache: writes to file + validates with scanned state + updates cache
+            // Write document directly
+            yamlParser.writeDocument(openApiDoc);
+
+            // Update cache (validates with scanned state + updates cache, but does not write file)
             specManager.processAndCacheSpec(Protocol.REST, openApiDoc);
 
             // registry 초기화 후 재등록 (전체 읽기)

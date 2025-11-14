@@ -7,10 +7,8 @@ import static kr.co.ouroboros.core.rest.handler.helper.MockApiHelper.isMockApi;
 import static kr.co.ouroboros.core.rest.handler.helper.RequestDiffHelper.HttpMethod;
 import static kr.co.ouroboros.core.rest.handler.helper.RequestDiffHelper.compareAndMarkRequest;
 
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Map.Entry;
 import kr.co.ouroboros.core.global.handler.SpecSyncPipeline;
 import kr.co.ouroboros.core.global.spec.OuroApiSpec;
 import kr.co.ouroboros.core.rest.common.dto.Operation;
@@ -102,36 +100,37 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
             restFileSpec.setPaths(pathsFile);
         }
 
-        Iterator<Entry<String, PathItem>> it = pathsFile.entrySet().iterator();
-
-        while (it.hasNext()) {
-            Map.Entry<String, PathItem> e = it.next();
-            PathItem fileItem = e.getValue();
-
-            int cnt = 0;
-            for (HttpMethod httpMethod : HttpMethod.values()) {
-                Operation fileOp = getOperationByMethod(fileItem, httpMethod);
-                if (fileOp == null) continue;
-
-                if ("endpoint".equals(fileOp.getXOuroborosDiff())) {
-                    setOperationByMethodToNull(fileItem, httpMethod);
-                } else {
-                    cnt++;
-                    fileOp.setXOuroborosDiff("none");
-                    fileOp.setXOuroborosProgress("mock");
-                    fileOp.setXOuroborosTag("none");
-                }
-            }
-
-            if (cnt == 0) {
-                it.remove();
-            }
-        }
+        // TODO 삭제 될 로직
+//        Iterator<Entry<String, PathItem>> it = pathsFile.entrySet().iterator();
+//
+//        while (it.hasNext()) {
+//            Map.Entry<String, PathItem> e = it.next();
+//            PathItem fileItem = e.getValue();
+//
+//            int cnt = 0;
+//            for (HttpMethod httpMethod : HttpMethod.values()) {
+//                Operation fileOp = getOperationByMethod(fileItem, httpMethod);
+//                if (fileOp == null) continue;
+//
+//                if ("endpoint".equals(fileOp.getXOuroborosDiff())) {
+//                    setOperationByMethodToNull(fileItem, httpMethod);
+//                } else {
+//                    cnt++;
+//                    fileOp.setXOuroborosDiff("none");
+//                    fileOp.setXOuroborosProgress("mock");
+//                    fileOp.setXOuroborosTag("none");
+//                }
+//            }
+//
+//            if (cnt == 0) {
+//                it.remove();
+//            }
+//        }
 
         for (String url : pathsScanned.keySet()) {
 
             // url이 다른가 먼저 봄
-            if(isDiffUrl(url, pathsFile, pathsScanned)) continue;
+            if(isDiffUrl(url, pathsFile, pathsScanned, fileFlattenedSchemas, restFileSpec, restScannedSpec)) continue;
 
             PathItem fileItem = pathsFile.get(url);
             PathItem scanItem = pathsScanned.get(url);

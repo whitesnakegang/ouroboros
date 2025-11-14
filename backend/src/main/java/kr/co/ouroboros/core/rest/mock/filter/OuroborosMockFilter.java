@@ -198,9 +198,9 @@ public class OuroborosMockFilter implements Filter {
             body = schemaMockBuilder.build(responseMeta.getBody());
         }
 
-        // ===== 요청 body와 병합 (요청 필드가 있으면 덮어씀) =====
+        // ===== 요청 body와 병합 (스키마에 정의된 필드만 덮어씀) =====
         if (body instanceof Map<?, ?> bodyMap && requestBody instanceof Map<?, ?> requestMap) {
-            deepMerge((Map<String, Object>) bodyMap, (Map<String, Object>) requestMap);
+            selectiveMerge((Map<String, Object>) bodyMap, (Map<String, Object>) requestMap, responseMeta.getBody());
         }
 
         // ===== Content-Type 결정 =====
@@ -295,26 +295,58 @@ public class OuroborosMockFilter implements Filter {
     }
 
     /**
-     * Recursively merges entries from `source` into `target`, overriding `target` values with `source` values.
+     * Selectively merges entries from `source` into `target` based on the response schema definition.
      *
-     * The merge mutates the `target` map in place. When a value for the same key is a map in both
-     * `target` and `source`, the maps are merged recursively; otherwise the `source` value replaces
-     * the `target` value.
+     * <p>Only fields defined in the response schema's `properties` are merged. This prevents
+     * request body fields that are not part of the response DTO from being included in the mock response.</p>
+     *
+     * <p>The merge mutates the `target` map in place. When a value for the same key is a map in both
+     * `target` and `source`, and the schema defines it as an object type, the maps are merged recursively.</p>
      *
      * @param target the map to be mutated with merged values (e.g., generated mock data)
-     * @param source the map whose values take precedence and will overwrite or be merged into `target` (e.g., request body)
+     * @param source the map whose values take precedence (e.g., request body)
+     * @param schema the response schema defining which fields are allowed
      */
     @SuppressWarnings("unchecked")
-    private void deepMerge(Map<String, Object> target, Map<String, Object> source) {
+    private void selectiveMerge(Map<String, Object> target, Map<String, Object> source, Map<String, Object> schema) {
+        if (schema == null || source == null || target == null) {
+            return;
+        }
+
+        // schema의 properties 추출
+        Object propertiesObj = schema.get("properties");
+        if (!(propertiesObj instanceof Map)) {
+            return;
+        }
+        Map<String, Object> properties = (Map<String, Object>) propertiesObj;
+
+        // schema에 정의된 필드만 병합
         for (Map.Entry<String, Object> entry : source.entrySet()) {
             String key = entry.getKey();
             Object sourceValue = entry.getValue();
 
-            if (sourceValue instanceof Map && target.get(key) instanceof Map) {
-                // 양쪽 모두 Map이면 재귀적으로 병합
-                deepMerge((Map<String, Object>) target.get(key), (Map<String, Object>) sourceValue);
+            // schema에 정의되지 않은 필드는 무시
+            if (!properties.containsKey(key)) {
+                continue;
+            }
+
+            Object propertySchema = properties.get(key);
+            if (!(propertySchema instanceof Map)) {
+                continue;
+            }
+
+            Map<String, Object> propSchemaMap = (Map<String, Object>) propertySchema;
+            String type = (String) propSchemaMap.getOrDefault("type", "string");
+
+            // nested object인 경우 재귀적으로 병합
+            if ("object".equals(type) && sourceValue instanceof Map && target.get(key) instanceof Map) {
+                selectiveMerge(
+                    (Map<String, Object>) target.get(key),
+                    (Map<String, Object>) sourceValue,
+                    propSchemaMap
+                );
             } else {
-                // 그 외의 경우 source 값으로 덮어씀
+                // primitive 또는 array인 경우 덮어씀
                 target.put(key, sourceValue);
             }
         }
