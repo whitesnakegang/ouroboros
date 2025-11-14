@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import { StatusFilter } from "./StatusFilter";
 import { EndpointGroup } from "./EndpointGroup";
 import { EndpointCard } from "./EndpointCard";
+import { ProtocolTabs } from "@/features/spec/components/ProtocolTabs";
 import { useSidebarStore } from "../store/sidebar.store";
 
 interface SidebarProps {
@@ -21,6 +22,9 @@ export function Sidebar({ onAddNew }: SidebarProps) {
     endpoints,
     loadEndpoints,
     isLoading,
+    protocol,
+    setProtocol,
+    setTriggerNewForm,
   } = useSidebarStore();
 
   React.useEffect(() => {
@@ -42,6 +46,15 @@ export function Sidebar({ onAddNew }: SidebarProps) {
 
     Object.entries(endpoints).forEach(([group, groupEndpoints]) => {
       const filteredGroupEndpoints = groupEndpoints.filter((endpoint) => {
+        // 프로토콜 필터링 (null일 때는 모든 엔드포인트 표시)
+        if (protocol !== null) {
+          const endpointProtocol = endpoint.protocol || "REST"; // 기본값은 REST
+          if (endpointProtocol !== protocol) {
+            return false;
+          }
+        }
+
+        // 검색 필터링
         if (searchQuery) {
           const query = searchQuery.toLowerCase();
           const matchesSearch =
@@ -51,15 +64,21 @@ export function Sidebar({ onAddNew }: SidebarProps) {
           if (!matchesSearch) return false;
         }
 
-        const ep = endpoint as {
-          progress?: string;
-        };
-        const progressLower = ep.progress?.toLowerCase();
-        if (activeFilter === "mock") {
-          return progressLower !== "completed";
-        } else {
-          return progressLower === "completed";
+        // REST 전용: Mock/Completed 필터 적용
+        // WebSocket, GraphQL: 필터 적용 안 함 (모두 표시)
+        const endpointProtocol = endpoint.protocol || "REST"; // 기본값은 REST
+        if (endpointProtocol === "REST") {
+          const ep = endpoint as { progress?: string };
+          const progressLower = ep.progress?.toLowerCase();
+          if (activeFilter === "mock") {
+            return progressLower !== "completed";
+          } else {
+            return progressLower === "completed";
+          }
         }
+
+        // WebSocket, GraphQL은 필터 미적용 (모두 통과)
+        return true;
       });
 
       if (filteredGroupEndpoints.length > 0) {
@@ -68,7 +87,7 @@ export function Sidebar({ onAddNew }: SidebarProps) {
     });
 
     return filtered;
-  }, [searchQuery, activeFilter, endpoints]);
+  }, [searchQuery, activeFilter, endpoints, protocol]);
 
   return (
     <div className="h-full flex flex-col bg-white dark:bg-[#0D1117] transition-colors">
@@ -129,6 +148,17 @@ export function Sidebar({ onAddNew }: SidebarProps) {
           </div>
         </div>
 
+        <ProtocolTabs
+          selectedProtocol={protocol}
+          onProtocolChange={setProtocol}
+          onNewForm={() => {
+            if (setTriggerNewForm) {
+              setTriggerNewForm(true);
+            }
+          }}
+          compact={true}
+        />
+
         <div className="relative mb-3">
           <svg
             className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#8B949E]"
@@ -172,10 +202,13 @@ export function Sidebar({ onAddNew }: SidebarProps) {
           )}
         </div>
 
-        <StatusFilter
-          activeFilter={activeFilter}
-          onFilterChange={setActiveFilter}
-        />
+        {/* REST일 때만 Mock/Completed 필터 표시 */}
+        {protocol === "REST" && (
+          <StatusFilter
+            activeFilter={activeFilter}
+            onFilterChange={setActiveFilter}
+          />
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -204,8 +237,21 @@ export function Sidebar({ onAddNew }: SidebarProps) {
 
       <div className="p-4 border-t border-gray-200 dark:border-[#2D333B]">
         <button
-          onClick={onAddNew}
-          className="w-full bg-black dark:bg-[#161B22] text-white dark:text-[#E6EDF3] py-2 px-4 rounded-lg hover:bg-gray-800 dark:hover:bg-[#21262D] transition-colors"
+          onClick={() => {
+            // 선택된 프로토콜 정보와 함께 새 폼 트리거
+            if (setTriggerNewForm) {
+              setTriggerNewForm(true);
+            }
+            if (onAddNew) {
+              onAddNew();
+            }
+          }}
+          disabled={protocol === null}
+          className={`w-full py-2 px-4 rounded-lg transition-colors ${
+            protocol === null
+              ? "bg-gray-300 dark:bg-[#2D333B] text-gray-500 dark:text-[#6E7681] cursor-not-allowed"
+              : "bg-black dark:bg-[#161B22] text-white dark:text-[#E6EDF3] hover:bg-gray-800 dark:hover:bg-[#21262D]"
+          }`}
         >
           + Add
         </button>

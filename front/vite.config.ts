@@ -13,6 +13,14 @@ export default defineConfig(({ mode }) => {
       react(),
       nodePolyfills(), // Node.js 폴리필 추가
     ],
+    optimizeDeps: {
+      exclude: ['refractor'],
+    },
+    build: {
+      commonjsOptions: {
+        transformMixedEsModules: true,
+      },
+    },
     define: {
       global: "window",
       "process.env": {},

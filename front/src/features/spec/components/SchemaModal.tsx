@@ -1,6 +1,6 @@
+import { deleteSchema, deleteWebSocketSchema } from "../services/api";
 import type { SchemaResponse } from "../services/api";
 import type { SchemaField } from "../types/schema.types";
-import { deleteSchema } from "../services/api";
 import { parseOpenAPISchemaToSchemaField } from "../utils/schemaConverter";
 
 interface Schema {
@@ -9,7 +9,7 @@ interface Schema {
   description?: string;
   type: string;
   fields: SchemaField[];
-  items?: any;  // array 타입일 경우
+  items?: any; // array 타입일 경우
 }
 
 interface SchemaModalProps {
@@ -18,6 +18,7 @@ interface SchemaModalProps {
   onSelect: (schema: Schema) => void;
   schemas: SchemaResponse[];
   setSchemas: (schemas: SchemaResponse[]) => void;
+  protocol?: "REST" | "WebSocket";
 }
 
 export function SchemaModal({
@@ -26,21 +27,36 @@ export function SchemaModal({
   onSelect,
   schemas,
   setSchemas,
+  protocol = "REST",
 }: SchemaModalProps) {
   if (!isOpen) return null;
 
+  // Schema 이름에서 마지막 부분만 추출 (예: com.example.dto.UserDTO -> UserDTO)
+  const getShortSchemaName = (fullName: string): string => {
+    const parts = fullName.split(".");
+    return parts[parts.length - 1];
+  };
+
   const handleDeleteSchema = async (schemaName: string) => {
-    if (!confirm(`'${schemaName}' 스키마를 삭제하시겠습니까?\n\n이 스키마를 참조하는 API 명세가 있다면 문제가 발생할 수 있습니다.\n이 작업은 되돌릴 수 없습니다.`)) {
+    if (!confirm(`"${schemaName}" 스키마를 삭제하시겠습니까?`)) {
       return;
     }
 
     try {
-      await deleteSchema(schemaName);
-      // 성공 시 로컬 상태에서 제거
+      if (protocol === "WebSocket") {
+        await deleteWebSocketSchema(schemaName);
+      } else {
+        await deleteSchema(schemaName);
+      }
       setSchemas(schemas.filter((s) => s.schemaName !== schemaName));
-    } catch (error) {
-      console.error("스키마 삭제 실패:", error);
-      alert(error instanceof Error ? error.message : "스키마 삭제에 실패했습니다.");
+      alert(`"${schemaName}" 스키마가 삭제되었습니다.`);
+    } catch (err) {
+      console.error("스키마 삭제 실패:", err);
+      alert(
+        `스키마 삭제에 실패했습니다: ${
+          err instanceof Error ? err.message : "알 수 없는 오류"
+        }`
+      );
     }
   };
 
@@ -61,7 +77,7 @@ export function SchemaModal({
             return field;
           })
         : [],
-      items: schema.items,  // array 타입일 경우
+      items: schema.items, // array 타입일 경우
     };
     onSelect(convertedSchema);
     onClose();
@@ -116,18 +132,36 @@ export function SchemaModal({
                     className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-purple-500 dark:hover:border-purple-400 transition-colors"
                   >
                     <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-medium text-gray-900 dark:text-white">
-                          {schema.schemaName}
+                      <div className="flex-1 min-w-0">
+                        <h3
+                          className="font-medium text-gray-900 dark:text-white truncate"
+                          title={schema.schemaName}
+                        >
+                          {getShortSchemaName(schema.schemaName)}
                         </h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          {schema.properties
-                            ? Object.keys(schema.properties).length
-                            : 0}
-                          개 필드
-                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                            {schema.properties
+                              ? Object.keys(schema.properties).length
+                              : 0}
+                            개 필드
+                          </p>
+                          {schema.schemaName.includes(".") && (
+                            <span
+                              className="text-xs text-gray-400 dark:text-gray-500 font-mono truncate"
+                              title={schema.schemaName}
+                            >
+                              (
+                              {schema.schemaName
+                                .split(".")
+                                .slice(0, -1)
+                                .join(".")}
+                              )
+                            </span>
+                          )}
+                        </div>
                         {schema.description && (
-                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 truncate">
                             {schema.description}
                           </p>
                         )}
