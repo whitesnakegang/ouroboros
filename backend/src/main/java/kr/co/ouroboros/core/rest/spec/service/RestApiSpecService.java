@@ -97,4 +97,19 @@ public interface RestApiSpecService {
      * @throws Exception if file reading fails or file does not exist
      */
     String exportYaml() throws Exception;
+
+    /**
+     * Syncs a cache-only API specification to the YAML file.
+     * <p>
+     * This method is used when an API specification exists only in the cache (from code scanning)
+     * but not in the YAML file. It adds the specification to the file so it can be edited via
+     * the update endpoint.
+     * <p>
+     * If the specification already exists in the file, this operation is a no-op.
+     *
+     * @param id specification UUID
+     * @return synced specification details
+     * @throws Exception if specification not found in cache or sync fails
+     */
+    RestApiSpecResponse syncToFile(String id) throws Exception;
 }

@@ -1,5 +1,7 @@
 package kr.co.ouroboros.core.rest.spec.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.co.ouroboros.core.global.Protocol;
 import kr.co.ouroboros.core.global.manager.OuroApiSpecManager;
 import kr.co.ouroboros.core.rest.common.yaml.RestApiYamlParser;
@@ -43,6 +45,7 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
     private final RestMockRegistry mockRegistry;
     private final RestMockLoaderService mockLoaderService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     private static final List<String> HTTP_METHODS = Arrays.asList(
             "get", "post", "put", "delete", "patch", "options", "head", "trace"
@@ -79,6 +82,19 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
 
             // Build operation definition
             Map<String, Object> operation = buildOperation(id, request);
+
+            // Sync missing schemas from cache to file if operation references cache-only schemas
+            Map<String, Object> cacheDoc = specManager.convertSpecToMap(specManager.getApiSpec(Protocol.REST));
+            if (cacheDoc != null) {
+                syncMissingSchemasFromCache(cacheDoc, openApiDoc);
+                
+                // Update all $ref references in operation to use class names instead of full package names
+                Map<String, Object> cacheSchemas = yamlParser.getSchemas(cacheDoc);
+                if (cacheSchemas != null && !cacheSchemas.isEmpty()) {
+                    Map<String, String> packageToClassNameMap = buildPackageToClassNameMap(cacheSchemas);
+                    updateSchemaReferences(operation, packageToClassNameMap);
+                }
+            }
 
             // Add operation to document
             yamlParser.putOperation(openApiDoc, request.getPath(), request.getMethod(), operation);
@@ -282,6 +298,19 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
                 updateOperationFields(operation, request);
 
                 log.info("Updated REST API spec: {} {} (ID: {})", foundMethod.toUpperCase(), foundPath, id);
+            }
+
+            // Sync missing schemas from cache to file and update $ref references to use class names
+            Map<String, Object> cacheDoc = specManager.convertSpecToMap(specManager.getApiSpec(Protocol.REST));
+            if (cacheDoc != null) {
+                syncMissingSchemasFromCache(cacheDoc, openApiDoc);
+                
+                // Update all $ref references in operation to use class names instead of full package names
+                Map<String, Object> cacheSchemas = yamlParser.getSchemas(cacheDoc);
+                if (cacheSchemas != null && !cacheSchemas.isEmpty()) {
+                    Map<String, String> packageToClassNameMap = buildPackageToClassNameMap(cacheSchemas);
+                    updateSchemaReferences(operation, packageToClassNameMap);
+                }
             }
 
             // Auto-create security schemes if security is updated
@@ -1133,7 +1162,6 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
 
                 // tags를 대문자로 변환
                 if (operation.containsKey("tags") && operation.get("tags") instanceof List) {
-                    @SuppressWarnings("unchecked")
                     List<Object> tagsObj = (List<Object>) operation.get("tags");
                     if (tagsObj != null && !tagsObj.isEmpty()) {
                         List<String> upperCaseTags = tagsObj.stream()
@@ -1397,6 +1425,301 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
             return yamlParser.readYamlContent();
         } finally {
             lock.readLock().unlock();
+        }
+    }
+
+    /**
+     * Syncs a cache-only API specification to the YAML file.
+     * <p>
+     * This method is used when an API specification exists only in the cache (from code scanning)
+     * but not in the YAML file. It adds the specification to the file so it can be edited via
+     * the update endpoint.
+     * <p>
+     * If the specification already exists in the file, this operation is a no-op.
+     *
+     * @param id specification UUID
+     * @return synced specification details
+     * @throws IllegalArgumentException if specification not found in cache
+     * @throws Exception if sync fails
+     */
+    @Override
+    public RestApiSpecResponse syncToFile(String id) throws Exception {
+        lock.writeLock().lock();
+        try {
+            // Step 1: Find operation in cache
+            Map<String, Object> cacheDoc = specManager.convertSpecToMap(specManager.getApiSpec(Protocol.REST));
+            if (cacheDoc == null) {
+                throw new IllegalArgumentException("No API specifications found in cache.");
+            }
+
+            Map<String, Object> cachePaths = yamlParser.getOrCreatePaths(cacheDoc);
+            String foundPath = null;
+            String foundMethod = null;
+            Map<String, Object> cacheOperation = null;
+
+            for (Map.Entry<String, Object> pathEntry : cachePaths.entrySet()) {
+                String path = pathEntry.getKey();
+                @SuppressWarnings("unchecked")
+                Map<String, Object> methods = (Map<String, Object>) pathEntry.getValue();
+
+                for (Map.Entry<String, Object> methodEntry : methods.entrySet()) {
+                    String method = methodEntry.getKey();
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> operation = (Map<String, Object>) methodEntry.getValue();
+
+                    String operationId = (String) operation.get("x-ouroboros-id");
+                    if (id.equals(operationId)) {
+                        foundPath = path;
+                        foundMethod = method;
+                        cacheOperation = operation;
+                        break;
+                    }
+                }
+                if (cacheOperation != null) break;
+            }
+
+            if (cacheOperation == null) {
+                throw new IllegalArgumentException("REST API specification with ID '" + id + "' not found in cache.");
+            }
+
+            // Step 2: Read or create file document
+            Map<String, Object> fileDoc = yamlParser.readOrCreateDocument();
+
+            // Step 3: Check if operation already exists in file
+            if (yamlParser.operationExists(fileDoc, foundPath, foundMethod)) {
+                // Already exists in file, just return it
+                log.info("Operation {} {} already exists in file (ID: {}), no sync needed",
+                        foundMethod.toUpperCase(), foundPath, id);
+                Map<String, Object> existingOperation = yamlParser.getOperation(fileDoc, foundPath, foundMethod);
+                return convertToResponse(id, foundPath, foundMethod, existingOperation);
+            }
+
+            // Step 4: Sync missing schemas from cache to file first
+            syncMissingSchemasFromCache(cacheDoc, fileDoc);
+
+            // Step 5: Deep copy operation from cache and add to file
+            Map<String, Object> operationToAdd = deepCopyOperation(cacheOperation);
+            
+            // Step 5.1: Reset Ouroboros custom fields to default values when syncing to file
+            // This indicates the spec is newly added to the file (not yet edited)
+            operationToAdd.put("x-ouroboros-progress", "mock");
+            operationToAdd.put("x-ouroboros-tag", "none");
+            operationToAdd.put("x-ouroboros-diff", "none");
+            
+            // Step 5.2: Update all $ref references in operation (requestBody, responses, parameters)
+            // to use class names instead of full package names
+            Map<String, Object> cacheSchemas = yamlParser.getSchemas(cacheDoc);
+            if (cacheSchemas != null && !cacheSchemas.isEmpty()) {
+                Map<String, String> packageToClassNameMap = buildPackageToClassNameMap(cacheSchemas);
+                updateSchemaReferences(operationToAdd, packageToClassNameMap);
+            }
+            
+            yamlParser.putOperation(fileDoc, foundPath, foundMethod, operationToAdd);
+
+            // Step 6: Validate and auto-create missing schemas (from operation references)
+            int createdSchemas = restSchemaValidator.validateAndCreateMissingSchemas(fileDoc);
+            if (createdSchemas > 0) {
+                log.info("Auto-created {} missing schema(s) during sync", createdSchemas);
+            }
+
+            // Step 7: Write document to file
+            yamlParser.writeDocument(fileDoc);
+
+            // Step 8: Update cache (validates with scanned state + updates cache)
+            specManager.processAndCacheSpec(Protocol.REST, fileDoc);
+
+            // Step 9: Reload mock registry
+            reloadMockRegistry();
+
+            log.info("Synced cache-only operation {} {} to file (ID: {})",
+                    foundMethod.toUpperCase(), foundPath, id);
+
+            return convertToResponse(id, foundPath, foundMethod, operationToAdd);
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    /**
+     * Syncs missing schemas from cache to file document.
+     * <p>
+     * This method checks all schemas in the cache and adds any schemas that don't exist
+     * in the file document to ensure schema consistency during operation sync.
+     *
+     * @param cacheDoc the cached document containing all schemas
+     * @param fileDoc the file document to sync schemas into
+     */
+    @SuppressWarnings("unchecked")
+    private void syncMissingSchemasFromCache(Map<String, Object> cacheDoc, Map<String, Object> fileDoc) {
+        // Get schemas from cache
+        Map<String, Object> cacheSchemas = yamlParser.getSchemas(cacheDoc);
+        if (cacheSchemas == null || cacheSchemas.isEmpty()) {
+            return;
+        }
+
+        // Get or create schemas section in file
+        Map<String, Object> fileSchemas = yamlParser.getSchemas(fileDoc);
+        if (fileSchemas == null) {
+            // Ensure components section exists
+            Map<String, Object> components = yamlParser.getOrCreateComponents(fileDoc);
+            fileSchemas = yamlParser.getOrCreateSchemas(components);
+        }
+
+        // Sync each schema from cache to file if missing
+        int syncedCount = 0;
+        for (Map.Entry<String, Object> cacheEntry : cacheSchemas.entrySet()) {
+            String cacheSchemaName = cacheEntry.getKey();
+            
+            // Extract class name from package-qualified name (e.g., "com.c102.ourotest.dto.User" -> "User")
+            String className = extractClassNameFromFullName(cacheSchemaName);
+            if (className == null || className.isEmpty()) {
+                className = cacheSchemaName; // Fallback to original if extraction fails
+            }
+            
+            // Check if schema already exists in file (by class name)
+            if (fileSchemas.containsKey(className)) {
+                continue; // Skip if already exists
+            }
+
+            // Deep copy schema from cache and add to file with class name only
+            try {
+                Map<String, Object> cacheSchema = (Map<String, Object>) cacheEntry.getValue();
+                Map<String, Object> schemaToAdd = deepCopySchema(cacheSchema);
+                
+                // Update all $ref references in schema to use class names instead of full package names
+                updateSchemaReferencesToClassName(schemaToAdd, cacheSchemas);
+                
+                fileSchemas.put(className, schemaToAdd);
+                syncedCount++;
+                log.debug("Synced schema '{}' (as '{}') from cache to file", cacheSchemaName, className);
+            } catch (Exception e) {
+                log.warn("Failed to sync schema '{}' from cache to file: {}", cacheSchemaName, e.getMessage());
+            }
+        }
+
+        if (syncedCount > 0) {
+            log.info("Synced {} missing schema(s) from cache to file", syncedCount);
+        }
+    }
+
+    /**
+     * Builds a map from package-qualified schema names to class names.
+     * <p>
+     * This map is used to update $ref references in operations to use class names
+     * instead of full package names.
+     *
+     * @param cacheSchemas map of all cache schemas (key: full package name, value: schema definition)
+     * @return map from package-qualified names to class names
+     */
+    private Map<String, String> buildPackageToClassNameMap(Map<String, Object> cacheSchemas) {
+        Map<String, String> map = new HashMap<>();
+        for (String fullName : cacheSchemas.keySet()) {
+            String className = extractClassNameFromFullName(fullName);
+            if (className != null && !className.equals(fullName)) {
+                map.put(fullName, className);
+            }
+        }
+        return map;
+    }
+
+    /**
+     * Extracts the simple class name from a package-qualified name.
+     * <p>
+     * Example: "com.c102.ourotest.dto.User" -> "User"
+     *
+     * @param fullName the package-qualified name
+     * @return the simple class name, or the original string if no '.' is present
+     */
+    private String extractClassNameFromFullName(String fullName) {
+        if (fullName == null || fullName.isEmpty()) {
+            return fullName;
+        }
+        
+        int lastDotIndex = fullName.lastIndexOf('.');
+        if (lastDotIndex == -1) {
+            return fullName;
+        }
+        
+        return fullName.substring(lastDotIndex + 1);
+    }
+
+    /**
+     * Recursively updates all $ref references in a schema to use class names instead of full package names.
+     *
+     * @param schema the schema map to update
+     * @param cacheSchemas map of all cache schemas to resolve full names to class names
+     */
+    @SuppressWarnings("unchecked")
+    private void updateSchemaReferencesToClassName(Object schema, Map<String, Object> cacheSchemas) {
+        if (schema == null || !(schema instanceof Map)) {
+            return;
+        }
+        
+        Map<String, Object> schemaMap = (Map<String, Object>) schema;
+        
+        // Update $ref if present
+        if (schemaMap.containsKey("$ref")) {
+            Object refObj = schemaMap.get("$ref");
+            if (refObj instanceof String) {
+                String ref = (String) refObj;
+                if (ref.startsWith("#/components/schemas/")) {
+                    String fullSchemaName = ref.substring("#/components/schemas/".length());
+                    String className = extractClassNameFromFullName(fullSchemaName);
+                    if (className != null && !className.equals(fullSchemaName)) {
+                        // Update ref to use class name
+                        schemaMap.put("$ref", "#/components/schemas/" + className);
+                    }
+                }
+            }
+        }
+        
+        // Recursively process properties
+        Object propertiesObj = schemaMap.get("properties");
+        if (propertiesObj instanceof Map) {
+            Map<String, Object> properties = (Map<String, Object>) propertiesObj;
+            for (Object property : properties.values()) {
+                updateSchemaReferencesToClassName(property, cacheSchemas);
+            }
+        }
+        
+        // Recursively process items (for array types)
+        Object itemsObj = schemaMap.get("items");
+        if (itemsObj instanceof Map) {
+            updateSchemaReferencesToClassName(itemsObj, cacheSchemas);
+        }
+    }
+
+    /**
+     * Deep copies a schema map to prevent cache pollution.
+     *
+     * @param schema the original schema to copy
+     * @return a deep copy of the schema
+     */
+    private Map<String, Object> deepCopySchema(Map<String, Object> schema) {
+        try {
+            byte[] bytes = objectMapper.writeValueAsBytes(schema);
+            return objectMapper.readValue(bytes, new TypeReference<Map<String, Object>>() {});
+        } catch (Exception e) {
+            log.error("Failed to deep copy schema, returning original (UNSAFE!)", e);
+            // Fallback: return original (not ideal but prevents total failure)
+            return new LinkedHashMap<>(schema);
+        }
+    }
+
+    /**
+     * Deep copies an operation map to prevent cache pollution.
+     *
+     * @param operation the original operation to copy
+     * @return a deep copy of the operation
+     */
+    private Map<String, Object> deepCopyOperation(Map<String, Object> operation) {
+        try {
+            byte[] bytes = objectMapper.writeValueAsBytes(operation);
+            return objectMapper.readValue(bytes, new TypeReference<Map<String, Object>>() {});
+        } catch (Exception e) {
+            log.error("Failed to deep copy operation, returning original (UNSAFE!)", e);
+            // Fallback: return original (not ideal but prevents total failure)
+            return new LinkedHashMap<>(operation);
         }
     }
 }

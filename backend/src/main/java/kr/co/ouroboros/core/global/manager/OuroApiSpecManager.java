@@ -16,6 +16,7 @@ import kr.co.ouroboros.core.global.Protocol;
 import kr.co.ouroboros.core.global.handler.OuroProtocolHandler;
 import kr.co.ouroboros.core.global.spec.OuroApiSpec;
 import kr.co.ouroboros.core.rest.common.dto.OuroRestApiSpec;
+import kr.co.ouroboros.core.websocket.common.dto.OuroWebSocketApiSpec;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
@@ -71,9 +72,16 @@ public class OuroApiSpecManager {
         // 2. 코드 스캔
         OuroApiSpec scannedSpec = handler.scanCurrentState();
 
+        // Early return if both file and scanned specs are empty (avoid unnecessary validation)
         if (scannedSpec instanceof OuroRestApiSpec restApiSpec) {
             if (fileSpec == null && restApiSpec.getPaths()
                     .isEmpty()) {
+                return;
+            }
+        }
+
+        if (scannedSpec instanceof OuroWebSocketApiSpec wsApiSpec) {
+            if (fileSpec == null && (wsApiSpec.getOperations() == null || wsApiSpec.getOperations().isEmpty())) {
                 return;
             }
         }
