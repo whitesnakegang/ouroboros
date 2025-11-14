@@ -751,10 +751,10 @@ export interface CreateOperationRequest {
 }
 
 export interface UpdateOperationRequest {
-  action?: "receive" | "send";
-  channel?: ChannelReference;
-  messages?: MessageReference[];
-  reply?: ReplyInfo | null;
+  protocol?: string;
+  pathname?: string;
+  receive?: ChannelMessageInfo;
+  reply?: ChannelMessageInfo;
 }
 
 export interface GetAllOperationsResponse {
