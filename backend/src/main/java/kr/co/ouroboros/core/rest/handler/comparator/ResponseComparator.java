@@ -256,6 +256,7 @@ public class ResponseComparator {
      * @param contentType        the response Content-Type associated with the schema being compared (used to format the message)
      * @param schemaMatchResults map from schema name (extracted from a `$ref` like "#/components/schemas/Name") to a boolean indicating whether that referenced schema matched previously; may be null
      * @return null if the schemas are considered matching; otherwise a descriptive mismatch message suitable for logging or inclusion in a diff log.
+     */
     private String compareSchemas(Schema scannedSchema, Schema fileSchema, HttpMethod method, String endpoint, String statusCode, String contentType, Map<String, Boolean> schemaMatchResults) {
         if (scannedSchema == null && fileSchema == null) {
             return null;
