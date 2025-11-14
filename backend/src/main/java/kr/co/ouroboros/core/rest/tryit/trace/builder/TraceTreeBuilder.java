@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -75,9 +76,14 @@ public class TraceTreeBuilder {
         }
         
         // Find root spans (spans with no parent or parent not in trace)
+        // Sort by startTimeNanos to preserve call order
         List<TraceSpanInfo> rootSpans = spans.stream()
                 .filter(s -> s.getParentSpanId() == null || s.getParentSpanId().isEmpty() || 
                            s.getParentSpanId().equals("0") || !spanMap.containsKey(s.getParentSpanId()))
+                .sorted(Comparator.comparing(
+                    (TraceSpanInfo s) -> s.getStartTimeNanos() != null ? s.getStartTimeNanos() : Long.MAX_VALUE,
+                    Comparator.nullsLast(Comparator.naturalOrder())
+                ))
                 .collect(Collectors.toList());
         
         // Build tree recursively
@@ -112,10 +118,14 @@ public class TraceTreeBuilder {
         // Parse class name and method signature
         SpanMethodInfo methodInfo = spanMethodParser.parse(span);
         
-        // Get children
+        // Get children and sort by startTimeNanos to preserve call order
         List<SpanNode> children = new ArrayList<>();
         if (childrenMap.containsKey(span.getSpanId())) {
             children = childrenMap.get(span.getSpanId()).stream()
+                    .sorted(Comparator.comparing(
+                        (TraceSpanInfo s) -> s.getStartTimeNanos() != null ? s.getStartTimeNanos() : Long.MAX_VALUE,
+                        Comparator.nullsLast(Comparator.naturalOrder())
+                    ))
                     .map(child -> buildSpanNode(child, spanMap, childrenMap, totalDurationMs))
                     .collect(Collectors.toList());
         }
