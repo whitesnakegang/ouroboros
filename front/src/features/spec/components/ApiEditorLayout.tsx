@@ -8,7 +8,10 @@ import { TestLayout } from "@/features/testing/components/TestLayout";
 import { DiffNotification } from "./DiffNotification";
 import { WsEditorForm } from "./WsEditorForm";
 import type { RequestBody } from "../types/schema.types";
-import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
+import {
+  useSidebarStore,
+  type Endpoint,
+} from "@/features/sidebar/store/sidebar.store";
 import { useTestingStore } from "@/features/testing/store/testing.store";
 import axios from "axios";
 import { downloadMarkdown } from "../utils/markdownExporter";
@@ -25,6 +28,7 @@ import {
   getRestApiSpec,
   getSchema,
   getWebSocketOperation,
+  updateWebSocketOperation,
   getWebSocketChannel,
   type RestApiSpecResponse,
 } from "../services/api";
@@ -1407,6 +1411,125 @@ export function ApiEditorLayout() {
     }
   };
 
+  // WebSocket Operation 동기화 (channel diff 해결)
+  const handleSyncWebSocketToActual = async () => {
+    if (!selectedEndpoint || protocol !== "WebSocket") return;
+
+    // UUID(id)를 사용 (operationName이 아님)
+    const operationId = selectedEndpoint.id;
+    if (!operationId) {
+      alert("Operation ID를 찾을 수 없습니다.");
+      return;
+    }
+
+    if (
+      confirm(
+        "실제 구현의 Channel 정보를 명세에 자동으로 반영하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다."
+      )
+    ) {
+      try {
+        // UUID로 operation 정보 조회
+        const response = await getWebSocketOperation(operationId);
+        const operation = response.data.operation;
+
+        // 백엔드가 기대하는 UpdateOperationRequest 형식으로 변환
+        const updateRequest: any = {};
+
+        // Receive 변환 (channel + messages)
+        if (operation.channel) {
+          updateRequest.receive = {
+            channelRef:
+              operation.channel.ref?.replace("#/channels/", "") || null,
+            messages:
+              operation.messages
+                ?.map((m) =>
+                  typeof m === "string" ? m : m.ref?.replace("#/messages/", "")
+                )
+                .filter(Boolean) || [],
+          };
+        }
+
+        // Reply 변환
+        if (operation.reply?.channel) {
+          updateRequest.reply = {
+            channelRef:
+              operation.reply.channel.ref?.replace("#/channels/", "") || null,
+            messages:
+              operation.reply.messages
+                ?.map((m) =>
+                  typeof m === "string" ? m : m.ref?.replace("#/messages/", "")
+                )
+                .filter(Boolean) || [],
+          };
+        }
+
+        console.log("🔄 WebSocket Update Request:", updateRequest);
+        console.log("📝 operationId (UUID):", operationId);
+        console.log("📊 업데이트 전 diff 상태:", selectedEndpoint.diff);
+
+        // UUID로 업데이트
+        const updateResponse = await updateWebSocketOperation(
+          operationId,
+          updateRequest
+        );
+
+        // ✅ 업데이트 응답에서 diff 상태 확인
+        const updatedDiff = updateResponse.data?.operation?.diff || "none";
+        console.log("📊 업데이트 후 응답의 diff 상태:", updatedDiff);
+
+        // UUID로 다시 로드
+        await loadWebSocketOperationData(operationId);
+
+        // 사이드바 목록도 다시 로드하여 diff 상태 업데이트
+        await loadEndpoints();
+
+        // ✅ 사이드바 새로고침 후 실제 diff 상태 확인
+        setTimeout(() => {
+          const allEndpoints = useSidebarStore.getState().endpoints;
+          let foundEndpoint: Endpoint | null = null;
+
+          for (const group of Object.values(allEndpoints)) {
+            const ep = (group as Endpoint[]).find((e) => e?.id === operationId);
+            if (ep) {
+              foundEndpoint = ep;
+              break;
+            }
+          }
+
+          if (foundEndpoint) {
+            console.log(
+              "📊 사이드바 새로고침 후 diff 상태:",
+              foundEndpoint.diff
+            );
+            console.log(
+              "📊 사이드바 새로고침 후 전체 endpoint:",
+              foundEndpoint
+            );
+
+            // selectedEndpoint도 최신 상태로 업데이트
+            if (foundEndpoint.diff !== selectedEndpoint.diff) {
+              setSelectedEndpoint(foundEndpoint);
+              console.log(
+                "✅ selectedEndpoint diff 상태 업데이트 완료:",
+                foundEndpoint.diff
+              );
+            }
+          } else {
+            console.warn(
+              "⚠️ 사이드바에서 업데이트된 endpoint를 찾을 수 없습니다."
+            );
+          }
+        }, 200);
+
+        alert("✅ 실제 구현이 명세에 성공적으로 반영되었습니다!");
+      } catch (error: unknown) {
+        console.error("명세 동기화 실패:", error);
+        const errorMessage = getErrorMessage(error);
+        alert(`명세 동기화에 실패했습니다: ${errorMessage}`);
+      }
+    }
+  };
+
   const handleRun = async () => {
     setIsLoading(true);
     setExecutionStatus("running");
@@ -1997,6 +2120,13 @@ export function ApiEditorLayout() {
                           tag: selectedEndpoint.method?.toLowerCase(),
                           progress: selectedEndpoint.progress,
                         }
+                      : undefined
+                  }
+                  onSyncToActual={
+                    selectedEndpoint &&
+                    selectedEndpoint.diff &&
+                    selectedEndpoint.diff !== "none"
+                      ? handleSyncWebSocketToActual
                       : undefined
                   }
                 />
