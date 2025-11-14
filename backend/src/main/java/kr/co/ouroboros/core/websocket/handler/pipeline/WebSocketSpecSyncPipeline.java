@@ -2,6 +2,7 @@ package kr.co.ouroboros.core.websocket.handler.pipeline;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import kr.co.ouroboros.core.global.handler.SpecSyncPipeline;
 import kr.co.ouroboros.core.global.spec.OuroApiSpec;
 import kr.co.ouroboros.core.websocket.common.dto.MessageReference;
@@ -56,9 +57,10 @@ public class WebSocketSpecSyncPipeline implements SpecSyncPipeline {
             
             // 파일에 없는 경우 추가
             if(!fileChannelNameOperationMap.containsKey(channelRef)){
+
                 scanOp.setXOuroborosDiff("channel");
+                scanOp.setXOuroborosId(UUID.randomUUID().toString());
                 fileOpMap.put(operationKey, scanOp);
-                
                 // Operation이 참조하는 Channel 추가
                 WebSocketSpecSyncHelper.addReferencedChannel(wsFileSpec, wsScannedSpec, channelRef);
                 
