@@ -39,25 +39,27 @@ export class StompClient {
       };
 
       this.ws.onmessage = (event) => {
-        const frame = this.parseFrame(event.data);
-        if (!frame) return;
-
-        if (frame.command === "CONNECTED") {
-          this.connected = true;
-          if (this.onConnectCallback) {
-            this.onConnectCallback();
-          }
-        } else if (frame.command === "ERROR") {
-          const error = new Error(frame.body || "STOMP Error");
-          if (this.onErrorCallback) {
-            this.onErrorCallback(error);
-          }
-        } else if (frame.command === "MESSAGE") {
-          const subscriptionId = frame.headers["subscription"];
-          const callback = subscriptionId ? this.subscriptions.get(subscriptionId) : null;
-          if (callback) {
-            callback(frame);
-          }
+        // 바이너리 데이터인 경우 처리
+        let data: string;
+        if (event.data instanceof ArrayBuffer) {
+          const decoder = new TextDecoder();
+          data = decoder.decode(event.data);
+        } else if (event.data instanceof Blob) {
+          // Blob은 비동기로 처리해야 하지만, 여기서는 동기적으로 처리
+          event.data.text().then((text: string) => {
+            const frame = this.parseFrame(text);
+            if (frame) {
+              this.handleFrame(frame);
+            }
+          });
+          return;
+        } else {
+          data = event.data;
+        }
+        
+        const frame = this.parseFrame(data);
+        if (frame) {
+          this.handleFrame(frame);
         }
       };
 
@@ -153,6 +155,26 @@ export class StompClient {
     return this.connected && this.ws?.readyState === WebSocket.OPEN;
   }
 
+  private handleFrame(frame: StompFrame) {
+    if (frame.command === "CONNECTED") {
+      this.connected = true;
+      if (this.onConnectCallback) {
+        this.onConnectCallback();
+      }
+    } else if (frame.command === "ERROR") {
+      const error = new Error(frame.body || "STOMP Error");
+      if (this.onErrorCallback) {
+        this.onErrorCallback(error);
+      }
+    } else if (frame.command === "MESSAGE") {
+      const subscriptionId = frame.headers["subscription"];
+      const callback = subscriptionId ? this.subscriptions.get(subscriptionId) : null;
+      if (callback) {
+        callback(frame);
+      }
+    }
+  }
+
   private buildFrame(command: string, headers: StompHeaders, body: string): string {
     let frame = `${command}\n`;
     
@@ -197,23 +219,30 @@ export class StompClient {
         body,
       };
     } catch (error) {
-      console.error("Failed to parse STOMP frame:", error);
+      // Failed to parse STOMP frame
       return null;
     }
   }
 }
 
 /**
- * 현재 페이지의 프로토콜에 따라 적절한 WebSocket URL을 생성합니다.
+ * 백엔드 서버 주소를 기반으로 WebSocket URL을 생성합니다.
  * - https:// 환경에서는 wss:// 사용 (Mixed Content 정책 준수)
  * - http:// 환경에서는 ws:// 사용
  * 
- * @param path WebSocket 경로 (예: "/ws/chat")
- * @returns 완전한 WebSocket URL (예: "wss://example.com/ws/chat")
+ * @param path WebSocket 경로 (예: "/ws")
+ * @returns 완전한 WebSocket URL (예: "ws://localhost:8080/ws")
  */
 export function buildWebSocketUrl(path: string): string {
-  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  // 백엔드 서버 주소 가져오기 (환경 변수 또는 기본값)
+  const backendUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
+  
+  // URL 파싱하여 호스트와 포트 추출
+  const backendUrlObj = new URL(backendUrl);
+  const protocol = backendUrlObj.protocol === "https:" ? "wss:" : "ws:";
+  const host = backendUrlObj.host; // hostname:port 형태
+  
   const wsPath = path.startsWith("/") ? path : `/${path}`;
-  return `${protocol}//${window.location.host}${wsPath}`;
+  return `${protocol}//${host}${wsPath}`;
 }
 

@@ -43,9 +43,8 @@ export function TestResponseTabs() {
         const response = await getTryMethodList(tryId);
         setMethodList(response.data.methods);
         setTotalDurationMs(response.data.totalDurationMs);
-      } catch (error) {
-        console.error("Try 메서드 리스트 로드 실패:", error);
-        setMethodList(null);
+        } catch (error) {
+          setMethodList(null);
         setTotalDurationMs(null);
       } finally {
         setIsLoadingMethods(false);
@@ -159,9 +158,8 @@ export function TestResponseTabs() {
               try {
                 const response = await getTryTrace(tryId);
                 setTraceData(response.data);
-              } catch (error) {
-                console.error("Trace 조회 실패:", error);
-                setTraceData(null);
+                } catch (error) {
+                  setTraceData(null);
               } finally {
                 setIsLoadingTrace(false);
               }
