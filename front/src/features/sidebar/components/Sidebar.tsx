@@ -64,10 +64,10 @@ export function Sidebar({ onAddNew }: SidebarProps) {
           if (!matchesSearch) return false;
         }
 
-        // REST: Mock/Completed 필터 적용
-        // WebSocket: 필터 적용 안 함 (모두 표시)
-        const isWebSocket = endpoint.protocol === "WebSocket";
-        if (!isWebSocket) {
+        // REST 전용: Mock/Completed 필터 적용
+        // WebSocket, GraphQL: 필터 적용 안 함 (모두 표시)
+        const endpointProtocol = endpoint.protocol || "REST"; // 기본값은 REST
+        if (endpointProtocol === "REST") {
           const ep = endpoint as { progress?: string };
           const progressLower = ep.progress?.toLowerCase();
           if (activeFilter === "mock") {
@@ -77,7 +77,8 @@ export function Sidebar({ onAddNew }: SidebarProps) {
           }
         }
 
-        return true; // WebSocket은 모두 통과
+        // WebSocket, GraphQL은 필터 미적용 (모두 통과)
+        return true;
       });
 
       if (filteredGroupEndpoints.length > 0) {
