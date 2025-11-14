@@ -11,8 +11,10 @@ import kr.co.ouroboros.core.websocket.common.dto.OuroWebSocketApiSpec;
 import kr.co.ouroboros.core.websocket.handler.helper.WebSocketSpecSyncHelper;
 import kr.co.ouroboros.core.websocket.handler.comparator.WebSocketSchemaComparator;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class WebSocketSpecSyncPipeline implements SpecSyncPipeline {
@@ -35,13 +37,38 @@ public class WebSocketSpecSyncPipeline implements SpecSyncPipeline {
         OuroWebSocketApiSpec wsFileSpec = (OuroWebSocketApiSpec) fileSpec;
         OuroWebSocketApiSpec wsScannedSpec = (OuroWebSocketApiSpec) scannedSpec;
 
+        // Handle case: file is null but scanned spec has operations (code exists without file)
+        if (fileSpec == null && wsScannedSpec.getOperations() != null && !wsScannedSpec.getOperations().isEmpty()) {
+            wsFileSpec = wsScannedSpec;
+            Map<String, Operation> operations = wsFileSpec.getOperations();
+            for (Map.Entry<String, Operation> entry : operations.entrySet()) {
+                Operation operation = entry.getValue();
+                if (operation != null) {
+                    // Generate x-ouroboros-id if not present
+                    if (operation.getXOuroborosId() == null) {
+                        operation.setXOuroborosId(java.util.UUID.randomUUID().toString());
+                    }
+                    operation.setXOuroborosDiff("channel");
+                    operation.setXOuroborosProgress("none");
+                }
+            }
+            return wsFileSpec;
+        }
+
         Map<String, Boolean> schemaMap = schemaComparator.compareSchemas(wsFileSpec, wsScannedSpec);
-        
+
         Map<String, Operation> fileOpMap = wsFileSpec.getOperations();
         Map<String, Operation> scanOpMap = wsScannedSpec.getOperations();
 
+        // Early return if no scanned operations to process
         if (scanOpMap == null || scanOpMap.isEmpty()) {
-            // 불일치 비교 안함
+            return wsFileSpec;
+        }
+
+        // Initialize fileOpMap if null (empty file case)
+        if (fileOpMap == null) {
+            fileOpMap = new java.util.LinkedHashMap<>();
+            wsFileSpec.setOperations(fileOpMap);
         }
 
         // fileOpMap의 모든 operation 키에서 채널 이름을 추출하여 Map에 저장
@@ -51,7 +78,14 @@ public class WebSocketSpecSyncPipeline implements SpecSyncPipeline {
         for(String operationKey :  scanOpMap.keySet()) {
 
             Operation scanOp = scanOpMap.get(operationKey);
+            if (scanOp == null || scanOp.getChannel() == null) {
+                continue;
+            }
+
             String channelRef = scanOp.getChannel().getRef();
+            if (channelRef == null) {
+                continue;
+            }
 
             if(scanOp.getXOuroborosProgress() == null) continue;
             
@@ -77,14 +111,31 @@ public class WebSocketSpecSyncPipeline implements SpecSyncPipeline {
                 continue;
             }
 
-            Operation fileOp = fileChannelNameOperationMap.get(channelRef)
-                    .get(0);
+            List<Operation> fileOps = fileChannelNameOperationMap.get(channelRef);
+            if (fileOps == null || fileOps.isEmpty()) {
+                continue;
+            }
+
+            Operation fileOp = fileOps.get(0);
+            if (fileOp == null || fileOp.getMessages() == null || fileOp.getMessages().isEmpty()) {
+                continue;
+            }
+            if (scanOp.getMessages() == null || scanOp.getMessages().isEmpty()) {
+                continue;
+            }
+
             MessageReference fileMessage = fileOp.getMessages().get(0);
             MessageReference scanMessage = scanOp.getMessages().get(0);
 
-            if(fileMessage.getRef().equals(scanMessage.getRef())){
+            if (fileMessage == null || scanMessage == null) {
+                continue;
+            }
+
+            if(fileMessage.getRef() != null && fileMessage.getRef().equals(scanMessage.getRef())){
                 // $ref가 같은 경우 schema 정답지 확인
-                if(schemaMap.get(WebSocketSpecSyncHelper.extractClassNameFromRef(scanMessage.getRef()))){
+                String schemaName = WebSocketSpecSyncHelper.extractClassNameFromRef(scanMessage.getRef());
+                Boolean schemaMatches = schemaMap != null ? schemaMap.get(schemaName) : null;
+                if(Boolean.TRUE.equals(schemaMatches)){
                     // 정답인 경우
                     for (Operation operation : fileChannelNameOperationMap.get(channelRef)) {
                         operation.setXOuroborosProgress("completed");
