@@ -203,3 +203,17 @@ export class StompClient {
   }
 }
 
+/**
+ * 현재 페이지의 프로토콜에 따라 적절한 WebSocket URL을 생성합니다.
+ * - https:// 환경에서는 wss:// 사용 (Mixed Content 정책 준수)
+ * - http:// 환경에서는 ws:// 사용
+ * 
+ * @param path WebSocket 경로 (예: "/ws/chat")
+ * @returns 완전한 WebSocket URL (예: "wss://example.com/ws/chat")
+ */
+export function buildWebSocketUrl(path: string): string {
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  const wsPath = path.startsWith("/") ? path : `/${path}`;
+  return `${protocol}//${window.location.host}${wsPath}`;
+}
+

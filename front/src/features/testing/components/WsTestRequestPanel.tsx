@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useTestingStore } from "../store/testing.store";
 import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
-import { StompClient } from "../utils/stompClient";
+import { StompClient, buildWebSocketUrl } from "../utils/stompClient";
 
 interface Subscription {
   id: string;
@@ -59,12 +59,9 @@ export function WsTestRequestPanel() {
   useEffect(() => {
     if (selectedEndpoint && selectedEndpoint.protocol === "WebSocket") {
       // WebSocket 엔드포인트의 path를 기반으로 Entry Point 생성
-      // 예: /ws/chat -> ws://localhost:8080/ws/chat
-      const baseUrl = window.location.origin.replace("http", "ws");
-      const wsPath = selectedEndpoint.path.startsWith("/") 
-        ? selectedEndpoint.path 
-        : `/${selectedEndpoint.path}`;
-      setEntryPoint(`${baseUrl}${wsPath}`);
+      // https 환경에서는 wss://, http 환경에서는 ws:// 사용
+      const wsUrl = buildWebSocketUrl(selectedEndpoint.path);
+      setEntryPoint(wsUrl);
     } else {
       setEntryPoint("");
     }
