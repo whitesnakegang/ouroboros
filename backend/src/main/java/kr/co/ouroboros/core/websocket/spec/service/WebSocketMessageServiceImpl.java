@@ -42,7 +42,7 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
     public MessageResponse createMessage(CreateMessageRequest request) throws Exception {
         lock.writeLock().lock();
         try {
-            // Read existing document or create new one
+            // Read existing document or create new one (from file, not cache)
             Map<String, Object> asyncApiDoc = yamlParser.readOrCreateDocument();
 
             // Check for duplicate message name
@@ -56,8 +56,11 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
             // Add message to document
             yamlParser.putMessage(asyncApiDoc, request.getMessageName(), messageDefinition);
 
-            // Process and cache: writes to file + validates with scanned state + updates cache
+            // Write document directly
             yamlParser.writeDocument(asyncApiDoc);
+
+            // Update cache (validates with scanned state + updates cache, but does not write file)
+            specManager.processAndCacheSpec(Protocol.WEB_SOCKET, asyncApiDoc);
 
             log.info("Created WebSocket message: {}", request.getMessageName());
 
@@ -71,11 +74,12 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
     public List<MessageResponse> getAllMessages() throws Exception {
         lock.readLock().lock();
         try {
-            if (!yamlParser.fileExists()) {
+            // Read from cache
+            Map<String, Object> asyncApiDoc = specManager.convertSpecToMap(specManager.getApiSpec(Protocol.WEB_SOCKET));
+            if (asyncApiDoc == null) {
                 return new ArrayList<>();
             }
 
-            Map<String, Object> asyncApiDoc = yamlParser.readDocument();
             Map<String, Object> messages = yamlParser.getMessages(asyncApiDoc);
 
             if (messages == null || messages.isEmpty()) {
@@ -100,11 +104,12 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
     public MessageResponse getMessage(String messageName) throws Exception {
         lock.readLock().lock();
         try {
-            if (!yamlParser.fileExists()) {
+            // Read from cache
+            Map<String, Object> asyncApiDoc = specManager.convertSpecToMap(specManager.getApiSpec(Protocol.WEB_SOCKET));
+            if (asyncApiDoc == null) {
                 throw new IllegalArgumentException("No messages found. The specification file does not exist.");
             }
 
-            Map<String, Object> asyncApiDoc = yamlParser.readDocument();
             Map<String, Object> messageDefinition = yamlParser.getMessage(asyncApiDoc, messageName);
 
             if (messageDefinition == null) {
@@ -134,7 +139,8 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
                 throw new IllegalArgumentException("No messages found. The specification file does not exist.");
             }
 
-            Map<String, Object> asyncApiDoc = yamlParser.readDocument();
+            // Read from file directly (not cache) for CUD operations
+            Map<String, Object> asyncApiDoc = yamlParser.readDocumentFromFile();
             Map<String, Object> existingMessage = yamlParser.getMessage(asyncApiDoc, messageName);
 
             if (existingMessage == null) {
@@ -160,8 +166,11 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
                 existingMessage.put("payload", ReferenceConverter.convertRefToDollarRef(request.getPayload()));
             }
 
-            // Process and cache: writes to file + validates with scanned state + updates cache
+            // Write document directly
             yamlParser.writeDocument(asyncApiDoc);
+
+            // Update cache (validates with scanned state + updates cache, but does not write file)
+            specManager.processAndCacheSpec(Protocol.WEB_SOCKET, asyncApiDoc);
 
             log.info("Updated WebSocket message: {}", messageName);
 
@@ -186,7 +195,8 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
                 throw new IllegalArgumentException("No messages found. The specification file does not exist.");
             }
 
-            Map<String, Object> asyncApiDoc = yamlParser.readDocument();
+            // Read from file directly (not cache) for CUD operations
+            Map<String, Object> asyncApiDoc = yamlParser.readDocumentFromFile();
 
             boolean removed = yamlParser.removeMessage(asyncApiDoc, messageName);
 
@@ -194,8 +204,11 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
                 throw new IllegalArgumentException("Message '" + messageName + "' not found");
             }
 
-            // Process and cache: writes to file + validates with scanned state + updates cache
+            // Write document directly
             yamlParser.writeDocument(asyncApiDoc);
+
+            // Update cache (validates with scanned state + updates cache, but does not write file)
+            specManager.processAndCacheSpec(Protocol.WEB_SOCKET, asyncApiDoc);
 
             log.info("Deleted WebSocket message: {}", messageName);
         } finally {

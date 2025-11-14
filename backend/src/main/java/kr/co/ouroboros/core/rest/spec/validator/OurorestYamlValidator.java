@@ -153,7 +153,7 @@ public class OurorestYamlValidator {
      */
     private Map<String, Object> parseYaml() {
         try {
-            Map<String, Object> doc = yamlParser.readDocument();
+            Map<String, Object> doc = yamlParser.readOrCreateDocument();
             log.info("✅ Successfully parsed ourorest.yml");
             return doc;
         } catch (Exception e) {

@@ -1,6 +1,8 @@
 package kr.co.ouroboros.core.websocket.spec.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import kr.co.ouroboros.core.global.Protocol;
+import kr.co.ouroboros.core.global.manager.OuroApiSpecManager;
 import kr.co.ouroboros.core.websocket.common.dto.Channel;
 import kr.co.ouroboros.core.websocket.common.dto.MessageReference;
 import kr.co.ouroboros.core.websocket.common.yaml.WebSocketYamlParser;
@@ -32,17 +34,19 @@ public class WebSocketChannelServiceImpl implements WebSocketChannelService {
 
     private final WebSocketYamlParser yamlParser;
     private final ObjectMapper objectMapper;
+    private final OuroApiSpecManager specManager;
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
     @Override
     public List<ChannelResponse> getAllChannels() throws Exception {
         lock.readLock().lock();
         try {
-            if (!yamlParser.fileExists()) {
+            // Read from cache
+            Map<String, Object> asyncApiDoc = specManager.convertSpecToMap(specManager.getApiSpec(Protocol.WEB_SOCKET));
+            if (asyncApiDoc == null) {
                 return new ArrayList<>();
             }
 
-            Map<String, Object> asyncApiDoc = yamlParser.readDocument();
             Map<String, Object> channels = yamlParser.getChannels(asyncApiDoc);
 
             if (channels == null || channels.isEmpty()) {
@@ -73,11 +77,12 @@ public class WebSocketChannelServiceImpl implements WebSocketChannelService {
     public ChannelResponse getChannel(String channelName) throws Exception {
         lock.readLock().lock();
         try {
-            if (!yamlParser.fileExists()) {
+            // Read from cache
+            Map<String, Object> asyncApiDoc = specManager.convertSpecToMap(specManager.getApiSpec(Protocol.WEB_SOCKET));
+            if (asyncApiDoc == null) {
                 throw new IllegalArgumentException("No channels found. The specification file does not exist.");
             }
 
-            Map<String, Object> asyncApiDoc = yamlParser.readDocument();
             Map<String, Object> channelDefinition = yamlParser.getChannel(asyncApiDoc, channelName);
 
             if (channelDefinition == null) {

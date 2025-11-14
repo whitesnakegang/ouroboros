@@ -67,7 +67,7 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
             // Generate UUID if not provided
             String id = request.getId() != null ? request.getId() : UUID.randomUUID().toString();
 
-            // Read existing document or create new one
+            // Read existing document or create new one (from file, not cache)
             Map<String, Object> openApiDoc = yamlParser.readOrCreateDocument();
 
             // Check for duplicate path+method
@@ -107,7 +107,10 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
                 log.info("Auto-created {} missing schema(s)", createdSchemas);
             }
 
-            // Process and cache: writes to file + validates with scanned state + updates cache
+            // Write document directly
+            yamlParser.writeDocument(openApiDoc);
+
+            // Update cache (validates with scanned state + updates cache, but does not write file)
             specManager.processAndCacheSpec(Protocol.REST, openApiDoc);
 
             // registry 초기화 후 재등록 (전체 읽기)
@@ -125,11 +128,12 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
     public List<RestApiSpecResponse> getAllRestApiSpecs() throws Exception {
         lock.readLock().lock();
         try {
-            if (!yamlParser.fileExists()) {
+            // Read from cache
+            Map<String, Object> openApiDoc = specManager.convertSpecToMap(specManager.getApiSpec(Protocol.REST));
+            if (openApiDoc == null) {
                 return new ArrayList<>();
             }
 
-            Map<String, Object> openApiDoc = yamlParser.readDocument();
             Map<String, Object> paths = yamlParser.getOrCreatePaths(openApiDoc);
 
             List<RestApiSpecResponse> responses = new ArrayList<>();
@@ -161,11 +165,12 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
     public RestApiSpecResponse getRestApiSpec(String id) throws Exception {
         lock.readLock().lock();
         try {
-            if (!yamlParser.fileExists()) {
+            // Read from cache
+            Map<String, Object> openApiDoc = specManager.convertSpecToMap(specManager.getApiSpec(Protocol.REST));
+            if (openApiDoc == null) {
                 throw new IllegalArgumentException("No API specifications found. The specification file does not exist.");
             }
 
-            Map<String, Object> openApiDoc = yamlParser.readDocument();
             Map<String, Object> paths = yamlParser.getOrCreatePaths(openApiDoc);
 
             // Search for operation with matching ID
@@ -210,7 +215,8 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
                 throw new IllegalArgumentException("No API specifications found. The specification file does not exist.");
             }
 
-            Map<String, Object> openApiDoc = yamlParser.readDocument();
+            // Read from file directly (not cache) for CUD operations
+            Map<String, Object> openApiDoc = yamlParser.readDocumentFromFile();
             Map<String, Object> paths = yamlParser.getOrCreatePaths(openApiDoc);
 
             // Find operation with matching ID
@@ -289,7 +295,10 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
                 log.info("Auto-created {} missing schema(s)", createdSchemas);
             }
 
-            // Process and cache: writes to file + validates with scanned state + updates cache
+            // Write document directly
+            yamlParser.writeDocument(openApiDoc);
+
+            // Update cache (validates with scanned state + updates cache, but does not write file)
             specManager.processAndCacheSpec(Protocol.REST, openApiDoc);
 
             // registry 초기화 후 재등록 (전체 읽기)
@@ -317,7 +326,8 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
                 throw new IllegalArgumentException("No API specifications found. The specification file does not exist.");
             }
 
-            Map<String, Object> openApiDoc = yamlParser.readDocument();
+            // Read from file directly (not cache) for CUD operations
+            Map<String, Object> openApiDoc = yamlParser.readDocumentFromFile();
             Map<String, Object> paths = yamlParser.getOrCreatePaths(openApiDoc);
 
             // Find and remove operation with matching ID
@@ -347,7 +357,10 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
                 throw new IllegalArgumentException("REST API specification with ID '" + id + "' not found");
             }
 
-            // Process and cache: writes to file + validates with scanned state + updates cache
+            // Write document directly
+            yamlParser.writeDocument(openApiDoc);
+
+            // Update cache (validates with scanned state + updates cache, but does not write file)
             specManager.processAndCacheSpec(Protocol.REST, openApiDoc);
 
             // registry 초기화 후 재등록 (전체 읽기)
@@ -928,7 +941,7 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
             @SuppressWarnings("unchecked")
             Map<String, Object> importedDoc = (Map<String, Object>) yaml.load(yamlContent);
 
-            // Step 2: Read existing document or create new one
+            // Step 2: Read existing document or create new one (from file, not cache)
             Map<String, Object> existingDoc = yamlParser.readOrCreateDocument();
 
             // Step 3: Prepare renamed tracking
@@ -947,13 +960,16 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
                 log.info("📦 Auto-created {} missing schema(s)", createdSchemas);
             }
 
-            // Step 7: Process and cache: writes to file + validates with scanned state + updates cache
+            // Step 7: Write document directly
+            yamlParser.writeDocument(existingDoc);
+
+            // Step 8: Update cache (validates with scanned state + updates cache, but does not write file)
             specManager.processAndCacheSpec(Protocol.REST, existingDoc);
 
-            // Step 8: Reload mock registry (same as create/update/delete)
+            // Step 9: Reload mock registry (same as create/update/delete)
             reloadMockRegistry();
 
-            // Step 9: Build response
+            // Step 10: Build response
             String summary = String.format("Successfully imported %d APIs and %d schemas%s",
                     importedApis, importedSchemas,
                     !renamedList.isEmpty() ? ", renamed " + renamedList.size() + " items due to duplicates" : "");

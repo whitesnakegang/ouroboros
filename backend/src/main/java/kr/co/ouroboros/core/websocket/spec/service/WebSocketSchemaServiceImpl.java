@@ -44,7 +44,7 @@ public class WebSocketSchemaServiceImpl implements WebsocketSchemaService {
     public SchemaResponse createSchema(CreateSchemaRequest request) throws Exception {
         lock.writeLock().lock();
         try {
-            // Read existing document or create new one
+            // Read existing document or create new one (from file, not cache)
             Map<String, Object> asyncApiDoc = yamlParser.readOrCreateDocument();
 
             // Check for duplicate schema name
@@ -58,8 +58,11 @@ public class WebSocketSchemaServiceImpl implements WebsocketSchemaService {
             // Add schema to document
             yamlParser.putSchema(asyncApiDoc, request.getSchemaName(), schemaDefinition);
 
-            // Write to file directly (cache update will be done later when handler is implemented)
+            // Write document directly
             yamlParser.writeDocument(asyncApiDoc);
+
+            // Update cache (validates with scanned state + updates cache, but does not write file)
+            specManager.processAndCacheSpec(Protocol.WEB_SOCKET, asyncApiDoc);
 
             log.info("Created WebSocket schema: {}", request.getSchemaName());
 
@@ -73,11 +76,12 @@ public class WebSocketSchemaServiceImpl implements WebsocketSchemaService {
     public List<SchemaResponse> getAllSchemas() throws Exception {
         lock.readLock().lock();
         try {
-            if (!yamlParser.fileExists()) {
+            // Read from cache
+            Map<String, Object> asyncApiDoc = specManager.convertSpecToMap(specManager.getApiSpec(Protocol.WEB_SOCKET));
+            if (asyncApiDoc == null) {
                 return new ArrayList<>();
             }
 
-            Map<String, Object> asyncApiDoc = yamlParser.readDocument();
             Map<String, Object> schemas = yamlParser.getSchemas(asyncApiDoc);
 
             if (schemas == null || schemas.isEmpty()) {
@@ -102,11 +106,12 @@ public class WebSocketSchemaServiceImpl implements WebsocketSchemaService {
     public SchemaResponse getSchema(String schemaName) throws Exception {
         lock.readLock().lock();
         try {
-            if (!yamlParser.fileExists()) {
+            // Read from cache
+            Map<String, Object> asyncApiDoc = specManager.convertSpecToMap(specManager.getApiSpec(Protocol.WEB_SOCKET));
+            if (asyncApiDoc == null) {
                 throw new IllegalArgumentException("No schemas found. The specification file does not exist.");
             }
 
-            Map<String, Object> asyncApiDoc = yamlParser.readDocument();
             Map<String, Object> schemaDefinition = yamlParser.getSchema(asyncApiDoc, schemaName);
 
             if (schemaDefinition == null) {
@@ -136,7 +141,8 @@ public class WebSocketSchemaServiceImpl implements WebsocketSchemaService {
                 throw new IllegalArgumentException("No schemas found. The specification file does not exist.");
             }
 
-            Map<String, Object> asyncApiDoc = yamlParser.readDocument();
+            // Read from file directly (not cache) for CUD operations
+            Map<String, Object> asyncApiDoc = yamlParser.readDocumentFromFile();
             Map<String, Object> existingSchema = yamlParser.getSchema(asyncApiDoc, schemaName);
 
             if (existingSchema == null) {
@@ -270,7 +276,11 @@ public class WebSocketSchemaServiceImpl implements WebsocketSchemaService {
             }
 
             // Write to file directly (cache update will be done later when handler is implemented)
+            // Write document directly
             yamlParser.writeDocument(asyncApiDoc);
+
+            // Update cache (validates with scanned state + updates cache, but does not write file)
+            specManager.processAndCacheSpec(Protocol.WEB_SOCKET, asyncApiDoc);
 
             log.info("Updated WebSocket schema: {}", finalSchemaName);
 
@@ -295,7 +305,8 @@ public class WebSocketSchemaServiceImpl implements WebsocketSchemaService {
                 throw new IllegalArgumentException("No schemas found. The specification file does not exist.");
             }
 
-            Map<String, Object> asyncApiDoc = yamlParser.readDocument();
+            // Read from file directly (not cache) for CUD operations
+            Map<String, Object> asyncApiDoc = yamlParser.readDocumentFromFile();
 
             boolean removed = yamlParser.removeSchema(asyncApiDoc, schemaName);
 
@@ -304,7 +315,11 @@ public class WebSocketSchemaServiceImpl implements WebsocketSchemaService {
             }
 
             // Write to file directly (cache update will be done later when handler is implemented)
+            // Write document directly
             yamlParser.writeDocument(asyncApiDoc);
+
+            // Update cache (validates with scanned state + updates cache, but does not write file)
+            specManager.processAndCacheSpec(Protocol.WEB_SOCKET, asyncApiDoc);
 
             log.info("Deleted WebSocket schema: {}", schemaName);
         } finally {

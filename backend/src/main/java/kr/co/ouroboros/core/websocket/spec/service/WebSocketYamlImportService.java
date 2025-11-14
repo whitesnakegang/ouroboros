@@ -49,7 +49,7 @@ public class WebSocketYamlImportService {
         @SuppressWarnings("unchecked")
         Map<String, Object> importedDoc = (Map<String, Object>) yaml.load(yamlContent);
 
-        // Step 2: Read existing document or create new one
+        // Step 2: Read existing document or create new one (from file, not cache)
         Map<String, Object> existingDoc = yamlParser.readOrCreateDocument();
 
         // Step 3: Prepare renamed tracking

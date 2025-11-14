@@ -134,19 +134,21 @@ public class WebSocketYamlParser {
         } catch (Exception e) {
             // Fallback: read directly from file during initialization
             log.debug("Cache not available, reading directly from file: {}", e.getMessage());
-            return readDocumentDirectly();
+            return readDocumentFromFile();
         }
     }
 
     /**
      * Reads the AsyncAPI document directly from the file without using cache.
-     * Used as fallback during initialization when cache is not yet available.
+     * <p>
+     * This method should be used for CUD operations to ensure we read the latest file content,
+     * not the cached version. For read operations, use {@link #readDocument()} which uses cache.
      *
      * @return AsyncAPI document as a map
      * @throws Exception if file reading fails
      */
     @SuppressWarnings("unchecked")
-    private Map<String, Object> readDocumentDirectly() throws Exception {
+    public Map<String, Object> readDocumentFromFile() throws Exception {
         Path filePath = getYamlFilePath();
         try (InputStream is = Files.newInputStream(filePath)) {
             Yaml yaml = createYaml();
@@ -168,7 +170,7 @@ public class WebSocketYamlParser {
     public Map<String, Object> readOrCreateDocument() throws Exception {
         Map<String, Object> doc;
         if (fileExists()) {
-            doc = readDocument();
+            doc = readDocumentFromFile();
         } else {
             doc = createMinimalDocument();
         }

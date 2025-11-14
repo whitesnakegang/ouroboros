@@ -1,6 +1,8 @@
 package kr.co.ouroboros.core.websocket.spec.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import kr.co.ouroboros.core.global.Protocol;
+import kr.co.ouroboros.core.global.manager.OuroApiSpecManager;
 import kr.co.ouroboros.core.websocket.common.dto.ChannelReference;
 import kr.co.ouroboros.core.websocket.common.dto.MessageReference;
 import kr.co.ouroboros.core.websocket.common.dto.Operation;
@@ -37,12 +39,14 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
     private final WebSocketServerManager serverManager;
     private final WebSocketReferenceUpdater referenceUpdater;
     private final WebSocketYamlImportService yamlImportService;
+    private final OuroApiSpecManager specManager;
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
     @Override
     public List<OperationResponse> createOperations(CreateOperationRequest request) throws Exception {
         lock.writeLock().lock();
         try {
+            // Read existing document or create new one (from file, not cache)
             Map<String, Object> asyncApiDoc = yamlParser.readOrCreateDocument();
 
             List<OperationResponse> createdOperations = new ArrayList<>();
@@ -160,8 +164,11 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                 }
             }
 
-            // Write to file
+            // Write document directly
             yamlParser.writeDocument(asyncApiDoc);
+
+            // Update cache (validates with scanned state + updates cache, but does not write file)
+            specManager.processAndCacheSpec(Protocol.WEB_SOCKET, asyncApiDoc);
 
             log.info("Created {} WebSocket operations", createdOperations.size());
 
@@ -175,11 +182,12 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
     public List<OperationResponse> getAllOperations() throws Exception {
         lock.readLock().lock();
         try {
-            if (!yamlParser.fileExists()) {
+            // Read from cache
+            Map<String, Object> asyncApiDoc = specManager.convertSpecToMap(specManager.getApiSpec(Protocol.WEB_SOCKET));
+            if (asyncApiDoc == null) {
                 return new ArrayList<>();
             }
 
-            Map<String, Object> asyncApiDoc = yamlParser.readDocument();
             Map<String, Object> operations = yamlParser.getOperations(asyncApiDoc);
 
             if (operations == null || operations.isEmpty()) {
@@ -214,11 +222,12 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
     public OperationResponse getOperation(String id) throws Exception {
         lock.readLock().lock();
         try {
-            if (!yamlParser.fileExists()) {
+            // Read from cache
+            Map<String, Object> asyncApiDoc = specManager.convertSpecToMap(specManager.getApiSpec(Protocol.WEB_SOCKET));
+            if (asyncApiDoc == null) {
                 throw new IllegalArgumentException("No operations found. The specification file does not exist.");
             }
 
-            Map<String, Object> asyncApiDoc = yamlParser.readDocument();
             Map.Entry<String, Map<String, Object>> operationEntry = yamlParser.findOperationById(asyncApiDoc, id);
 
             if (operationEntry == null) {
@@ -247,7 +256,8 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                 throw new IllegalArgumentException("No operations found. The specification file does not exist.");
             }
 
-            Map<String, Object> asyncApiDoc = yamlParser.readDocument();
+            // Read from file directly (not cache) for CUD operations
+            Map<String, Object> asyncApiDoc = yamlParser.readDocumentFromFile();
             Map.Entry<String, Map<String, Object>> operationEntry = yamlParser.findOperationById(asyncApiDoc, id);
 
             if (operationEntry == null) {
@@ -373,8 +383,11 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
             // Check and delete channels that are no longer referenced
             channelManager.cleanupUnusedChannels(asyncApiDoc, removedChannels);
 
-            // Write to file
+            // Write document directly
             yamlParser.writeDocument(asyncApiDoc);
+
+            // Update cache (validates with scanned state + updates cache, but does not write file)
+            specManager.processAndCacheSpec(Protocol.WEB_SOCKET, asyncApiDoc);
 
             log.info("Updated WebSocket operation: {}", operationName);
 
@@ -397,7 +410,8 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                 throw new IllegalArgumentException("No operations found. The specification file does not exist.");
             }
 
-            Map<String, Object> asyncApiDoc = yamlParser.readDocument();
+            // Read from file directly (not cache) for CUD operations
+            Map<String, Object> asyncApiDoc = yamlParser.readDocumentFromFile();
 
             // Find operation by id before deletion
             Map.Entry<String, Map<String, Object>> operationEntry = yamlParser.findOperationById(asyncApiDoc, id);
@@ -420,8 +434,11 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
             // Check and delete channels that are no longer referenced
             channelManager.cleanupUnusedChannels(asyncApiDoc, referencedChannels);
 
-            // Write to file
+            // Write document directly
             yamlParser.writeDocument(asyncApiDoc);
+
+            // Update cache (validates with scanned state + updates cache, but does not write file)
+            specManager.processAndCacheSpec(Protocol.WEB_SOCKET, asyncApiDoc);
 
             log.info("Deleted WebSocket operation: {}", operationName);
         } finally {
@@ -725,7 +742,13 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
     public ImportYamlResponse importYaml(String yamlContent) throws Exception {
         lock.writeLock().lock();
         try {
-            return yamlImportService.importYaml(yamlContent);
+            ImportYamlResponse response = yamlImportService.importYaml(yamlContent);
+            
+            // After import, read the document from file and update cache
+            Map<String, Object> asyncApiDoc = yamlParser.readDocumentFromFile();
+            specManager.processAndCacheSpec(Protocol.WEB_SOCKET, asyncApiDoc);
+            
+            return response;
         } finally {
             lock.writeLock().unlock();
         }
