@@ -1068,6 +1068,21 @@ export function ApiEditorLayout() {
   };
 
   const handleSave = async () => {
+    // WebSocket 저장 로직
+    if (protocol === "WebSocket") {
+      if (!wsEntryPoint) {
+        alert("Entry Point를 입력해주세요.");
+        return;
+      }
+      alert("WebSocket Operation 저장 기능은 준비 중입니다.");
+      // TODO: Implement WebSocket Operation save logic
+      // - createWebSocketOperation or updateWebSocketOperation 호출
+      // - receiver/reply messages 변환
+      // - protocol + pathname 변환
+      return;
+    }
+
+    // REST 저장 로직
     if (!method || !url) {
       alert("Method와 URL을 입력해주세요.");
       return;
@@ -1173,6 +1188,16 @@ export function ApiEditorLayout() {
 
   const handleDelete = async () => {
     if (!selectedEndpoint) return;
+
+    // WebSocket 삭제 로직
+    if (protocol === "WebSocket") {
+      if (confirm("이 WebSocket Operation을 삭제하시겠습니까?")) {
+        alert("WebSocket Operation 삭제 기능은 준비 중입니다.");
+        // TODO: Implement WebSocket Operation delete logic
+        // - deleteWebSocketOperation 호출
+      }
+      return;
+    }
 
     // completed 상태만 삭제 불가 (mock 상태는 diff가 있어도 삭제 가능)
     if (isCompleted) {
@@ -1964,6 +1989,16 @@ export function ApiEditorLayout() {
                   setReply={setWsReply}
                   isReadOnly={!!(selectedEndpoint && !isEditMode)}
                   diff={selectedEndpoint?.diff}
+                  operationInfo={
+                    selectedEndpoint
+                      ? {
+                          operationName: (selectedEndpoint as any)
+                            .operationName,
+                          tag: selectedEndpoint.method?.toLowerCase(),
+                          progress: selectedEndpoint.progress,
+                        }
+                      : undefined
+                  }
                 />
               )}
             {protocol !== null &&

@@ -31,6 +31,12 @@ export function SchemaModal({
 }: SchemaModalProps) {
   if (!isOpen) return null;
 
+  // Schema 이름에서 마지막 부분만 추출 (예: com.example.dto.UserDTO -> UserDTO)
+  const getShortSchemaName = (fullName: string): string => {
+    const parts = fullName.split(".");
+    return parts[parts.length - 1];
+  };
+
   const handleDeleteSchema = async (schemaName: string) => {
     if (!confirm(`"${schemaName}" 스키마를 삭제하시겠습니까?`)) {
       return;
@@ -126,18 +132,36 @@ export function SchemaModal({
                     className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-purple-500 dark:hover:border-purple-400 transition-colors"
                   >
                     <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-medium text-gray-900 dark:text-white">
-                          {schema.schemaName}
+                      <div className="flex-1 min-w-0">
+                        <h3
+                          className="font-medium text-gray-900 dark:text-white truncate"
+                          title={schema.schemaName}
+                        >
+                          {getShortSchemaName(schema.schemaName)}
                         </h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          {schema.properties
-                            ? Object.keys(schema.properties).length
-                            : 0}
-                          개 필드
-                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                            {schema.properties
+                              ? Object.keys(schema.properties).length
+                              : 0}
+                            개 필드
+                          </p>
+                          {schema.schemaName.includes(".") && (
+                            <span
+                              className="text-xs text-gray-400 dark:text-gray-500 font-mono truncate"
+                              title={schema.schemaName}
+                            >
+                              (
+                              {schema.schemaName
+                                .split(".")
+                                .slice(0, -1)
+                                .join(".")}
+                              )
+                            </span>
+                          )}
+                        </div>
                         {schema.description && (
-                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 truncate">
                             {schema.description}
                           </p>
                         )}
