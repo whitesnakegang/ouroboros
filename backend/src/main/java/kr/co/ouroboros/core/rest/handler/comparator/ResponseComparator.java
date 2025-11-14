@@ -24,17 +24,17 @@ import org.springframework.stereotype.Component;
 public class ResponseComparator {
 
     /**
-     * Compares response definitions between a scanned operation and a file-based operation for a given URL and HTTP method.
+     * Compares response definitions of a scanned operation and a file-based operation for a specific URL and HTTP method.
      *
-     * If the file operation is missing responses that exist in the scanned operation, those scanned responses are added
-     * to the file operation's responses. If any response status, content type, or schema differs, the method marks the
-     * endpoint as having a mismatch and updates the file operation's Ouroboros progress and diff fields accordingly.
+     * Accumulates per-status-code mismatch reasons and updates the provided fileOperation's XOuroborosProgress,
+     * XOuroborosDiff, and XOuroborosResLog to reflect detected differences; when no differences are found the
+     * method clears the response log and may mark progress as completed.
      *
      * @param url the endpoint URL being compared
      * @param method the HTTP method of the endpoint
      * @param scannedOperation the operation obtained from the scan (baseline)
-     * @param fileOperation the operation loaded from the file (reference) which may be modified
-     * @param schemaMatchResults a map of schema names to booleans indicating precomputed schema match outcomes
+     * @param fileOperation the operation loaded from the file (reference) which may be modified to record diffs/progress
+     * @param schemaMatchResults map of referenced schema names to booleans indicating previously computed schema match outcomes (`true` = matched, `false` = mismatched)
      */
     public void compareResponsesForMethod(String url, HttpMethod method, Operation scannedOperation, Operation fileOperation, Map<String, Boolean> schemaMatchResults) {
         if (scannedOperation == null || fileOperation == null) {
@@ -111,17 +111,17 @@ public class ResponseComparator {
     }
 
     /**
-     * Determine whether two Response objects have matching content definitions for a specific HTTP method, endpoint, and status code.
+     * Compare the content schemas of two Response objects for a given HTTP method, endpoint, and status code and report any mismatch reason.
      *
-     * Compares the responses' content types and their associated schemas; a match requires all compared content types to be present and their schemas to be considered equal (including reference checks via schemaMatchResults).
+     * If both responses are absent, they are considered matching. If one response is missing, a localized message indicating the missing definition is returned. When both are present, their content types and associated schemas are compared; referenced schemas are resolved against the provided schemaMatchResults map to determine equality.
      *
      * @param scannedResponse     the scanned (baseline) response to compare; may be null
      * @param fileResponse        the file-based (reference) response to compare; may be null
      * @param method              the HTTP method for the endpoint being compared
      * @param endpoint            the endpoint URL being compared
      * @param statusCode          the HTTP status code for the response being compared
-     * @param schemaMatchResults  map from schema name to boolean indicating whether that named schema matched earlier comparisons; used to resolve $ref-based schema equality
-     * @return                    true if the responses' content types and schemas match, false otherwise
+     * @param schemaMatchResults  map from schema name to boolean indicating whether that named schema matched earlier comparisons; used to evaluate equality of `$ref`-referenced schemas (may be null)
+     * @return                    `null` when the responses' contents and schemas match; otherwise a descriptive mismatch reason string
      */
     private String compareResponseSchemas(Response scannedResponse, Response fileResponse, HttpMethod method, String endpoint, String statusCode, Map<String, Boolean> schemaMatchResults) {
         if (scannedResponse == null && fileResponse == null) {
@@ -138,6 +138,19 @@ public class ResponseComparator {
         return compareContent(scannedResponse.getContent(), fileResponse.getContent(), method, endpoint, statusCode, schemaMatchResults);
     }
 
+    /**
+     * Compare response content schemas between a scanned operation and a file-based operation for a given endpoint response.
+     *
+     * This comparison ignores content-type keys and treats each media type's schema in one side as matching if it equals any schema on the other side.
+     *
+     * @param scannedContent      media-type map of the scanned operation's response content
+     * @param fileContent         media-type map of the file operation's response content
+     * @param method              the HTTP method of the operation being compared
+     * @param endpoint            the endpoint (URL) of the operation being compared
+     * @param statusCode          the response status code being compared
+     * @param schemaMatchResults  optional map of referenced schema names to booleans indicating whether that referenced schema was previously determined to match; used when comparing `$ref` schemas
+     * @return                    `null` if all content schemas are mutually matched; otherwise a descriptive mismatch message explaining the first detected difference
+     */
     private String compareContent(Map<String, MediaType> scannedContent, Map<String, MediaType> fileContent, HttpMethod method, String endpoint, String statusCode,
             Map<String, Boolean> schemaMatchResults) {
         if (scannedContent == null && fileContent == null) {
@@ -230,19 +243,19 @@ public class ResponseComparator {
     }
 
     /**
-     * Determine whether two response schemas are equivalent for a given endpoint response.
+     * Compare two response schemas and produce a human-readable mismatch reason if they differ.
      *
-     * If either schema uses a `$ref`, the `$ref` values must be identical and, when available, the referenced schema's prior match result from `schemaMatchResults` must be `true`; otherwise the schemas' `type` values must be equal.
+     * Compares by `$ref` when either schema uses a `$ref`: the `$ref` values must be identical, and when `schemaMatchResults`
+     * is provided the referenced schema's entry must be `true`. If neither schema uses a `$ref`, their `type` fields are compared.
      *
      * @param scannedSchema      the scanned (baseline) Schema to compare
      * @param fileSchema         the file-based (reference) Schema to compare against
      * @param method             the HTTP method associated with the response being compared
      * @param endpoint           the endpoint path associated with the response being compared
      * @param statusCode         the HTTP status code associated with the response being compared
-     * @param contentType        the response Content-Type associated with the schema being compared
-     * @param schemaMatchResults map from schema name (extracted from `$ref`) to a boolean indicating whether that referenced schema matched previously
-     * @return `true` if the schemas are considered matching, `false` otherwise
-     */
+     * @param contentType        the response Content-Type associated with the schema being compared (used to format the message)
+     * @param schemaMatchResults map from schema name (extracted from a `$ref` like "#/components/schemas/Name") to a boolean indicating whether that referenced schema matched previously; may be null
+     * @return null if the schemas are considered matching; otherwise a descriptive mismatch message suitable for logging or inclusion in a diff log.
     private String compareSchemas(Schema scannedSchema, Schema fileSchema, HttpMethod method, String endpoint, String statusCode, String contentType, Map<String, Boolean> schemaMatchResults) {
         if (scannedSchema == null && fileSchema == null) {
             return null;
@@ -289,6 +302,13 @@ public class ResponseComparator {
         return null;
     }
 
+    /**
+     * Prefixes a message with "Content 'contentType': " when a content type is provided.
+     *
+     * @param contentType the media type string to include as a prefix (e.g., "application/json"); if null or empty the message is returned unchanged
+     * @param message the base message to format
+     * @return the original message prefixed with "Content '...': " when contentType is non-empty, otherwise the original message
+     */
     private String formatContentReason(String contentType, String message) {
         if (contentType == null || contentType.isEmpty()) {
             return message;
