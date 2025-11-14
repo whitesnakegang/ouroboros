@@ -1317,65 +1317,81 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
 
     /**
      * Deep copies an operation map to prevent cache pollution.
+     * <p>
+     * Uses ObjectMapper for safe deep copying. Throws exception on failure to prevent
+     * cache contamination from shallow copies.
      *
-     * @param operation the original operation to copy
-     * @return a deep copy of the operation
+     * @param operation the operation map to deep copy
+     * @return deep copied operation map
+     * @throws RuntimeException if deep copy fails
      */
     private Map<String, Object> deepCopyOperation(Map<String, Object> operation) {
         try {
             byte[] bytes = objectMapper.writeValueAsBytes(operation);
             return objectMapper.readValue(bytes, new TypeReference<Map<String, Object>>() {});
         } catch (Exception e) {
-            log.error("Failed to deep copy operation, returning original (UNSAFE!)", e);
-            return new LinkedHashMap<>(operation);
+            log.error("Failed to deep copy operation", e);
+            throw new RuntimeException("Operation deep copy failed, cannot proceed safely", e);
         }
     }
 
     /**
      * Deep copies a schema map to prevent cache pollution.
+     * <p>
+     * Uses ObjectMapper for safe deep copying. Throws exception on failure to prevent
+     * cache contamination from shallow copies.
      *
-     * @param schema the original schema to copy
-     * @return a deep copy of the schema
+     * @param schema the schema map to deep copy
+     * @return deep copied schema map
+     * @throws RuntimeException if deep copy fails
      */
     private Map<String, Object> deepCopySchema(Map<String, Object> schema) {
         try {
             byte[] bytes = objectMapper.writeValueAsBytes(schema);
             return objectMapper.readValue(bytes, new TypeReference<Map<String, Object>>() {});
         } catch (Exception e) {
-            log.error("Failed to deep copy schema, returning original (UNSAFE!)", e);
-            return new LinkedHashMap<>(schema);
+            log.error("Failed to deep copy schema", e);
+            throw new RuntimeException("Schema deep copy failed, cannot proceed safely", e);
         }
     }
 
     /**
      * Deep copies a message map to prevent cache pollution.
+     * <p>
+     * Uses ObjectMapper for safe deep copying. Throws exception on failure to prevent
+     * cache contamination from shallow copies.
      *
-     * @param message the original message to copy
-     * @return a deep copy of the message
+     * @param message the message map to deep copy
+     * @return deep copied message map
+     * @throws RuntimeException if deep copy fails
      */
     private Map<String, Object> deepCopyMessage(Map<String, Object> message) {
         try {
             byte[] bytes = objectMapper.writeValueAsBytes(message);
             return objectMapper.readValue(bytes, new TypeReference<Map<String, Object>>() {});
         } catch (Exception e) {
-            log.error("Failed to deep copy message, returning original (UNSAFE!)", e);
-            return new LinkedHashMap<>(message);
+            log.error("Failed to deep copy message", e);
+            throw new RuntimeException("Message deep copy failed, cannot proceed safely", e);
         }
     }
 
     /**
      * Deep copies a channel map to prevent cache pollution.
+     * <p>
+     * Uses ObjectMapper for safe deep copying. Throws exception on failure to prevent
+     * cache contamination from shallow copies.
      *
-     * @param channel the original channel to copy
-     * @return a deep copy of the channel
+     * @param channel the channel map to deep copy
+     * @return deep copied channel map
+     * @throws RuntimeException if deep copy fails
      */
     private Map<String, Object> deepCopyChannel(Map<String, Object> channel) {
         try {
             byte[] bytes = objectMapper.writeValueAsBytes(channel);
             return objectMapper.readValue(bytes, new TypeReference<Map<String, Object>>() {});
         } catch (Exception e) {
-            log.error("Failed to deep copy channel, returning original (UNSAFE!)", e);
-            return new LinkedHashMap<>(channel);
+            log.error("Failed to deep copy channel", e);
+            throw new RuntimeException("Channel deep copy failed, cannot proceed safely", e);
         }
     }
 }

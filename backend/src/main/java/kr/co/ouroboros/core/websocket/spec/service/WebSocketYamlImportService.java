@@ -75,9 +75,6 @@ public class WebSocketYamlImportService {
         // Step 7: Process operations (with message reference updates)
         int importedOperations = importOperations(importedDoc, existingDoc, renamedList, messageRenameMap, entrypoint);
 
-        // Step 7.5: Update schema references in messages (after all messages are imported)
-        referenceUpdater.updateSchemaReferencesInMessages(existingDoc, schemaRenameMap);
-
         // Step 8: Save to file
         yamlParser.writeDocument(existingDoc);
 

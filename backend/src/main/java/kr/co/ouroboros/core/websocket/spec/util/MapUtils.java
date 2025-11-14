@@ -9,7 +9,8 @@ import java.util.Map;
  * Utility class for safely extracting values from Maps.
  * <p>
  * Provides type-safe extraction methods with automatic type validation and logging.
- * All methods return null if the value is not found or has an unexpected type.
+ * All methods return null if the map is null, the value is not found, or has an unexpected type.
+ * A null map is treated as "value not found" and results in null being returned.
  *
  * @since 0.1.0
  */
@@ -22,12 +23,18 @@ public final class MapUtils {
 
     /**
      * Safely extracts a String value from a Map.
+     * <p>
+     * If the map is null, treats it as "value not found" and returns null.
      *
-     * @param map the source map
+     * @param map the source map (can be null)
      * @param key the key to look up
-     * @return the String value, or null if not found or not a String
+     * @return the String value, or null if map is null, value is not found, or not a String
      */
     public static String safeGetString(Map<String, Object> map, String key) {
+        if (map == null) {
+            log.debug("Map is null for key '{}'", key);
+            return null;
+        }
         Object value = map.get(key);
         if (value instanceof String) {
             return (String) value;
@@ -40,12 +47,18 @@ public final class MapUtils {
 
     /**
      * Safely extracts an Integer value from a Map.
+     * <p>
+     * If the map is null, treats it as "value not found" and returns null.
      *
-     * @param map the source map
+     * @param map the source map (can be null)
      * @param key the key to look up
-     * @return the Integer value, or null if not found or not an Integer
+     * @return the Integer value, or null if map is null, value is not found, or not an Integer
      */
     public static Integer safeGetInteger(Map<String, Object> map, String key) {
+        if (map == null) {
+            log.debug("Map is null for key '{}'", key);
+            return null;
+        }
         Object value = map.get(key);
         if (value instanceof Integer) {
             return (Integer) value;
@@ -61,13 +74,19 @@ public final class MapUtils {
 
     /**
      * Safely extracts a Map value from a Map.
+     * <p>
+     * If the map is null, treats it as "value not found" and returns null.
      *
-     * @param map the source map
+     * @param map the source map (can be null)
      * @param key the key to look up
-     * @return the Map value, or null if not found or not a Map
+     * @return the Map value, or null if map is null, value is not found, or not a Map
      */
     @SuppressWarnings("unchecked")
     public static Map<String, Object> safeGetMap(Map<String, Object> map, String key) {
+        if (map == null) {
+            log.debug("Map is null for key '{}'", key);
+            return null;
+        }
         Object value = map.get(key);
         if (value instanceof Map) {
             return (Map<String, Object>) value;
@@ -82,13 +101,18 @@ public final class MapUtils {
      * Safely extracts a List of Strings from a Map.
      * <p>
      * Validates that every element in the list is a String.
+     * If the map is null, treats it as "value not found" and returns null.
      *
-     * @param map the source map
+     * @param map the source map (can be null)
      * @param key the key to look up
-     * @return the list of strings, or null if not found, not a list, or contains non-String elements
+     * @return the list of strings, or null if map is null, value is not found, not a list, or contains non-String elements
      */
     @SuppressWarnings("unchecked")
     public static List<String> safeGetStringList(Map<String, Object> map, String key) {
+        if (map == null) {
+            log.debug("Map is null for key '{}'", key);
+            return null;
+        }
         Object value = map.get(key);
         if (value instanceof List) {
             try {
@@ -115,12 +139,18 @@ public final class MapUtils {
 
     /**
      * Safely extracts a Boolean value from a Map.
+     * <p>
+     * If the map is null, treats it as "value not found" and returns null.
      *
-     * @param map the source map
+     * @param map the source map (can be null)
      * @param key the key to look up
-     * @return the Boolean value, or null if not found or not a Boolean
+     * @return the Boolean value, or null if map is null, value is not found, or not a Boolean
      */
     public static Boolean safeGetBoolean(Map<String, Object> map, String key) {
+        if (map == null) {
+            log.debug("Map is null for key '{}'", key);
+            return null;
+        }
         Object value = map.get(key);
         if (value instanceof Boolean) {
             return (Boolean) value;
@@ -133,12 +163,18 @@ public final class MapUtils {
 
     /**
      * Safely extracts a Long value from a Map.
+     * <p>
+     * If the map is null, treats it as "value not found" and returns null.
      *
-     * @param map the source map
+     * @param map the source map (can be null)
      * @param key the key to look up
-     * @return the Long value, or null if not found or not a Long
+     * @return the Long value, or null if map is null, value is not found, or not a Long
      */
     public static Long safeGetLong(Map<String, Object> map, String key) {
+        if (map == null) {
+            log.debug("Map is null for key '{}'", key);
+            return null;
+        }
         Object value = map.get(key);
         if (value instanceof Long) {
             return (Long) value;
@@ -154,12 +190,18 @@ public final class MapUtils {
 
     /**
      * Safely extracts a Double value from a Map.
+     * <p>
+     * If the map is null, treats it as "value not found" and returns null.
      *
-     * @param map the source map
+     * @param map the source map (can be null)
      * @param key the key to look up
-     * @return the Double value, or null if not found or not a Double
+     * @return the Double value, or null if map is null, value is not found, or not a Double
      */
     public static Double safeGetDouble(Map<String, Object> map, String key) {
+        if (map == null) {
+            log.debug("Map is null for key '{}'", key);
+            return null;
+        }
         Object value = map.get(key);
         if (value instanceof Double) {
             return (Double) value;

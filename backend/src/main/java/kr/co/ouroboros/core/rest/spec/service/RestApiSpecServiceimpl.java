@@ -1691,35 +1691,41 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
 
     /**
      * Deep copies a schema map to prevent cache pollution.
+     * <p>
+     * Uses ObjectMapper for safe deep copying. Throws exception on failure to prevent
+     * cache contamination from shallow copies.
      *
-     * @param schema the original schema to copy
-     * @return a deep copy of the schema
+     * @param schema the schema map to deep copy
+     * @return deep copied schema map
+     * @throws RuntimeException if deep copy fails
      */
     private Map<String, Object> deepCopySchema(Map<String, Object> schema) {
         try {
             byte[] bytes = objectMapper.writeValueAsBytes(schema);
             return objectMapper.readValue(bytes, new TypeReference<Map<String, Object>>() {});
         } catch (Exception e) {
-            log.error("Failed to deep copy schema, returning original (UNSAFE!)", e);
-            // Fallback: return original (not ideal but prevents total failure)
-            return new LinkedHashMap<>(schema);
+            log.error("Failed to deep copy schema", e);
+            throw new RuntimeException("Schema deep copy failed, cannot proceed safely", e);
         }
     }
 
     /**
      * Deep copies an operation map to prevent cache pollution.
+     * <p>
+     * Uses ObjectMapper for safe deep copying. Throws exception on failure to prevent
+     * cache contamination from shallow copies.
      *
-     * @param operation the original operation to copy
-     * @return a deep copy of the operation
+     * @param operation the operation map to deep copy
+     * @return deep copied operation map
+     * @throws RuntimeException if deep copy fails
      */
     private Map<String, Object> deepCopyOperation(Map<String, Object> operation) {
         try {
             byte[] bytes = objectMapper.writeValueAsBytes(operation);
             return objectMapper.readValue(bytes, new TypeReference<Map<String, Object>>() {});
         } catch (Exception e) {
-            log.error("Failed to deep copy operation, returning original (UNSAFE!)", e);
-            // Fallback: return original (not ideal but prevents total failure)
-            return new LinkedHashMap<>(operation);
+            log.error("Failed to deep copy operation", e);
+            throw new RuntimeException("Operation deep copy failed, cannot proceed safely", e);
         }
     }
 }
