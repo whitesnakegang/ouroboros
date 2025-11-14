@@ -73,15 +73,19 @@ public class OuroApiSpecManager {
         OuroApiSpec scannedSpec = handler.scanCurrentState();
 
         // Early return if both file and scanned specs are empty (avoid unnecessary validation)
+        // This prevents NPE in synchronize() when fileSpec is null
         if (scannedSpec instanceof OuroRestApiSpec restApiSpec) {
-            if (fileSpec == null && restApiSpec.getPaths()
-                    .isEmpty()) {
+            if (fileSpec == null && restApiSpec.getPaths().isEmpty()) {
+                // Cache empty scanned spec to prevent computeIfAbsent from being triggered
+                apiCache.put(protocol, scannedSpec);
                 return;
             }
         }
 
         if (scannedSpec instanceof OuroWebSocketApiSpec wsApiSpec) {
             if (fileSpec == null && (wsApiSpec.getOperations() == null || wsApiSpec.getOperations().isEmpty())) {
+                // Cache empty scanned spec to prevent computeIfAbsent from being triggered
+                apiCache.put(protocol, scannedSpec);
                 return;
             }
         }
@@ -170,11 +174,15 @@ public class OuroApiSpecManager {
     }
 
     /**
-     * Load spec from file, synchronize with scanned state, and cache the result.
+     * Load spec from file, synchronize with scanned state, and return the result.
      * This is called when cache is empty and needs to be populated on-demand.
+     * <p>
+     * IMPORTANT: This method is invoked inside computeIfAbsent(), so it must NOT
+     * call apiCache.put() to avoid "Recursive update" exceptions. The returned
+     * value will be automatically cached by computeIfAbsent().
      *
      * @param protocol the protocol identifier used to select the protocol handler
-     * @return the synchronized OuroApiSpec that was stored in the cache
+     * @return the synchronized OuroApiSpec (will be cached by computeIfAbsent)
      */
     private OuroApiSpec findAndCacheSpecOnDemand(Protocol protocol) {
         OuroProtocolHandler handler = getHandler(protocol);
@@ -184,15 +192,14 @@ public class OuroApiSpecManager {
         String yamlContent = loadYamlFromResources(filePath);
 
         if (yamlContent != null && !yamlContent.isEmpty()) {
-            // File exists - process and cache (includes validation)
-            processAndCacheSpec(protocol, yamlContent);
-            return apiCache.get(protocol);
+            // File exists - process spec without caching (computeIfAbsent will cache the return value)
+            OuroApiSpec fileSpec = handler.loadFromFile(yamlContent);
+            OuroApiSpec scannedSpec = handler.scanCurrentState();
+            return handler.synchronize(fileSpec, scannedSpec);
         }
 
-        // File doesn't exist - scan only and cache
-        OuroApiSpec scannedSpec = handler.scanCurrentState();
-        apiCache.put(protocol, scannedSpec);
-        return scannedSpec;
+        // File doesn't exist - return scanned spec (computeIfAbsent will cache the return value)
+        return handler.scanCurrentState();
     }
 
     /**
