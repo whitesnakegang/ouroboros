@@ -3,6 +3,7 @@ package kr.co.ouroboros.core.websocket.spec.service;
 import kr.co.ouroboros.core.global.Protocol;
 import kr.co.ouroboros.core.global.manager.OuroApiSpecManager;
 import kr.co.ouroboros.core.websocket.common.yaml.WebSocketYamlParser;
+import kr.co.ouroboros.core.websocket.spec.util.ReferenceConverter;
 import kr.co.ouroboros.ui.websocket.spec.dto.CreateMessageRequest;
 import kr.co.ouroboros.ui.websocket.spec.dto.MessageResponse;
 import kr.co.ouroboros.ui.websocket.spec.dto.UpdateMessageRequest;
@@ -152,11 +153,11 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
             }
             if (request.getHeaders() != null) {
                 // Convert ref to $ref for YAML storage
-                existingMessage.put("headers", convertRefToDollarRef(request.getHeaders()));
+                existingMessage.put("headers", ReferenceConverter.convertRefToDollarRef(request.getHeaders()));
             }
             if (request.getPayload() != null) {
                 // Convert ref to $ref for YAML storage
-                existingMessage.put("payload", convertRefToDollarRef(request.getPayload()));
+                existingMessage.put("payload", ReferenceConverter.convertRefToDollarRef(request.getPayload()));
             }
 
             // Process and cache: writes to file + validates with scanned state + updates cache
@@ -219,12 +220,12 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
 
         if (request.getHeaders() != null && !request.getHeaders().isEmpty()) {
             // Convert ref to $ref for YAML storage
-            message.put("headers", convertRefToDollarRef(request.getHeaders()));
+            message.put("headers", ReferenceConverter.convertRefToDollarRef(request.getHeaders()));
         }
 
         if (request.getPayload() != null && !request.getPayload().isEmpty()) {
             // Convert ref to $ref for YAML storage
-            message.put("payload", convertRefToDollarRef(request.getPayload()));
+            message.put("payload", ReferenceConverter.convertRefToDollarRef(request.getPayload()));
         }
 
         return message;
@@ -240,8 +241,8 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
                 .name(safeGetString(messageDefinition, "name"))
                 .contentType(safeGetString(messageDefinition, "contentType"))
                 .description(safeGetString(messageDefinition, "description"))
-                .headers(headers != null ? convertDollarRefToRef(headers) : null)
-                .payload(payload != null ? convertDollarRefToRef(payload) : null)
+                .headers(headers != null ? ReferenceConverter.convertDollarRefToRef(headers) : null)
+                .payload(payload != null ? ReferenceConverter.convertDollarRefToRef(payload) : null)
                 .build();
     }
 
@@ -282,121 +283,4 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
         return null;
     }
 
-    /**
-     * Converts "ref" field to "$ref" field in a Map (for YAML storage).
-     * Recursively processes nested Maps and Arrays.
-     *
-     * @param map the source map (may contain "ref" fields)
-     * @return new map with "ref" converted to "$ref"
-     */
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> convertRefToDollarRef(Map<String, Object> map) {
-        if (map == null) {
-            return null;
-        }
-        
-        Map<String, Object> result = new LinkedHashMap<>();
-        for (Map.Entry<String, Object> entry : map.entrySet()) {
-            String key = entry.getKey();
-            Object value = entry.getValue();
-
-            // Convert "ref" key to "$ref" with full path
-            if ("ref".equals(key) && value instanceof String) {
-                String refValue = (String) value;
-                // Convert simple schema name to full AsyncAPI path
-                if (!refValue.startsWith("#")) {
-                    refValue = "#/components/schemas/" + refValue;
-                }
-                result.put("$ref", refValue);
-            } else if (value instanceof Map) {
-                // Recursively process nested maps
-                result.put(key, convertRefToDollarRef((Map<String, Object>) value));
-            } else if (value instanceof List) {
-                // Recursively process lists
-                result.put(key, convertRefToDollarRefInList((List<Object>) value));
-            } else {
-                // Keep other fields as-is
-                result.put(key, value);
-            }
-        }
-        return result;
-    }
-
-    /**
-     * Converts "$ref" field to "ref" field in a Map (for JSON API).
-     * Recursively processes nested Maps and Arrays.
-     *
-     * @param map the source map (may contain "$ref" fields)
-     * @return new map with "$ref" converted to "ref"
-     */
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> convertDollarRefToRef(Map<String, Object> map) {
-        if (map == null) {
-            return null;
-        }
-        
-        Map<String, Object> result = new LinkedHashMap<>();
-        for (Map.Entry<String, Object> entry : map.entrySet()) {
-            String key = entry.getKey();
-            Object value = entry.getValue();
-            
-            // Convert "$ref" key to "ref"
-            if ("$ref".equals(key)) {
-                result.put("ref", value);
-            } else if (value instanceof Map) {
-                // Recursively process nested maps
-                result.put(key, convertDollarRefToRef((Map<String, Object>) value));
-            } else if (value instanceof List) {
-                // Recursively process lists
-                result.put(key, convertDollarRefToRefInList((List<Object>) value));
-            } else {
-                result.put(key, value);
-            }
-        }
-        return result;
-    }
-
-    /**
-     * Recursively converts "ref" to "$ref" in a List.
-     */
-    @SuppressWarnings("unchecked")
-    private List<Object> convertRefToDollarRefInList(List<Object> list) {
-        if (list == null) {
-            return null;
-        }
-        
-        List<Object> result = new ArrayList<>();
-        for (Object item : list) {
-            if (item instanceof Map) {
-                result.add(convertRefToDollarRef((Map<String, Object>) item));
-            } else if (item instanceof List) {
-                result.add(convertRefToDollarRefInList((List<Object>) item));
-            } else {
-                result.add(item);
-            }
-        }
-        return result;
-    }
-
-    /**
-     * Recursively converts "$ref" to "ref" in a List.
-     */
-    @SuppressWarnings("unchecked")
-    private List<Object> convertDollarRefToRefInList(List<Object> list) {
-        if (list == null) {
-            return null;
-        }
-        
-        List<Object> result = new ArrayList<>();
-        for (Object item : list) {
-            if (item instanceof Map) {
-                result.add(convertDollarRefToRef((Map<String, Object>) item));
-            } else if (item instanceof List) {
-                result.add(convertDollarRefToRefInList((List<Object>) item));
-            } else {
-                result.add(item);
-            }
-        }
-        return result;
-    }
 }

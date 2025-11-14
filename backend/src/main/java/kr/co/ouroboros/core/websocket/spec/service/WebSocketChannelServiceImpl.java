@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.co.ouroboros.core.websocket.common.dto.Channel;
 import kr.co.ouroboros.core.websocket.common.dto.MessageReference;
 import kr.co.ouroboros.core.websocket.common.yaml.WebSocketYamlParser;
+import kr.co.ouroboros.core.websocket.spec.util.ReferenceConverter;
 import kr.co.ouroboros.ui.websocket.spec.dto.ChannelResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -104,7 +105,7 @@ public class WebSocketChannelServiceImpl implements WebSocketChannelService {
      */
     private Channel convertMapToChannel(Map<String, Object> channelMap) {
         try {
-            // Convert $ref to ref in messages for JSON API
+            // Convert $ref to ref in messages for JSON API using ReferenceConverter
             @SuppressWarnings("unchecked")
             Map<String, Object> messages = (Map<String, Object>) channelMap.get("messages");
             if (messages != null) {
@@ -114,16 +115,9 @@ public class WebSocketChannelServiceImpl implements WebSocketChannelService {
                     if (messageObj instanceof Map) {
                         @SuppressWarnings("unchecked")
                         Map<String, Object> messageMap = (Map<String, Object>) messageObj;
-                        // Convert $ref to ref while preserving all other metadata
-                        if (messageMap.containsKey("$ref")) {
-                            // Shallow-copy the original map to preserve all existing keys
-                            Map<String, Object> convertedMessage = new LinkedHashMap<>(messageMap);
-                            // Replace "$ref" with "ref"
-                            convertedMessage.put("ref", convertedMessage.remove("$ref"));
-                            convertedMessages.put(entry.getKey(), convertedMessage);
-                        } else {
-                            convertedMessages.put(entry.getKey(), messageMap);
-                        }
+                        // Convert $ref to ref using ReferenceConverter
+                        Map<String, Object> convertedMessage = ReferenceConverter.convertDollarRefToRef(messageMap);
+                        convertedMessages.put(entry.getKey(), convertedMessage);
                     } else {
                         convertedMessages.put(entry.getKey(), messageObj);
                     }
@@ -142,18 +136,20 @@ public class WebSocketChannelServiceImpl implements WebSocketChannelService {
             @SuppressWarnings("unchecked")
             Map<String, Object> messages = (Map<String, Object>) channelMap.get("messages");
             if (messages != null) {
-                // Convert $ref to ref in messages
+                // Convert $ref to ref in messages using ReferenceConverter
                 Map<String, MessageReference> convertedMessages = new LinkedHashMap<>();
                 for (Map.Entry<String, Object> entry : messages.entrySet()) {
                     Object messageObj = entry.getValue();
                     if (messageObj instanceof Map) {
                         @SuppressWarnings("unchecked")
                         Map<String, Object> messageMap = (Map<String, Object>) messageObj;
+                        // Convert using ReferenceConverter
+                        Map<String, Object> convertedMap = ReferenceConverter.convertDollarRefToRef(messageMap);
                         MessageReference msgRef = new MessageReference();
                         // Handle both $ref (YAML) and ref (JSON)
-                        String ref = (String) messageMap.get("$ref");
+                        String ref = (String) convertedMap.get("ref");
                         if (ref == null) {
-                            ref = (String) messageMap.get("ref");
+                            ref = (String) messageMap.get("$ref");
                         }
                         msgRef.setRef(ref);
                         convertedMessages.put(entry.getKey(), msgRef);

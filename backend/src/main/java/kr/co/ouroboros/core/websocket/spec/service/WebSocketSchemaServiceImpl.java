@@ -4,6 +4,7 @@ import kr.co.ouroboros.core.global.Protocol;
 import kr.co.ouroboros.core.global.manager.OuroApiSpecManager;
 import kr.co.ouroboros.core.websocket.common.yaml.WebSocketYamlParser;
 import kr.co.ouroboros.core.websocket.spec.model.Property;
+import kr.co.ouroboros.core.websocket.spec.util.ReferenceConverter;
 import kr.co.ouroboros.ui.websocket.spec.dto.CreateSchemaRequest;
 import kr.co.ouroboros.ui.websocket.spec.dto.SchemaResponse;
 import kr.co.ouroboros.ui.websocket.spec.dto.UpdateSchemaRequest;
@@ -709,43 +710,12 @@ public class WebSocketSchemaServiceImpl implements WebsocketSchemaService {
 
     /**
      * Recursively updates all $ref references according to schema rename map.
-     * Similar to REST API import logic.
+     * Delegates to ReferenceConverter for consistency.
      *
      * @param obj the object to scan for $ref (can be Map, List, or primitive)
      * @param schemaRenameMap map of old schema names to new names
      */
-    @SuppressWarnings("unchecked")
     private void updateSchemaReferences(Object obj, Map<String, String> schemaRenameMap) {
-        if (schemaRenameMap.isEmpty()) {
-            return;
-        }
-
-        if (obj instanceof Map) {
-            Map<String, Object> map = (Map<String, Object>) obj;
-
-            // Check if this map has a $ref field
-            if (map.containsKey("$ref")) {
-                String ref = (String) map.get("$ref");
-                if (ref != null && ref.startsWith("#/components/schemas/")) {
-                    String schemaName = ref.substring("#/components/schemas/".length());
-                    if (schemaRenameMap.containsKey(schemaName)) {
-                        String newSchemaName = schemaRenameMap.get(schemaName);
-                        map.put("$ref", "#/components/schemas/" + newSchemaName);
-                        log.debug("🔗 Updated schema $ref: {} -> {}", schemaName, newSchemaName);
-                    }
-                }
-            }
-
-            // Recursively scan all values
-            for (Object value : map.values()) {
-                updateSchemaReferences(value, schemaRenameMap);
-            }
-
-        } else if (obj instanceof List) {
-            List<Object> list = (List<Object>) obj;
-            for (Object item : list) {
-                updateSchemaReferences(item, schemaRenameMap);
-            }
-        }
+        ReferenceConverter.updateSchemaReferences(obj, schemaRenameMap);
     }
 }
