@@ -103,6 +103,21 @@ public interface WebSocketOperationService {
      * @throws Exception if file reading fails or file does not exist
      */
     String exportYaml() throws Exception;
+
+    /**
+     * Syncs a cache-only operation to the YAML file.
+     * <p>
+     * This method is used when an operation exists only in the cache (from code scanning)
+     * but not in the YAML file. It adds the operation to the file so it can be edited via
+     * the update endpoint.
+     * <p>
+     * If the operation already exists in the file, this operation is a no-op.
+     *
+     * @param id operation UUID (x-ouroboros-id)
+     * @return synced operation details
+     * @throws Exception if operation not found in cache or sync fails
+     */
+    OperationResponse syncToFile(String id) throws Exception;
 }
 
 

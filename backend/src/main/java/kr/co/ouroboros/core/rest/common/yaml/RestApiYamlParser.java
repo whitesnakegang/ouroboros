@@ -114,19 +114,21 @@ public class RestApiYamlParser {
         } catch (Exception e) {
             // Fallback: read directly from file during initialization
             log.debug("Cache not available, reading directly from file: {}", e.getMessage());
-            return readDocumentDirectly();
+            return readDocumentFromFile();
         }
     }
 
     /**
      * Reads the OpenAPI document directly from the file without using cache.
-     * Used as fallback during initialization when cache is not yet available.
+     * <p>
+     * This method should be used for CUD operations to ensure we read the latest file content,
+     * not the cached version. For read operations, use {@link #readDocument()} which uses cache.
      *
      * @return OpenAPI document as a map
      * @throws Exception if file reading fails
      */
     @SuppressWarnings("unchecked")
-    private Map<String, Object> readDocumentDirectly() throws Exception {
+    public Map<String, Object> readDocumentFromFile() throws Exception {
         Path filePath = getYamlFilePath();
         try (InputStream is = Files.newInputStream(filePath)) {
             Yaml yaml = createYaml();
@@ -168,7 +170,7 @@ public class RestApiYamlParser {
     public Map<String, Object> readOrCreateDocument() throws Exception {
         Path filePath = getYamlFilePath();
         if (Files.exists(filePath)) {
-            return readDocument();
+            return readDocumentFromFile();
         }
 
         // Create new OpenAPI document structure
@@ -203,14 +205,10 @@ public class RestApiYamlParser {
 
     /**
      * Writes the OpenAPI document to the YAML file.
-     * Note: This method is deprecated and will be removed.
-     * Use OuroApiSpecManager.processAndCacheSpec() instead for CUD operations.
      *
      * @param document OpenAPI document to write
      * @throws Exception if file writing fails
-     * @deprecated Use {@link OuroApiSpecManager#processAndCacheSpec(Protocol, Map)} instead
      */
-    @Deprecated
     public void writeDocument(Map<String, Object> document) throws Exception {
         Path filePath = getYamlFilePath();
 

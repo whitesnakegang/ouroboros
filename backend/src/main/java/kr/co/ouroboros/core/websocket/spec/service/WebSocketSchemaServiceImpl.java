@@ -4,6 +4,7 @@ import kr.co.ouroboros.core.global.Protocol;
 import kr.co.ouroboros.core.global.manager.OuroApiSpecManager;
 import kr.co.ouroboros.core.websocket.common.yaml.WebSocketYamlParser;
 import kr.co.ouroboros.core.websocket.spec.model.Property;
+import kr.co.ouroboros.core.websocket.spec.util.ReferenceConverter;
 import kr.co.ouroboros.ui.websocket.spec.dto.CreateSchemaRequest;
 import kr.co.ouroboros.ui.websocket.spec.dto.SchemaResponse;
 import kr.co.ouroboros.ui.websocket.spec.dto.UpdateSchemaRequest;
@@ -43,7 +44,7 @@ public class WebSocketSchemaServiceImpl implements WebsocketSchemaService {
     public SchemaResponse createSchema(CreateSchemaRequest request) throws Exception {
         lock.writeLock().lock();
         try {
-            // Read existing document or create new one
+            // Read existing document or create new one (from file, not cache)
             Map<String, Object> asyncApiDoc = yamlParser.readOrCreateDocument();
 
             // Check for duplicate schema name
@@ -57,8 +58,11 @@ public class WebSocketSchemaServiceImpl implements WebsocketSchemaService {
             // Add schema to document
             yamlParser.putSchema(asyncApiDoc, request.getSchemaName(), schemaDefinition);
 
-            // Write to file directly (cache update will be done later when handler is implemented)
+            // Write document directly
             yamlParser.writeDocument(asyncApiDoc);
+
+            // Update cache (validates with scanned state + updates cache, but does not write file)
+            specManager.processAndCacheSpec(Protocol.WEB_SOCKET, asyncApiDoc);
 
             log.info("Created WebSocket schema: {}", request.getSchemaName());
 
@@ -72,11 +76,12 @@ public class WebSocketSchemaServiceImpl implements WebsocketSchemaService {
     public List<SchemaResponse> getAllSchemas() throws Exception {
         lock.readLock().lock();
         try {
-            if (!yamlParser.fileExists()) {
+            // Read from cache
+            Map<String, Object> asyncApiDoc = specManager.convertSpecToMap(specManager.getApiSpec(Protocol.WEB_SOCKET));
+            if (asyncApiDoc == null) {
                 return new ArrayList<>();
             }
 
-            Map<String, Object> asyncApiDoc = yamlParser.readDocument();
             Map<String, Object> schemas = yamlParser.getSchemas(asyncApiDoc);
 
             if (schemas == null || schemas.isEmpty()) {
@@ -101,11 +106,12 @@ public class WebSocketSchemaServiceImpl implements WebsocketSchemaService {
     public SchemaResponse getSchema(String schemaName) throws Exception {
         lock.readLock().lock();
         try {
-            if (!yamlParser.fileExists()) {
+            // Read from cache
+            Map<String, Object> asyncApiDoc = specManager.convertSpecToMap(specManager.getApiSpec(Protocol.WEB_SOCKET));
+            if (asyncApiDoc == null) {
                 throw new IllegalArgumentException("No schemas found. The specification file does not exist.");
             }
 
-            Map<String, Object> asyncApiDoc = yamlParser.readDocument();
             Map<String, Object> schemaDefinition = yamlParser.getSchema(asyncApiDoc, schemaName);
 
             if (schemaDefinition == null) {
@@ -135,7 +141,8 @@ public class WebSocketSchemaServiceImpl implements WebsocketSchemaService {
                 throw new IllegalArgumentException("No schemas found. The specification file does not exist.");
             }
 
-            Map<String, Object> asyncApiDoc = yamlParser.readDocument();
+            // Read from file directly (not cache) for CUD operations
+            Map<String, Object> asyncApiDoc = yamlParser.readDocumentFromFile();
             Map<String, Object> existingSchema = yamlParser.getSchema(asyncApiDoc, schemaName);
 
             if (existingSchema == null) {
@@ -269,7 +276,11 @@ public class WebSocketSchemaServiceImpl implements WebsocketSchemaService {
             }
 
             // Write to file directly (cache update will be done later when handler is implemented)
+            // Write document directly
             yamlParser.writeDocument(asyncApiDoc);
+
+            // Update cache (validates with scanned state + updates cache, but does not write file)
+            specManager.processAndCacheSpec(Protocol.WEB_SOCKET, asyncApiDoc);
 
             log.info("Updated WebSocket schema: {}", finalSchemaName);
 
@@ -294,7 +305,8 @@ public class WebSocketSchemaServiceImpl implements WebsocketSchemaService {
                 throw new IllegalArgumentException("No schemas found. The specification file does not exist.");
             }
 
-            Map<String, Object> asyncApiDoc = yamlParser.readDocument();
+            // Read from file directly (not cache) for CUD operations
+            Map<String, Object> asyncApiDoc = yamlParser.readDocumentFromFile();
 
             boolean removed = yamlParser.removeSchema(asyncApiDoc, schemaName);
 
@@ -303,7 +315,11 @@ public class WebSocketSchemaServiceImpl implements WebsocketSchemaService {
             }
 
             // Write to file directly (cache update will be done later when handler is implemented)
+            // Write document directly
             yamlParser.writeDocument(asyncApiDoc);
+
+            // Update cache (validates with scanned state + updates cache, but does not write file)
+            specManager.processAndCacheSpec(Protocol.WEB_SOCKET, asyncApiDoc);
 
             log.info("Deleted WebSocket schema: {}", schemaName);
         } finally {
@@ -709,43 +725,12 @@ public class WebSocketSchemaServiceImpl implements WebsocketSchemaService {
 
     /**
      * Recursively updates all $ref references according to schema rename map.
-     * Similar to REST API import logic.
+     * Delegates to ReferenceConverter for consistency.
      *
      * @param obj the object to scan for $ref (can be Map, List, or primitive)
      * @param schemaRenameMap map of old schema names to new names
      */
-    @SuppressWarnings("unchecked")
     private void updateSchemaReferences(Object obj, Map<String, String> schemaRenameMap) {
-        if (schemaRenameMap.isEmpty()) {
-            return;
-        }
-
-        if (obj instanceof Map) {
-            Map<String, Object> map = (Map<String, Object>) obj;
-
-            // Check if this map has a $ref field
-            if (map.containsKey("$ref")) {
-                String ref = (String) map.get("$ref");
-                if (ref != null && ref.startsWith("#/components/schemas/")) {
-                    String schemaName = ref.substring("#/components/schemas/".length());
-                    if (schemaRenameMap.containsKey(schemaName)) {
-                        String newSchemaName = schemaRenameMap.get(schemaName);
-                        map.put("$ref", "#/components/schemas/" + newSchemaName);
-                        log.debug("🔗 Updated schema $ref: {} -> {}", schemaName, newSchemaName);
-                    }
-                }
-            }
-
-            // Recursively scan all values
-            for (Object value : map.values()) {
-                updateSchemaReferences(value, schemaRenameMap);
-            }
-
-        } else if (obj instanceof List) {
-            List<Object> list = (List<Object>) obj;
-            for (Object item : list) {
-                updateSchemaReferences(item, schemaRenameMap);
-            }
-        }
+        ReferenceConverter.updateSchemaReferences(obj, schemaRenameMap);
     }
 }
