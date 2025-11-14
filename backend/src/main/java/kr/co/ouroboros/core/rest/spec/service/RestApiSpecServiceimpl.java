@@ -739,7 +739,9 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
                 .tags((List<String>) operation.get("tags"))
                 .progress((String) operation.get("x-ouroboros-progress"))
                 .tag((String) operation.get("x-ouroboros-tag"))
-                .diff((String) operation.get("x-ouroboros-diff"));
+                .diff((String) operation.get("x-ouroboros-diff"))
+                .reqLog((String) operation.get("x-ouroboros-req-log"))
+                .resLog((String) operation.get("x-ouroboros-res-log"));
 
         // Convert parameters
         List<Object> params = (List<Object>) operation.get("parameters");

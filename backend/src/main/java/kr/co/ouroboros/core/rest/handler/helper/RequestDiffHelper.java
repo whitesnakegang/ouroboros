@@ -54,15 +54,18 @@ public final class RequestDiffHelper {
 
         // 3. 타입별 개수 비교
         boolean typeDiff = !fileTypeCounts.equals(scanTypeCounts);
+        String diffLog = typeDiff ? buildTypeDiffLog(fileTypeCounts, scanTypeCounts) : null;
 
         if (typeDiff) {
             fileOp.setXOuroborosDiff(DIFF_REQUEST);
             fileOp.setXOuroborosProgress(DIFF_MOCK);
             fileOp.setXOuroborosTag(DIFF_NONE);
+            fileOp.setXOuroborosReqLog(diffLog);
         } else {
             fileOp.setXOuroborosDiff(DIFF_NONE);
             fileOp.setXOuroborosProgress(DIFF_COMPLETED);
             fileOp.setXOuroborosTag(DIFF_NONE);
+            fileOp.setXOuroborosReqLog(null);
         }
     }
 
@@ -229,6 +232,70 @@ public final class RequestDiffHelper {
             }
             typeCounts.merge(key, 1, Integer::sum);
         }
+    }
+
+    /**
+     * Builds a human-readable diff log describing mismatches between file and scan request type counts.
+     *
+     * <p>The maps' keys are expected to be either "fieldName" or "fieldName:type" (e.g., "id" or "file:binary").</p>
+     *
+     * @param fileTypeCounts mapping from field key to its count in the file/spec (may be null)
+     * @param scanTypeCounts mapping from field key to its count observed in scans (may be null)
+     * @return a multiline string describing per-field count differences; returns an empty string if both maps are null or empty
+     */
+    private static String buildTypeDiffLog(Map<String, Integer> fileTypeCounts,
+            Map<String, Integer> scanTypeCounts) {
+        if ((fileTypeCounts == null || fileTypeCounts.isEmpty())
+                && (scanTypeCounts == null || scanTypeCounts.isEmpty())) {
+            return "";
+        }
+
+        Set<String> allKeys = new TreeSet<>();
+        if (fileTypeCounts != null) {
+            allKeys.addAll(fileTypeCounts.keySet());
+        }
+        if (scanTypeCounts != null) {
+            allKeys.addAll(scanTypeCounts.keySet());
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("요청 타입 카운트 불일치");
+
+        for (String key : allKeys) {
+            int fileCount = fileTypeCounts != null ? fileTypeCounts.getOrDefault(key, 0) : 0;
+            int scanCount = scanTypeCounts != null ? scanTypeCounts.getOrDefault(key, 0) : 0;
+            if (fileCount == scanCount) {
+                continue;
+            }
+
+            String fieldName;
+            String fieldType = null;
+            int delimiterIdx = key.indexOf(':');
+            if (delimiterIdx >= 0) {
+                fieldName = key.substring(0, delimiterIdx);
+                fieldType = key.substring(delimiterIdx + 1);
+            } else {
+                fieldName = key;
+            }
+
+            String displayName = fieldType == null || fieldType.isEmpty()
+                    ? fieldName
+                    : fieldName + "(" + fieldType + ")";
+
+            if (fileCount == 0) {
+                sb.append("\n - ").append(displayName)
+                        .append("은(는) 명세에 없는 필드입니다 (scan=").append(scanCount).append(")");
+            } else if (scanCount == 0) {
+                sb.append("\n - ").append(displayName)
+                        .append("은(는) 스캔 결과에서 확인되지 않았습니다 (spec=").append(fileCount).append(")");
+            } else {
+                sb.append("\n - ").append(displayName)
+                        .append("의 개수가 서로 다릅니다 (spec=").append(fileCount)
+                        .append(", scan=").append(scanCount).append(")");
+            }
+        }
+
+        return sb.toString();
     }
 
     /**

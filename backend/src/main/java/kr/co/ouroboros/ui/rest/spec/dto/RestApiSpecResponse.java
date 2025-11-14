@@ -89,4 +89,14 @@ public class RestApiSpecResponse {
      * Diff status (none, added, modified, deleted)
      */
     private String diff;
+
+    /**
+     * Request log data (can be null)
+     */
+    private String reqLog;
+
+    /**
+     * Response log data (can be null)
+     */
+    private String resLog;
 }
