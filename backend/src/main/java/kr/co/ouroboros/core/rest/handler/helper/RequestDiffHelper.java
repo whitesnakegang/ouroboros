@@ -234,6 +234,15 @@ public final class RequestDiffHelper {
         }
     }
 
+    /**
+     * Builds a human-readable diff log describing mismatches between file and scan request type counts.
+     *
+     * <p>The maps' keys are expected to be either "fieldName" or "fieldName:type" (e.g., "id" or "file:binary").</p>
+     *
+     * @param fileTypeCounts mapping from field key to its count in the file/spec (may be null)
+     * @param scanTypeCounts mapping from field key to its count observed in scans (may be null)
+     * @return a multiline string describing per-field count differences; returns an empty string if both maps are null or empty
+     */
     private static String buildTypeDiffLog(Map<String, Integer> fileTypeCounts,
             Map<String, Integer> scanTypeCounts) {
         if ((fileTypeCounts == null || fileTypeCounts.isEmpty())
