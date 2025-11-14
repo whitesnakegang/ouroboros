@@ -1,16 +1,5 @@
 import { useSidebarStore } from "../store/sidebar.store";
-
-interface Endpoint {
-  id: string;
-  method: string;
-  path: string;
-  description: string;
-  implementationStatus?: "not-implemented" | "in-progress" | "modifying";
-  hasSpecError?: boolean;
-  progress?: string;
-  tag?: string;
-  diff?: string;
-}
+import type { Endpoint } from "../store/sidebar.store";
 
 interface EndpointCardProps {
   endpoint: Endpoint;
@@ -24,6 +13,9 @@ const methodTextColors = {
   PUT: "text-[#F59E0B]",
   PATCH: "text-[#F59E0B]",
   DELETE: "text-red-500",
+  RECEIVE: "text-[#8B5CF6]", // 보라색
+  SEND: "text-[#06B6D4]", // 청록색
+  DUPLEX: "text-[#EC4899]", // 핑크색 (양방향)
 };
 
 // Mock 상태 표시 색상
@@ -31,6 +23,20 @@ const mockStatusColors = {
   "not-implemented": "bg-[#8B949E]",
   "in-progress": "bg-blue-500",
   modifying: "bg-orange-500",
+};
+
+// WebSocket Progress 상태 표시 색상 (점 스타일)
+const wsProgressColors = {
+  none: "bg-gray-400 dark:bg-gray-600",
+  mock: "bg-yellow-500 dark:bg-yellow-400",
+  completed: "bg-green-500 dark:bg-green-400",
+};
+
+// Progress 상태별 툴팁 텍스트
+const wsProgressLabels = {
+  none: "미구현",
+  mock: "Mock",
+  completed: "완료",
 };
 
 export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
@@ -45,6 +51,7 @@ export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
     "text-[#8B949E]";
 
   const isSelected = selectedEndpoint?.id === endpoint.id;
+  const isWebSocket = endpoint.protocol === "WebSocket";
 
   return (
     <div
@@ -56,8 +63,8 @@ export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
       }`}
     >
       <div className="flex items-start gap-3">
-        {/* Mock 탭: 구현 상태 표시 점 (왼쪽) - 항상 표시 */}
-        {filterType === "mock" && endpoint.implementationStatus && (
+        {/* REST: Mock 탭에서만 구현 상태 표시 점 */}
+        {!isWebSocket && filterType === "mock" && endpoint.implementationStatus && (
           <div
             className={`w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0 ${
               mockStatusColors[endpoint.implementationStatus]
@@ -72,6 +79,16 @@ export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
           />
         )}
 
+        {/* WebSocket: Progress 상태 표시 점 */}
+        {isWebSocket && endpoint.progress && wsProgressColors[endpoint.progress as keyof typeof wsProgressColors] && (
+          <div
+            className={`w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0 ${
+              wsProgressColors[endpoint.progress as keyof typeof wsProgressColors]
+            }`}
+            title={wsProgressLabels[endpoint.progress as keyof typeof wsProgressLabels]}
+          />
+        )}
+
         <div className="flex-1 min-w-0">
           {/* Method 배지와 Path */}
           <div className="flex items-center gap-2 mb-1">
@@ -83,7 +100,8 @@ export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
             <span className="text-sm text-gray-900 dark:text-[#E6EDF3] truncate font-mono flex-1 min-w-0">
               {endpoint.path}
             </span>
-            {/* Diff 주의 표시 아이콘 (Path 우측) - Mock 및 Completed 탭 모두 */}
+            
+            {/* Diff 주의 표시 아이콘 */}
             {(endpoint.diff && endpoint.diff !== "none") || endpoint.hasSpecError ? (
               <div className="flex-shrink-0 ml-1" title="명세와 구현이 일치하지 않습니다">
                 <svg
@@ -103,7 +121,7 @@ export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
             ) : null}
           </div>
 
-          {/* Description */}
+          {/* Summary (두 번째 줄) */}
           <p className="text-xs text-gray-600 dark:text-[#8B949E] line-clamp-1">
             {endpoint.description}
           </p>

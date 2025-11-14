@@ -1,7 +1,14 @@
 import { useState, useEffect } from "react";
 import { SchemaModal } from "./SchemaModal";
 import { SchemaFieldEditor } from "./SchemaFieldEditor";
-import { getAllSchemas, createSchema, updateSchema } from "../services/api";
+import {
+  getAllSchemas,
+  createSchema,
+  updateSchema,
+  getAllWebSocketSchemas,
+  createWebSocketSchema,
+  updateWebSocketSchema,
+} from "../services/api";
 import type {
   SchemaResponse,
   CreateSchemaRequest,
@@ -13,15 +20,21 @@ import { convertSchemaFieldToOpenAPI } from "../utils/schemaConverter";
 
 interface SchemaCardProps {
   isReadOnly?: boolean;
+  protocol?: "REST" | "WebSocket";
 }
 
-export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
+export function SchemaCard({
+  isReadOnly = false,
+  protocol = "REST",
+}: SchemaCardProps) {
   const [schemas, setSchemas] = useState<SchemaResponse[]>([]);
   const [isSchemaModalOpen, setIsSchemaModalOpen] = useState(false);
   const [schemaFields, setSchemaFields] = useState<SchemaField[]>([]);
   const [currentSchemaName, setCurrentSchemaName] = useState("");
   const [currentSchemaDescription, setCurrentSchemaDescription] = useState("");
-  const [originalSchemaName, setOriginalSchemaName] = useState<string | null>(null); // 편집 중인 원래 스키마 이름
+  const [originalSchemaName, setOriginalSchemaName] = useState<string | null>(
+    null
+  ); // 편집 중인 원래 스키마 이름
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(false); // 기본적으로 접힌 상태
@@ -47,17 +60,20 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
     return "알 수 없는 오류가 발생했습니다.";
   };
 
-  // 컴포넌트 마운트 시 스키마 목록 로드
+  // 컴포넌트 마운트 시 및 프로토콜 변경 시 스키마 목록 로드
   useEffect(() => {
     loadSchemas();
-  }, []);
+  }, [protocol]);
 
   // 스키마 목록 로드
   const loadSchemas = async () => {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await getAllSchemas();
+      const response =
+        protocol === "WebSocket"
+          ? await getAllWebSocketSchemas()
+          : await getAllSchemas();
       setSchemas(response.data);
     } catch (err) {
       console.error("스키마 로드 실패:", err);
@@ -134,23 +150,23 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
           "🔍 Update Request:",
           JSON.stringify(updateRequest, null, 2)
         );
-        
-        // 이름이 변경된 경우 처리
-        if (originalSchemaName && originalSchemaName !== currentSchemaName.trim()) {
-          // 이름 변경은 지원하지 않음 - 원래 이름으로 업데이트
-          alert("스키마 이름 변경은 지원하지 않습니다. 원래 이름으로 업데이트됩니다.");
-          setCurrentSchemaName(originalSchemaName);
+        if (protocol === "WebSocket") {
+          await updateWebSocketSchema(currentSchemaName, updateRequest);
+        } else {
+          await updateSchema(currentSchemaName, updateRequest);
         }
-        
-        await updateSchema(originalSchemaName || currentSchemaName.trim(), updateRequest);
-        alert(`"${originalSchemaName || currentSchemaName}" 스키마가 수정되었습니다.`);
+        alert(`"${currentSchemaName}" 스키마가 수정되었습니다.`);
       } else {
         // 생성 모드
         console.log(
           "🔍 Create Request:",
           JSON.stringify(schemaRequest, null, 2)
         );
-        await createSchema(schemaRequest);
+        if (protocol === "WebSocket") {
+          await createWebSocketSchema(schemaRequest);
+        } else {
+          await createSchema(schemaRequest);
+        }
         alert(`"${currentSchemaName}" 스키마가 생성되었습니다.`);
       }
 
@@ -273,7 +289,9 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
                     placeholder="Schema 이름을 입력하세요 (예: UserInfo, ProductData)"
                     disabled={isReadOnly || originalSchemaName !== null}
                     className={`flex-1 px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] ${
-                      isReadOnly || originalSchemaName !== null ? "opacity-60 cursor-not-allowed" : ""
+                      isReadOnly || originalSchemaName !== null
+                        ? "opacity-60 cursor-not-allowed"
+                        : ""
                     }`}
                   />
                   {originalSchemaName !== null && (
@@ -296,7 +314,8 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
                 </div>
                 {originalSchemaName !== null && (
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    편집 모드: "{originalSchemaName}" 스키마를 편집 중입니다. 이름은 변경할 수 없습니다.
+                    편집 모드: "{originalSchemaName}" 스키마를 편집 중입니다.
+                    이름은 변경할 수 없습니다.
                   </p>
                 )}
               </div>
@@ -409,6 +428,7 @@ export function SchemaCard({ isReadOnly = false }: SchemaCardProps) {
         }}
         schemas={schemas}
         setSchemas={setSchemas}
+        protocol={protocol}
       />
     </div>
   );

@@ -1,13 +1,13 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { ApiRequestCard } from "./ApiRequestCard";
 import { ApiResponseCard } from "./ApiResponseCard";
 import { SchemaCard } from "./SchemaCard";
-import { ProtocolTabs } from "./ProtocolTabs";
 import { CodeSnippetPanel } from "./CodeSnippetPanel";
 import { ImportResultModal } from "./ImportResultModal";
 import { TestLayout } from "@/features/testing/components/TestLayout";
 import { DiffNotification } from "./DiffNotification";
-import { useSpecStore } from "../store/spec.store";
+import { WsEditorForm } from "./WsEditorForm";
+import type { RequestBody } from "../types/schema.types";
 import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
 import { useTestingStore } from "@/features/testing/store/testing.store";
 import axios from "axios";
@@ -24,6 +24,8 @@ import {
   deleteRestApiSpec,
   getRestApiSpec,
   getSchema,
+  getWebSocketOperation,
+  getWebSocketChannel,
   type RestApiSpecResponse,
 } from "../services/api";
 import {
@@ -31,7 +33,6 @@ import {
   parseOpenAPIRequestBody,
   parseOpenAPISchemaToSchemaField,
 } from "../utils/schemaConverter";
-import type { RequestBody } from "../types/schema.types";
 import {
   createPrimitiveField,
   isArraySchema,
@@ -62,7 +63,6 @@ interface StatusCode {
 }
 
 export function ApiEditorLayout() {
-  const { protocol, setProtocol } = useSpecStore();
   const {
     selectedEndpoint,
     deleteEndpoint,
@@ -73,10 +73,10 @@ export function ApiEditorLayout() {
     loadEndpoints,
     updateEndpoint,
     endpoints,
+    protocol,
+    setProtocol,
   } = useSidebarStore();
   const {
-    protocol: testProtocol,
-    setProtocol: setTestProtocol,
     request,
     setResponse,
     isLoading,
@@ -84,10 +84,12 @@ export function ApiEditorLayout() {
     setTryId,
     authorization,
     setAuthorization,
+    setProtocol: setTestingProtocol,
   } = useTestingStore();
   const [activeTab, setActiveTab] = useState<"form" | "test">("form");
   const [isCodeSnippetOpen, setIsCodeSnippetOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isNewFormMode, setIsNewFormMode] = useState(false);
   const [importResult, setImportResult] = useState<ImportYamlResponse | null>(
     null
   );
@@ -113,6 +115,18 @@ export function ApiEditorLayout() {
   const getErrorMessage = (error: unknown): string => {
     if (error instanceof Error) {
       let message = error.message || String(error);
+
+      // 네트워크 에러를 사용자 친화적인 메시지로 변환
+      const lowerMessage = message.toLowerCase();
+      if (
+        lowerMessage.includes("failed to fetch") ||
+        lowerMessage.includes("networkerror") ||
+        lowerMessage.includes("network request failed") ||
+        message.trim() === ""
+      ) {
+        return "서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.";
+      }
+
       // localhost 주소 및 관련 텍스트 제거 (다양한 형식 대응)
       message = message.replace(/localhost:\d+/gi, "");
       message = message.replace(/127\.0\.0\.1:\d+/gi, "");
@@ -127,12 +141,23 @@ export function ApiEditorLayout() {
       message = message.replace(/\s+/g, " ").trim();
       // 빈 메시지인 경우 기본 메시지 반환
       if (!message) {
-        return "";
+        return "서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.";
       }
       return message;
     }
     // Error 객체가 아닌 경우 문자열로 변환 후 처리
     const errorStr = String(error);
+    const lowerErrorStr = errorStr.toLowerCase();
+
+    // 네트워크 에러 체크
+    if (
+      lowerErrorStr.includes("failed to fetch") ||
+      lowerErrorStr.includes("networkerror") ||
+      lowerErrorStr.includes("network request failed")
+    ) {
+      return "서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.";
+    }
+
     const message = errorStr
       .replace(/localhost:\d+/gi, "")
       .replace(/127\.0\.0\.1:\d+/gi, "")
@@ -140,7 +165,9 @@ export function ApiEditorLayout() {
       .replace(/.*Content:\s*/i, "")
       .replace(/\s+/g, " ")
       .trim();
-    return message || "";
+    return (
+      message || "서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요."
+    );
   };
 
   // endpoints가 업데이트된 후 selectedEndpoint 유효성 검증 및 상태 동기화
@@ -181,7 +208,20 @@ export function ApiEditorLayout() {
   useEffect(() => {
     if (selectedEndpoint && selectedEndpoint.id) {
       setIsEditMode(false); // 항목 선택 시 읽기 전용 모드로 시작
-      loadEndpointData(selectedEndpoint.id);
+      setIsNewFormMode(false); // 엔드포인트 선택 시 새 폼 모드 해제
+
+      // WebSocket 엔드포인트인 경우 프로토콜 설정 및 operation 데이터 로드
+      if (selectedEndpoint.protocol === "WebSocket") {
+        setProtocol("WebSocket");
+        setTestingProtocol("WebSocket");
+        setActiveTab("form"); // 명세서 상세보기를 위해 form 탭으로
+        loadWebSocketOperationData(selectedEndpoint.id);
+      } else {
+        // REST 엔드포인트인 경우 프로토콜 설정 및 데이터 로드
+        setProtocol("REST");
+        setTestingProtocol("REST");
+        loadEndpointData(selectedEndpoint.id);
+      }
 
       // 폼 부분으로 스크롤 (activeTab에 따라 다른 컨테이너로 스크롤)
       setTimeout(() => {
@@ -619,14 +659,162 @@ export function ApiEditorLayout() {
       console.error("API 스펙 로드 실패:", error);
       const errorMessage = getErrorMessage(error);
 
-      // 명세에 없는 내용일 경우 selectedEndpoint 초기화
-      alert("명세에 없는 내용입니다. 선택된 엔드포인트가 존재하지 않습니다.");
+      // 에러 타입에 따라 적절한 메시지 표시
+      let alertMessage = "";
+
+      if (error instanceof Error) {
+        const errMsg = error.message.toLowerCase();
+
+        // 네트워크 에러 (서버 다운)
+        if (
+          errMsg.includes("failed to fetch") ||
+          errMsg.includes("networkerror") ||
+          errMsg.includes("network request failed") ||
+          errMsg === "" ||
+          !error.message
+        ) {
+          alertMessage =
+            "서버에 연결할 수 없습니다.\n\n서버가 실행 중인지 확인해주세요.";
+        }
+        // 404 에러 (엔드포인트 없음)
+        else if (errMsg.includes("404") || errMsg.includes("not found")) {
+          alertMessage =
+            "명세에 없는 내용입니다. 선택된 엔드포인트가 존재하지 않습니다.";
+        }
+        // 기타 서버 에러
+        else {
+          alertMessage = `API 스펙 로드에 실패했습니다.\n\n${
+            errorMessage || error.message
+          }`;
+        }
+      } else {
+        // Error 객체가 아닌 경우
+        alertMessage =
+          "서버에 연결할 수 없습니다.\n\n서버가 실행 중인지 확인해주세요.";
+      }
+
+      alert(alertMessage);
       setSelectedEndpoint(null);
 
-      // 기존 에러 메시지는 콘솔에만 출력
+      // 상세 에러 정보는 콘솔에 출력
       if (errorMessage) {
         console.error("상세 에러:", errorMessage);
       }
+    }
+  };
+
+  // Load WebSocket operation data from backend
+  const loadWebSocketOperationData = async (operationId: string) => {
+    if (!operationId || operationId.trim() === "") {
+      alert("유효하지 않은 Operation ID입니다.");
+      setSelectedEndpoint(null);
+      return;
+    }
+
+    try {
+      // operationId는 UUID (x-ouroboros-id)
+      const response = await getWebSocketOperation(operationId);
+      const operationData = response.data;
+
+      console.log("✅ Loaded WebSocket operation:", operationData);
+
+      // WebSocket form state 설정
+      setWsEntryPoint(operationData.operation.entrypoint || "/ws");
+      setWsSummary(""); // Operation에는 summary가 없음
+      setWsDescription(operationData.operationName || ""); // operationName을 description으로
+      setWsTags(""); // 필요시 추가
+
+      // Receiver 설정
+      if (
+        operationData.operation.action === "receive" &&
+        operationData.operation.channel
+      ) {
+        const channelRef = operationData.operation.channel.ref || "";
+        const channelName = channelRef.replace("#/channels/", "");
+
+        // Channel 정보 조회하여 실제 address 사용
+        let actualAddress = channelName;
+        try {
+          const channelResponse = await getWebSocketChannel(channelName);
+          actualAddress = channelResponse.data.channel?.address || channelName;
+        } catch {
+          console.warn("Channel 조회 실패, channel name 사용:", channelName);
+        }
+
+        setWsReceiver({
+          address: actualAddress,
+          headers: [
+            {
+              key: "accept-version",
+              value: "1.1",
+              required: true,
+              description: "STOMP 프로토콜 버전 (필수)",
+            },
+          ],
+          schema: { type: "json", fields: [] },
+        });
+      } else if (
+        operationData.operation.action === "send" &&
+        operationData.operation.channel
+      ) {
+        // Send-only operation의 경우도 channel을 receiver로 설정
+        const channelRef = operationData.operation.channel.ref || "";
+        const channelName = channelRef.replace("#/channels/", "");
+
+        let actualAddress = channelName;
+        try {
+          const channelResponse = await getWebSocketChannel(channelName);
+          actualAddress = channelResponse.data.channel?.address || channelName;
+        } catch {
+          console.warn("Channel 조회 실패, channel name 사용:", channelName);
+        }
+
+        setWsReceiver({
+          address: actualAddress,
+          headers: [],
+          schema: { type: "json", fields: [] },
+        });
+      } else {
+        setWsReceiver(null);
+      }
+
+      // Reply 설정 (reply가 있는 경우)
+      if (
+        operationData.operation.reply &&
+        operationData.operation.reply.channel
+      ) {
+        const replyChannelRef = operationData.operation.reply.channel.ref || "";
+        const replyChannelName = replyChannelRef.replace("#/channels/", "");
+
+        // Channel 정보 조회하여 실제 address 사용
+        let actualReplyAddress = replyChannelName;
+        try {
+          const channelResponse = await getWebSocketChannel(replyChannelName);
+          actualReplyAddress =
+            channelResponse.data.channel?.address || replyChannelName;
+        } catch {
+          console.warn(
+            "Reply channel 조회 실패, channel name 사용:",
+            replyChannelName
+          );
+        }
+
+        setWsReply({
+          address: actualReplyAddress,
+          schema: { type: "json", fields: [] },
+        });
+      } else {
+        setWsReply(null);
+      }
+
+      console.log("✅ WebSocket form state 설정 완료");
+    } catch (error) {
+      console.error("WebSocket Operation 로드 실패:", error);
+      alert(
+        `Operation을 불러오는데 실패했습니다: ${
+          error instanceof Error ? error.message : "알 수 없는 오류"
+        }`
+      );
     }
   };
 
@@ -667,6 +855,21 @@ export function ApiEditorLayout() {
 
   // Response state
   const [statusCodes, setStatusCodes] = useState<StatusCode[]>([]);
+
+  // WebSocket state
+  const [wsEntryPoint, setWsEntryPoint] = useState("");
+  const [wsSummary, setWsSummary] = useState("");
+  const [wsDescription, setWsDescription] = useState("");
+  const [wsTags, setWsTags] = useState("");
+  const [wsReceiver, setWsReceiver] = useState<{
+    address: string;
+    headers: KeyValuePair[];
+    schema: RequestBody;
+  } | null>(null);
+  const [wsReply, setWsReply] = useState<{
+    address: string;
+    schema: RequestBody;
+  } | null>(null);
 
   const methods = ["GET", "POST", "PUT", "PATCH", "DELETE"];
 
@@ -865,6 +1068,21 @@ export function ApiEditorLayout() {
   };
 
   const handleSave = async () => {
+    // WebSocket 저장 로직
+    if (protocol === "WebSocket") {
+      if (!wsEntryPoint) {
+        alert("Entry Point를 입력해주세요.");
+        return;
+      }
+      alert("WebSocket Operation 저장 기능은 준비 중입니다.");
+      // TODO: Implement WebSocket Operation save logic
+      // - createWebSocketOperation or updateWebSocketOperation 호출
+      // - receiver/reply messages 변환
+      // - protocol + pathname 변환
+      return;
+    }
+
+    // REST 저장 로직
     if (!method || !url) {
       alert("Method와 URL을 입력해주세요.");
       return;
@@ -955,6 +1173,7 @@ export function ApiEditorLayout() {
 
         // 생성된 엔드포인트를 선택
         setSelectedEndpoint(newEndpoint);
+        setIsNewFormMode(false); // 저장 후 새 폼 모드 해제
 
         // 생성 후 다시 로드하여 백엔드에서 최신 데이터 가져오기
         // loadEndpointData에서 백엔드 응답의 progress, tag, diff를 자동으로 반영함
@@ -969,6 +1188,16 @@ export function ApiEditorLayout() {
 
   const handleDelete = async () => {
     if (!selectedEndpoint) return;
+
+    // WebSocket 삭제 로직
+    if (protocol === "WebSocket") {
+      if (confirm("이 WebSocket Operation을 삭제하시겠습니까?")) {
+        alert("WebSocket Operation 삭제 기능은 준비 중입니다.");
+        // TODO: Implement WebSocket Operation delete logic
+        // - deleteWebSocketOperation 호출
+      }
+      return;
+    }
 
     // completed 상태만 삭제 불가 (mock 상태는 diff가 있어도 삭제 가능)
     if (isCompleted) {
@@ -1034,7 +1263,10 @@ export function ApiEditorLayout() {
 
   const handleNewForm = useCallback(() => {
     // 새 작성 폼으로 전환
+    // 선택된 프로토콜에 따라 다른 폼을 표시할 수 있도록 구조화
+    // 현재는 REST만 지원하지만, 나중에 WebSocket/GraphQL 지원 시 확장 가능
     setSelectedEndpoint(null);
+    setIsNewFormMode(true);
     setMethod("POST");
     // 값은 비워 placeholder가 보이도록 처리
     setUrl("");
@@ -1049,7 +1281,18 @@ export function ApiEditorLayout() {
       fields: [],
     });
     setStatusCodes([]);
-  }, [setSelectedEndpoint]);
+
+    // 프로토콜에 따른 추가 초기화
+    if (protocol === "WebSocket") {
+      setWsEntryPoint("");
+      setWsSummary("");
+      setWsDescription("");
+      setWsTags("");
+      setWsReceiver(null);
+      setWsReply(null);
+    }
+    // if (protocol === "GraphQL") { ... }
+  }, [setSelectedEndpoint, protocol]);
 
   // 사이드바 Add 버튼 클릭 시 새 폼 초기화
   useEffect(() => {
@@ -1059,6 +1302,28 @@ export function ApiEditorLayout() {
       setTriggerNewForm(false);
     }
   }, [triggerNewForm, handleNewForm, setTriggerNewForm]);
+
+  // 프로토콜 변경 시 새 폼 모드 해제
+  // Add 버튼을 눌러서 새 폼을 작성 중이어도 프로토콜을 변경하면 새 폼 모드를 해제해야 함
+  const prevProtocolRef = useRef(protocol);
+  const triggerNewFormRef = useRef(triggerNewForm);
+
+  // triggerNewForm 변경 시 ref 업데이트
+  useEffect(() => {
+    triggerNewFormRef.current = triggerNewForm;
+  }, [triggerNewForm]);
+
+  useEffect(() => {
+    // 프로토콜이 변경되었을 때
+    if (prevProtocolRef.current !== protocol) {
+      // triggerNewForm이 true인 경우는 Add 버튼을 누른 직후이므로 무시
+      if (!triggerNewFormRef.current) {
+        // 프로토콜 변경 시 새 폼 모드 해제
+        setIsNewFormMode(false);
+      }
+    }
+    prevProtocolRef.current = protocol;
+  }, [protocol]);
 
   const handleImportYAML = async () => {
     // 파일 선택 input 생성
@@ -1643,23 +1908,6 @@ export function ApiEditorLayout() {
         </div>
       </div>
 
-      {/* Protocol Tabs - 항상 표시 */}
-      <div className="border-b border-gray-200 dark:border-[#2D333B] px-6 bg-white dark:bg-[#0D1117]">
-        {activeTab === "form" ? (
-          <ProtocolTabs
-            selectedProtocol={protocol}
-            onProtocolChange={setProtocol}
-            onNewForm={handleNewForm}
-          />
-        ) : (
-          <ProtocolTabs
-            selectedProtocol={testProtocol}
-            onProtocolChange={setTestProtocol}
-            onNewForm={handleNewForm}
-          />
-        )}
-      </div>
-
       {/* Main Content */}
       <div className="flex-1 overflow-auto">
         {activeTab === "test" ? (
@@ -1693,8 +1941,11 @@ export function ApiEditorLayout() {
             id="api-form-container"
             className="w-full max-w-6xl mx-auto px-6 py-8"
           >
-            {/* Protocol not supported message */}
-            {protocol !== "REST" && (
+            {/* Protocol not selected or not supported message */}
+            {(protocol === null ||
+              (protocol !== null &&
+                selectedEndpoint === null &&
+                !isNewFormMode)) && (
               <div className="h-full flex items-center justify-center py-12">
                 <div className="text-center">
                   <div className="w-16 h-16 mx-auto mb-6 rounded-md bg-gray-100 dark:bg-[#161B22] border border-gray-300 dark:border-[#2D333B] flex items-center justify-center">
@@ -1713,17 +1964,76 @@ export function ApiEditorLayout() {
                     </svg>
                   </div>
                   <h3 className="text-xl font-semibold text-gray-900 dark:text-[#E6EDF3] mb-2">
-                    {protocol} 명세서 준비 중
+                    프로토콜을 선택해주세요
                   </h3>
-                  <p className="text-gray-600 dark:text-[#8B949E] mb-4">
-                    현재는 REST API만 지원합니다.
-                  </p>
-                  <p className="text-sm text-gray-500 dark:text-[#8B949E]">
-                    프로토콜 탭을 클릭하여 REST로 전환할 수 있습니다.
+                  <p className="text-gray-600 dark:text-[#8B949E]">
+                    사이드바에서 프로토콜을 선택한 후 Add 버튼을 클릭하세요.
                   </p>
                 </div>
               </div>
             )}
+            {protocol === "WebSocket" &&
+              (selectedEndpoint !== null || isNewFormMode) && (
+                <WsEditorForm
+                  entryPoint={wsEntryPoint}
+                  setEntryPoint={setWsEntryPoint}
+                  summary={wsSummary}
+                  setSummary={setWsSummary}
+                  description={wsDescription}
+                  setDescription={setWsDescription}
+                  tags={wsTags}
+                  setTags={setWsTags}
+                  receiver={wsReceiver}
+                  setReceiver={setWsReceiver}
+                  reply={wsReply}
+                  setReply={setWsReply}
+                  isReadOnly={!!(selectedEndpoint && !isEditMode)}
+                  diff={selectedEndpoint?.diff}
+                  operationInfo={
+                    selectedEndpoint
+                      ? {
+                          operationName: (selectedEndpoint as any)
+                            .operationName,
+                          tag: selectedEndpoint.method?.toLowerCase(),
+                          progress: selectedEndpoint.progress,
+                        }
+                      : undefined
+                  }
+                />
+              )}
+            {protocol !== null &&
+              protocol !== "REST" &&
+              protocol !== "WebSocket" && (
+                <div className="h-full flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <div className="w-16 h-16 mx-auto mb-6 rounded-md bg-gray-100 dark:bg-[#161B22] border border-gray-300 dark:border-[#2D333B] flex items-center justify-center">
+                      <svg
+                        className="w-8 h-8 text-gray-500 dark:text-[#8B949E]"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                        />
+                      </svg>
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-[#E6EDF3] mb-2">
+                      {protocol} 명세서 준비 중
+                    </h3>
+                    <p className="text-gray-600 dark:text-[#8B949E] mb-4">
+                      현재는 REST API와 WebSocket만 지원합니다.
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-[#8B949E]">
+                      프로토콜 탭을 클릭하여 REST 또는 WebSocket으로 전환할 수
+                      있습니다.
+                    </p>
+                  </div>
+                </div>
+              )}
 
             {/* Diff Notification - 불일치가 있을 때만 표시 (completed 또는 mock 상태 모두) */}
             {protocol === "REST" && selectedEndpoint && hasDiff && (
@@ -1735,34 +2045,13 @@ export function ApiEditorLayout() {
             )}
 
             {/* Method + URL Card */}
-            {protocol === "REST" && (
-              <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm mb-6">
-                <div className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3] mb-2 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <svg
-                      className="h-4 w-4 text-gray-500 dark:text-[#8B949E]"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                      />
-                    </svg>
-                    <span>Method & URL</span>
-                  </div>
-                  {/* Code Snippet 버튼 - 생성 완료된 명세서에서만 활성화 (수정 중일 때는 숨김) */}
-                  {selectedEndpoint && !isEditMode && (
-                    <button
-                      onClick={() => setIsCodeSnippetOpen(true)}
-                      className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2"
-                      title="Code Snippet 보기"
-                    >
+            {protocol === "REST" &&
+              (selectedEndpoint !== null || isNewFormMode) && (
+                <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm mb-6">
+                  <div className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3] mb-2 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
                       <svg
-                        className="w-4 h-4"
+                        className="h-4 w-4 text-gray-500 dark:text-[#8B949E]"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -1771,39 +2060,20 @@ export function ApiEditorLayout() {
                           strokeLinecap="round"
                           strokeLinejoin="round"
                           strokeWidth={2}
-                          d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
+                          d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
                         />
                       </svg>
-                      <span className="hidden sm:inline">Code Snippet</span>
-                    </button>
-                  )}
-                </div>
-                <p className="text-xs text-gray-600 dark:text-[#8B949E] mb-4">
-                  HTTP 메서드와 엔드포인트 URL을 입력하세요
-                </p>
-
-                <div className="space-y-4">
-                  <div className="flex flex-col sm:flex-row gap-4">
-                    <div className="relative sm:w-auto w-full">
-                      <select
-                        value={method}
-                        onChange={(e) => setMethod(e.target.value)}
-                        disabled={!!(selectedEndpoint && !isEditMode)}
-                        className={`appearance-none w-full sm:w-auto px-3 py-2 pr-10 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm font-medium min-w-[120px] ${
-                          selectedEndpoint && !isEditMode
-                            ? "opacity-60 cursor-not-allowed"
-                            : ""
-                        }`}
+                      <span>Method & URL</span>
+                    </div>
+                    {/* Code Snippet 버튼 - 생성 완료된 명세서에서만 활성화 (수정 중일 때는 숨김) */}
+                    {selectedEndpoint && !isEditMode && (
+                      <button
+                        onClick={() => setIsCodeSnippetOpen(true)}
+                        className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2"
+                        title="Code Snippet 보기"
                       >
-                        {methods.map((m) => (
-                          <option key={m} value={m}>
-                            {m}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                         <svg
-                          className="w-4 h-4 text-gray-500 dark:text-[#8B949E]"
+                          className="w-4 h-4"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -1812,34 +2082,39 @@ export function ApiEditorLayout() {
                             strokeLinecap="round"
                             strokeLinejoin="round"
                             strokeWidth={2}
-                            d="M19 9l-7 7-7-7"
+                            d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
                           />
                         </svg>
-                      </div>
-                    </div>
-                    <div className="relative flex-1">
-                      <input
-                        type="text"
-                        value={url}
-                        onChange={(e) => setUrl(e.target.value)}
-                        placeholder="예: /api/users, /api/auth/login"
-                        disabled={!!(selectedEndpoint && !isEditMode)}
-                        className={`w-full px-3 py-2 ${
-                          hasDiff ? "pr-10" : ""
-                        } rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm font-mono ${
-                          selectedEndpoint && !isEditMode
-                            ? "opacity-60 cursor-not-allowed"
-                            : ""
-                        }`}
-                      />
-                      {/* Diff 주의 표시 아이콘 (URL 우측) */}
-                      {hasDiff && (
-                        <div
-                          className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"
-                          title="명세와 실제 구현이 일치하지 않습니다"
+                        <span className="hidden sm:inline">Code Snippet</span>
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-600 dark:text-[#8B949E] mb-4">
+                    HTTP 메서드와 엔드포인트 URL을 입력하세요
+                  </p>
+
+                  <div className="space-y-4">
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      <div className="relative sm:w-auto w-full">
+                        <select
+                          value={method}
+                          onChange={(e) => setMethod(e.target.value)}
+                          disabled={!!(selectedEndpoint && !isEditMode)}
+                          className={`appearance-none w-full sm:w-auto px-3 py-2 pr-10 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm font-medium min-w-[120px] ${
+                            selectedEndpoint && !isEditMode
+                              ? "opacity-60 cursor-not-allowed"
+                              : ""
+                          }`}
                         >
+                          {methods.map((m) => (
+                            <option key={m} value={m}>
+                              {m}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                           <svg
-                            className="w-4 h-4 text-amber-500"
+                            className="w-4 h-4 text-gray-500 dark:text-[#8B949E]"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -1848,46 +2123,119 @@ export function ApiEditorLayout() {
                               strokeLinecap="round"
                               strokeLinejoin="round"
                               strokeWidth={2}
-                              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                              d="M19 9l-7 7-7-7"
                             />
                           </svg>
                         </div>
-                      )}
+                      </div>
+                      <div className="relative flex-1">
+                        <input
+                          type="text"
+                          value={url}
+                          onChange={(e) => setUrl(e.target.value)}
+                          placeholder="예: /api/users, /api/auth/login"
+                          disabled={!!(selectedEndpoint && !isEditMode)}
+                          className={`w-full px-3 py-2 ${
+                            hasDiff ? "pr-10" : ""
+                          } rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm font-mono ${
+                            selectedEndpoint && !isEditMode
+                              ? "opacity-60 cursor-not-allowed"
+                              : ""
+                          }`}
+                        />
+                        {/* Diff 주의 표시 아이콘 (URL 우측) */}
+                        {hasDiff && (
+                          <div
+                            className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"
+                            title="명세와 실제 구현이 일치하지 않습니다"
+                          >
+                            <svg
+                              className="w-4 h-4 text-amber-500"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                              />
+                            </svg>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Method Badge */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-600 dark:text-[#8B949E]">
-                      Method:
-                    </span>
-                    <span
-                      className={`inline-flex items-center rounded-[4px] border border-gray-300 dark:border-[#2D333B] bg-white dark:bg-[#0D1117] px-2 py-[2px] text-[10px] font-mono font-semibold ${
-                        method === "GET"
-                          ? "text-[#10B981]"
-                          : method === "POST"
-                          ? "text-[#2563EB]"
-                          : method === "PUT"
-                          ? "text-[#F59E0B]"
-                          : method === "PATCH"
-                          ? "text-[#F59E0B]"
-                          : "text-red-500"
-                      }`}
-                    >
-                      {method}
-                    </span>
-                  </div>
+                    {/* Method Badge */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-600 dark:text-[#8B949E]">
+                        Method:
+                      </span>
+                      <span
+                        className={`inline-flex items-center rounded-[4px] border border-gray-300 dark:border-[#2D333B] bg-white dark:bg-[#0D1117] px-2 py-[2px] text-[10px] font-mono font-semibold ${
+                          method === "GET"
+                            ? "text-[#10B981]"
+                            : method === "POST"
+                            ? "text-[#2563EB]"
+                            : method === "PUT"
+                            ? "text-[#F59E0B]"
+                            : method === "PATCH"
+                            ? "text-[#F59E0B]"
+                            : "text-red-500"
+                        }`}
+                      >
+                        {method}
+                      </span>
+                    </div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
+                          Tags/Category
+                        </label>
+                        <input
+                          type="text"
+                          value={tags}
+                          onChange={(e) => setTags(e.target.value)}
+                          placeholder="예: AUTH, USER, PRODUCT, ORDER"
+                          disabled={!!(selectedEndpoint && !isEditMode)}
+                          className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
+                            selectedEndpoint && !isEditMode
+                              ? "opacity-60 cursor-not-allowed"
+                              : ""
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
+                          Summary
+                        </label>
+                        <input
+                          type="text"
+                          value={summary}
+                          onChange={(e) => setSummary(e.target.value)}
+                          placeholder="예: 사용자 로그인 생성"
+                          disabled={!!(selectedEndpoint && !isEditMode)}
+                          className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
+                            selectedEndpoint && !isEditMode
+                              ? "opacity-60 cursor-not-allowed"
+                              : ""
+                          }`}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Description */}
                     <div>
                       <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                        Tags/Category
+                        Description
                       </label>
                       <input
                         type="text"
-                        value={tags}
-                        onChange={(e) => setTags(e.target.value)}
-                        placeholder="예: AUTH, USER, PRODUCT, ORDER"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder="예: 사용자 로그인, 상품 목록 조회, 주문 생성"
                         disabled={!!(selectedEndpoint && !isEditMode)}
                         className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
                           selectedEndpoint && !isEditMode
@@ -1896,79 +2244,48 @@ export function ApiEditorLayout() {
                         }`}
                       />
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                        Summary
-                      </label>
-                      <input
-                        type="text"
-                        value={summary}
-                        onChange={(e) => setSummary(e.target.value)}
-                        placeholder="예: 사용자 로그인 생성"
-                        disabled={!!(selectedEndpoint && !isEditMode)}
-                        className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
-                          selectedEndpoint && !isEditMode
-                            ? "opacity-60 cursor-not-allowed"
-                            : ""
-                        }`}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Description */}
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                      Description
-                    </label>
-                    <input
-                      type="text"
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder="예: 사용자 로그인, 상품 목록 조회, 주문 생성"
-                      disabled={!!(selectedEndpoint && !isEditMode)}
-                      className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
-                        selectedEndpoint && !isEditMode
-                          ? "opacity-60 cursor-not-allowed"
-                          : ""
-                      }`}
-                    />
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
             {/* Request Card */}
-            {protocol === "REST" && (
-              <ApiRequestCard
-                queryParams={queryParams}
-                setQueryParams={setQueryParams}
-                requestHeaders={requestHeaders}
-                setRequestHeaders={setRequestHeaders}
-                requestBody={requestBody}
-                setRequestBody={setRequestBody}
-                auth={auth}
-                setAuth={setAuth}
-                isReadOnly={!!(selectedEndpoint && !isEditMode)}
-              />
-            )}
-
-            {/* Response Card */}
-            {protocol === "REST" && (
-              <div className="mt-6">
-                <ApiResponseCard
-                  statusCodes={statusCodes}
-                  setStatusCodes={setStatusCodes}
+            {protocol === "REST" &&
+              (selectedEndpoint !== null || isNewFormMode) && (
+                <ApiRequestCard
+                  queryParams={queryParams}
+                  setQueryParams={setQueryParams}
+                  requestHeaders={requestHeaders}
+                  setRequestHeaders={setRequestHeaders}
+                  requestBody={requestBody}
+                  setRequestBody={setRequestBody}
+                  auth={auth}
+                  setAuth={setAuth}
                   isReadOnly={!!(selectedEndpoint && !isEditMode)}
                 />
-              </div>
-            )}
+              )}
+
+            {/* Response Card */}
+            {protocol === "REST" &&
+              (selectedEndpoint !== null || isNewFormMode) && (
+                <div className="mt-6">
+                  <ApiResponseCard
+                    statusCodes={statusCodes}
+                    setStatusCodes={setStatusCodes}
+                    isReadOnly={!!(selectedEndpoint && !isEditMode)}
+                  />
+                </div>
+              )}
 
             {/* Schema Card */}
-            {protocol === "REST" && (
-              <div className="mt-6">
-                <SchemaCard isReadOnly={!!(selectedEndpoint && !isEditMode)} />
-              </div>
-            )}
+            {protocol === "REST" &&
+              (selectedEndpoint !== null || isNewFormMode) && (
+                <div className="mt-6">
+                  <SchemaCard
+                    isReadOnly={!!(selectedEndpoint && !isEditMode)}
+                    protocol="REST"
+                  />
+                </div>
+              )}
 
             {/* Preview 제거: 상세 보기에서는 Code Snippet만 노출 */}
           </div>

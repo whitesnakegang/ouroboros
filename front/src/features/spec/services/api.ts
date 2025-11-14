@@ -110,7 +110,7 @@ export interface SchemaResponse {
   properties?: Record<string, SchemaField>;
   required?: string[];
   orders?: string[];
-  items?: any;  // array 타입일 경우
+  items?: any; // array 타입일 경우
   xmlName?: string;
 }
 
@@ -344,8 +344,11 @@ export async function deleteRestApiSpec(
   return response.json();
 }
 
-// Schema 관련 API 함수들
+// REST Schema 관련 API 함수들
 const SCHEMA_API_BASE_URL = "/ouro/rest-specs/schemas";
+
+// WebSocket Schema 관련 API 함수들
+const WS_SCHEMA_API_BASE_URL = "/ouro/websocket-specs/schemas";
 
 /**
  * 전체 Schema 조회
@@ -692,6 +695,745 @@ export async function getTryTrace(tryId: string): Promise<TryTraceResponse> {
     );
     console.error("Try Trace 조회 실패:", {
       tryId,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+// ========== WebSocket Types ==========
+
+// WebSocket Operation 관련 인터페이스
+export interface ChannelReference {
+  ref: string;
+}
+
+export interface MessageReference {
+  ref: string;
+}
+
+export interface ReplyInfo {
+  channel: ChannelReference;
+  messages: MessageReference[];
+}
+
+export interface Operation {
+  action: "receive" | "send";
+  channel: ChannelReference;
+  messages: MessageReference[];
+  reply?: ReplyInfo | null;
+  bindings?: { stomp?: {} };
+  id?: string;
+  entrypoint?: string;
+  diff?: string;
+  progress?: string;
+}
+
+export interface OperationResponse {
+  operationName: string;
+  tag?: string;
+  operation: Operation;
+}
+
+export interface ChannelMessageInfo {
+  address?: string | null;
+  channelRef?: string | null;
+  messages?: string[];
+}
+
+export interface CreateOperationRequest {
+  protocol: string;
+  pathname: string;
+  receives?: ChannelMessageInfo[] | null;
+  replies?: ChannelMessageInfo[] | null;
+}
+
+export interface UpdateOperationRequest {
+  action?: "receive" | "send";
+  channel?: ChannelReference;
+  messages?: MessageReference[];
+  reply?: ReplyInfo | null;
+}
+
+export interface GetAllOperationsResponse {
+  status: number;
+  data: OperationResponse[];
+  message: string;
+}
+
+export interface GetOperationResponse {
+  status: number;
+  data: OperationResponse;
+  message: string;
+}
+
+export interface CreateOperationResponse {
+  status: number;
+  data: OperationResponse[];
+  message: string;
+}
+
+export interface UpdateOperationResponse {
+  status: number;
+  data: OperationResponse;
+  message: string;
+}
+
+export interface DeleteOperationResponse {
+  status: number;
+  message: string;
+}
+
+// WebSocket Message 관련 인터페이스
+export interface MessageResponse {
+  messageName: string;
+  name?: string;
+  contentType?: string;
+  description?: string;
+  headers?: any;
+  payload?: any;
+}
+
+export interface CreateMessageRequest {
+  messageName: string;
+  name?: string;
+  contentType?: string;
+  description?: string;
+  headers?: any;
+  payload?: any;
+}
+
+export interface UpdateMessageRequest {
+  name?: string;
+  contentType?: string;
+  description?: string;
+  headers?: any;
+  payload?: any;
+}
+
+export interface GetAllMessagesResponse {
+  status: number;
+  data: MessageResponse[];
+  message: string;
+}
+
+export interface GetMessageResponse {
+  status: number;
+  data: MessageResponse;
+  message: string;
+}
+
+export interface CreateMessageResponse {
+  status: number;
+  data: MessageResponse;
+  message: string;
+}
+
+export interface UpdateMessageResponse {
+  status: number;
+  data: MessageResponse;
+  message: string;
+}
+
+export interface DeleteMessageResponse {
+  status: number;
+  message: string;
+}
+
+// WebSocket Channel 관련 인터페이스
+export interface ChannelResponse {
+  channelName: string;
+  channel: {
+    address: string;
+    messages: Record<string, MessageReference>;
+    bindings?: { stomp?: {} };
+  };
+}
+
+export interface GetAllChannelsResponse {
+  status: number;
+  data: ChannelResponse[];
+  message: string;
+}
+
+export interface GetChannelResponse {
+  status: number;
+  data: ChannelResponse;
+  message: string;
+}
+
+// ========== WebSocket Schema API 함수들 ==========
+
+/**
+ * 전체 WebSocket Schema 조회
+ */
+export async function getAllWebSocketSchemas(): Promise<GetAllSchemasResponse> {
+  const response = await fetch(WS_SCHEMA_API_BASE_URL, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Schema 조회 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WebSocket Schema API 호출 실패:", {
+      url: WS_SCHEMA_API_BASE_URL,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+/**
+ * 특정 WebSocket Schema 조회
+ */
+export async function getWebSocketSchema(
+  schemaName: string
+): Promise<GetSchemaResponse> {
+  const response = await fetch(`${WS_SCHEMA_API_BASE_URL}/${schemaName}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Schema 조회 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WebSocket Schema 조회 실패:", {
+      schemaName,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+/**
+ * 새로운 WebSocket Schema 생성
+ */
+export async function createWebSocketSchema(
+  request: CreateSchemaRequest
+): Promise<CreateSchemaResponse> {
+  const response = await fetch(WS_SCHEMA_API_BASE_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Schema 생성 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WebSocket Schema 생성 실패:", {
+      request,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+/**
+ * WebSocket Schema 수정
+ */
+export async function updateWebSocketSchema(
+  schemaName: string,
+  request: UpdateSchemaRequest
+): Promise<UpdateSchemaResponse> {
+  const response = await fetch(`${WS_SCHEMA_API_BASE_URL}/${schemaName}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Schema 수정 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WebSocket Schema 수정 실패:", {
+      schemaName,
+      request,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+/**
+ * WebSocket Schema 삭제
+ */
+export async function deleteWebSocketSchema(
+  schemaName: string
+): Promise<DeleteSchemaResponse> {
+  const response = await fetch(`${WS_SCHEMA_API_BASE_URL}/${schemaName}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Schema 삭제 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WebSocket Schema 삭제 실패:", {
+      schemaName,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+// ========== WebSocket Operation API 함수들 ==========
+
+const WS_OPERATION_API_BASE_URL = "/ouro/websocket-specs/operations";
+
+// $ref를 ref로 변환하는 헬퍼 함수
+function transformOperationResponse(data: any): any {
+  if (!data) return data;
+  
+  // operation 객체 변환
+  if (data.operation) {
+    const op = data.operation;
+    
+    // x-ouroboros-* 필드를 간단한 이름으로 매핑
+    if (op['x-ouroboros-id']) {
+      op.id = op['x-ouroboros-id'];
+    }
+    if (op['x-ouroboros-entrypoint']) {
+      op.entrypoint = op['x-ouroboros-entrypoint'];
+    }
+    if (op['x-ouroboros-diff']) {
+      op.diff = op['x-ouroboros-diff'];
+    }
+    if (op['x-ouroboros-progress']) {
+      op.progress = op['x-ouroboros-progress'];
+    }
+    
+    // channel.$ref → channel.ref 변환
+    if (op.channel && op.channel['$ref']) {
+      op.channel.ref = op.channel['$ref'];
+    }
+    
+    // reply.channel.$ref → reply.channel.ref 변환
+    if (op.reply && op.reply.channel && op.reply.channel['$ref']) {
+      op.reply.channel.ref = op.reply.channel['$ref'];
+    }
+    
+    // messages.$ref → messages.ref 변환
+    if (Array.isArray(op.messages)) {
+      op.messages = op.messages.map((msg: any) => {
+        if (msg['$ref']) {
+          return { ref: msg['$ref'] };
+        }
+        return msg;
+      });
+    }
+    
+    // reply.messages.$ref → reply.messages.ref 변환
+    if (op.reply && Array.isArray(op.reply.messages)) {
+      op.reply.messages = op.reply.messages.map((msg: any) => {
+        if (msg['$ref']) {
+          return { ref: msg['$ref'] };
+        }
+        return msg;
+      });
+    }
+  }
+  
+  return data;
+}
+
+/**
+ * 전체 WebSocket Operation 조회
+ */
+export async function getAllWebSocketOperations(): Promise<GetAllOperationsResponse> {
+  const response = await fetch(WS_OPERATION_API_BASE_URL, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Operation 조회 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WebSocket Operation API 호출 실패:", {
+      url: WS_OPERATION_API_BASE_URL,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  const result = await response.json();
+  
+  // 각 operation 데이터를 변환
+  if (result.data && Array.isArray(result.data)) {
+    result.data = result.data.map(transformOperationResponse);
+  }
+  
+  return result;
+}
+
+/**
+ * 특정 WebSocket Operation 조회
+ */
+export async function getWebSocketOperation(
+  operationId: string
+): Promise<GetOperationResponse> {
+  const response = await fetch(`${WS_OPERATION_API_BASE_URL}/${operationId}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Operation 조회 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WebSocket Operation 조회 실패:", {
+      operationId,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  const result = await response.json();
+  
+  // operation 데이터 변환
+  if (result.data) {
+    result.data = transformOperationResponse(result.data);
+  }
+  
+  return result;
+}
+
+/**
+ * 새로운 WebSocket Operation 생성
+ */
+export async function createWebSocketOperation(
+  request: CreateOperationRequest
+): Promise<CreateOperationResponse> {
+  const response = await fetch(WS_OPERATION_API_BASE_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Operation 생성 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WebSocket Operation 생성 실패:", {
+      request,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  const result = await response.json();
+  
+  // 생성된 operation 데이터들 변환
+  if (result.data && Array.isArray(result.data)) {
+    result.data = result.data.map(transformOperationResponse);
+  }
+  
+  return result;
+}
+
+/**
+ * WebSocket Operation 수정
+ */
+export async function updateWebSocketOperation(
+  operationId: string,
+  request: UpdateOperationRequest
+): Promise<UpdateOperationResponse> {
+  const response = await fetch(`${WS_OPERATION_API_BASE_URL}/${operationId}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Operation 수정 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WebSocket Operation 수정 실패:", {
+      operationId,
+      request,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  const result = await response.json();
+  
+  // 수정된 operation 데이터 변환
+  if (result.data) {
+    result.data = transformOperationResponse(result.data);
+  }
+  
+  return result;
+}
+
+/**
+ * WebSocket Operation 삭제
+ */
+export async function deleteWebSocketOperation(
+  operationId: string
+): Promise<DeleteOperationResponse> {
+  const response = await fetch(`${WS_OPERATION_API_BASE_URL}/${operationId}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Operation 삭제 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WebSocket Operation 삭제 실패:", {
+      operationId,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+// ========== WebSocket Message API 함수들 ==========
+
+const WS_MESSAGE_API_BASE_URL = "/ouro/websocket-specs/messages";
+
+/**
+ * 전체 WebSocket Message 조회
+ */
+export async function getAllWebSocketMessages(): Promise<GetAllMessagesResponse> {
+  const response = await fetch(WS_MESSAGE_API_BASE_URL, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Message 조회 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WebSocket Message API 호출 실패:", {
+      url: WS_MESSAGE_API_BASE_URL,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+/**
+ * 특정 WebSocket Message 조회
+ */
+export async function getWebSocketMessage(
+  messageName: string
+): Promise<GetMessageResponse> {
+  const response = await fetch(`${WS_MESSAGE_API_BASE_URL}/${messageName}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Message 조회 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WebSocket Message 조회 실패:", {
+      messageName,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+/**
+ * 새로운 WebSocket Message 생성
+ */
+export async function createWebSocketMessage(
+  request: CreateMessageRequest
+): Promise<CreateMessageResponse> {
+  const response = await fetch(WS_MESSAGE_API_BASE_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Message 생성 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WebSocket Message 생성 실패:", {
+      request,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+/**
+ * WebSocket Message 수정
+ */
+export async function updateWebSocketMessage(
+  messageName: string,
+  request: UpdateMessageRequest
+): Promise<UpdateMessageResponse> {
+  const response = await fetch(`${WS_MESSAGE_API_BASE_URL}/${messageName}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Message 수정 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WebSocket Message 수정 실패:", {
+      messageName,
+      request,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+/**
+ * WebSocket Message 삭제
+ */
+export async function deleteWebSocketMessage(
+  messageName: string
+): Promise<DeleteMessageResponse> {
+  const response = await fetch(`${WS_MESSAGE_API_BASE_URL}/${messageName}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Message 삭제 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WebSocket Message 삭제 실패:", {
+      messageName,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+// ========== WebSocket Channel API 함수들 ==========
+
+const WS_CHANNEL_API_BASE_URL = "/ouro/websocket-specs/channels";
+
+/**
+ * 전체 WebSocket Channel 조회
+ */
+export async function getAllWebSocketChannels(): Promise<GetAllChannelsResponse> {
+  const response = await fetch(WS_CHANNEL_API_BASE_URL, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Channel 조회 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WebSocket Channel API 호출 실패:", {
+      url: WS_CHANNEL_API_BASE_URL,
+      status: response.status,
+    });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+/**
+ * 특정 WebSocket Channel 조회
+ */
+export async function getWebSocketChannel(
+  channelName: string
+): Promise<GetChannelResponse> {
+  const response = await fetch(`${WS_CHANNEL_API_BASE_URL}/${channelName}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Channel 조회 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WebSocket Channel 조회 실패:", {
+      channelName,
       status: response.status,
     });
     throw new Error(errorMessage);

@@ -1,5 +1,7 @@
 import { TestRequestPanel } from "./TestRequestPanel";
 import { TestResponseTabs } from "./TestResponseTabs";
+import { WsTestRequestPanel } from "./WsTestRequestPanel";
+import { WsTestResponseTabs } from "./WsTestResponseTabs";
 import { useTestingStore } from "../store/testing.store";
 
 export function TestLayout() {
@@ -13,6 +15,11 @@ export function TestLayout() {
           <div id="test-form-container" className="max-w-6xl mx-auto space-y-6">
             <TestRequestPanel />
             <TestResponseTabs />
+          </div>
+        ) : protocol === "WebSocket" ? (
+          <div id="test-form-container" className="max-w-6xl mx-auto space-y-6">
+            <WsTestRequestPanel />
+            <WsTestResponseTabs />
           </div>
         ) : (
           <div className="h-full flex items-center justify-center">
@@ -36,7 +43,7 @@ export function TestLayout() {
                 {protocol} 테스트 준비 중
               </h3>
               <p className="text-gray-600 dark:text-[#8B949E]">
-                현재는 REST 프로토콜만 지원합니다.
+                현재는 REST와 WebSocket 프로토콜만 지원합니다.
               </p>
             </div>
           </div>
