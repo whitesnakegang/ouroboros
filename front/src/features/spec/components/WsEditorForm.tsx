@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { SchemaFieldEditor } from "./SchemaFieldEditor";
 import { SchemaModal } from "./SchemaModal";
 import { SchemaCard } from "./SchemaCard";
+import { SchemaViewer } from "./SchemaViewer";
 import { getAllSchemas, getAllWebSocketMessages, type SchemaResponse, type MessageResponse } from "../services/api";
 import type { SchemaField, RequestBody } from "../types/schema.types";
 import { createDefaultField } from "../types/schema.types";
@@ -41,6 +42,7 @@ interface WsEditorFormProps {
   reply: Reply | null;
   setReply: (reply: Reply | null) => void;
   isReadOnly?: boolean;
+  isDocumentView?: boolean;
   diff?: string; // 명세 불일치 정보
   operationInfo?: {
     operationName?: string;
@@ -64,6 +66,7 @@ export function WsEditorForm({
   reply,
   setReply,
   isReadOnly = false,
+  isDocumentView = false,
   diff,
   operationInfo,
   onSyncToActual,
@@ -72,6 +75,7 @@ export function WsEditorForm({
   const [messages, setMessages] = useState<MessageResponse[]>([]);
   const [isReceiverSchemaModalOpen, setIsReceiverSchemaModalOpen] = useState(false);
   const [isReplySchemaModalOpen, setIsReplySchemaModalOpen] = useState(false);
+  const [wsTab, setWsTab] = useState<"receiver" | "reply" | "schema">("receiver");
   
   // Protocol state (entryPoint에서 분리)
   const [protocol, setProtocol] = useState<"ws" | "wss">("ws");
@@ -332,6 +336,132 @@ export function WsEditorForm({
       canSync: false,
     };
   };
+
+  // 문서 형식 뷰
+  if (isDocumentView) {
+    return (
+      <div className="space-y-6">
+        {/* Entry Point */}
+        <div>
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">Entry Point</h3>
+          <div className="flex items-start gap-3 text-sm">
+            <span className="font-mono text-gray-900 dark:text-[#E6EDF3]">{entryPoint || <span className="text-gray-400 italic">(empty)</span>}</span>
+          </div>
+        </div>
+
+        {/* Summary */}
+        {summary && (
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">Summary</h3>
+            <div className="text-sm text-gray-900 dark:text-[#E6EDF3]">{summary}</div>
+          </div>
+        )}
+
+        {/* Description */}
+        {description && (
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">Description</h3>
+            <div className="text-sm text-gray-900 dark:text-[#E6EDF3]">{description}</div>
+          </div>
+        )}
+
+        {/* Tags */}
+        {tags && (
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">Tags</h3>
+            <div className="flex flex-wrap gap-2">
+              {tags.split(",").map((tag, index) => (
+                <span
+                  key={index}
+                  className="px-2 py-1 bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs rounded"
+                >
+                  {tag.trim()}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Receiver */}
+        {receiver && (
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-3">Receiver</h3>
+            <div className="space-y-4 ml-4">
+              <div>
+                <h4 className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] mb-2">Address</h4>
+                <div className="flex items-start gap-3 text-sm">
+                  <span className="font-mono text-gray-900 dark:text-[#E6EDF3]">{receiver.address || <span className="text-gray-400 italic">(empty)</span>}</span>
+                </div>
+              </div>
+
+              {receiver.headers && receiver.headers.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] mb-2">Headers</h4>
+                  <div className="space-y-2">
+                    {receiver.headers.map((header, index) => (
+                      <div key={index} className="flex items-start gap-3 text-sm">
+                        <span className="font-mono text-gray-900 dark:text-[#E6EDF3] min-w-[120px]">{header.key}</span>
+                        <span className="text-gray-600 dark:text-[#8B949E]">:</span>
+                        <span className="text-gray-900 dark:text-[#E6EDF3] flex-1">{header.value || <span className="text-gray-400 italic">(empty)</span>}</span>
+                        {header.required && (
+                          <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-xs rounded">Required</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {receiver.schema && (
+                <div>
+                  <h4 className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] mb-2">Schema</h4>
+                  <SchemaViewer
+                    schemaType={receiver.schema.rootSchemaType}
+                    fields={receiver.schema.fields}
+                    schemaRef={receiver.schema.schemaRef}
+                    description={receiver.schema.description}
+                    contentType="application/json"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Reply */}
+        {reply && (
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-3">Reply</h3>
+            <div className="space-y-4 ml-4">
+              <div>
+                <h4 className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] mb-2">Address</h4>
+                <div className="flex items-start gap-3 text-sm">
+                  <span className="font-mono text-gray-900 dark:text-[#E6EDF3]">{reply.address || <span className="text-gray-400 italic">(empty)</span>}</span>
+                </div>
+              </div>
+
+              {reply.schema && (
+                <div>
+                  <h4 className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] mb-2">Schema</h4>
+                  <SchemaViewer
+                    schemaType={reply.schema.rootSchemaType}
+                    fields={reply.schema.fields}
+                    schemaRef={reply.schema.schemaRef}
+                    description={reply.schema.description}
+                    contentType="application/json"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {!receiver && !reply && (
+          <div className="text-sm text-gray-500 dark:text-[#8B949E] italic">No WebSocket configuration.</div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-6xl mx-auto px-6 py-8">
@@ -597,47 +727,85 @@ export function WsEditorForm({
         </div>
       )}
 
-      {/* Receivers & Replies - 이분할 레이아웃 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Receiver 섹션 */}
-        <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-[#E6EDF3]">
+      {/* Receiver/Reply/Schema 탭 */}
+      <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] shadow-sm mb-6 overflow-hidden">
+        {/* 탭 헤더 - 폴더 느낌으로 통합 */}
+        <div className="bg-gray-50 dark:bg-[#0D1117] border-b border-gray-200 dark:border-[#2D333B] px-4 pt-2">
+          <div className="flex gap-0.5 -mb-px">
+            <button
+              onClick={() => setWsTab("receiver")}
+              className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md border border-b-0 ${
+                wsTab === "receiver"
+                  ? "text-gray-900 dark:text-[#E6EDF3] bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] border-b-white dark:border-b-[#161B22] relative z-10"
+                  : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
+              }`}
+            >
               Receiver
-            </h2>
-            {!isReadOnly && (
-              <div className="flex gap-2">
-                {receiver ? (
-                  <button
-                    onClick={() => setReceiver(null)}
-                    className="text-red-500 hover:text-red-700 text-sm font-medium"
-                  >
-                    제거
-                  </button>
-                ) : (
-                  <button
-                    onClick={initializeReceiver}
-                    className="px-3 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md text-sm font-medium transition-colors flex items-center gap-2"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 4v16m8-8H4"
-                      />
-                    </svg>
-                    추가
-                  </button>
+            </button>
+            <button
+              onClick={() => setWsTab("reply")}
+              className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md border border-b-0 ${
+                wsTab === "reply"
+                  ? "text-gray-900 dark:text-[#E6EDF3] bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] border-b-white dark:border-b-[#161B22] relative z-10"
+                  : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
+              }`}
+            >
+              Reply
+            </button>
+            <button
+              onClick={() => setWsTab("schema")}
+              className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md border border-b-0 ${
+                wsTab === "schema"
+                  ? "text-gray-900 dark:text-[#E6EDF3] bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] border-b-white dark:border-b-[#161B22] relative z-10"
+                  : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
+              }`}
+            >
+              Schema
+            </button>
+          </div>
+        </div>
+
+        {/* 탭 내용 */}
+        <div className="p-4 bg-white dark:bg-[#161B22]">
+          {wsTab === "receiver" && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
+                  Receiver
+                </h3>
+                {!isReadOnly && (
+                  <div className="flex gap-2">
+                    {receiver ? (
+                      <button
+                        onClick={() => setReceiver(null)}
+                        className="text-red-500 hover:text-red-700 text-sm font-medium"
+                      >
+                        제거
+                      </button>
+                    ) : (
+                      <button
+                        onClick={initializeReceiver}
+                        className="px-3 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md text-sm font-medium transition-colors flex items-center gap-2"
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 4v16m8-8H4"
+                          />
+                        </svg>
+                        추가
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
-          </div>
 
           {receiver ? (
             <div className="space-y-4">
@@ -872,47 +1040,48 @@ export function WsEditorForm({
               <p>Receiver가 없습니다. "추가" 버튼을 클릭하여 추가하세요.</p>
             </div>
           )}
-        </div>
+            </div>
+          )}
 
-        {/* Reply 섹션 */}
-        <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-[#E6EDF3]">
-              Reply
-            </h2>
-            {!isReadOnly && (
-              <div className="flex gap-2">
-                {reply ? (
-                  <button
-                    onClick={() => setReply(null)}
-                    className="text-red-500 hover:text-red-700 text-sm font-medium"
-                  >
-                    제거
-                  </button>
-                ) : (
-                  <button
-                    onClick={initializeReply}
-                    className="px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md text-sm font-medium transition-colors flex items-center gap-2"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 4v16m8-8H4"
-                      />
-                    </svg>
-                    추가
-                  </button>
+          {wsTab === "reply" && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
+                  Reply
+                </h3>
+                {!isReadOnly && (
+                  <div className="flex gap-2">
+                    {reply ? (
+                      <button
+                        onClick={() => setReply(null)}
+                        className="text-red-500 hover:text-red-700 text-sm font-medium"
+                      >
+                        제거
+                      </button>
+                    ) : (
+                      <button
+                        onClick={initializeReply}
+                        className="px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md text-sm font-medium transition-colors flex items-center gap-2"
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 4v16m8-8H4"
+                          />
+                        </svg>
+                        추가
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
-          </div>
 
           {reply ? (
             <div className="space-y-4">
@@ -1084,6 +1253,15 @@ export function WsEditorForm({
               <p>Reply가 없습니다. "추가" 버튼을 클릭하여 추가하세요.</p>
             </div>
           )}
+            </div>
+          )}
+
+          {wsTab === "schema" && (
+            <SchemaCard
+              isReadOnly={isReadOnly}
+              protocol="WebSocket"
+            />
+          )}
         </div>
       </div>
 
@@ -1103,11 +1281,6 @@ export function WsEditorForm({
         schemas={schemas}
         setSchemas={setSchemas}
       />
-
-      {/* Schema Card - Schema 관리 */}
-      <div className="mt-6">
-        <SchemaCard isReadOnly={isReadOnly} protocol="WebSocket" />
-      </div>
     </div>
   );
 }
