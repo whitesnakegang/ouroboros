@@ -131,9 +131,16 @@ public class WebSocketSpecSyncPipeline implements SpecSyncPipeline {
                 continue;
             }
 
-            if(fileMessage.getRef() != null && fileMessage.getRef().equals(scanMessage.getRef())){
-                // $ref가 같은 경우 schema 정답지 확인
-                String schemaName = WebSocketSpecSyncHelper.extractClassNameFromRef(scanMessage.getRef());
+            // ref에서 메시지 이름 추출 후, 패키지명을 제외한 클래스명만 추출하여 비교
+            String fileMessageName = WebSocketSpecSyncHelper.extractMessageNameFromRef(fileMessage.getRef());
+            String scanMessageName = WebSocketSpecSyncHelper.extractMessageNameFromRef(scanMessage.getRef());
+
+            String fileMessageClassName = WebSocketSpecSyncHelper.extractClassNameFromFullName(fileMessageName);
+            String scanMessageClassName = WebSocketSpecSyncHelper.extractClassNameFromFullName(scanMessageName);
+
+            if(fileMessageClassName != null && fileMessageClassName.equals(scanMessageClassName)){
+                // 클래스명이 같은 경우 schema 정답지 확인
+                String schemaName = scanMessageClassName;
                 Boolean schemaMatches = schemaMap != null ? schemaMap.get(schemaName) : null;
                 if(Boolean.TRUE.equals(schemaMatches)){
                     // 정답인 경우
