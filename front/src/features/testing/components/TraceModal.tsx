@@ -34,43 +34,7 @@ export function TraceModal({ isOpen, onClose, traceData, initialExpandedSpanId }
     return null;
   };
 
-  // spanId로 span을 찾고, 해당 span과 모든 자식 span들의 ID를 수집하는 함수
-  const collectAllDescendantIds = (spans: TryTraceSpan[], targetSpanId: string): string[] => {
-    const allIds: string[] = [];
-    
-    const findAndCollect = (spans: TryTraceSpan[]): boolean => {
-      for (const span of spans) {
-        if (span.spanId === targetSpanId) {
-          allIds.push(span.spanId);
-          // 모든 자식 span들의 ID 수집
-          if (span.children && span.children.length > 0) {
-            collectDescendants(span.children, allIds);
-          }
-          return true;
-        }
-        if (span.children && span.children.length > 0) {
-          if (findAndCollect(span.children)) {
-            allIds.push(span.spanId);
-            return true;
-          }
-        }
-      }
-      return false;
-    };
-    
-    findAndCollect(spans);
-    return allIds;
-  };
-
-  // 재귀적으로 모든 자식 span들의 ID를 수집하는 함수
-  const collectDescendants = (spans: TryTraceSpan[], ids: string[]): void => {
-    for (const span of spans) {
-      ids.push(span.spanId);
-      if (span.children && span.children.length > 0) {
-        collectDescendants(span.children, ids);
-      }
-    }
-  };
+  // (제거) 사용되지 않는 후손 수집 유틸리티 함수들
 
   // 모달이 닫힐 때 하이라이트 제거
   useEffect(() => {

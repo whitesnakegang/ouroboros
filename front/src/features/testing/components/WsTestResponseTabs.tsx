@@ -4,11 +4,11 @@ import { useTestingStore } from "../store/testing.store";
 import { MessageDetailModal } from "./MessageDetailModal";
 import type { WebSocketMessage } from "../store/testing.store";
 // JSON 포맷팅을 위한 간단한 컴포넌트
-const JsonHighlighter = ({ 
-  code, 
-  isSent 
-}: { 
-  code: string; 
+const JsonHighlighter = ({
+  code,
+  isSent,
+}: {
+  code: string;
   isSent: boolean;
 }) => {
   const formatJson = (text: string): string => {
@@ -21,15 +21,15 @@ const JsonHighlighter = ({
 
   const highlightJson = (jsonStr: string): React.ReactElement => {
     const formatted = formatJson(jsonStr);
-    const lines = formatted.split('\n');
-    
+    const lines = formatted.split("\n");
+
     return (
       <>
         {lines.map((line, lineIndex) => {
           // 간단한 JSON 하이라이팅
           const parts: (string | React.ReactElement)[] = [];
           let lastIndex = 0;
-          
+
           // 키 (따옴표로 감싸진 문자열 뒤에 콜론)
           const keyMatch = line.match(/("(?:[^"\\]|\\.)*")\s*:/);
           if (keyMatch && keyMatch.index !== undefined) {
@@ -37,63 +37,87 @@ const JsonHighlighter = ({
               parts.push(line.substring(lastIndex, keyMatch.index));
             }
             parts.push(
-              <span key={`key-${lineIndex}`} className={isSent ? "text-blue-300" : "text-blue-400"}>
+              <span
+                key={`key-${lineIndex}`}
+                className={isSent ? "text-blue-300" : "text-blue-400"}
+              >
                 {keyMatch[0]}
               </span>
             );
             lastIndex = keyMatch.index + keyMatch[0].length;
           }
-          
+
           // 문자열 값
           const stringValueMatch = line.match(/:\s*("(?:[^"\\]|\\.)*")/);
-          if (stringValueMatch && stringValueMatch.index !== undefined && stringValueMatch.index >= lastIndex) {
+          if (
+            stringValueMatch &&
+            stringValueMatch.index !== undefined &&
+            stringValueMatch.index >= lastIndex
+          ) {
             if (stringValueMatch.index > lastIndex) {
               parts.push(line.substring(lastIndex, stringValueMatch.index));
             }
             parts.push(
-              <span key={`str-${lineIndex}`} className={isSent ? "text-green-300" : "text-green-400"}>
+              <span
+                key={`str-${lineIndex}`}
+                className={isSent ? "text-green-300" : "text-green-400"}
+              >
                 {stringValueMatch[0]}
               </span>
             );
             lastIndex = stringValueMatch.index + stringValueMatch[0].length;
           }
-          
+
           // 숫자 값
           const numberMatch = line.match(/:\s*(\d+\.?\d*)/);
-          if (numberMatch && numberMatch.index !== undefined && numberMatch.index >= lastIndex) {
+          if (
+            numberMatch &&
+            numberMatch.index !== undefined &&
+            numberMatch.index >= lastIndex
+          ) {
             if (numberMatch.index > lastIndex) {
               parts.push(line.substring(lastIndex, numberMatch.index));
             }
             parts.push(
-              <span key={`num-${lineIndex}`} className={isSent ? "text-yellow-300" : "text-yellow-400"}>
+              <span
+                key={`num-${lineIndex}`}
+                className={isSent ? "text-yellow-300" : "text-yellow-400"}
+              >
                 {numberMatch[0]}
               </span>
             );
             lastIndex = numberMatch.index + numberMatch[0].length;
           }
-          
+
           // boolean/null 값
           const boolMatch = line.match(/:\s*(true|false|null)\b/);
-          if (boolMatch && boolMatch.index !== undefined && boolMatch.index >= lastIndex) {
+          if (
+            boolMatch &&
+            boolMatch.index !== undefined &&
+            boolMatch.index >= lastIndex
+          ) {
             if (boolMatch.index > lastIndex) {
               parts.push(line.substring(lastIndex, boolMatch.index));
             }
             parts.push(
-              <span key={`bool-${lineIndex}`} className={isSent ? "text-purple-300" : "text-purple-400"}>
+              <span
+                key={`bool-${lineIndex}`}
+                className={isSent ? "text-purple-300" : "text-purple-400"}
+              >
                 {boolMatch[0]}
               </span>
             );
             lastIndex = boolMatch.index + boolMatch[0].length;
           }
-          
+
           if (lastIndex < line.length) {
             parts.push(line.substring(lastIndex));
           }
-          
+
           return (
             <span key={lineIndex}>
               {parts.length > 0 ? parts : line}
-              {lineIndex < lines.length - 1 && '\n'}
+              {lineIndex < lines.length - 1 && "\n"}
             </span>
           );
         })}
@@ -102,26 +126,24 @@ const JsonHighlighter = ({
   };
 
   return (
-    <pre className={`p-3 text-sm font-mono overflow-x-auto rounded ${
-      isSent 
-        ? "bg-black/20 text-white" 
-        : "bg-[#1e1e1e] text-[#d4d4d4]"
-    }`}>
+    <pre
+      className={`p-3 text-sm font-mono overflow-x-auto rounded ${
+        isSent ? "bg-black/20 text-white" : "bg-[#1e1e1e] text-[#d4d4d4]"
+      }`}
+    >
       <code>{highlightJson(code)}</code>
     </pre>
   );
 };
 
 export function WsTestResponseTabs() {
-  const {
-    wsMessages,
-    wsConnectionStatus,
-    wsStats,
-    wsConnectionStartTime,
-  } = useTestingStore();
+  const { wsMessages, wsConnectionStatus, wsStats, wsConnectionStartTime } =
+    useTestingStore();
   // removed unused selectedEndpoint
 
-  const [messageFilter, setMessageFilter] = useState<"all" | "sent" | "received">("all");
+  const [messageFilter, setMessageFilter] = useState<
+    "all" | "sent" | "received"
+  >("all");
   const [searchQuery, setSearchQuery] = useState<string>(() => {
     try {
       return localStorage.getItem("ws-log-search") || "";
@@ -130,7 +152,8 @@ export function WsTestResponseTabs() {
     }
   });
   const [isJsonFormatted, setIsJsonFormatted] = useState(true);
-  const [selectedMessage, setSelectedMessage] = useState<WebSocketMessage | null>(null);
+  const [selectedMessage, setSelectedMessage] =
+    useState<WebSocketMessage | null>(null);
   const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -165,8 +188,12 @@ export function WsTestResponseTabs() {
   });
 
   // 받은 값과 보낸 값 분리
-  const receivedMessages = filteredMessages.filter((msg) => msg.direction === "received");
-  const sentMessages = filteredMessages.filter((msg) => msg.direction === "sent");
+  const receivedMessages = filteredMessages.filter(
+    (msg) => msg.direction === "received"
+  );
+  const sentMessages = filteredMessages.filter(
+    (msg) => msg.direction === "sent"
+  );
 
   const handleMessageClick = (message: WebSocketMessage) => {
     setSelectedMessage(message);
@@ -267,15 +294,35 @@ export function WsTestResponseTabs() {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-[#8B949E]">
               <div className="flex items-center gap-1">
-                <svg className="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
+                <svg
+                  className="w-3.5 h-3.5 text-blue-500"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M7 11l5-5m0 0l5 5m-5-5v12"
+                  />
                 </svg>
                 <span className="font-medium">{wsStats.totalSent}</span>
               </div>
               <div className="w-px h-4 bg-gray-300 dark:bg-[#2D333B]"></div>
               <div className="flex items-center gap-1">
-                <svg className="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
+                <svg
+                  className="w-3.5 h-3.5 text-green-500"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M17 13l-5 5m0 0l-5-5m5 5V6"
+                  />
                 </svg>
                 <span className="font-medium">{wsStats.totalReceived}</span>
               </div>
@@ -344,7 +391,9 @@ function ResponseContent({
   messagesEndRef: React.RefObject<HTMLDivElement | null>;
   onMessageClick: (message: WebSocketMessage) => void;
 }) {
-  const allMessages = [...sentMessages, ...receivedMessages].sort((a, b) => a.timestamp - b.timestamp);
+  const allMessages = [...sentMessages, ...receivedMessages].sort(
+    (a, b) => a.timestamp - b.timestamp
+  );
 
   return (
     <div>
@@ -382,8 +431,18 @@ function ResponseContent({
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-[#8B949E]"
                 title="검색어 지우기 (Esc)"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             )}
@@ -409,8 +468,18 @@ function ResponseContent({
                   : "text-gray-700 dark:text-[#8B949E] hover:bg-gray-100 dark:hover:bg-[#0D1117]"
               }`}
             >
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
+              <svg
+                className="w-3 h-3"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M7 11l5-5m0 0l5 5m-5-5v12"
+                />
               </svg>
               Sent
             </button>
@@ -422,8 +491,18 @@ function ResponseContent({
                   : "text-gray-700 dark:text-[#8B949E] hover:bg-gray-100 dark:hover:bg-[#0D1117]"
               }`}
             >
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
+              <svg
+                className="w-3 h-3"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17 13l-5 5m0 0l-5-5m5 5V6"
+                />
               </svg>
               Received
             </button>
@@ -445,8 +524,18 @@ function ResponseContent({
               onClick={() => exportMessages("json")}
               className="px-3 py-1.5 text-xs font-medium bg-white dark:bg-[#161B22] text-gray-700 dark:text-[#8B949E] hover:bg-gray-100 dark:hover:bg-[#0D1117] rounded-md transition-colors border border-gray-300 dark:border-[#2D333B] flex items-center gap-1.5"
             >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                />
               </svg>
               Export
             </button>
@@ -476,7 +565,8 @@ function ResponseContent({
           <p className="text-xs mt-1 text-gray-500 dark:text-[#6B7280]">
             {searchQuery ? (
               <>
-                검색어 "<span className="font-mono">{searchQuery}</span>"에 해당하는 메시지가 없습니다.
+                검색어 "<span className="font-mono">{searchQuery}</span>"에
+                해당하는 메시지가 없습니다.
               </>
             ) : (
               <>연결 후 메시지를 전송하거나 수신하면 여기에 표시됩니다</>
@@ -554,16 +644,31 @@ function MessageBubble({
         }`}
       >
         {/* Direction Icon */}
-        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-          isSent
-            ? "bg-blue-500 text-white"
-            : "bg-green-500 text-white"
-        }`}>
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div
+          className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+            isSent ? "bg-blue-500 text-white" : "bg-green-500 text-white"
+          }`}
+        >
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
             {isSent ? (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M7 11l5-5m0 0l5 5m-5-5v12"
+              />
             ) : (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17 13l-5 5m0 0l-5-5m5 5V6"
+              />
             )}
           </svg>
         </div>
@@ -572,11 +677,13 @@ function MessageBubble({
         <div className="flex-1 min-w-0">
           {/* Header */}
           <div className="flex items-center gap-2 mb-2">
-            <span className={`text-xs font-bold uppercase tracking-wide ${
-              isSent
-                ? "text-blue-700 dark:text-blue-400"
-                : "text-green-700 dark:text-green-400"
-            }`}>
+            <span
+              className={`text-xs font-bold uppercase tracking-wide ${
+                isSent
+                  ? "text-blue-700 dark:text-blue-400"
+                  : "text-green-700 dark:text-green-400"
+              }`}
+            >
               {isSent ? "Sent" : "Received"}
             </span>
             <span className="text-xs text-gray-500 dark:text-[#8B949E]">
@@ -591,9 +698,24 @@ function MessageBubble({
 
           {/* Destination/Address */}
           <div className="mb-3 flex items-center gap-2">
-            <svg className="w-3.5 h-3.5 text-gray-400 dark:text-[#8B949E]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            <svg
+              className="w-3.5 h-3.5 text-gray-400 dark:text-[#8B949E]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+              />
             </svg>
             <span className="text-xs font-mono text-gray-700 dark:text-[#E6EDF3]">
               {message.address}
@@ -604,14 +726,15 @@ function MessageBubble({
           <div className="relative">
             {isJson ? (
               <div className="rounded-md overflow-hidden border border-gray-200 dark:border-[#2D333B]">
-                <JsonHighlighter 
-                  code={message.content} 
-                  isSent={isSent}
-                />
+                <JsonHighlighter code={message.content} isSent={isSent} />
               </div>
             ) : (
               <div className="whitespace-pre-wrap break-words text-sm font-mono bg-white dark:bg-[#0D1117] p-3 rounded-md border border-gray-200 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3]">
-                {message.content || <span className="text-gray-400 dark:text-[#8B949E] italic">(empty)</span>}
+                {message.content || (
+                  <span className="text-gray-400 dark:text-[#8B949E] italic">
+                    (empty)
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -889,4 +1012,3 @@ export function TestContent({
     </div>
   );
 }
-
