@@ -7,9 +7,13 @@ import type { WebSocketMessage } from "../store/testing.store";
 const JsonHighlighter = ({
   code,
   isSent,
+  useMonospace = true,
+  softWrap = true,
 }: {
   code: string;
   isSent: boolean;
+  useMonospace?: boolean;
+  softWrap?: boolean;
 }) => {
   const formatJson = (text: string): string => {
     try {
@@ -125,11 +129,17 @@ const JsonHighlighter = ({
     );
   };
 
+  const fontClass = useMonospace ? "font-mono" : "font-sans";
+  const wrapClass = softWrap
+    ? "whitespace-pre-wrap break-words"
+    : "whitespace-pre";
+
   return (
     <pre
-      className={`p-3 text-sm font-mono overflow-x-auto rounded ${
+      tabIndex={0}
+      className={`p-3 text-sm ${fontClass} ${wrapClass} overflow-x-auto rounded ${
         isSent ? "bg-black/20 text-white" : "bg-[#1e1e1e] text-[#d4d4d4]"
-      }`}
+      } focus-visible:outline-none focus-visible:[box-shadow:inset_2px_0_0_#3B82F6] dark:focus-visible:[box-shadow:inset_2px_0_0_#60A5FA]`}
     >
       <code>{highlightJson(code)}</code>
     </pre>
@@ -169,7 +179,9 @@ export function WsTestResponseTabs() {
   useEffect(() => {
     try {
       localStorage.setItem("ws-log-search", searchQuery);
-    } catch {}
+    } catch {
+      // no-op: localStorage not available
+    }
   }, [searchQuery]);
 
   // 필터링된 메시지
@@ -394,6 +406,7 @@ function ResponseContent({
   const allMessages = [...sentMessages, ...receivedMessages].sort(
     (a, b) => a.timestamp - b.timestamp
   );
+  const isCompact = allMessages.length >= 200;
 
   return (
     <div>
@@ -510,15 +523,28 @@ function ResponseContent({
 
           {/* Options */}
           <div className="flex items-center gap-2 ml-auto">
-            <label className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-[#8B949E] hover:bg-white dark:hover:bg-[#161B22] rounded-md transition-colors cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isJsonFormatted}
-                onChange={(e) => setIsJsonFormatted(e.target.checked)}
-                className="rounded"
-              />
-              Format JSON
-            </label>
+            <div className="inline-flex rounded-md border border-gray-300 dark:border-[#2D333B] overflow-hidden">
+              <button
+                onClick={() => setIsJsonFormatted(true)}
+                className={`px-3 py-1.5 text-xs ${
+                  isJsonFormatted
+                    ? "bg-[#2563EB] text-white"
+                    : "bg-white dark:bg-[#161B22] text-gray-700 dark:text-[#8B949E]"
+                }`}
+              >
+                Pretty
+              </button>
+              <button
+                onClick={() => setIsJsonFormatted(false)}
+                className={`px-3 py-1.5 text-xs ${
+                  !isJsonFormatted
+                    ? "bg-[#2563EB] text-white"
+                    : "bg-white dark:bg-[#161B22] text-gray-700 dark:text-[#8B949E]"
+                }`}
+              >
+                Raw
+              </button>
+            </div>
 
             <button
               onClick={() => exportMessages("json")}
@@ -597,14 +623,78 @@ function ResponseContent({
         </div>
       ) : (
         <div className="space-y-3 max-h-[600px] overflow-y-auto">
-          {allMessages.map((message) => (
-            <MessageBubble
-              key={message.id}
-              message={message}
-              formatTimestamp={formatTimestamp}
-              onClick={() => onMessageClick(message)}
-            />
-          ))}
+          {(() => {
+            const rows: React.ReactElement[] = [];
+            const thresholdMs = 30000;
+            for (let i = 0; i < allMessages.length; i++) {
+              const message = allMessages[i];
+              const prev = i > 0 ? allMessages[i - 1] : null;
+              // Divider for long gaps
+              if (prev) {
+                const delta = message.timestamp - prev.timestamp;
+                if (delta >= thresholdMs) {
+                  const sec = Math.floor(delta / 1000);
+                  const min = Math.floor(sec / 60);
+                  const gapLabel =
+                    min > 0 ? `+${min}m ${sec % 60}s` : `+${sec}s`;
+                  rows.push(
+                    <div
+                      key={`divider-${message.id}`}
+                      className="flex items-center gap-3 my-2"
+                    >
+                      <div className="h-px flex-1 bg-gray-200 dark:bg-[#2D333B]" />
+                      <span className="text-[10px] text-gray-500 dark:text-[#8B949E] px-2 py-0.5 rounded-full bg-gray-50 dark:bg-[#0D1117] border border-gray-200 dark:border-[#2D333B]">
+                        {formatTimestamp(message.timestamp)} {gapLabel}
+                      </span>
+                      <div className="h-px flex-1 bg-gray-200 dark:bg-[#2D333B]" />
+                    </div>
+                  );
+                }
+              }
+              // Group header for 3+ same-direction run
+              const isGroupStart =
+                i === 0 || (prev && prev.direction !== message.direction);
+              if (isGroupStart) {
+                let run = 1;
+                for (let j = i + 1; j < allMessages.length; j++) {
+                  if (allMessages[j].direction === message.direction) run++;
+                  else break;
+                }
+                if (run >= 3) {
+                  rows.push(
+                    <div
+                      key={`group-${message.id}`}
+                      className="mt-2 mb-1 flex items-center gap-2"
+                    >
+                      <span
+                        className={`text-[11px] font-semibold ${
+                          message.direction === "sent"
+                            ? "text-blue-700 dark:text-blue-400"
+                            : "text-green-700 dark:text-green-400"
+                        }`}
+                      >
+                        {message.direction === "sent" ? "Sent" : "Received"} ·{" "}
+                        {run}
+                      </span>
+                      <div className="h-px flex-1 bg-gray-200 dark:bg-[#2D333B]" />
+                    </div>
+                  );
+                }
+              }
+              rows.push(
+                <MessageBubble
+                  key={message.id}
+                  message={message}
+                  formatTimestamp={formatTimestamp}
+                  prevTimestamp={prev ? prev.timestamp : null}
+                  isJsonFormatted={isJsonFormatted}
+                  compactMode={isCompact}
+                  onClick={() => onMessageClick(message)}
+                />
+              );
+            }
+            return rows;
+          })()}
           <div ref={messagesEndRef} />
         </div>
       )}
@@ -615,10 +705,20 @@ function ResponseContent({
 function MessageBubble({
   message,
   formatTimestamp,
+  prevTimestamp = null,
+  isJsonFormatted = true,
+  useMonospace = true,
+  softWrap = true,
+  compactMode = false,
   onClick,
 }: {
   message: WebSocketMessage;
   formatTimestamp: (timestamp: number) => string;
+  prevTimestamp?: number | null;
+  isJsonFormatted?: boolean;
+  useMonospace?: boolean;
+  softWrap?: boolean;
+  compactMode?: boolean;
   onClick?: () => void;
 }) {
   const isSent = message.direction === "sent";
@@ -631,11 +731,32 @@ function MessageBubble({
     }
   })();
 
+  const relativeBadge = (() => {
+    if (!prevTimestamp) return null;
+    const deltaMs = message.timestamp - prevTimestamp;
+    if (deltaMs < 0) return null;
+    const sec = (deltaMs / 1000).toFixed(1);
+    return (
+      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-[#0D1117] text-gray-600 dark:text-[#8B949E]">
+        +{sec}s
+      </span>
+    );
+  })();
+
   return (
     <div className="group relative">
       <div
         onClick={onClick}
-        className={`flex items-start gap-3 p-4 rounded-lg border transition-all hover:shadow-md ${
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (onClick && (e.key === "Enter" || e.key === " ")) {
+            e.preventDefault();
+            onClick();
+          }
+        }}
+        className={`flex items-start gap-3 ${
+          compactMode ? "p-3" : "p-4"
+        } rounded-lg border transition-all hover:shadow-md focus-visible:outline-none focus-visible:[box-shadow:inset_2px_0_0_#3B82F6] dark:focus-visible:[box-shadow:inset_2px_0_0_#60A5FA] ${
           onClick ? "cursor-pointer" : ""
         } ${
           isSent
@@ -686,9 +807,10 @@ function MessageBubble({
             >
               {isSent ? "Sent" : "Received"}
             </span>
-            <span className="text-xs text-gray-500 dark:text-[#8B949E]">
+            <span className="text-xs text-gray-600 dark:text-[#C9D1D9]">
               {formatTimestamp(message.timestamp)}
             </span>
+            {relativeBadge}
             {message.tryId && (
               <span className="ml-auto text-xs font-mono text-gray-500 dark:text-[#8B949E] opacity-0 group-hover:opacity-100 transition-opacity">
                 #{message.tryId.slice(0, 8)}
@@ -697,9 +819,13 @@ function MessageBubble({
           </div>
 
           {/* Destination/Address */}
-          <div className="mb-3 flex items-center gap-2">
+          <div
+            className={`${
+              compactMode ? "mb-2" : "mb-3"
+            } flex items-center gap-2`}
+          >
             <svg
-              className="w-3.5 h-3.5 text-gray-400 dark:text-[#8B949E]"
+              className="w-3.5 h-3.5 text-gray-400 dark:text-[#C9D1D9]"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -724,14 +850,25 @@ function MessageBubble({
 
           {/* Body */}
           <div className="relative">
-            {isJson ? (
+            {isJson && isJsonFormatted ? (
               <div className="rounded-md overflow-hidden border border-gray-200 dark:border-[#2D333B]">
-                <JsonHighlighter code={message.content} isSent={isSent} />
+                <JsonHighlighter
+                  code={message.content}
+                  isSent={isSent}
+                  useMonospace={useMonospace}
+                  softWrap={softWrap}
+                />
               </div>
             ) : (
-              <div className="whitespace-pre-wrap break-words text-sm font-mono bg-white dark:bg-[#0D1117] p-3 rounded-md border border-gray-200 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3]">
+              <div
+                className={`${
+                  compactMode ? "text-[12px]" : "text-sm"
+                } font-mono whitespace-pre-wrap break-words bg-white dark:bg-[#0D1117] ${
+                  compactMode ? "p-2" : "p-3"
+                } rounded-md border border-gray-200 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3]`}
+              >
                 {message.content || (
-                  <span className="text-gray-400 dark:text-[#8B949E] italic">
+                  <span className="text-gray-500 dark:text-[#C9D1D9] italic">
                     (empty)
                   </span>
                 )}
@@ -744,6 +881,16 @@ function MessageBubble({
   );
 }
 
+interface TryMethodLite {
+  spanId?: string;
+  name: string;
+  className: string;
+  parameters?: Array<{ type: string; name: string }>;
+  selfDurationMs: number;
+  selfPercentage: number;
+  percentage?: number;
+}
+
 export function TestContent({
   methodList,
   totalDurationMs,
@@ -753,7 +900,7 @@ export function TestContent({
   onShowTrace,
   isLoadingTrace,
 }: {
-  methodList: any[] | null;
+  methodList: TryMethodLite[] | null;
   totalDurationMs: number | null;
   isMockEndpoint: boolean;
   isLoading: boolean;
@@ -954,7 +1101,7 @@ export function TestContent({
           메서드별 실행 시간 ({methodList.length}개)
         </div>
         <div className="space-y-2">
-          {methodList.map((method: any, index: number) => (
+          {methodList.map((method: TryMethodLite, index: number) => (
             <div
               key={method.spanId || index}
               onClick={() => onShowTrace(method.spanId)}
@@ -971,7 +1118,10 @@ export function TestContent({
                   {method.parameters && method.parameters.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1">
                       {method.parameters.map(
-                        (param: any, paramIndex: number) => (
+                        (
+                          param: { type: string; name: string },
+                          paramIndex: number
+                        ) => (
                           <span
                             key={paramIndex}
                             className="px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded"
