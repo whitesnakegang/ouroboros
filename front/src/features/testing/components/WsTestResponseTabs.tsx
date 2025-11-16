@@ -122,7 +122,13 @@ export function WsTestResponseTabs() {
   // removed unused selectedEndpoint
 
   const [messageFilter, setMessageFilter] = useState<"all" | "sent" | "received">("all");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState<string>(() => {
+    try {
+      return localStorage.getItem("ws-log-search") || "";
+    } catch {
+      return "";
+    }
+  });
   const [isJsonFormatted, setIsJsonFormatted] = useState(true);
   const [selectedMessage, setSelectedMessage] = useState<WebSocketMessage | null>(null);
   const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
@@ -136,6 +142,12 @@ export function WsTestResponseTabs() {
     }
   }, [wsMessages]);
 
+  // 검색어 저장 (항상 입력창 유지 및 복원)
+  useEffect(() => {
+    try {
+      localStorage.setItem("ws-log-search", searchQuery);
+    } catch {}
+  }, [searchQuery]);
 
   // 필터링된 메시지
   const filteredMessages = wsMessages.filter((msg) => {
@@ -333,36 +345,10 @@ function ResponseContent({
   onMessageClick: (message: WebSocketMessage) => void;
 }) {
   const allMessages = [...sentMessages, ...receivedMessages].sort((a, b) => a.timestamp - b.timestamp);
-  
-  if (allMessages.length === 0) {
-    return (
-      <div className="text-center py-12 text-gray-600 dark:text-[#8B949E]">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] flex items-center justify-center">
-          <svg
-            className="w-8 h-8 text-gray-500 dark:text-[#8B949E]"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
-            />
-          </svg>
-        </div>
-        <p className="text-sm">메시지가 없습니다</p>
-        <p className="text-xs mt-1 text-gray-500 dark:text-[#6B7280]">
-          연결 후 메시지를 전송하거나 수신하면 여기에 표시됩니다
-        </p>
-      </div>
-    );
-  }
 
   return (
     <div>
-      {/* Filters & Actions Bar */}
+      {/* Filters & Actions Bar (상단 고정 해제) */}
       <div className="mb-4 bg-gray-50 dark:bg-[#0D1117] border border-gray-200 dark:border-[#2D333B] rounded-md p-3">
         <div className="flex flex-wrap items-center gap-3">
           {/* Search Bar */}
@@ -384,9 +370,23 @@ function ResponseContent({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setSearchQuery("");
+              }}
               placeholder="Search messages..."
-              className="w-full pl-9 pr-3 py-2 text-sm rounded-md bg-white dark:bg-[#161B22] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
+              className="w-full pl-9 pr-9 py-2 text-sm rounded-md bg-white dark:bg-[#161B22] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
             />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-[#8B949E]"
+                title="검색어 지우기 (Esc)"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
           </div>
 
           {/* Filter Buttons */}
@@ -454,18 +454,70 @@ function ResponseContent({
         </div>
       </div>
 
-      {/* Message Log - 시간순 정렬 */}
-      <div className="space-y-3 max-h-[600px] overflow-y-auto">
-        {allMessages.map((message) => (
-          <MessageBubble
-            key={message.id}
-            message={message}
-            formatTimestamp={formatTimestamp}
-            onClick={() => onMessageClick(message)}
-          />
-        ))}
-        <div ref={messagesEndRef} />
-      </div>
+      {/* Message Log 또는 빈 상태 */}
+      {allMessages.length === 0 ? (
+        <div className="text-center py-12 text-gray-600 dark:text-[#8B949E]">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] flex items-center justify-center">
+            <svg
+              className="w-8 h-8 text-gray-500 dark:text-[#8B949E]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
+              />
+            </svg>
+          </div>
+          <p className="text-sm">메시지가 없습니다</p>
+          <p className="text-xs mt-1 text-gray-500 dark:text-[#6B7280]">
+            {searchQuery ? (
+              <>
+                검색어 "<span className="font-mono">{searchQuery}</span>"에 해당하는 메시지가 없습니다.
+              </>
+            ) : (
+              <>연결 후 메시지를 전송하거나 수신하면 여기에 표시됩니다</>
+            )}
+          </p>
+          {(searchQuery || messageFilter !== "all") && (
+            <div className="mt-3 flex items-center justify-center gap-2">
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="px-3 py-1.5 text-xs border rounded-md"
+                  title="검색 초기화"
+                >
+                  검색 초기화
+                </button>
+              )}
+              {messageFilter !== "all" && (
+                <button
+                  onClick={() => setMessageFilter("all")}
+                  className="px-3 py-1.5 text-xs border rounded-md"
+                  title="필터 초기화"
+                >
+                  필터 초기화
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-3 max-h-[600px] overflow-y-auto">
+          {allMessages.map((message) => (
+            <MessageBubble
+              key={message.id}
+              message={message}
+              formatTimestamp={formatTimestamp}
+              onClick={() => onMessageClick(message)}
+            />
+          ))}
+          <div ref={messagesEndRef} />
+        </div>
+      )}
     </div>
   );
 }
