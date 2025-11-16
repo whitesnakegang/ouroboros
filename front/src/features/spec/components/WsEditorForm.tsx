@@ -297,17 +297,7 @@ export function WsEditorForm({
     setIsReplySchemaModalOpen(false);
   };
 
-  // Diff 불일치 메시지 생성
-  const getDiffMessage = (diffType?: string) => {
-    switch (diffType) {
-      case "payload":
-        return "메시지 Payload 구조가 명세와 실제 구현이 다릅니다.";
-      case "channel":
-        return "Channel 정보가 명세와 실제 구현이 다릅니다.";
-      default:
-        return "명세서가 실제 구현과 일치하지 않습니다.";
-    }
-  };
+  // removed unused getDiffMessage
 
   // Diff 타입별 상세 정보 (REST DiffNotification 스타일과 동일)
   const getDiffDetails = (diffType?: string) => {

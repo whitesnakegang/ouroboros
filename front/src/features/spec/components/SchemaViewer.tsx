@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import type { SchemaField, SchemaType } from "../types/schema.types";
 import {
   isPrimitiveSchema,
@@ -65,7 +65,7 @@ export function SchemaViewer({
     loadSchemaFields();
   }, [schemaRef]);
   // SchemaField를 재귀적으로 렌더링하는 함수
-  const renderField = (field: SchemaField, depth: number = 0): JSX.Element => {
+  const renderField = (field: SchemaField, depth: number = 0): React.ReactElement => {
     const getTypeString = (schemaType: SchemaType): string => {
       if (isPrimitiveSchema(schemaType)) {
         return schemaType.type;

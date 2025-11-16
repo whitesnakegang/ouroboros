@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { deleteSchema, deleteWebSocketSchema } from "../services/api";
 import type { SchemaResponse } from "../services/api";
 import type { SchemaField } from "../types/schema.types";

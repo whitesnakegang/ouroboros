@@ -1,5 +1,4 @@
-import { Button } from "@/ui/Button";
-import { Badge } from "@/ui/Badge";
+// removed unused UI imports
 
 interface DiffDetails {
   type: "request" | "response" | "endpoint" | "both";

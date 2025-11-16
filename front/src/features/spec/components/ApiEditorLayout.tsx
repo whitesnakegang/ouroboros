@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback, useRef } from "react";
 import { ApiRequestCard } from "./ApiRequestCard";
 import { ApiResponseCard } from "./ApiResponseCard";
@@ -20,6 +21,8 @@ import {
   importWebSocketYaml,
 } from "../services/api";
 import { MarkdownPreviewModal } from "./MarkdownPreviewModal";
+// FilenameOptions removed
+import { WsChannelMessageTree } from "./WsChannelMessageTree";
 import {
   createRestApiSpec,
   updateRestApiSpec,
@@ -115,6 +118,7 @@ export function ApiEditorLayout() {
   const [mdPreviewFilename, setMdPreviewFilename] = useState(
     "API_DOCUMENTATION.md"
   );
+  // Removed filename option states; use automatic filenames instead
 
   // Diff가 있는지 확인 (boolean으로 명시적 변환)
   const hasDiff = !!(
@@ -1814,17 +1818,13 @@ export function ApiEditorLayout() {
                         const wsYaml = await exportWebSocketYaml();
                         const wsMd = convertWsYamlToMarkdown(wsYaml);
                         setMdPreviewContent(wsMd);
-                        setMdPreviewFilename(
-                          `WS_API_DOCUMENTATION_${new Date().getTime()}.md`
-                        );
+                        setMdPreviewFilename("WS_API_DOCUMENTATION.md");
                         setIsMdPreviewOpen(true);
                       } else {
                         const yaml = await exportYaml();
                         const md = convertYamlToMarkdown(yaml);
                         setMdPreviewContent(md);
-                        setMdPreviewFilename(
-                          `API_DOCUMENTATION_${new Date().getTime()}.md`
-                        );
+                        setMdPreviewFilename("API_DOCUMENTATION.md");
                         setIsMdPreviewOpen(true);
                       }
                     } catch (e) {
@@ -1861,11 +1861,9 @@ export function ApiEditorLayout() {
                           : await exportYaml();
                       downloadYaml(
                         yaml,
-                        `${
-                          protocol === "WebSocket"
-                            ? "ourowebsocket"
-                            : "ourorest"
-                        }_${new Date().getTime()}.yml`
+                        protocol === "WebSocket"
+                          ? "ourowebsocket.yml"
+                          : "ourorest.yml"
                       );
                       alert("YAML 파일이 다운로드되었습니다.");
                     } catch (e) {
@@ -2653,6 +2651,13 @@ export function ApiEditorLayout() {
         onClose={() => setIsCodeSnippetOpen(false)}
         spec={currentSpec}
       />
+
+      {/* WebSocket Channels/Messages Tree */}
+      {protocol === "WebSocket" && activeTab === "form" && (
+        <div className="px-6 py-4">
+          <WsChannelMessageTree />
+        </div>
+      )}
 
       {/* Import Result Modal */}
       {importResult && (

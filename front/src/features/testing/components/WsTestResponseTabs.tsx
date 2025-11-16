@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useTestingStore } from "../store/testing.store";
-import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
+// removed unused useSidebarStore import
 import { MessageDetailModal } from "./MessageDetailModal";
 import type { WebSocketMessage } from "../store/testing.store";
 // JSON 포맷팅을 위한 간단한 컴포넌트
@@ -19,7 +19,7 @@ const JsonHighlighter = ({
     }
   };
 
-  const highlightJson = (jsonStr: string): JSX.Element => {
+  const highlightJson = (jsonStr: string): React.ReactElement => {
     const formatted = formatJson(jsonStr);
     const lines = formatted.split('\n');
     
@@ -27,7 +27,7 @@ const JsonHighlighter = ({
       <>
         {lines.map((line, lineIndex) => {
           // 간단한 JSON 하이라이팅
-          const parts: (string | JSX.Element)[] = [];
+          const parts: (string | React.ReactElement)[] = [];
           let lastIndex = 0;
           
           // 키 (따옴표로 감싸진 문자열 뒤에 콜론)
@@ -119,7 +119,7 @@ export function WsTestResponseTabs() {
     wsStats,
     wsConnectionStartTime,
   } = useTestingStore();
-  const { selectedEndpoint } = useSidebarStore();
+  // removed unused selectedEndpoint
 
   const [messageFilter, setMessageFilter] = useState<"all" | "sent" | "received">("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -187,16 +187,7 @@ export function WsTestResponseTabs() {
     return `${hours}:${minutes}:${seconds}.${milliseconds}`;
   };
 
-  // JSON 포맷팅
-  const formatContent = (content: string): string => {
-    if (!isJsonFormatted) return content;
-    try {
-      const parsed = JSON.parse(content);
-      return JSON.stringify(parsed, null, 2);
-    } catch {
-      return content;
-    }
-  };
+  // JSON 포맷팅은 렌더 단계에서 처리
 
   // 메시지 로그 내보내기
   const exportMessages = (format: "json" | "csv") => {
@@ -293,7 +284,6 @@ export function WsTestResponseTabs() {
           isJsonFormatted={isJsonFormatted}
           setIsJsonFormatted={setIsJsonFormatted}
           formatTimestamp={formatTimestamp}
-          formatContent={formatContent}
           exportMessages={exportMessages}
           messagesEndRef={messagesEndRef}
           onMessageClick={handleMessageClick}
@@ -325,7 +315,6 @@ function ResponseContent({
   isJsonFormatted,
   setIsJsonFormatted,
   formatTimestamp,
-  formatContent,
   exportMessages,
   messagesEndRef,
   onMessageClick,
@@ -339,9 +328,8 @@ function ResponseContent({
   isJsonFormatted: boolean;
   setIsJsonFormatted: (formatted: boolean) => void;
   formatTimestamp: (timestamp: number) => string;
-  formatContent: (content: string) => string;
   exportMessages: (format: "json" | "csv") => void;
-  messagesEndRef: React.RefObject<HTMLDivElement>;
+  messagesEndRef: React.RefObject<HTMLDivElement | null>;
   onMessageClick: (message: WebSocketMessage) => void;
 }) {
   const allMessages = [...sentMessages, ...receivedMessages].sort((a, b) => a.timestamp - b.timestamp);
@@ -473,7 +461,6 @@ function ResponseContent({
             key={message.id}
             message={message}
             formatTimestamp={formatTimestamp}
-            formatContent={formatContent}
             onClick={() => onMessageClick(message)}
           />
         ))}
@@ -486,12 +473,10 @@ function ResponseContent({
 function MessageBubble({
   message,
   formatTimestamp,
-  formatContent,
   onClick,
 }: {
   message: WebSocketMessage;
   formatTimestamp: (timestamp: number) => string;
-  formatContent: (content: string) => string;
   onClick?: () => void;
 }) {
   const isSent = message.direction === "sent";
@@ -593,7 +578,7 @@ export function TestContent({
   onShowTrace,
   isLoadingTrace,
 }: {
-  methodList: TryMethod[] | null;
+  methodList: any[] | null;
   totalDurationMs: number | null;
   isMockEndpoint: boolean;
   isLoading: boolean;
@@ -794,7 +779,7 @@ export function TestContent({
           메서드별 실행 시간 ({methodList.length}개)
         </div>
         <div className="space-y-2">
-          {methodList.map((method: TryMethod, index: number) => (
+          {methodList.map((method: any, index: number) => (
             <div
               key={method.spanId || index}
               onClick={() => onShowTrace(method.spanId)}

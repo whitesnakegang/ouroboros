@@ -185,12 +185,9 @@ export const useTestingStore = create<TestingState>((set) => ({
     connectionDuration: null,
   },
   updateWsStats: (stats) =>
-    set((state) => {
-      const statsUpdate = typeof stats === "function" ? stats(state.wsStats) : stats;
-      return {
-        wsStats: { ...state.wsStats, ...statsUpdate },
-      };
-    }),
+    set((state) => ({
+      wsStats: { ...state.wsStats, ...stats },
+    })),
   wsConnectionStartTime: null,
   setWsConnectionStartTime: (time) => set({ wsConnectionStartTime: time }),
 }));

@@ -16,8 +16,6 @@ export function Sidebar({ onAddNew }: SidebarProps) {
   );
 
   const {
-    isDarkMode,
-    toggleDarkMode,
     toggle,
     endpoints,
     loadEndpoints,

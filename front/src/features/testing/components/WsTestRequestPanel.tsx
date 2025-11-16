@@ -226,9 +226,7 @@ export function WsTestRequestPanel() {
                     tryId: tryIdHeader,
                   };
                   addWsMessage(tryMessage);
-                  updateWsStats((currentStats) => ({
-                    totalReceived: currentStats.totalReceived + 1,
-                  }));
+                  updateWsStats({ totalReceived: (wsStats?.totalReceived || 0) + 1 });
                 } catch (parseError) {
                   // 파싱 실패 시 원본 body 그대로 표시
                   const tryMessage = {
@@ -240,9 +238,7 @@ export function WsTestRequestPanel() {
                     tryId: tryIdHeader,
                   };
                   addWsMessage(tryMessage);
-                  updateWsStats((currentStats) => ({
-                    totalReceived: currentStats.totalReceived + 1,
-                  }));
+                  updateWsStats({ totalReceived: (wsStats?.totalReceived || 0) + 1 });
                 }
               });
             }
@@ -324,9 +320,7 @@ export function WsTestRequestPanel() {
           tryId: tryIdHeader || undefined,
         };
         addWsMessage(message);
-        updateWsStats((currentStats) => ({
-          totalReceived: currentStats.totalReceived + 1,
-        }));
+        updateWsStats({ totalReceived: (wsStats?.totalReceived || 0) + 1 });
       });
 
       if (existingSubscription) {
@@ -455,9 +449,7 @@ export function WsTestRequestPanel() {
         content: messageBody,
       };
       addWsMessage(message);
-      updateWsStats((currentStats) => ({
-        totalSent: currentStats.totalSent + 1,
-      }));
+      updateWsStats({ totalSent: (wsStats?.totalSent || 0) + 1 });
 
       // Content 초기화
       setContent("");
