@@ -1754,7 +1754,7 @@ export function ApiEditorLayout() {
           <div className="flex gap-1 border-b border-gray-200 dark:border-[#2D333B]">
             <button
               onClick={() => setActiveTab("form")}
-              className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+              className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 focus:outline-none focus-visible:outline-none ${
                 activeTab === "form"
                   ? "text-gray-900 dark:text-[#E6EDF3] border-[#2563EB]"
                   : "text-gray-500 dark:text-[#8B949E] border-transparent hover:text-gray-900 dark:hover:text-[#E6EDF3]"
@@ -1771,7 +1771,7 @@ export function ApiEditorLayout() {
                 setActiveTab("test");
               }}
               disabled={!selectedEndpoint}
-              className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+              className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 focus:outline-none focus-visible:outline-none ${
                 activeTab === "test"
                   ? "text-gray-900 dark:text-[#E6EDF3] border-[#2563EB]"
                   : "text-gray-500 dark:text-[#8B949E] border-transparent hover:text-gray-900 dark:hover:text-[#E6EDF3]"
@@ -1872,7 +1872,7 @@ export function ApiEditorLayout() {
                       alert(`YAML 내보내기에 실패했습니다.\n오류: ${errorMsg}`);
                     }
                   }}
-                  className="px-3 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-colors text-sm font-medium flex items-center gap-2"
+                  className="px-3 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none text-sm font-medium flex items-center gap-2"
                   title="API YAML 파일 생성"
                 >
                   <svg
@@ -1905,7 +1905,7 @@ export function ApiEditorLayout() {
                 {!isAuthorizationInputOpen ? (
                   <button
                     onClick={() => setIsAuthorizationInputOpen(true)}
-                    className={`px-3 py-2 rounded-md border transition-colors text-sm font-medium flex items-center gap-2 ${
+                    className={`px-3 py-2 rounded-md border transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus-visible:outline-none active:translate-y-[1px] ${
                       authorization && authorization.trim()
                         ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300"
                         : "bg-white dark:bg-[#0D1117] border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22]"
@@ -1997,7 +1997,7 @@ export function ApiEditorLayout() {
                 <button
                   onClick={handleRun}
                   disabled={isLoading}
-                  className="px-6 py-2 bg-[#2563EB] hover:bg-[#1E40AF] disabled:bg-gray-200 dark:disabled:bg-[#161B22] disabled:text-gray-400 dark:disabled:text-[#8B949E] text-white rounded-md transition-colors text-sm font-medium flex items-center gap-2 disabled:cursor-not-allowed"
+                  className="px-6 py-2 bg-[#2563EB] hover:bg-[#1E40AF] disabled:bg-gray-200 dark:disabled:bg-[#161B22] disabled:text-gray-400 dark:disabled:text-[#8B949E] text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none text-sm font-medium flex items-center gap-2 disabled:cursor-not-allowed"
                 >
                   {isLoading ? (
                     <>
@@ -2494,7 +2494,7 @@ export function ApiEditorLayout() {
                     <div className="flex gap-0.5 -mb-px">
                       <button
                         onClick={() => setSpecTab("request")}
-                        className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md border border-b-0 ${
+                        className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ${
                           specTab === "request"
                             ? "text-gray-900 dark:text-[#E6EDF3] bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] border-b-white dark:border-b-[#161B22] relative z-10"
                             : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
@@ -2504,7 +2504,7 @@ export function ApiEditorLayout() {
                       </button>
                       <button
                         onClick={() => setSpecTab("response")}
-                        className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md border border-b-0 ${
+                        className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ${
                           specTab === "response"
                             ? "text-gray-900 dark:text-[#E6EDF3] bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] border-b-white dark:border-b-[#161B22] relative z-10"
                             : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
@@ -2515,7 +2515,7 @@ export function ApiEditorLayout() {
                       {!isCompletedView && (
                         <button
                           onClick={() => setSpecTab("schema")}
-                          className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md border border-b-0 ${
+                          className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ${
                             specTab === "schema"
                               ? "text-gray-900 dark:text-[#E6EDF3] bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] border-b-white dark:border-b-[#161B22] relative z-10"
                               : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
@@ -2589,7 +2589,7 @@ export function ApiEditorLayout() {
                 </button>
                 <button
                   onClick={handleSave}
-                  className="px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md transition-colors text-sm font-medium flex items-center gap-2"
+                  className="px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none text-sm font-medium flex items-center gap-2"
                 >
                   저장
                 </button>
@@ -2637,7 +2637,7 @@ export function ApiEditorLayout() {
             </button>
             <button
               onClick={handleSave}
-              className="px-3 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-colors text-sm font-medium flex items-center gap-2"
+              className="px-3 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none text-sm font-medium flex items-center gap-2"
             >
               생성
             </button>

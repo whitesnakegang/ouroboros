@@ -556,14 +556,14 @@ export function WsTestRequestPanel() {
             {wsConnectionStatus === "disconnected" ? (
               <button
                 onClick={handleConnect}
-                className="flex-1 px-4 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-colors text-sm font-semibold"
+                className="flex-1 px-4 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-all text-sm font-semibold active:translate-y-[1px] focus:outline-none focus-visible:outline-none md:flex-none md:w-auto w-full"
               >
                 Connect
               </button>
             ) : (
               <button
                 onClick={handleDisconnect}
-                className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-md transition-colors text-sm font-semibold"
+                className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-md transition-all text-sm font-semibold active:translate-y-[1px] focus:outline-none focus-visible:outline-none md:flex-none md:w-auto w-full"
               >
                 Disconnect
               </button>
@@ -581,7 +581,7 @@ export function WsTestRequestPanel() {
               </label>
               <button
                 onClick={addConnectHeader}
-                className="text-xs px-2 py-1 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-colors"
+                className="text-xs px-2 py-1 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none"
               >
                 + Add Header
               </button>
@@ -696,7 +696,7 @@ export function WsTestRequestPanel() {
 
             <button
               onClick={handleSimpleSend}
-              className="w-full px-4 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-colors text-sm font-semibold"
+              className="w-full md:w-auto px-4 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-all text-sm font-semibold active:translate-y-[1px] focus:outline-none focus-visible:outline-none"
             >
               Send STOMP
             </button>

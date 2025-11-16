@@ -37,7 +37,7 @@ export function ProtocolTabs({
             <button
               key={protocol}
               onClick={() => handleProtocolChange(protocol)}
-              className={`flex-1 py-2 px-3 text-xs font-medium rounded-md transition-colors ${
+              className={`flex-1 py-2 px-3 text-xs font-medium rounded-md transition-colors focus:outline-none focus-visible:outline-none ${
                 selectedProtocol === protocol
                   ? "bg-white dark:bg-[#0D1117] text-[#2563EB] shadow-sm"
                   : "text-gray-600 dark:text-[#8B949E] hover:text-gray-900 dark:hover:text-[#E6EDF3]"
@@ -59,7 +59,7 @@ export function ProtocolTabs({
           <button
             key={protocol}
             onClick={() => handleProtocolChange(protocol)}
-            className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+            className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 focus:outline-none focus-visible:outline-none ${
               selectedProtocol === protocol
                 ? "text-gray-900 dark:text-[#E6EDF3] border-[#2563EB]"
                 : "text-gray-500 dark:text-[#8B949E] border-transparent hover:text-gray-900 dark:hover:text-[#E6EDF3]"

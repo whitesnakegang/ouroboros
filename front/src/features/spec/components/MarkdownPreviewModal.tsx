@@ -39,13 +39,13 @@ export function MarkdownPreviewModal({
             <div className="flex items-center gap-2">
               <button
                 onClick={handleCopy}
-                className="px-3 py-2 text-sm rounded-md border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#0D1117]"
+                className="px-3 py-2 text-sm rounded-md border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#0D1117] transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none"
               >
                 복사
               </button>
               <button
                 onClick={onClose}
-                className="px-3 py-2 text-sm rounded-md border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#0D1117]"
+                className="px-3 py-2 text-sm rounded-md border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#0D1117] transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none"
               >
                 닫기
               </button>
@@ -59,7 +59,7 @@ export function MarkdownPreviewModal({
           <div className="px-6 py-4 border-t border-gray-200 dark:border-[#2D333B] flex items-center justify-end gap-2">
             <button
               onClick={handleDownload}
-              className="px-4 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md text-sm font-medium"
+              className="px-4 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md text-sm font-medium transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none"
             >
               다운로드
             </button>

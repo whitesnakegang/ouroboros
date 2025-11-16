@@ -16,7 +16,7 @@ export function StatusFilter({
       <div className="flex gap-0.5 -mb-px">
         <button
           onClick={() => onFilterChange("all")}
-          className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md border border-b-0 ${
+          className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ${
             activeFilter === "all"
               ? "text-gray-900 dark:text-[#E6EDF3] bg-white dark:bg-[#0D1117] border-gray-200 dark:border-[#2D333B] border-b-white dark:border-b-[#0D1117] relative z-10"
               : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
@@ -29,7 +29,7 @@ export function StatusFilter({
             onClick={() => onFilterChange("mock")}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
-            className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md border border-b-0 ${
+            className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ${
               activeFilter === "mock"
                 ? "text-gray-900 dark:text-[#E6EDF3] bg-white dark:bg-[#0D1117] border-gray-200 dark:border-[#2D333B] border-b-white dark:border-b-[#0D1117] relative z-10"
                 : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
@@ -80,7 +80,7 @@ export function StatusFilter({
         </div>
         <button
           onClick={() => onFilterChange("completed")}
-          className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md border border-b-0 ${
+          className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ${
             activeFilter === "completed"
               ? "text-gray-900 dark:text-[#E6EDF3] bg-white dark:bg-[#0D1117] border-gray-200 dark:border-[#2D333B] border-b-white dark:border-b-[#0D1117] relative z-10"
               : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"

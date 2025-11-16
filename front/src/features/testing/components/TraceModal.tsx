@@ -17,6 +17,7 @@ export function TraceModal({ isOpen, onClose, traceData, initialExpandedSpanId }
   const [expandedSpans, setExpandedSpans] = useState<Set<string>>(new Set());
   const [highlightedSpanId, setHighlightedSpanId] = useState<string | null>(null);
   const highlightedSpanRef = useRef<HTMLDivElement | null>(null);
+  const [visiblePathSet, setVisiblePathSet] = useState<Set<string> | null>(null);
 
   // spanId로 span을 찾고, 해당 span까지의 부모 path를 반환하는 함수
   const findSpanPath = (spans: TryTraceSpan[], targetSpanId: string, path: string[] = []): string[] | null => {
@@ -78,20 +79,17 @@ export function TraceModal({ isOpen, onClose, traceData, initialExpandedSpanId }
     }
   }, [isOpen]);
 
-  // initialExpandedSpanId가 변경되면 해당 span과 부모들, 그리고 모든 자식들을 확장하고 하이라이트
+  // initialExpandedSpanId 설정 시: 선택한 span까지의 경로만 표시하고,
+  // 선택한 span 자체의 토글은 열지 않음(자식 미노출).
   useEffect(() => {
     if (initialExpandedSpanId && traceData.spans.length > 0) {
       const path = findSpanPath(traceData.spans, initialExpandedSpanId);
       if (path) {
-        // 해당 span까지의 모든 부모 path
-        const parentPath = new Set(path);
-        
-        // 해당 span과 모든 자식 span들의 ID 수집
-        const allDescendantIds = collectAllDescendantIds(traceData.spans, initialExpandedSpanId);
-        
-        // 부모 path + 해당 span + 모든 자식들을 확장
-        const allIdsToExpand = new Set([...parentPath, ...allDescendantIds]);
-        setExpandedSpans(allIdsToExpand);
+        // 해당 span까지의 모든 부모 path (마지막 타겟 제외 = 토글 미오픈)
+        const parentOnly = new Set(path.slice(0, -1));
+        setExpandedSpans(parentOnly);
+        // 화면에 보일 경로(부모 + 타겟)만 허용
+        setVisiblePathSet(new Set(path));
         
         // 해당 span을 하이라이트
         setHighlightedSpanId(initialExpandedSpanId);
@@ -115,6 +113,7 @@ export function TraceModal({ isOpen, onClose, traceData, initialExpandedSpanId }
       }
     } else {
       setHighlightedSpanId(null);
+      setVisiblePathSet(null);
     }
   }, [initialExpandedSpanId, traceData.spans]);
 
@@ -131,6 +130,10 @@ export function TraceModal({ isOpen, onClose, traceData, initialExpandedSpanId }
   };
 
   const renderSpan = (span: TryTraceSpan, depth: number = 0) => {
+    // 선택 경로 모드일 때: 경로 외의 span은 렌더하지 않음
+    if (visiblePathSet && !visiblePathSet.has(span.spanId)) {
+      return null;
+    }
     const isExpanded = expandedSpans.has(span.spanId);
     const hasChildren = span.children && span.children.length > 0;
     const isHighlighted = highlightedSpanId === span.spanId;

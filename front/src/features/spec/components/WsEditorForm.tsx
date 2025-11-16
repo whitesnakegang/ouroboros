@@ -725,7 +725,7 @@ export function WsEditorForm({
           <div className="flex gap-0.5 -mb-px">
             <button
               onClick={() => setWsTab("receiver")}
-              className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md border border-b-0 ${
+              className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ${
                 wsTab === "receiver"
                   ? "text-gray-900 dark:text-[#E6EDF3] bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] border-b-white dark:border-b-[#161B22] relative z-10"
                   : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
@@ -735,7 +735,7 @@ export function WsEditorForm({
             </button>
             <button
               onClick={() => setWsTab("reply")}
-              className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md border border-b-0 ${
+              className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ${
                 wsTab === "reply"
                   ? "text-gray-900 dark:text-[#E6EDF3] bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] border-b-white dark:border-b-[#161B22] relative z-10"
                   : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
@@ -745,7 +745,7 @@ export function WsEditorForm({
             </button>
             <button
               onClick={() => setWsTab("schema")}
-              className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md border border-b-0 ${
+              className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ${
                 wsTab === "schema"
                   ? "text-gray-900 dark:text-[#E6EDF3] bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] border-b-white dark:border-b-[#161B22] relative z-10"
                   : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
@@ -776,7 +776,7 @@ export function WsEditorForm({
                     ) : (
                       <button
                         onClick={initializeReceiver}
-                        className="px-3 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md text-sm font-medium transition-colors flex items-center gap-2"
+                        className="px-3 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md text-sm font-medium transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none flex items-center gap-2"
                       >
                         <svg
                           className="w-4 h-4"

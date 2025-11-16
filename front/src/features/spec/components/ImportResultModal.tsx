@@ -169,7 +169,7 @@ export function ImportResultModal({
           <div className="px-6 py-4 border-t border-gray-200 dark:border-[#2D333B]">
             <button
               onClick={onClose}
-              className="w-full px-6 py-3 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-colors font-medium"
+              className="w-full md:w-auto px-6 py-3 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-all font-medium active:translate-y-[1px] focus:outline-none focus-visible:outline-none"
             >
               확인
             </button>

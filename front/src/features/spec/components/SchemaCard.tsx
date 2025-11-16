@@ -530,7 +530,7 @@ export function SchemaCard({
                       setSchemaFields([...schemaFields, createDefaultField()]);
                     }}
                     disabled={isReadOnly}
-                    className={`px-3 py-1.5 text-sm text-[#2563EB] hover:text-[#1E40AF] font-medium border border-[#2563EB] hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors ${
+                    className={`px-3 py-1.5 text-sm text-[#2563EB] hover:text-[#1E40AF] font-medium border border-[#2563EB] hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none ${
                       isReadOnly ? "opacity-50 cursor-not-allowed" : ""
                     }`}
                   >
@@ -543,7 +543,7 @@ export function SchemaCard({
                       originalSchemaName
                         ? "bg-blue-500 hover:bg-blue-600"
                         : "bg-emerald-500 hover:bg-emerald-600"
-                    } text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50 ${
+                    } text-white rounded-md text-sm font-medium transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none disabled:opacity-50 ${
                       isReadOnly ? "opacity-50 cursor-not-allowed" : ""
                     }`}
                   >
