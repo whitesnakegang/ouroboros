@@ -11,7 +11,6 @@ import type { RequestBody } from "../types/schema.types";
 import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
 import { useTestingStore } from "@/features/testing/store/testing.store";
 import axios from "axios";
-import { downloadMarkdown } from "../utils/markdownExporter";
 import { downloadYaml } from "../utils/yamlExporter";
 import {
   importYaml,
@@ -20,6 +19,7 @@ import {
   exportWebSocketYaml,
   importWebSocketYaml,
 } from "../services/api";
+import { MarkdownPreviewModal } from "./MarkdownPreviewModal";
 import {
   createRestApiSpec,
   updateRestApiSpec,
@@ -109,6 +109,12 @@ export function ApiEditorLayout() {
     useState(false);
   const [reqLog, setReqLog] = useState<string | undefined>(undefined);
   const [resLog, setResLog] = useState<string | undefined>(undefined);
+  // Markdown Preview
+  const [isMdPreviewOpen, setIsMdPreviewOpen] = useState(false);
+  const [mdPreviewContent, setMdPreviewContent] = useState("");
+  const [mdPreviewFilename, setMdPreviewFilename] = useState(
+    "API_DOCUMENTATION.md"
+  );
 
   // Diff가 있는지 확인 (boolean으로 명시적 변환)
   const hasDiff = !!(
@@ -1352,13 +1358,19 @@ export function ApiEditorLayout() {
       }
 
       try {
-        // Import 실행 (프로토콜 분기)
+        // Import 실행 (프로토콜 분기) - 결과 모달 표시
         if (protocol === "WebSocket") {
-          await importWebSocketYaml(file);
-          alert("WebSocket YAML Import가 완료되었습니다.");
+          const wsResult = await importWebSocketYaml(file); // GlobalApiResponse
+          const data = wsResult?.data;
+          if (data) {
+            setImportResult({ data } as unknown as ImportYamlResponse);
+            setIsImportModalOpen(true);
+          } else {
+            alert("WebSocket YAML Import가 완료되었습니다.");
+          }
         } else {
-          const result: ImportYamlResponse = await importYaml(file);
-          setImportResult(result);
+          const restResult: ImportYamlResponse = await importYaml(file);
+          setImportResult(restResult);
           setIsImportModalOpen(true);
         }
 
@@ -1801,19 +1813,19 @@ export function ApiEditorLayout() {
                       if (protocol === "WebSocket") {
                         const wsYaml = await exportWebSocketYaml();
                         const wsMd = convertWsYamlToMarkdown(wsYaml);
-                        downloadMarkdown(
-                          wsMd,
+                        setMdPreviewContent(wsMd);
+                        setMdPreviewFilename(
                           `WS_API_DOCUMENTATION_${new Date().getTime()}.md`
                         );
-                        alert("WebSocket Markdown 파일이 다운로드되었습니다.");
+                        setIsMdPreviewOpen(true);
                       } else {
                         const yaml = await exportYaml();
                         const md = convertYamlToMarkdown(yaml);
-                        downloadMarkdown(
-                          md,
+                        setMdPreviewContent(md);
+                        setMdPreviewFilename(
                           `API_DOCUMENTATION_${new Date().getTime()}.md`
                         );
-                        alert("Markdown 파일이 다운로드되었습니다.");
+                        setIsMdPreviewOpen(true);
                       }
                     } catch (e) {
                       console.error("Markdown 내보내기 오류:", e);
@@ -2650,9 +2662,17 @@ export function ApiEditorLayout() {
             setIsImportModalOpen(false);
             setImportResult(null);
           }}
-          result={importResult.data}
+          result={(importResult as any).data || (importResult as any)}
         />
       )}
+
+      {/* Markdown Preview Modal */}
+      <MarkdownPreviewModal
+        isOpen={isMdPreviewOpen}
+        onClose={() => setIsMdPreviewOpen(false)}
+        content={mdPreviewContent}
+        filename={mdPreviewFilename}
+      />
     </div>
   );
 }
