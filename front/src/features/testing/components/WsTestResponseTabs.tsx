@@ -1,9 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useTestingStore } from "../store/testing.store";
 import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
-import type { TryMethod, TryTraceData } from "@/features/spec/services/api";
-import { getTryMethodList, getTryTrace } from "@/features/spec/services/api";
-import { TraceModal } from "./TraceModal";
+import { MessageDetailModal } from "./MessageDetailModal";
 import type { WebSocketMessage } from "../store/testing.store";
 // JSON 포맷팅을 위한 간단한 컴포넌트
 const JsonHighlighter = ({ 
@@ -21,7 +19,7 @@ const JsonHighlighter = ({
     }
   };
 
-  const highlightJson = (jsonStr: string): React.ReactElement => {
+  const highlightJson = (jsonStr: string): JSX.Element => {
     const formatted = formatJson(jsonStr);
     const lines = formatted.split('\n');
     
@@ -29,7 +27,7 @@ const JsonHighlighter = ({
       <>
         {lines.map((line, lineIndex) => {
           // 간단한 JSON 하이라이팅
-          const parts: (string | React.ReactElement)[] = [];
+          const parts: (string | JSX.Element)[] = [];
           let lastIndex = 0;
           
           // 키 (따옴표로 감싸진 문자열 뒤에 콜론)
@@ -120,29 +118,16 @@ export function WsTestResponseTabs() {
     wsConnectionStatus,
     wsStats,
     wsConnectionStartTime,
-    methodList,
-    totalDurationMs,
-    tryId,
-    setMethodList,
-    setTotalDurationMs,
   } = useTestingStore();
   const { selectedEndpoint } = useSidebarStore();
 
-  const [activeTab, setActiveTab] = useState<"response" | "test">("response");
   const [messageFilter, setMessageFilter] = useState<"all" | "sent" | "received">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [isJsonFormatted, setIsJsonFormatted] = useState(true);
-  const [isLoadingMethods, setIsLoadingMethods] = useState(false);
-  const [isTraceModalOpen, setIsTraceModalOpen] = useState(false);
-  const [traceData, setTraceData] = useState<TryTraceData | null>(null);
-  const [isLoadingTrace, setIsLoadingTrace] = useState(false);
-  const [initialExpandedSpanId, setInitialExpandedSpanId] = useState<string | null>(null);
+  const [selectedMessage, setSelectedMessage] = useState<WebSocketMessage | null>(null);
+  const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  // Mock 엔드포인트인지 확인
-  const isMockEndpoint =
-    selectedEndpoint?.progress?.toLowerCase() !== "completed";
 
   // 메시지 로그 자동 스크롤
   useEffect(() => {
@@ -151,29 +136,6 @@ export function WsTestResponseTabs() {
     }
   }, [wsMessages]);
 
-  // Test 탭이 활성화되고 tryId가 있을 때 메서드 리스트 로드
-  useEffect(() => {
-    const loadTryMethods = async () => {
-      if (!tryId || isMockEndpoint) return;
-
-      setIsLoadingMethods(true);
-      try {
-        const response = await getTryMethodList(tryId);
-        setMethodList(response.data.methods);
-        setTotalDurationMs(response.data.totalDurationMs);
-      } catch (error) {
-        console.error("Try 메서드 리스트 로드 실패:", error);
-        setMethodList(null);
-        setTotalDurationMs(null);
-      } finally {
-        setIsLoadingMethods(false);
-      }
-    };
-
-    if (activeTab === "test" && tryId && !isMockEndpoint) {
-      loadTryMethods();
-    }
-  }, [activeTab, tryId, isMockEndpoint, setMethodList, setTotalDurationMs]);
 
   // 필터링된 메시지
   const filteredMessages = wsMessages.filter((msg) => {
@@ -189,6 +151,15 @@ export function WsTestResponseTabs() {
     }
     return true;
   });
+
+  // 받은 값과 보낸 값 분리
+  const receivedMessages = filteredMessages.filter((msg) => msg.direction === "received");
+  const sentMessages = filteredMessages.filter((msg) => msg.direction === "sent");
+
+  const handleMessageClick = (message: WebSocketMessage) => {
+    setSelectedMessage(message);
+    setIsMessageModalOpen(true);
+  };
 
   // 연결 지속 시간 포맷팅
   const formatConnectionDuration = (durationMs: number | null): string => {
@@ -214,6 +185,17 @@ export function WsTestResponseTabs() {
     const seconds = date.getSeconds().toString().padStart(2, "0");
     const milliseconds = date.getMilliseconds().toString().padStart(3, "0");
     return `${hours}:${minutes}:${seconds}.${milliseconds}`;
+  };
+
+  // JSON 포맷팅
+  const formatContent = (content: string): string => {
+    if (!isJsonFormatted) return content;
+    try {
+      const parsed = JSON.parse(content);
+      return JSON.stringify(parsed, null, 2);
+    } catch {
+      return content;
+    }
   };
 
   // 메시지 로그 내보내기
@@ -251,12 +233,12 @@ export function WsTestResponseTabs() {
 
   return (
     <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] shadow-sm">
-      {/* Response Header */}
+      {/* Log Header */}
       <div className="px-4 py-3 border-b border-gray-200 dark:border-[#2D333B] bg-gray-50 dark:bg-[#0D1117]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
-              Response
+              Log
             </span>
             {wsConnectionStatus === "connected" ? (
               <span className="px-2 py-0.5 text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full flex items-center gap-1.5">
@@ -299,83 +281,34 @@ export function WsTestResponseTabs() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-gray-200 dark:border-[#2D333B]">
-        <button
-          onClick={() => setActiveTab("response")}
-          className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-            activeTab === "response"
-              ? "text-[#2563EB] border-b-2 border-[#2563EB] bg-blue-50 dark:bg-blue-900/20"
-              : "text-gray-600 dark:text-[#8B949E] hover:text-gray-900 dark:hover:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#0D1117]"
-          }`}
-        >
-          Response
-        </button>
-        <button
-          onClick={() => setActiveTab("test")}
-          className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-            activeTab === "test"
-              ? "text-[#2563EB] border-b-2 border-[#2563EB] bg-blue-50 dark:bg-blue-900/20"
-              : "text-gray-600 dark:text-[#8B949E] hover:text-gray-900 dark:hover:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#0D1117]"
-          }`}
-        >
-          Test
-        </button>
-      </div>
-
-      {/* Tab Content */}
+      {/* Log Content */}
       <div className="p-4">
-        {activeTab === "response" ? (
-              <ResponseContent
-                messages={filteredMessages}
-                messageFilter={messageFilter}
-                setMessageFilter={setMessageFilter}
-                searchQuery={searchQuery}
-                setSearchQuery={setSearchQuery}
-                isJsonFormatted={isJsonFormatted}
-                setIsJsonFormatted={setIsJsonFormatted}
-                formatTimestamp={formatTimestamp}
-                exportMessages={exportMessages}
-                messagesEndRef={messagesEndRef}
-              />
-        ) : (
-          <TestContent
-            methodList={methodList}
-            totalDurationMs={totalDurationMs}
-            isMockEndpoint={isMockEndpoint}
-            isLoading={isLoadingMethods}
-            tryId={tryId}
-            onShowTrace={async (spanId?: string) => {
-              if (!tryId) return;
-              setIsLoadingTrace(true);
-              setIsTraceModalOpen(true);
-              setInitialExpandedSpanId(spanId || null);
-              try {
-                const response = await getTryTrace(tryId);
-                setTraceData(response.data);
-              } catch (error) {
-                console.error("Trace 조회 실패:", error);
-                setTraceData(null);
-              } finally {
-                setIsLoadingTrace(false);
-              }
-            }}
-            isLoadingTrace={isLoadingTrace}
-          />
-        )}
+        <ResponseContent
+          receivedMessages={receivedMessages}
+          sentMessages={sentMessages}
+          messageFilter={messageFilter}
+          setMessageFilter={setMessageFilter}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          isJsonFormatted={isJsonFormatted}
+          setIsJsonFormatted={setIsJsonFormatted}
+          formatTimestamp={formatTimestamp}
+          formatContent={formatContent}
+          exportMessages={exportMessages}
+          messagesEndRef={messagesEndRef}
+          onMessageClick={handleMessageClick}
+        />
       </div>
 
-      {/* Trace Modal */}
-      {traceData && (
-        <TraceModal
-          isOpen={isTraceModalOpen}
+      {/* Message Detail Modal */}
+      {selectedMessage && (
+        <MessageDetailModal
+          isOpen={isMessageModalOpen}
           onClose={() => {
-            setIsTraceModalOpen(false);
-            setTraceData(null);
-            setInitialExpandedSpanId(null);
+            setIsMessageModalOpen(false);
+            setSelectedMessage(null);
           }}
-          traceData={traceData}
-          initialExpandedSpanId={initialExpandedSpanId}
+          message={selectedMessage}
         />
       )}
     </div>
@@ -383,7 +316,8 @@ export function WsTestResponseTabs() {
 }
 
 function ResponseContent({
-  messages,
+  receivedMessages,
+  sentMessages,
   messageFilter,
   setMessageFilter,
   searchQuery,
@@ -391,10 +325,13 @@ function ResponseContent({
   isJsonFormatted,
   setIsJsonFormatted,
   formatTimestamp,
+  formatContent,
   exportMessages,
   messagesEndRef,
+  onMessageClick,
 }: {
-  messages: WebSocketMessage[];
+  receivedMessages: WebSocketMessage[];
+  sentMessages: WebSocketMessage[];
   messageFilter: "all" | "sent" | "received";
   setMessageFilter: (filter: "all" | "sent" | "received") => void;
   searchQuery: string;
@@ -402,10 +339,14 @@ function ResponseContent({
   isJsonFormatted: boolean;
   setIsJsonFormatted: (formatted: boolean) => void;
   formatTimestamp: (timestamp: number) => string;
+  formatContent: (content: string) => string;
   exportMessages: (format: "json" | "csv") => void;
-  messagesEndRef: React.RefObject<HTMLDivElement | null>;
+  messagesEndRef: React.RefObject<HTMLDivElement>;
+  onMessageClick: (message: WebSocketMessage) => void;
 }) {
-  if (messages.length === 0) {
+  const allMessages = [...sentMessages, ...receivedMessages].sort((a, b) => a.timestamp - b.timestamp);
+  
+  if (allMessages.length === 0) {
     return (
       <div className="text-center py-12 text-gray-600 dark:text-[#8B949E]">
         <div className="w-16 h-16 mx-auto mb-4 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] flex items-center justify-center">
@@ -525,14 +466,16 @@ function ResponseContent({
         </div>
       </div>
 
-      {/* Message Log */}
+      {/* Message Log - 시간순 정렬 */}
       <div className="space-y-3 max-h-[600px] overflow-y-auto">
-        {messages.map((message) => (
-            <MessageBubble
-              key={message.id}
-              message={message}
-              formatTimestamp={formatTimestamp}
-            />
+        {allMessages.map((message) => (
+          <MessageBubble
+            key={message.id}
+            message={message}
+            formatTimestamp={formatTimestamp}
+            formatContent={formatContent}
+            onClick={() => onMessageClick(message)}
+          />
         ))}
         <div ref={messagesEndRef} />
       </div>
@@ -543,9 +486,13 @@ function ResponseContent({
 function MessageBubble({
   message,
   formatTimestamp,
+  formatContent,
+  onClick,
 }: {
   message: WebSocketMessage;
   formatTimestamp: (timestamp: number) => string;
+  formatContent: (content: string) => string;
+  onClick?: () => void;
 }) {
   const isSent = message.direction === "sent";
   const isJson = (() => {
@@ -560,7 +507,10 @@ function MessageBubble({
   return (
     <div className="group relative">
       <div
+        onClick={onClick}
         className={`flex items-start gap-3 p-4 rounded-lg border transition-all hover:shadow-md ${
+          onClick ? "cursor-pointer" : ""
+        } ${
           isSent
             ? "bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800/50"
             : "bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800/50"
@@ -634,7 +584,7 @@ function MessageBubble({
   );
 }
 
-function TestContent({
+export function TestContent({
   methodList,
   totalDurationMs,
   isMockEndpoint,

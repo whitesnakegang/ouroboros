@@ -266,7 +266,7 @@ export async function createRestApiSpec(
 /**
  * 특정 REST API 스펙 조회
  */
-export async function getRestApiSpec(id: string): Promise<GetSpecResponse> {
+export async function getRestApiSpec(id: string): Promise<GetSpecResponse & { reqLog?: string; resLog?: string }> {
   const response = await fetch(`${API_BASE_URL}/${id}`, {
     method: "GET",
     headers: {
@@ -285,7 +285,17 @@ export async function getRestApiSpec(id: string): Promise<GetSpecResponse> {
     throw new Error(errorMessage);
   }
 
-  return response.json();
+  const data = await response.json();
+  
+  // 응답 헤더에서 diff 로그 정보 추출
+  const reqLog = response.headers.get("x-ouroboros-req-log") || response.headers.get("X-Ouroboros-Req-Log");
+  const resLog = response.headers.get("x-ouroboros-res-log") || response.headers.get("X-Ouroboros-Res-Log");
+  
+  return {
+    ...data,
+    reqLog: reqLog || undefined,
+    resLog: resLog || undefined,
+  };
 }
 
 /**
@@ -338,6 +348,30 @@ export async function deleteRestApiSpec(
       `API 스펙 삭제 실패: ${response.status} ${response.statusText}`
     );
     console.error("API 스펙 삭제 실패:", { id, status: response.status });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+/**
+ * REST API 스펙 동기화 (캐시 -> 파일)
+ */
+export async function syncRestApiSpec(
+  id: string
+): Promise<GetSpecResponse> {
+  const response = await fetch(`${API_BASE_URL}/${id}/sync`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `API 스펙 동기화 실패: ${response.status} ${response.statusText}`
+    );
     throw new Error(errorMessage);
   }
 
@@ -562,6 +596,99 @@ export async function exportYaml(): Promise<string> {
       `YAML Export 실패: ${response.status} ${response.statusText}`
     );
     console.error("YAML Export 실패:", { status: response.status });
+    throw new Error(errorMessage);
+  }
+
+  return response.text();
+}
+
+// ========== WebSocket Spec Import/Export ==========
+const WS_SPEC_BASE_URL = "/ouro/websocket-specs";
+
+export interface WsImportYamlErrorData {
+  validationErrors?: ValidationError[];
+}
+
+export interface WsImportYamlErrorResponse {
+  status: number;
+  data: WsImportYamlErrorData | null;
+  message: string;
+  error: {
+    code: string;
+    details: string;
+  };
+}
+
+/**
+ * WebSocket YAML 파일 Import
+ * AsyncAPI 3.0.0 YAML 파일을 업로드하여 ourowebsocket.yml에 병합
+ */
+export async function importWebSocketYaml(file: File): Promise<any> {
+  console.log("WS YAML Import 시작:", {
+    fileName: file.name,
+    fileSize: file.size,
+    fileType: file.type,
+    endpoint: `${WS_SPEC_BASE_URL}/import`,
+  });
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${WS_SPEC_BASE_URL}/import`, {
+    method: "POST",
+    body: formData,
+  });
+
+  console.log("WS YAML Import 응답:", {
+    status: response.status,
+    statusText: response.statusText,
+    ok: response.ok,
+  });
+
+  if (!response.ok) {
+    let errorMessage = `WS YAML Import 실패: ${response.status} ${response.statusText}`;
+    try {
+      const errorData: WsImportYamlErrorResponse = await response.json();
+      if (errorData.message) {
+        errorMessage = errorData.message;
+      }
+      if (errorData.error?.details) {
+        errorMessage += `\n상세: ${errorData.error.details}`;
+      }
+      if (errorData.data?.validationErrors) {
+        const validationMessages = errorData.data.validationErrors
+          .map((err) => `- ${err.location}: ${err.message}`)
+          .join("\n");
+        errorMessage = `YAML 검증 실패:\n${validationMessages}\n\n${errorMessage}`;
+      }
+    } catch (e) {
+      console.error("WS YAML Import 에러 응답 파싱 실패:", e);
+    }
+    console.error("WS YAML Import 실패:", { status: response.status });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+/**
+ * WebSocket YAML 파일 Export
+ * 백엔드에서 ourowebsocket.yml 파일 전체 내용을 가져옵니다.
+ */
+export async function exportWebSocketYaml(): Promise<string> {
+  const response = await fetch(`${WS_SPEC_BASE_URL}/export/yaml`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WS YAML Export 실패: ${response.status} ${response.statusText}`
+    );
+    console.error("WS YAML Export 실패:", { status: response.status });
     throw new Error(errorMessage);
   }
 
@@ -1232,6 +1359,30 @@ export async function deleteWebSocketOperation(
       operationId,
       status: response.status,
     });
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+/**
+ * WebSocket Operation 동기화 (캐시 -> 파일)
+ */
+export async function syncWebSocketOperation(
+  operationId: string
+): Promise<GetOperationResponse> {
+  const response = await fetch(`${WS_OPERATION_API_BASE_URL}/${operationId}/sync`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorMessage = await parseErrorResponse(
+      response,
+      `WebSocket Operation 동기화 실패: ${response.status} ${response.statusText}`
+    );
     throw new Error(errorMessage);
   }
 

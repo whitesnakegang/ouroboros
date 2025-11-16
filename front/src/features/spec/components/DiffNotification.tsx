@@ -11,12 +11,16 @@ interface DiffNotificationProps {
   diff: string; // "none", "request", "response", "endpoint", "both" 등
   progress?: string; // "mock", "completed" 등
   onSyncToSpec?: () => void; // 명세에 자동 추가 버튼 핸들러
+  reqLog?: string; // x-ouroboros-req-log 헤더 값
+  resLog?: string; // x-ouroboros-res-log 헤더 값
 }
 
 export function DiffNotification({
   diff,
   progress,
   onSyncToSpec,
+  reqLog,
+  resLog,
 }: DiffNotificationProps) {
   if (!diff || diff === "none") {
     return null;
@@ -118,6 +122,7 @@ export function DiffNotification({
 
       {/* 상세 정보 */}
       <div className="p-4 space-y-3">
+        {/* 기본 안내사항 */}
         <div className="bg-white dark:bg-amber-950/30 rounded-md p-3 border border-amber-200 dark:border-amber-800">
           <h4 className="text-xs font-semibold text-amber-900 dark:text-amber-200 mb-2 flex items-center gap-1">
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -138,24 +143,88 @@ export function DiffNotification({
                 필드를 통해 불일치가 감지되었습니다.
               </span>
             </li>
-            <li className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
-              <svg className="w-3 h-3 text-amber-600 dark:text-amber-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span>명세서의 수정 및 삭제가 제한됩니다.</span>
-            </li>
             {diffDetails.type === "endpoint" && (
               <li className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
                 <svg className="w-3 h-3 text-amber-600 dark:text-amber-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <span>
-                  실제 구현에 존재하지만 명세에 없는 필드가 있다면, 아래 버튼을 클릭하여 명세에 자동으로 추가할 수 있습니다.
+                  실제 구현에 존재하지만 명세에 없는 Endpoint가 있습니다. 아래 버튼을 클릭하여 명세에 자동으로 추가할 수 있습니다.
                 </span>
               </li>
             )}
           </ul>
         </div>
+
+        {/* 상세 로그 정보 */}
+        {diffDetails.type === "request" && reqLog && (
+          <div className="bg-white dark:bg-amber-950/30 rounded-md p-3 border border-amber-200 dark:border-amber-800">
+            <h4 className="text-xs font-semibold text-amber-900 dark:text-amber-200 mb-2 flex items-center gap-1">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              요청(Request) 불일치 상세 정보
+            </h4>
+            <div className="mt-2 p-2 bg-amber-100 dark:bg-amber-900/50 rounded border border-amber-300 dark:border-amber-700">
+              <pre className="text-xs text-amber-900 dark:text-amber-200 whitespace-pre-wrap break-words font-mono">
+                {reqLog}
+              </pre>
+            </div>
+          </div>
+        )}
+
+        {diffDetails.type === "response" && resLog && (
+          <div className="bg-white dark:bg-amber-950/30 rounded-md p-3 border border-amber-200 dark:border-amber-800">
+            <h4 className="text-xs font-semibold text-amber-900 dark:text-amber-200 mb-2 flex items-center gap-1">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              응답(Response) 불일치 상세 정보
+            </h4>
+            <div className="mt-2 p-2 bg-amber-100 dark:bg-amber-900/50 rounded border border-amber-300 dark:border-amber-700">
+              <pre className="text-xs text-amber-900 dark:text-amber-200 whitespace-pre-wrap break-words font-mono">
+                {resLog}
+              </pre>
+            </div>
+          </div>
+        )}
+
+        {diffDetails.type === "both" && (reqLog || resLog) && (
+          <div className="bg-white dark:bg-amber-950/30 rounded-md p-3 border border-amber-200 dark:border-amber-800">
+            <h4 className="text-xs font-semibold text-amber-900 dark:text-amber-200 mb-2 flex items-center gap-1">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              불일치 상세 정보
+            </h4>
+            <div className="space-y-3 mt-2">
+              {reqLog && (
+                <div>
+                  <h5 className="text-xs font-medium text-amber-800 dark:text-amber-300 mb-1">
+                    요청(Request) 불일치:
+                  </h5>
+                  <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded border border-amber-300 dark:border-amber-700">
+                    <pre className="text-xs text-amber-900 dark:text-amber-200 whitespace-pre-wrap break-words font-mono">
+                      {reqLog}
+                    </pre>
+                  </div>
+                </div>
+              )}
+              {resLog && (
+                <div>
+                  <h5 className="text-xs font-medium text-amber-800 dark:text-amber-300 mb-1">
+                    응답(Response) 불일치:
+                  </h5>
+                  <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded border border-amber-300 dark:border-amber-700">
+                    <pre className="text-xs text-amber-900 dark:text-amber-200 whitespace-pre-wrap break-words font-mono">
+                      {resLog}
+                    </pre>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {onSyncToSpec && diffDetails.type === "endpoint" && (
           <button

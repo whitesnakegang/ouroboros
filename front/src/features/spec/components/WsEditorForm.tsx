@@ -337,10 +337,111 @@ export function WsEditorForm({
     };
   };
 
+  // Diff 알림 렌더링 (문서 뷰와 편집 뷰 모두에서 표시)
+  const renderDiffNotification = () => {
+    if (!diff || diff === "none") return null;
+
+    const details = getDiffDetails(diff);
+    const progressLower = operationInfo?.progress?.toLowerCase() || "none";
+    const isCompleted = progressLower === "completed";
+    
+    return (
+      <div className="rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 shadow-sm mb-6">
+        {/* 헤더 */}
+        <div className="p-4 border-b border-amber-200 dark:border-amber-800">
+          <div className="flex items-start gap-3">
+            <svg
+              className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
+            </svg>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                  명세와 실제 구현의 불일치
+                </h3>
+                <span className="px-2 py-0.5 bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200 text-xs font-medium rounded">
+                  {details.label}
+                </span>
+              </div>
+              <p className="text-sm text-amber-700 dark:text-amber-400">
+                {details.description}
+              </p>
+              <p className="text-xs text-amber-600 dark:text-amber-500 mt-2">
+                {isCompleted
+                  ? "이 Operation은 completed 상태로 실제 구현이 완료되었습니다."
+                  : "이 Operation은 진행 중입니다."}
+                {details.canSync && " 아래 버튼으로 명세를 갱신할 수 있습니다."}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* 상세 정보 */}
+        <div className="p-4 space-y-3">
+          <div className="bg-white dark:bg-amber-950/30 rounded-md p-3 border border-amber-200 dark:border-amber-800">
+            <h4 className="text-xs font-semibold text-amber-900 dark:text-amber-200 mb-2 flex items-center gap-1">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              안내사항
+            </h4>
+            <ul className="space-y-2">
+              <li className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
+                <svg className="w-3 h-3 text-amber-600 dark:text-amber-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>
+                  백엔드에서{" "}
+                  <code className="px-1 py-0.5 bg-amber-100 dark:bg-amber-900 border border-amber-300 dark:border-amber-700 rounded text-[10px] font-mono text-amber-900 dark:text-amber-200">
+                    x-ouroboros-diff
+                  </code>{" "}
+                  필드를 통해 불일치가 감지되었습니다.
+                </span>
+              </li>
+              {details.type === "channel" && (
+                <li className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
+                  <svg className="w-3 h-3 text-amber-600 dark:text-amber-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>
+                    실제 구현에 존재하지만 명세에 없는 Channel이 있다면, 아래 버튼을 클릭하여 명세에 자동으로 추가할 수 있습니다.
+                  </span>
+                </li>
+              )}
+            </ul>
+          </div>
+
+          {details.canSync && onSyncToActual && (
+            <button
+              onClick={onSyncToActual}
+              className="w-full px-4 py-3 bg-amber-600 hover:bg-amber-700 dark:bg-amber-700 dark:hover:bg-amber-800 text-white rounded-md transition-colors text-sm font-semibold flex items-center justify-center gap-2 shadow-md"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              실제 구현을 명세에 반영
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   // 문서 형식 뷰
   if (isDocumentView) {
     return (
       <div className="space-y-6">
+        {/* Diff 알림 */}
+        {renderDiffNotification()}
         {/* Entry Point */}
         <div>
           <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">Entry Point</h3>
@@ -465,108 +566,8 @@ export function WsEditorForm({
 
   return (
     <div className="w-full max-w-6xl mx-auto px-6 py-8">
-      {/* Diff 불일치 경고 메시지 (amber 배경 2단 레이아웃) */}
-      {diff && diff !== "none" && (() => {
-        const details = getDiffDetails(diff);
-        const progressLower = operationInfo?.progress?.toLowerCase() || "none";
-        const isCompleted = progressLower === "completed";
-        
-        return (
-          <div className="rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 shadow-sm mb-6">
-            {/* 헤더 */}
-            <div className="p-4 border-b border-amber-200 dark:border-amber-800">
-              <div className="flex items-start gap-3">
-                <svg
-                  className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                  />
-                </svg>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-                      명세와 실제 구현의 불일치
-                    </h3>
-                    <span className="px-2 py-0.5 bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200 text-xs font-medium rounded">
-                      {details.label}
-                    </span>
-                  </div>
-                  <p className="text-sm text-amber-700 dark:text-amber-400">
-                    {details.description}
-                  </p>
-                  <p className="text-xs text-amber-600 dark:text-amber-500 mt-2">
-                    {isCompleted
-                      ? "이 Operation은 completed 상태로 실제 구현이 완료되었습니다."
-                      : "이 Operation은 진행 중입니다."}
-                    {details.canSync && " 아래 버튼으로 명세를 갱신할 수 있습니다."}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* 상세 정보 */}
-            <div className="p-4 space-y-3">
-              <div className="bg-white dark:bg-amber-950/30 rounded-md p-3 border border-amber-200 dark:border-amber-800">
-                <h4 className="text-xs font-semibold text-amber-900 dark:text-amber-200 mb-2 flex items-center gap-1">
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  안내사항
-                </h4>
-                <ul className="space-y-2">
-                  <li className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
-                    <svg className="w-3 h-3 text-amber-600 dark:text-amber-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>
-                      백엔드에서{" "}
-                      <code className="px-1 py-0.5 bg-amber-100 dark:bg-amber-900 border border-amber-300 dark:border-amber-700 rounded text-[10px] font-mono text-amber-900 dark:text-amber-200">
-                        x-ouroboros-diff
-                      </code>{" "}
-                      필드를 통해 불일치가 감지되었습니다.
-                    </span>
-                  </li>
-                  <li className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
-                    <svg className="w-3 h-3 text-amber-600 dark:text-amber-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>명세서의 수정 및 삭제가 제한됩니다.</span>
-                  </li>
-                  {details.type === "channel" && (
-                    <li className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
-                      <svg className="w-3 h-3 text-amber-600 dark:text-amber-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <span>
-                        실제 구현에 존재하지만 명세에 없는 Channel이 있다면, 아래 버튼을 클릭하여 명세에 자동으로 추가할 수 있습니다.
-                      </span>
-                    </li>
-                  )}
-                </ul>
-              </div>
-
-              {details.canSync && onSyncToActual && (
-                <button
-                  onClick={onSyncToActual}
-                  className="w-full px-4 py-3 bg-amber-600 hover:bg-amber-700 dark:bg-amber-700 dark:hover:bg-amber-800 text-white rounded-md transition-colors text-sm font-semibold flex items-center justify-center gap-2 shadow-md"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  실제 구현을 명세에 반영
-                </button>
-              )}
-            </div>
-          </div>
-        );
-      })()}
+      {/* Diff 알림 */}
+      {renderDiffNotification()}
 
       {/* Entry Point & Metadata */}
       <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm mb-6">

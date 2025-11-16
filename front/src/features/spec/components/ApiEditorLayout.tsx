@@ -8,10 +8,7 @@ import { TestLayout } from "@/features/testing/components/TestLayout";
 import { DiffNotification } from "./DiffNotification";
 import { WsEditorForm } from "./WsEditorForm";
 import type { RequestBody } from "../types/schema.types";
-import {
-  useSidebarStore,
-  type Endpoint,
-} from "@/features/sidebar/store/sidebar.store";
+import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
 import { useTestingStore } from "@/features/testing/store/testing.store";
 import axios from "axios";
 import { downloadMarkdown } from "../utils/markdownExporter";
@@ -20,15 +17,19 @@ import {
   importYaml,
   type ImportYamlResponse,
   exportYaml,
+  exportWebSocketYaml,
+  importWebSocketYaml,
 } from "../services/api";
 import {
   createRestApiSpec,
   updateRestApiSpec,
   deleteRestApiSpec,
   getRestApiSpec,
+  syncRestApiSpec,
   getSchema,
   getWebSocketOperation,
   updateWebSocketOperation,
+  syncWebSocketOperation,
   getWebSocketChannel,
   type RestApiSpecResponse,
 } from "../services/api";
@@ -1351,12 +1352,15 @@ export function ApiEditorLayout() {
       }
 
       try {
-        // Import 실행
-        const result: ImportYamlResponse = await importYaml(file);
-
-        // 모달로 결과 표시
-        setImportResult(result);
-        setIsImportModalOpen(true);
+        // Import 실행 (프로토콜 분기)
+        if (protocol === "WebSocket") {
+          await importWebSocketYaml(file);
+          alert("WebSocket YAML Import가 완료되었습니다.");
+        } else {
+          const result: ImportYamlResponse = await importYaml(file);
+          setImportResult(result);
+          setIsImportModalOpen(true);
+        }
 
         // 사이드바 목록 새로고침
         await loadEndpoints();
@@ -1374,41 +1378,63 @@ export function ApiEditorLayout() {
   const handleSyncDiffToSpec = async () => {
     if (!selectedEndpoint) return;
 
+    const diffType = selectedEndpoint.diff?.toLowerCase() || "";
+
     if (
       confirm(
         "실제 구현의 내용을 명세에 자동으로 반영하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다."
       )
     ) {
       try {
-        // 현재 엔드포인트의 정보를 백엔드에서 가져옴
-        const response = await getRestApiSpec(selectedEndpoint.id);
-        const spec = response.data;
+        // diff가 "endpoint"인 경우 sync API 호출 (캐시 -> 파일 동기화)
+        if (diffType === "endpoint") {
+          const syncResponse = await syncRestApiSpec(selectedEndpoint.id);
 
-        // 현재 명세 정보를 그대로 업데이트 요청으로 전달
-        // 백엔드의 updateRestApiSpec 메서드에서 자동으로 x-ouroboros-diff를 "none"으로 설정함
-        const updateRequest = {
-          path: spec.path,
-          method: spec.method,
-          summary: spec.summary,
-          description: spec.description,
-          tags: spec.tags || [],
-          parameters: spec.parameters || [],
-          requestBody: spec.requestBody || undefined,
-          responses: spec.responses || {},
-          security: spec.security || [],
-        };
+          // 엔드포인트 데이터 다시 로드하여 최신 상태 반영
+          await loadEndpointData(selectedEndpoint.id);
 
-        await updateRestApiSpec(selectedEndpoint.id, updateRequest);
+          // 사이드바 목록도 다시 로드하여 diff 상태 업데이트
+          await loadEndpoints();
 
-        // 엔드포인트 데이터 다시 로드하여 최신 상태 반영
-        await loadEndpointData(selectedEndpoint.id);
+          // selectedEndpoint 업데이트
+          const updatedSpec = syncResponse.data;
+          if (updatedSpec) {
+            setSelectedEndpoint({
+              ...selectedEndpoint,
+              diff: updatedSpec.diff || "none",
+              progress: updatedSpec.progress || selectedEndpoint.progress,
+            });
+          }
 
-        // 사이드바 목록도 다시 로드하여 diff 상태 업데이트
-        await loadEndpoints();
+          alert("실제 구현이 명세에 성공적으로 반영되었습니다!");
+        } else {
+          // 다른 diff 타입 (request, response, both)은 기존 로직 유지
+          const response = await getRestApiSpec(selectedEndpoint.id);
+          const spec = response.data;
 
-        alert(" 실제 구현이 명세에 성공적으로 반영되었습니다!");
+          const updateRequest = {
+            path: spec.path,
+            method: spec.method,
+            summary: spec.summary,
+            description: spec.description,
+            tags: spec.tags || [],
+            parameters: spec.parameters || [],
+            requestBody: spec.requestBody || undefined,
+            responses: spec.responses || {},
+            security: spec.security || [],
+          };
+
+          await updateRestApiSpec(selectedEndpoint.id, updateRequest);
+
+          // 엔드포인트 데이터 다시 로드하여 최신 상태 반영
+          await loadEndpointData(selectedEndpoint.id);
+
+          // 사이드바 목록도 다시 로드하여 diff 상태 업데이트
+          await loadEndpoints();
+
+          alert("실제 구현이 명세에 성공적으로 반영되었습니다!");
+        }
       } catch (error: unknown) {
-        console.error("명세 동기화 실패:", error);
         const errorMessage = getErrorMessage(error);
         alert(`명세 동기화에 실패했습니다: ${errorMessage}`);
       }
@@ -1426,12 +1452,39 @@ export function ApiEditorLayout() {
       return;
     }
 
+    const diffType = selectedEndpoint.diff?.toLowerCase() || "";
+
     if (
       confirm(
         "실제 구현의 Channel 정보를 명세에 자동으로 반영하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다."
       )
     ) {
       try {
+        // diff가 "channel"인 경우 sync API 호출 (캐시 -> 파일 동기화)
+        if (diffType === "channel") {
+          const syncResponse = await syncWebSocketOperation(operationId);
+
+          // Operation 데이터 다시 로드하여 최신 상태 반영
+          await loadWebSocketOperationData(operationId);
+
+          // 사이드바 목록도 다시 로드하여 diff 상태 업데이트
+          await loadEndpoints();
+
+          // selectedEndpoint 업데이트
+          const updatedOperation = syncResponse.data?.operation;
+          if (updatedOperation) {
+            setSelectedEndpoint({
+              ...selectedEndpoint,
+              diff: updatedOperation.diff || "none",
+              progress: updatedOperation.progress || selectedEndpoint.progress,
+            });
+          }
+
+          alert("실제 구현의 Channel이 명세에 성공적으로 반영되었습니다!");
+          return;
+        }
+
+        // payload diff는 기존 로직 유지 (update API 사용)
         // UUID로 operation 정보 조회
         const response = await getWebSocketOperation(operationId);
         const operation = response.data.operation;
@@ -1467,19 +1520,8 @@ export function ApiEditorLayout() {
           };
         }
 
-        console.log("🔄 WebSocket Update Request:", updateRequest);
-        console.log("📝 operationId (UUID):", operationId);
-        console.log("📊 업데이트 전 diff 상태:", selectedEndpoint.diff);
-
         // UUID로 업데이트
-        const updateResponse = await updateWebSocketOperation(
-          operationId,
-          updateRequest
-        );
-
-        // ✅ 업데이트 응답에서 diff 상태 확인
-        const updatedDiff = updateResponse.data?.operation?.diff || "none";
-        console.log("📊 업데이트 후 응답의 diff 상태:", updatedDiff);
+        await updateWebSocketOperation(operationId, updateRequest);
 
         // UUID로 다시 로드
         await loadWebSocketOperationData(operationId);
@@ -1487,45 +1529,7 @@ export function ApiEditorLayout() {
         // 사이드바 목록도 다시 로드하여 diff 상태 업데이트
         await loadEndpoints();
 
-        // ✅ 사이드바 새로고침 후 실제 diff 상태 확인
-        setTimeout(() => {
-          const allEndpoints = useSidebarStore.getState().endpoints;
-          let foundEndpoint: Endpoint | null = null;
-
-          for (const group of Object.values(allEndpoints)) {
-            const ep = (group as Endpoint[]).find((e) => e?.id === operationId);
-            if (ep) {
-              foundEndpoint = ep;
-              break;
-            }
-          }
-
-          if (foundEndpoint) {
-            console.log(
-              "📊 사이드바 새로고침 후 diff 상태:",
-              foundEndpoint.diff
-            );
-            console.log(
-              "📊 사이드바 새로고침 후 전체 endpoint:",
-              foundEndpoint
-            );
-
-            // selectedEndpoint도 최신 상태로 업데이트
-            if (foundEndpoint.diff !== selectedEndpoint.diff) {
-              setSelectedEndpoint(foundEndpoint);
-              console.log(
-                "✅ selectedEndpoint diff 상태 업데이트 완료:",
-                foundEndpoint.diff
-              );
-            }
-          } else {
-            console.warn(
-              "⚠️ 사이드바에서 업데이트된 endpoint를 찾을 수 없습니다."
-            );
-          }
-        }, 200);
-
-        alert("✅ 실제 구현이 명세에 성공적으로 반영되었습니다!");
+        alert("실제 구현이 명세에 성공적으로 반영되었습니다!");
       } catch (error: unknown) {
         console.error("명세 동기화 실패:", error);
         const errorMessage = getErrorMessage(error);
@@ -1792,16 +1796,25 @@ export function ApiEditorLayout() {
                 <button
                   onClick={async () => {
                     try {
-                      const yaml = await exportYaml();
-                      const { convertYamlToMarkdown } = await import(
-                        "../utils/markdownExporter"
-                      );
-                      const md = convertYamlToMarkdown(yaml);
-                      downloadMarkdown(
-                        md,
-                        `API_DOCUMENTATION_${new Date().getTime()}.md`
-                      );
-                      alert("Markdown 파일이 다운로드되었습니다.");
+                      const { convertYamlToMarkdown, convertWsYamlToMarkdown } =
+                        await import("../utils/markdownExporter");
+                      if (protocol === "WebSocket") {
+                        const wsYaml = await exportWebSocketYaml();
+                        const wsMd = convertWsYamlToMarkdown(wsYaml);
+                        downloadMarkdown(
+                          wsMd,
+                          `WS_API_DOCUMENTATION_${new Date().getTime()}.md`
+                        );
+                        alert("WebSocket Markdown 파일이 다운로드되었습니다.");
+                      } else {
+                        const yaml = await exportYaml();
+                        const md = convertYamlToMarkdown(yaml);
+                        downloadMarkdown(
+                          md,
+                          `API_DOCUMENTATION_${new Date().getTime()}.md`
+                        );
+                        alert("Markdown 파일이 다운로드되었습니다.");
+                      }
                     } catch (e) {
                       console.error("Markdown 내보내기 오류:", e);
                       const errorMsg = getErrorMessage(e);
@@ -1830,10 +1843,17 @@ export function ApiEditorLayout() {
                 <button
                   onClick={async () => {
                     try {
-                      const yaml = await exportYaml();
+                      const yaml =
+                        protocol === "WebSocket"
+                          ? await exportWebSocketYaml()
+                          : await exportYaml();
                       downloadYaml(
                         yaml,
-                        `ourorest_${new Date().getTime()}.yml`
+                        `${
+                          protocol === "WebSocket"
+                            ? "ourowebsocket"
+                            : "ourorest"
+                        }_${new Date().getTime()}.yml`
                       );
                       alert("YAML 파일이 다운로드되었습니다.");
                     } catch (e) {

@@ -33,6 +33,44 @@ export function TraceModal({ isOpen, onClose, traceData, initialExpandedSpanId }
     return null;
   };
 
+  // spanId로 span을 찾고, 해당 span과 모든 자식 span들의 ID를 수집하는 함수
+  const collectAllDescendantIds = (spans: TryTraceSpan[], targetSpanId: string): string[] => {
+    const allIds: string[] = [];
+    
+    const findAndCollect = (spans: TryTraceSpan[]): boolean => {
+      for (const span of spans) {
+        if (span.spanId === targetSpanId) {
+          allIds.push(span.spanId);
+          // 모든 자식 span들의 ID 수집
+          if (span.children && span.children.length > 0) {
+            collectDescendants(span.children, allIds);
+          }
+          return true;
+        }
+        if (span.children && span.children.length > 0) {
+          if (findAndCollect(span.children)) {
+            allIds.push(span.spanId);
+            return true;
+          }
+        }
+      }
+      return false;
+    };
+    
+    findAndCollect(spans);
+    return allIds;
+  };
+
+  // 재귀적으로 모든 자식 span들의 ID를 수집하는 함수
+  const collectDescendants = (spans: TryTraceSpan[], ids: string[]): void => {
+    for (const span of spans) {
+      ids.push(span.spanId);
+      if (span.children && span.children.length > 0) {
+        collectDescendants(span.children, ids);
+      }
+    }
+  };
+
   // 모달이 닫힐 때 하이라이트 제거
   useEffect(() => {
     if (!isOpen) {
@@ -40,13 +78,21 @@ export function TraceModal({ isOpen, onClose, traceData, initialExpandedSpanId }
     }
   }, [isOpen]);
 
-  // initialExpandedSpanId가 변경되면 해당 span과 부모들을 확장하고 하이라이트
+  // initialExpandedSpanId가 변경되면 해당 span과 부모들, 그리고 모든 자식들을 확장하고 하이라이트
   useEffect(() => {
     if (initialExpandedSpanId && traceData.spans.length > 0) {
       const path = findSpanPath(traceData.spans, initialExpandedSpanId);
       if (path) {
-        // 해당 span까지의 모든 부모를 확장
-        setExpandedSpans(new Set(path));
+        // 해당 span까지의 모든 부모 path
+        const parentPath = new Set(path);
+        
+        // 해당 span과 모든 자식 span들의 ID 수집
+        const allDescendantIds = collectAllDescendantIds(traceData.spans, initialExpandedSpanId);
+        
+        // 부모 path + 해당 span + 모든 자식들을 확장
+        const allIdsToExpand = new Set([...parentPath, ...allDescendantIds]);
+        setExpandedSpans(allIdsToExpand);
+        
         // 해당 span을 하이라이트
         setHighlightedSpanId(initialExpandedSpanId);
         
