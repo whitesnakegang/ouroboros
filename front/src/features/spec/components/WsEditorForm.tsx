@@ -645,8 +645,10 @@ export function WsEditorForm({
     };
   };
 
-  // Diff 알림 렌더링 (문서 뷰와 편집 뷰 모두에서 표시)
+  // Diff 알림 렌더링 (문서 뷰에서만 표시, 편집 모드에서는 숨김)
   const renderDiffNotification = () => {
+    // 문서 뷰가 아닐 때는 표시하지 않음
+    if (!isDocumentView) return null;
     if (!diff || diff === "none") return null;
 
     const details = getDiffDetails(diff);
@@ -831,81 +833,87 @@ export function WsEditorForm({
     const channelType = wsSpecTab === "receiver" ? "Receiver" : "Reply";
 
     return (
-      <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] shadow-sm overflow-hidden">
-        {/* 탭 내용 */}
-        <div className="p-4 bg-white dark:bg-[#161B22]">
-          {currentChannel ? (
-            <div className="space-y-4">
-              {/* Address */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">
-                  Address
-                </h3>
-                <div className="flex items-start gap-3 text-sm">
-                  <span className="font-mono text-gray-900 dark:text-[#E6EDF3]">
-                    {currentChannel.address || (
-                      <span className="text-gray-400 italic">(empty)</span>
-                    )}
-                  </span>
+      <div className="w-full max-w-6xl mx-auto px-6 py-8">
+        {/* Diff 알림 */}
+        {renderDiffNotification()}
+
+        <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] shadow-sm overflow-hidden">
+          {/* 탭 내용 */}
+          <div className="p-4 bg-white dark:bg-[#161B22]">
+            {currentChannel ? (
+              <div className="space-y-4">
+                {/* Address */}
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">
+                    Address
+                  </h3>
+                  <div className="flex items-start gap-3 text-sm">
+                    <span className="font-mono text-gray-900 dark:text-[#E6EDF3]">
+                      {currentChannel.address || (
+                        <span className="text-gray-400 italic">(empty)</span>
+                      )}
+                    </span>
+                  </div>
                 </div>
-              </div>
 
-              {/* Messages */}
-              {currentChannel.messages &&
-                currentChannel.messages.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">
-                      Messages
-                    </h3>
-                    <div className="space-y-4">
-                      {currentChannel.messages.map((messageName, idx) => {
-                        // 메시지 정보 찾기
-                        const messageInfo = messages.find(
-                          (msg) =>
-                            msg.messageName === messageName ||
-                            msg.name === messageName
-                        );
+                {/* Messages */}
+                {currentChannel.messages &&
+                  currentChannel.messages.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">
+                        Messages
+                      </h3>
+                      <div className="space-y-4">
+                        {currentChannel.messages.map((messageName, idx) => {
+                          // 메시지 정보 찾기
+                          const messageInfo = messages.find(
+                            (msg) =>
+                              msg.messageName === messageName ||
+                              msg.name === messageName
+                          );
 
-                        return (
-                          <div
-                            key={`${messageName}-${idx}`}
-                            className="border border-gray-200 dark:border-[#2D333B] rounded-md p-3 bg-gray-50 dark:bg-[#0D1117]"
-                          >
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="font-mono text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
-                                {messageName}
-                              </span>
-                              {messageInfo?.description && (
-                                <span className="text-xs text-gray-500 dark:text-[#8B949E]">
-                                  - {messageInfo.description}
+                          return (
+                            <div
+                              key={`${messageName}-${idx}`}
+                              className="border border-gray-200 dark:border-[#2D333B] rounded-md p-3 bg-gray-50 dark:bg-[#0D1117]"
+                            >
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="font-mono text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
+                                  {messageName}
                                 </span>
-                              )}
-                            </div>
-
-                            {/* 메시지 구조 표시: name/header/payload 중 실제로 있는 것만 */}
-                            <div className="space-y-2 ml-4">
-                              {/* Name */}
-                              {messageInfo?.name && (
-                                <div>
-                                  <span className="text-xs font-semibold text-gray-600 dark:text-[#8B949E]">
-                                    Name:
+                                {messageInfo?.description && (
+                                  <span className="text-xs text-gray-500 dark:text-[#8B949E]">
+                                    - {messageInfo.description}
                                   </span>
-                                  <span className="ml-2 text-sm text-gray-900 dark:text-[#E6EDF3]">
-                                    {messageInfo.name}
-                                  </span>
-                                </div>
-                              )}
+                                )}
+                              </div>
 
-                              {/* Headers */}
-                              {messageInfo?.headers &&
-                                Object.keys(messageInfo.headers).length > 0 && (
+                              {/* 메시지 구조 표시: name/header/payload 중 실제로 있는 것만 */}
+                              <div className="space-y-2 ml-4">
+                                {/* Name */}
+                                {messageInfo?.name && (
                                   <div>
                                     <span className="text-xs font-semibold text-gray-600 dark:text-[#8B949E]">
-                                      Headers:
+                                      Name:
                                     </span>
-                                    <div className="mt-1 space-y-1">
-                                      {Object.entries(messageInfo.headers).map(
-                                        ([key, value]) => (
+                                    <span className="ml-2 text-sm text-gray-900 dark:text-[#E6EDF3]">
+                                      {messageInfo.name}
+                                    </span>
+                                  </div>
+                                )}
+
+                                {/* Headers */}
+                                {messageInfo?.headers &&
+                                  Object.keys(messageInfo.headers).length >
+                                    0 && (
+                                    <div>
+                                      <span className="text-xs font-semibold text-gray-600 dark:text-[#8B949E]">
+                                        Headers:
+                                      </span>
+                                      <div className="mt-1 space-y-1">
+                                        {Object.entries(
+                                          messageInfo.headers
+                                        ).map(([key, value]) => (
                                           <div
                                             key={key}
                                             className="flex items-start gap-2 text-sm"
@@ -920,113 +928,113 @@ export function WsEditorForm({
                                               {String(value)}
                                             </span>
                                           </div>
-                                        )
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                {/* Payload */}
+                                {messageInfo?.payload && (
+                                  <div>
+                                    <span className="text-xs font-semibold text-gray-600 dark:text-[#8B949E]">
+                                      Payload:
+                                    </span>
+                                    <div className="mt-2">
+                                      {messageInfo.payload.schema?.$ref ? (
+                                        <MessagePayloadSchemaViewer
+                                          schemaRef={
+                                            messageInfo.payload.schema.$ref
+                                          }
+                                        />
+                                      ) : messageInfo.payload.schema?.ref ? (
+                                        <MessagePayloadSchemaViewer
+                                          schemaRef={
+                                            messageInfo.payload.schema.ref
+                                          }
+                                        />
+                                      ) : messageInfo.payload.schema?.type ? (
+                                        <div>
+                                          <span className="text-sm text-gray-900 dark:text-[#E6EDF3]">
+                                            type:{" "}
+                                            {messageInfo.payload.schema.type}
+                                          </span>
+                                          {messageInfo.payload.schema
+                                            .properties && (
+                                            <div className="mt-2">
+                                              <SchemaViewer
+                                                schemaType={{
+                                                  kind: "object",
+                                                  properties: Object.entries(
+                                                    messageInfo.payload.schema
+                                                      .properties
+                                                  ).map(
+                                                    ([key, prop]: [
+                                                      string,
+                                                      unknown
+                                                    ]) => {
+                                                      const propObj = prop as {
+                                                        description?: string;
+                                                        type?: string;
+                                                        [key: string]: unknown;
+                                                      };
+                                                      return {
+                                                        key,
+                                                        description:
+                                                          propObj.description,
+                                                        required:
+                                                          messageInfo.payload.schema.required?.includes(
+                                                            key
+                                                          ) || false,
+                                                        schemaType:
+                                                          parseOpenAPISchemaToSchemaType(
+                                                            propObj
+                                                          ),
+                                                      };
+                                                    }
+                                                  ),
+                                                }}
+                                                contentType="application/json"
+                                              />
+                                            </div>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <span className="text-sm text-gray-500 dark:text-[#8B949E] italic">
+                                          (schema 정보 없음)
+                                        </span>
                                       )}
                                     </div>
                                   </div>
                                 )}
 
-                              {/* Payload */}
-                              {messageInfo?.payload && (
-                                <div>
-                                  <span className="text-xs font-semibold text-gray-600 dark:text-[#8B949E]">
-                                    Payload:
-                                  </span>
-                                  <div className="mt-2">
-                                    {messageInfo.payload.schema?.$ref ? (
-                                      <MessagePayloadSchemaViewer
-                                        schemaRef={
-                                          messageInfo.payload.schema.$ref
-                                        }
-                                      />
-                                    ) : messageInfo.payload.schema?.ref ? (
-                                      <MessagePayloadSchemaViewer
-                                        schemaRef={
-                                          messageInfo.payload.schema.ref
-                                        }
-                                      />
-                                    ) : messageInfo.payload.schema?.type ? (
-                                      <div>
-                                        <span className="text-sm text-gray-900 dark:text-[#E6EDF3]">
-                                          type:{" "}
-                                          {messageInfo.payload.schema.type}
-                                        </span>
-                                        {messageInfo.payload.schema
-                                          .properties && (
-                                          <div className="mt-2">
-                                            <SchemaViewer
-                                              schemaType={{
-                                                kind: "object",
-                                                properties: Object.entries(
-                                                  messageInfo.payload.schema
-                                                    .properties
-                                                ).map(
-                                                  ([key, prop]: [
-                                                    string,
-                                                    unknown
-                                                  ]) => {
-                                                    const propObj = prop as {
-                                                      description?: string;
-                                                      type?: string;
-                                                      [key: string]: unknown;
-                                                    };
-                                                    return {
-                                                      key,
-                                                      description:
-                                                        propObj.description,
-                                                      required:
-                                                        messageInfo.payload.schema.required?.includes(
-                                                          key
-                                                        ) || false,
-                                                      schemaType:
-                                                        parseOpenAPISchemaToSchemaType(
-                                                          propObj
-                                                        ),
-                                                    };
-                                                  }
-                                                ),
-                                              }}
-                                              contentType="application/json"
-                                            />
-                                          </div>
-                                        )}
-                                      </div>
-                                    ) : (
-                                      <span className="text-sm text-gray-500 dark:text-[#8B949E] italic">
-                                        (schema 정보 없음)
-                                      </span>
-                                    )}
+                                {/* 메시지 정보가 없는 경우 */}
+                                {!messageInfo && (
+                                  <div className="text-xs text-gray-500 dark:text-[#8B949E] italic">
+                                    메시지 정보를 불러올 수 없습니다.
                                   </div>
-                                </div>
-                              )}
-
-                              {/* 메시지 정보가 없는 경우 */}
-                              {!messageInfo && (
-                                <div className="text-xs text-gray-500 dark:text-[#8B949E] italic">
-                                  메시지 정보를 불러올 수 없습니다.
-                                </div>
-                              )}
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
+                  )}
+
+                {/* Messages가 없는 경우 */}
+                {(!currentChannel.messages ||
+                  currentChannel.messages.length === 0) && (
+                  <div className="text-sm text-gray-500 dark:text-[#8B949E] italic">
+                    No messages configured.
                   </div>
                 )}
-
-              {/* Messages가 없는 경우 */}
-              {(!currentChannel.messages ||
-                currentChannel.messages.length === 0) && (
-                <div className="text-sm text-gray-500 dark:text-[#8B949E] italic">
-                  No messages configured.
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="text-sm text-gray-500 dark:text-[#8B949E] italic">
-              No {channelType.toLowerCase()} configuration.
-            </div>
-          )}
+              </div>
+            ) : (
+              <div className="text-sm text-gray-500 dark:text-[#8B949E] italic">
+                No {channelType.toLowerCase()} configuration.
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );

@@ -1064,6 +1064,30 @@ export function ApiEditorLayout() {
     messages?: string[];
   } | null>(null);
 
+  // REST 수정 모드 진입 시 초기 상태 저장 (수정사항 확인용)
+  const restInitialStateRef = useRef<{
+    method: string;
+    url: string;
+    summary: string;
+    description: string;
+    tags: string;
+    queryParams: KeyValuePair[];
+    pathParams: KeyValuePair[];
+    requestHeaders: KeyValuePair[];
+    requestBody: RequestBody;
+    statusCodes: StatusCode[];
+    auth: typeof auth;
+  } | null>(null);
+
+  // WebSocket 수정 모드 진입 시 초기 상태 저장 (수정사항 확인용)
+  const wsInitialStateRef = useRef<{
+    entryPoint: string;
+    protocol: "ws" | "wss";
+    tags: string;
+    receiver: typeof wsReceiver;
+    reply: typeof wsReply;
+  } | null>(null);
+
   // wsReceiver나 wsReply가 하나만 있을 때 기본 탭 설정
   useEffect(() => {
     if (selectedEndpoint && !isEditMode && !isNewFormMode) {
@@ -1108,6 +1132,97 @@ export function ApiEditorLayout() {
       return hasEntryPoint && hasReceiverOrReply;
     }
     return false;
+  };
+
+  // REST 수정사항 확인 함수
+  const hasRestChanges = (): boolean => {
+    if (protocol !== "REST" || !isEditMode || !restInitialStateRef.current) {
+      return true; // 수정 모드가 아니거나 초기 상태가 없으면 변경사항 있다고 간주
+    }
+
+    const initial = restInitialStateRef.current;
+
+    // Method 변경 확인
+    if (initial.method !== method) return true;
+
+    // URL 변경 확인
+    if (initial.url !== url) return true;
+
+    // Summary 변경 확인
+    if (initial.summary !== summary) return true;
+
+    // Description 변경 확인
+    if (initial.description !== description) return true;
+
+    // Tags 변경 확인
+    if (initial.tags !== tags) return true;
+
+    // QueryParams 변경 확인
+    if (JSON.stringify(initial.queryParams) !== JSON.stringify(queryParams))
+      return true;
+
+    // PathParams 변경 확인
+    if (JSON.stringify(initial.pathParams) !== JSON.stringify(pathParams))
+      return true;
+
+    // RequestHeaders 변경 확인
+    if (
+      JSON.stringify(initial.requestHeaders) !== JSON.stringify(requestHeaders)
+    )
+      return true;
+
+    // RequestBody 변경 확인
+    if (JSON.stringify(initial.requestBody) !== JSON.stringify(requestBody))
+      return true;
+
+    // StatusCodes 변경 확인
+    if (JSON.stringify(initial.statusCodes) !== JSON.stringify(statusCodes))
+      return true;
+
+    // Auth 변경 확인
+    if (JSON.stringify(initial.auth) !== JSON.stringify(auth)) return true;
+
+    return false; // 변경사항 없음
+  };
+
+  // WebSocket 수정사항 확인 함수
+  const hasWebSocketChanges = (): boolean => {
+    if (protocol !== "WebSocket" || !isEditMode || !wsInitialStateRef.current) {
+      return true; // 수정 모드가 아니거나 초기 상태가 없으면 변경사항 있다고 간주
+    }
+
+    const initial = wsInitialStateRef.current;
+
+    // EntryPoint 변경 확인
+    if (initial.entryPoint !== wsEntryPoint) return true;
+
+    // Protocol 변경 확인
+    if (initial.protocol !== wsProtocol) return true;
+
+    // Tags 변경 확인
+    if (initial.tags !== wsTags) return true;
+
+    // Receiver 변경 확인
+    const receiverChanged =
+      (initial.receiver === null) !== (wsReceiver === null) ||
+      (initial.receiver &&
+        wsReceiver &&
+        (initial.receiver.address !== wsReceiver.address ||
+          JSON.stringify(initial.receiver.messages || []) !==
+            JSON.stringify(wsReceiver.messages || [])));
+    if (receiverChanged) return true;
+
+    // Reply 변경 확인
+    const replyChanged =
+      (initial.reply === null) !== (wsReply === null) ||
+      (initial.reply &&
+        wsReply &&
+        (initial.reply.address !== wsReply.address ||
+          JSON.stringify(initial.reply.messages || []) !==
+            JSON.stringify(wsReply.messages || [])));
+    if (replyChanged) return true;
+
+    return false; // 변경사항 없음
   };
 
   /**
@@ -1343,6 +1458,12 @@ export function ApiEditorLayout() {
 
         if (selectedEndpoint && isEditMode) {
           // 수정 로직
+          // receive나 reply 중 하나는 필수
+          if (!receives && !replies) {
+            alert("Receiver 또는 Reply 중 하나는 반드시 입력해야 합니다.");
+            return;
+          }
+
           await updateWebSocketOperation(selectedEndpoint.id, {
             protocol: wsProtocol,
             pathname: pathname,
@@ -1357,6 +1478,9 @@ export function ApiEditorLayout() {
                 : undefined, // 백엔드로 tags 전달
           });
           alert("WebSocket Operation이 수정되었습니다.");
+
+          // 초기 상태 참조 초기화
+          wsInitialStateRef.current = null;
 
           // 사이드바 목록 다시 로드
           await loadEndpoints();
@@ -1527,6 +1651,9 @@ export function ApiEditorLayout() {
 
         await updateRestApiSpec(selectedEndpoint.id, updateRequest);
 
+        // 초기 상태 참조 초기화
+        restInitialStateRef.current = null;
+
         alert("API 스펙이 수정되었습니다.");
         setIsEditMode(false);
 
@@ -1653,6 +1780,35 @@ export function ApiEditorLayout() {
       alert("이미 완료(completed)된 API는 수정할 수 없습니다.");
       return;
     }
+
+    // REST 수정 모드 진입 시 초기 상태 저장
+    if (protocol === "REST") {
+      restInitialStateRef.current = {
+        method,
+        url,
+        summary,
+        description,
+        tags,
+        queryParams: JSON.parse(JSON.stringify(queryParams)),
+        pathParams: JSON.parse(JSON.stringify(pathParams)),
+        requestHeaders: JSON.parse(JSON.stringify(requestHeaders)),
+        requestBody: JSON.parse(JSON.stringify(requestBody)),
+        statusCodes: JSON.parse(JSON.stringify(statusCodes)),
+        auth: JSON.parse(JSON.stringify(auth)),
+      };
+    }
+
+    // WebSocket 수정 모드 진입 시 초기 상태 저장
+    if (protocol === "WebSocket") {
+      wsInitialStateRef.current = {
+        entryPoint: wsEntryPoint,
+        protocol: wsProtocol,
+        tags: wsTags,
+        receiver: wsReceiver ? JSON.parse(JSON.stringify(wsReceiver)) : null,
+        reply: wsReply ? JSON.parse(JSON.stringify(wsReply)) : null,
+      };
+    }
+
     setIsEditMode(true);
   };
 
@@ -2596,7 +2752,7 @@ export function ApiEditorLayout() {
                 </div>
               )}
 
-            {/* Diff Notification - 불일치가 있을 때만 표시 (completed 또는 mock 상태 모두) */}
+            {/* Diff Notification - 불일치가 있을 때만 표시 (REST만, WebSocket은 WsEditorForm 내부에서 처리) */}
             {protocol === "REST" && selectedEndpoint && hasDiff && (
               <DiffNotification
                 diff={selectedEndpoint.diff || "none"}
@@ -3037,9 +3193,15 @@ export function ApiEditorLayout() {
                 </button>
                 <button
                   onClick={handleSave}
-                  disabled={!isFormValid()}
+                  disabled={
+                    !isFormValid() ||
+                    (protocol === "REST" && !hasRestChanges()) ||
+                    (protocol === "WebSocket" && !hasWebSocketChanges())
+                  }
                   className={`px-3 py-2 rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none text-sm font-medium flex items-center gap-2 ${
-                    !isFormValid()
+                    !isFormValid() ||
+                    (protocol === "REST" && !hasRestChanges()) ||
+                    (protocol === "WebSocket" && !hasWebSocketChanges())
                       ? "bg-gray-300 dark:bg-[#21262D] text-gray-500 dark:text-[#8B949E] cursor-not-allowed"
                       : "bg-emerald-500 hover:bg-emerald-600 text-white"
                   }`}
