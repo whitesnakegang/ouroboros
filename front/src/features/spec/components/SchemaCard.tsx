@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { SchemaModal } from "./SchemaModal";
 import { SchemaFieldEditor } from "./SchemaFieldEditor";
+import { ConfirmModal } from "@/ui/ConfirmModal";
+import { AlertModal } from "@/ui/AlertModal";
 import {
   getAllSchemas,
   createSchema,
@@ -53,6 +55,31 @@ export function SchemaCard({
   );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Modal 상태
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    variant?: "danger" | "warning" | "info";
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
+
+  const [alertModal, setAlertModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    variant?: "success" | "error" | "warning" | "info";
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+  });
 
   // Schema Type 상태 (object만 허용)
   const schemaType = "object" as const;
@@ -135,45 +162,68 @@ export function SchemaCard({
   };
 
   // 스키마 삭제 핸들러
-  const handleDeleteSchema = async (schemaName: string) => {
-    if (!confirm(`"${schemaName}" 스키마를 삭제하시겠습니까?`)) {
-      return;
-    }
+  const handleDeleteSchema = (schemaName: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "스키마 삭제",
+      message: `"${schemaName}" 스키마를 삭제하시겠습니까?`,
+      variant: "danger",
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          if (protocol === "WebSocket") {
+            await deleteWebSocketSchema(schemaName);
+          } else {
+            await deleteSchema(schemaName);
+          }
+          setSchemas(schemas.filter((s) => s.schemaName !== schemaName));
 
-    try {
-      if (protocol === "WebSocket") {
-        await deleteWebSocketSchema(schemaName);
-      } else {
-        await deleteSchema(schemaName);
-      }
-      setSchemas(schemas.filter((s) => s.schemaName !== schemaName));
+          // 삭제된 스키마가 선택된 스키마인 경우 초기화
+          if (selectedSchemaName === schemaName) {
+            handleNewSchema();
+          }
 
-      // 삭제된 스키마가 선택된 스키마인 경우 초기화
-      if (selectedSchemaName === schemaName) {
-        handleNewSchema();
-      }
-
-      alert(`"${schemaName}" 스키마가 삭제되었습니다.`);
-    } catch (err) {
-      console.error("스키마 삭제 실패:", err);
-      alert(
-        `스키마 삭제에 실패했습니다: ${
-          err instanceof Error ? err.message : "알 수 없는 오류"
-        }`
-      );
-    }
+          setAlertModal({
+            isOpen: true,
+            title: "삭제 완료",
+            message: `"${schemaName}" 스키마가 삭제되었습니다.`,
+            variant: "success",
+          });
+        } catch (err) {
+          console.error("스키마 삭제 실패:", err);
+          setAlertModal({
+            isOpen: true,
+            title: "삭제 실패",
+            message: `스키마 삭제에 실패했습니다: ${
+              err instanceof Error ? err.message : "알 수 없는 오류"
+            }`,
+            variant: "error",
+          });
+        }
+      },
+    });
   };
 
   // 스키마 저장 (생성 또는 수정)
   const saveSchema = async () => {
     if (!currentSchemaName.trim()) {
-      alert("스키마 이름을 입력해주세요.");
+      setAlertModal({
+        isOpen: true,
+        title: "입력 오류",
+        message: "스키마 이름을 입력해주세요.",
+        variant: "warning",
+      });
       return;
     }
 
     // object 타입은 필드 검증
     if (schemaFields.length === 0) {
-      alert("최소 하나의 필드를 추가해주세요.");
+      setAlertModal({
+        isOpen: true,
+        title: "입력 오류",
+        message: "최소 하나의 필드를 추가해주세요.",
+        variant: "warning",
+      });
       return;
     }
 
@@ -227,7 +277,12 @@ export function SchemaCard({
         } else {
           await updateSchema(originalSchemaName, updateRequest);
         }
-        alert(`"${originalSchemaName}" 스키마가 수정되었습니다.`);
+        setAlertModal({
+          isOpen: true,
+          title: "수정 완료",
+          message: `"${originalSchemaName}" 스키마가 수정되었습니다.`,
+          variant: "success",
+        });
       } else {
         // 생성 모드
         if (protocol === "WebSocket") {
@@ -235,7 +290,12 @@ export function SchemaCard({
         } else {
           await createSchema(schemaRequest);
         }
-        alert(`"${currentSchemaName}" 스키마가 생성되었습니다.`);
+        setAlertModal({
+          isOpen: true,
+          title: "생성 완료",
+          message: `"${currentSchemaName}" 스키마가 생성되었습니다.`,
+          variant: "success",
+        });
       }
 
       // 스키마 목록 다시 로드
@@ -252,7 +312,12 @@ export function SchemaCard({
     } catch (err) {
       console.error("스키마 저장 실패:", err);
       const errorMessage = getErrorMessage(err);
-      alert(`스키마 저장에 실패했습니다: ${errorMessage}`);
+      setAlertModal({
+        isOpen: true,
+        title: "저장 실패",
+        message: `스키마 저장에 실패했습니다: ${errorMessage}`,
+        variant: "error",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -599,12 +664,36 @@ export function SchemaCard({
             );
             setIsSchemaModalOpen(false);
           } else {
-            alert("스키마는 object 타입만 지원됩니다.");
+            setAlertModal({
+              isOpen: true,
+              title: "타입 오류",
+              message: "스키마는 object 타입만 지원됩니다.",
+              variant: "warning",
+            });
           }
         }}
         schemas={schemas}
         setSchemas={setSchemas}
         protocol={protocol}
+      />
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+      />
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={() => setAlertModal((prev) => ({ ...prev, isOpen: false }))}
+        title={alertModal.title}
+        message={alertModal.message}
+        variant={alertModal.variant}
       />
     </div>
   );

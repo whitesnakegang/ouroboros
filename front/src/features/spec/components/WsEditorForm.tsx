@@ -3,6 +3,7 @@ import { SchemaFieldEditor } from "./SchemaFieldEditor";
 import { SchemaModal } from "./SchemaModal";
 import { SchemaCard } from "./SchemaCard";
 import { SchemaViewer } from "./SchemaViewer";
+import { AlertModal } from "@/ui/AlertModal";
 import {
   getAllWebSocketSchemas,
   getAllWebSocketMessages,
@@ -107,6 +108,18 @@ export function WsEditorForm({
   const [isReplySchemaModalOpen, setIsReplySchemaModalOpen] = useState(false);
   const [isMessageSchemaModalOpen, setIsMessageSchemaModalOpen] =
     useState(false);
+
+  // Modal 상태
+  const [alertModal, setAlertModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    variant?: "success" | "error" | "warning" | "info";
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+  });
 
   // 내부 wsSpecTab state (외부에서 제공되지 않으면 내부에서 관리)
   // SEND 타입의 경우 기본 탭을 reply로 설정
@@ -401,7 +414,12 @@ export function WsEditorForm({
   // 메시지 생성
   const handleCreateMessage = async () => {
     if (!messageName.trim()) {
-      alert("메시지 이름을 입력해주세요.");
+      setAlertModal({
+        isOpen: true,
+        title: "입력 오류",
+        message: "메시지 이름을 입력해주세요.",
+        variant: "warning",
+      });
       return;
     }
 
@@ -451,7 +469,12 @@ export function WsEditorForm({
       }
 
       await createWebSocketMessage(request);
-      alert("메시지가 생성되었습니다.");
+      setAlertModal({
+        isOpen: true,
+        title: "생성 완료",
+        message: "메시지가 생성되었습니다.",
+        variant: "success",
+      });
 
       // 폼 초기화
       setMessageName("");
@@ -464,11 +487,14 @@ export function WsEditorForm({
       // 메시지 목록 새로고침
       await loadMessages();
     } catch (error) {
-      alert(
-        `메시지 생성 실패: ${
+      setAlertModal({
+        isOpen: true,
+        title: "생성 실패",
+        message: `메시지 생성 실패: ${
           error instanceof Error ? error.message : "알 수 없는 오류"
-        }`
-      );
+        }`,
+        variant: "error",
+      });
     }
   };
 
@@ -619,7 +645,12 @@ export function WsEditorForm({
         },
       });
     } else {
-      alert("스키마는 object 타입만 지원됩니다.");
+      setAlertModal({
+        isOpen: true,
+        title: "타입 오류",
+        message: "스키마는 object 타입만 지원됩니다.",
+        variant: "warning",
+      });
     }
     setIsReceiverSchemaModalOpen(false);
   };
@@ -640,7 +671,12 @@ export function WsEditorForm({
         },
       });
     } else {
-      alert("스키마는 object 타입만 지원됩니다.");
+      setAlertModal({
+        isOpen: true,
+        title: "타입 오류",
+        message: "스키마는 object 타입만 지원됩니다.",
+        variant: "warning",
+      });
     }
     setIsReplySchemaModalOpen(false);
   };
@@ -654,7 +690,12 @@ export function WsEditorForm({
     if (selectedSchema.type === "object") {
       setSelectedMessageSchema(selectedSchema.name);
     } else {
-      alert("스키마는 object 타입만 지원됩니다.");
+      setAlertModal({
+        isOpen: true,
+        title: "타입 오류",
+        message: "스키마는 object 타입만 지원됩니다.",
+        variant: "warning",
+      });
     }
     setIsMessageSchemaModalOpen(false);
   };
@@ -1095,13 +1136,16 @@ export function WsEditorForm({
                       setLocalProgress(
                         operationInfo.progress?.toLowerCase() || "none"
                       );
-                      alert(
-                        `Progress 업데이트에 실패했습니다: ${
+                      setAlertModal({
+                        isOpen: true,
+                        title: "업데이트 실패",
+                        message: `Progress 업데이트에 실패했습니다: ${
                           error instanceof Error
                             ? error.message
                             : "알 수 없는 오류"
-                        }`
-                      );
+                        }`,
+                        variant: "error",
+                      });
                     }
                   }}
                   className="sr-only"
@@ -2436,6 +2480,15 @@ export function WsEditorForm({
         schemas={schemas}
         setSchemas={setSchemas}
         protocol="WebSocket"
+      />
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={() => setAlertModal((prev) => ({ ...prev, isOpen: false }))}
+        title={alertModal.title}
+        message={alertModal.message}
+        variant={alertModal.variant}
       />
     </div>
   );

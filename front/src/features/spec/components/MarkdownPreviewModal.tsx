@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { downloadMarkdown } from "../utils/markdownExporter";
+import { AlertModal } from "@/ui/AlertModal";
 
 interface MarkdownPreviewModalProps {
   isOpen: boolean;
@@ -13,14 +15,35 @@ export function MarkdownPreviewModal({
   content,
   filename = "API_DOCUMENTATION.md",
 }: MarkdownPreviewModalProps) {
+  const [alertModal, setAlertModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    variant?: "success" | "error" | "warning" | "info";
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+  });
+
   if (!isOpen) return null;
 
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(content);
-      alert("Markdown이 클립보드에 복사되었습니다.");
+      setAlertModal({
+        isOpen: true,
+        title: "복사 완료",
+        message: "Markdown이 클립보드에 복사되었습니다.",
+        variant: "success",
+      });
     } catch {
-      alert("클립보드 복사에 실패했습니다.");
+      setAlertModal({
+        isOpen: true,
+        title: "복사 실패",
+        message: "클립보드 복사에 실패했습니다.",
+        variant: "error",
+      });
     }
   };
 
@@ -66,6 +89,15 @@ export function MarkdownPreviewModal({
           </div>
         </div>
       </div>
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={() => setAlertModal((prev) => ({ ...prev, isOpen: false }))}
+        title={alertModal.title}
+        message={alertModal.message}
+        variant={alertModal.variant}
+      />
     </>
   );
 }

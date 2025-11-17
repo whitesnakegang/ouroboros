@@ -8,6 +8,8 @@ import { ImportResultModal } from "./ImportResultModal";
 import { TestLayout } from "@/features/testing/components/TestLayout";
 import { DiffNotification } from "./DiffNotification";
 import { WsEditorForm } from "./WsEditorForm";
+import { ConfirmModal } from "@/ui/ConfirmModal";
+import { AlertModal } from "@/ui/AlertModal";
 import type { RequestBody } from "../types/schema.types";
 import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
 import { useTestingStore } from "@/features/testing/store/testing.store";
@@ -139,6 +141,31 @@ export function ApiEditorLayout() {
     "API_DOCUMENTATION.md"
   );
   // Removed filename option states; use automatic filenames instead
+
+  // Modal 상태
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    variant?: "danger" | "warning" | "info";
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
+
+  const [alertModal, setAlertModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    variant?: "success" | "error" | "warning" | "info";
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+  });
 
   // Diff가 있는지 확인 (boolean으로 명시적 변환)
   const hasDiff = !!(
@@ -1509,7 +1536,12 @@ export function ApiEditorLayout() {
           // 수정 로직
           // receive나 reply 중 하나는 필수
           if (!receives && !replies) {
-            alert("Receiver 또는 Reply 중 하나는 반드시 입력해야 합니다.");
+            setAlertModal({
+              isOpen: true,
+              title: "입력 오류",
+              message: "Receiver 또는 Reply 중 하나는 반드시 입력해야 합니다.",
+              variant: "warning",
+            });
             return;
           }
 
@@ -1526,7 +1558,12 @@ export function ApiEditorLayout() {
                     .filter((t) => t.length > 0)
                 : undefined, // 백엔드로 tags 전달
           });
-          alert("WebSocket Operation이 수정되었습니다.");
+          setAlertModal({
+            isOpen: true,
+            title: "수정 완료",
+            message: "WebSocket Operation이 수정되었습니다.",
+            variant: "success",
+          });
 
           // 초기 상태 참조 초기화
           wsInitialStateRef.current = null;
@@ -1638,7 +1675,12 @@ export function ApiEditorLayout() {
             const { addEndpoint } = useSidebarStore.getState();
             addEndpoint(newEndpoint, group);
 
-            alert(`WebSocket Operation이 생성되었습니다.`);
+            setAlertModal({
+              isOpen: true,
+              title: "생성 완료",
+              message: "WebSocket Operation이 생성되었습니다.",
+              variant: "success",
+            });
 
             // 사이드바 목록 다시 로드
             await loadEndpoints();
@@ -1669,7 +1711,12 @@ export function ApiEditorLayout() {
               // 최신 operation 정보 로드 실패 시 무시
             }
           } else {
-            alert("WebSocket Operation이 생성되었습니다.");
+            setAlertModal({
+              isOpen: true,
+              title: "생성 완료",
+              message: "WebSocket Operation이 생성되었습니다.",
+              variant: "success",
+            });
             // 사이드바 목록 다시 로드
             await loadEndpoints();
             // 폼 초기화
@@ -1678,7 +1725,12 @@ export function ApiEditorLayout() {
         }
       } catch (error: any) {
         console.error("WebSocket Operation 저장 실패:", error);
-        alert(error.message || "WebSocket Operation 저장에 실패했습니다.");
+        setAlertModal({
+          isOpen: true,
+          title: "저장 실패",
+          message: error.message || "WebSocket Operation 저장에 실패했습니다.",
+          variant: "error",
+        });
       }
       return;
     }
@@ -1687,7 +1739,12 @@ export function ApiEditorLayout() {
     // 필수 필드 검증은 이미 isFormValid()에서 처리되므로 여기서는 추가 검증 불필요
     // 하지만 안전을 위해 한 번 더 체크
     if (protocol === "REST" && (!method || !url || !url.trim())) {
-      alert("Method와 URL을 입력해주세요.");
+      setAlertModal({
+        isOpen: true,
+        title: "입력 오류",
+        message: "Method와 URL을 입력해주세요.",
+        variant: "warning",
+      });
       return;
     }
 
@@ -1714,7 +1771,12 @@ export function ApiEditorLayout() {
         // 초기 상태 참조 초기화
         restInitialStateRef.current = null;
 
-        alert("API 스펙이 수정되었습니다.");
+        setAlertModal({
+          isOpen: true,
+          title: "수정 완료",
+          message: "API 스펙이 수정되었습니다.",
+          variant: "success",
+        });
         setIsEditMode(false);
 
         // 사이드바 목록 다시 로드 (백그라운드에서)
@@ -1772,7 +1834,12 @@ export function ApiEditorLayout() {
         };
 
         addEndpoint(newEndpoint, group);
-        alert(`${method} ${url} API가 생성되었습니다.`);
+        setAlertModal({
+          isOpen: true,
+          title: "생성 완료",
+          message: `${method} ${url} API가 생성되었습니다.`,
+          variant: "success",
+        });
 
         // 사이드바 목록 다시 로드
         await loadEndpoints();
@@ -1788,56 +1855,100 @@ export function ApiEditorLayout() {
     } catch (error: unknown) {
       console.error("API 저장 실패:", error);
       const errorMessage = getErrorMessage(error);
-      alert(`API 저장에 실패했습니다: ${errorMessage}`);
+      setAlertModal({
+        isOpen: true,
+        title: "저장 실패",
+        message: `API 저장에 실패했습니다: ${errorMessage}`,
+        variant: "error",
+      });
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!selectedEndpoint) return;
 
     // WebSocket 삭제 로직
     if (protocol === "WebSocket") {
-      if (confirm("이 WebSocket Operation을 삭제하시겠습니까?")) {
-        alert("WebSocket Operation 삭제 기능은 준비 중입니다.");
-        // TODO: Implement WebSocket Operation delete logic
-        // - deleteWebSocketOperation 호출
-      }
+      setConfirmModal({
+        isOpen: true,
+        title: "WebSocket Operation 삭제",
+        message: "이 WebSocket Operation을 삭제하시겠습니까?",
+        variant: "danger",
+        onConfirm: () => {
+          setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+          setAlertModal({
+            isOpen: true,
+            title: "준비 중",
+            message: "WebSocket Operation 삭제 기능은 준비 중입니다.",
+            variant: "info",
+          });
+          // TODO: Implement WebSocket Operation delete logic
+          // - deleteWebSocketOperation 호출
+        },
+      });
       return;
     }
 
     // completed 상태만 삭제 불가 (mock 상태는 diff가 있어도 삭제 가능)
     if (isCompleted) {
-      alert("이미 완료(completed)된 API는 삭제할 수 없습니다.");
+      setAlertModal({
+        isOpen: true,
+        title: "삭제 불가",
+        message: "이미 완료(completed)된 API는 삭제할 수 없습니다.",
+        variant: "warning",
+      });
       return;
     }
 
-    if (confirm("이 엔드포인트를 삭제하시겠습니까?")) {
-      try {
-        await deleteRestApiSpec(selectedEndpoint.id);
-        deleteEndpoint(selectedEndpoint.id);
-        alert("엔드포인트가 삭제되었습니다.");
+    setConfirmModal({
+      isOpen: true,
+      title: "엔드포인트 삭제",
+      message: "이 엔드포인트를 삭제하시겠습니까?",
+      variant: "danger",
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          await deleteRestApiSpec(selectedEndpoint.id);
+          deleteEndpoint(selectedEndpoint.id);
+          setAlertModal({
+            isOpen: true,
+            title: "삭제 완료",
+            message: "엔드포인트가 삭제되었습니다.",
+            variant: "success",
+          });
 
-        // 폼 초기화
-        setSelectedEndpoint(null);
-        setMethod("POST");
-        setUrl("/api/auth/login");
-        setUrlError(""); // 에러 상태 초기화
-        setTags("AUTH");
-        setDescription("사용자 로그인");
-        setIsEditMode(false);
-        loadEndpoints();
-      } catch (error: unknown) {
-        console.error("API 삭제 실패:", error);
-        const errorMessage = getErrorMessage(error);
-        alert(`API 삭제에 실패했습니다: ${errorMessage}`);
-      }
-    }
+          // 폼 초기화
+          setSelectedEndpoint(null);
+          setMethod("POST");
+          setUrl("/api/auth/login");
+          setUrlError(""); // 에러 상태 초기화
+          setTags("AUTH");
+          setDescription("사용자 로그인");
+          setIsEditMode(false);
+          loadEndpoints();
+        } catch (error: unknown) {
+          console.error("API 삭제 실패:", error);
+          const errorMessage = getErrorMessage(error);
+          setAlertModal({
+            isOpen: true,
+            title: "삭제 실패",
+            message: `API 삭제에 실패했습니다: ${errorMessage}`,
+            variant: "error",
+          });
+        }
+      },
+    });
   };
 
   const handleEdit = () => {
     // completed 상태만 수정 불가 (mock 상태는 diff가 있어도 수정 가능)
     if (isCompleted) {
-      alert("이미 완료(completed)된 API는 수정할 수 없습니다.");
+      setAlertModal({
+        isOpen: true,
+        title: "수정 불가",
+        message: "이미 완료(completed)된 API는 수정할 수 없습니다.",
+        variant: "warning",
+      });
       return;
     }
 
@@ -1880,23 +1991,30 @@ export function ApiEditorLayout() {
   };
 
   const handleReset = () => {
-    if (confirm("작성 중인 내용을 초기화하시겠습니까?")) {
-      setMethod("POST");
-      setUrl("");
-      setUrlError(""); // 에러 상태 초기화
-      setTags("");
-      setDescription("");
-      setSummary("");
-      setQueryParams([]);
-      setRequestHeaders([]);
-      setPathParams([]);
-      setAuth({ type: "none" });
-      setRequestBody({
-        type: "json",
-        fields: [createPrimitiveField("email", "string")],
-      });
-      setStatusCodes([]);
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: "초기화 확인",
+      message: "작성 중인 내용을 초기화하시겠습니까?",
+      variant: "warning",
+      onConfirm: () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        setMethod("POST");
+        setUrl("");
+        setUrlError(""); // 에러 상태 초기화
+        setTags("");
+        setDescription("");
+        setSummary("");
+        setQueryParams([]);
+        setRequestHeaders([]);
+        setPathParams([]);
+        setAuth({ type: "none" });
+        setRequestBody({
+          type: "json",
+          fields: [createPrimitiveField("email", "string")],
+        });
+        setStatusCodes([]);
+      },
+    });
   };
 
   const handleNewForm = useCallback(() => {
@@ -3420,6 +3538,25 @@ export function ApiEditorLayout() {
         onClose={() => setIsMdPreviewOpen(false)}
         content={mdPreviewContent}
         filename={mdPreviewFilename}
+      />
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+      />
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={() => setAlertModal((prev) => ({ ...prev, isOpen: false }))}
+        title={alertModal.title}
+        message={alertModal.message}
+        variant={alertModal.variant}
       />
     </div>
   );
