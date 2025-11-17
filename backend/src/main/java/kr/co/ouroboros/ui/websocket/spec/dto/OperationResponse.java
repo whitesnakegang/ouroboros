@@ -46,6 +46,14 @@ public class OperationResponse {
      * </ul>
      */
     private String tag;
+
+    /**
+     * WebSocket protocol for this operation's entrypoint.
+     * <p>
+     * Extracted from the server definition matching the operation's x-ouroboros-entrypoint.
+     * Possible values: "ws" or "wss"
+     */
+    private String protocol;
 }
 
 
