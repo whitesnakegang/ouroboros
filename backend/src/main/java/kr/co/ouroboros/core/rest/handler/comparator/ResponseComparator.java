@@ -8,6 +8,7 @@ import kr.co.ouroboros.core.rest.common.dto.MediaType;
 import kr.co.ouroboros.core.rest.common.dto.Operation;
 import kr.co.ouroboros.core.rest.common.dto.Response;
 import kr.co.ouroboros.core.rest.common.dto.Schema;
+import kr.co.ouroboros.core.rest.handler.helper.RequestDiffHelper;
 import kr.co.ouroboros.core.rest.handler.helper.RequestDiffHelper.HttpMethod;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -269,7 +270,11 @@ public class ResponseComparator {
 
         // $ref 비교 (객체 참조인 경우)
         if (scannedSchema.getRef() != null || fileSchema.getRef() != null) {
-            if (!Objects.equals(scannedSchema.getRef(), fileSchema.getRef())) {
+            // Normalize both refs to simple class names for comparison
+            String normalizedScannedRef = normalizeSchemaRef(scannedSchema.getRef());
+            String normalizedFileRef = normalizeSchemaRef(fileSchema.getRef());
+
+            if (!Objects.equals(normalizedScannedRef, normalizedFileRef)) {
                 log.debug("[SCHEMA REF MISMATCH] {} {} - Status {}: $ref가 다릅니다. (스캔: {}, 파일: {})",
                         endpoint, method, statusCode, scannedSchema.getRef(), fileSchema.getRef());
                 return formatContentReason(contentType,
@@ -328,6 +333,25 @@ public class ResponseComparator {
             return null;
         }
         return ref.substring("#/components/schemas/".length());
+    }
+
+    /**
+     * Normalizes a schema reference to its simple class name for comparison.
+     * <p>
+     * Extracts the schema name from a $ref and converts FQCN to simple class name.
+     * Example: "#/components/schemas/com.c102.ourotest.dto.User" -> "User"
+     *
+     * @param ref a $ref string expected in the form "#/components/schemas/SchemaName"
+     * @return the simple class name, or {@code null} if {@code ref} is {@code null} or not in the expected form
+     */
+    private String normalizeSchemaRef(String ref) {
+        String schemaName = extractSchemaNameFromRef(ref);
+        if (schemaName == null) {
+            return null;
+        }
+
+        // Extract simple class name from FQCN using common helper
+        return RequestDiffHelper.extractClassNameFromFullName(schemaName);
     }
 
 }

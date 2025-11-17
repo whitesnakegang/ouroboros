@@ -117,13 +117,24 @@ public class RestSchemaServiceImpl implements RestSchemaService {
                 throw new IllegalArgumentException("No schemas found. The specification file does not exist.");
             }
 
+            // Try to find schema with exact name first
             Map<String, Object> schemaDefinition = yamlParser.getSchema(openApiDoc, schemaName);
+
+            // If not found, try with normalized name (simple class name)
+            String actualSchemaName = schemaName;
+            if (schemaDefinition == null) {
+                String normalizedName = extractClassNameFromFullName(schemaName);
+                schemaDefinition = yamlParser.getSchema(openApiDoc, normalizedName);
+                if (schemaDefinition != null) {
+                    actualSchemaName = normalizedName;
+                }
+            }
 
             if (schemaDefinition == null) {
                 throw new IllegalArgumentException("Schema '" + schemaName + "' not found");
             }
 
-            return convertToResponse(schemaName, schemaDefinition);
+            return convertToResponse(actualSchemaName, schemaDefinition);
         } finally {
             lock.readLock().unlock();
         }
@@ -151,7 +162,19 @@ public class RestSchemaServiceImpl implements RestSchemaService {
 
             // Read from file directly (not cache) for CUD operations
             Map<String, Object> openApiDoc = yamlParser.readDocumentFromFile();
+
+            // Try to find schema with exact name first
             Map<String, Object> existingSchema = yamlParser.getSchema(openApiDoc, schemaName);
+            String actualSchemaName = schemaName;
+
+            // If not found, try with normalized name (simple class name)
+            if (existingSchema == null) {
+                String normalizedName = extractClassNameFromFullName(schemaName);
+                existingSchema = yamlParser.getSchema(openApiDoc, normalizedName);
+                if (existingSchema != null) {
+                    actualSchemaName = normalizedName;
+                }
+            }
 
             if (existingSchema == null) {
                 throw new IllegalArgumentException("Schema '" + schemaName + "' not found");
@@ -203,9 +226,9 @@ public class RestSchemaServiceImpl implements RestSchemaService {
             // registry 초기화 후 재등록 (전체 읽기)
             reloadMockRegistry();
 
-            log.info("Updated schema: {}", schemaName);
+            log.info("Updated schema: {}", actualSchemaName);
 
-            return convertToResponse(schemaName, existingSchema);
+            return convertToResponse(actualSchemaName, existingSchema);
         } finally {
             lock.writeLock().unlock();
         }
@@ -229,7 +252,18 @@ public class RestSchemaServiceImpl implements RestSchemaService {
             // Read from file directly (not cache) for CUD operations
             Map<String, Object> openApiDoc = yamlParser.readDocumentFromFile();
 
+            // Try to remove schema with exact name first
             boolean removed = yamlParser.removeSchema(openApiDoc, schemaName);
+            String actualSchemaName = schemaName;
+
+            // If not found, try with normalized name (simple class name)
+            if (!removed) {
+                String normalizedName = extractClassNameFromFullName(schemaName);
+                removed = yamlParser.removeSchema(openApiDoc, normalizedName);
+                if (removed) {
+                    actualSchemaName = normalizedName;
+                }
+            }
 
             if (!removed) {
                 throw new IllegalArgumentException("Schema '" + schemaName + "' not found");
@@ -244,7 +278,7 @@ public class RestSchemaServiceImpl implements RestSchemaService {
             // registry 초기화 후 재등록 (전체 읽기)
             reloadMockRegistry();
 
-            log.info("Deleted schema: {}", schemaName);
+            log.info("Deleted schema: {}", actualSchemaName);
         } finally {
             lock.writeLock().unlock();
         }
@@ -562,6 +596,27 @@ public class RestSchemaServiceImpl implements RestSchemaService {
         Map<String, kr.co.ouroboros.core.rest.mock.model.EndpointMeta> endpoints = mockLoaderService.loadFromYaml();
         endpoints.values().forEach(mockRegistry::register);
         log.info("Reloaded {} mock endpoints into registry", endpoints.size());
+    }
+
+    /**
+     * Extracts the simple class name from a fully qualified class name (FQCN).
+     * <p>
+     * Example: "com.c102.ourotest.dto.MemberResponse" -> "MemberResponse"
+     *
+     * @param fullName the fully qualified class name or simple class name
+     * @return the simple class name; if no '.' is present, returns the original string
+     */
+    private String extractClassNameFromFullName(String fullName) {
+        if (fullName == null || fullName.isEmpty()) {
+            return fullName;
+        }
+
+        int lastDotIndex = fullName.lastIndexOf('.');
+        if (lastDotIndex == -1) {
+            return fullName;
+        }
+
+        return fullName.substring(lastDotIndex + 1);
     }
 
 }

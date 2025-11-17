@@ -314,4 +314,25 @@ public final class RequestDiffHelper {
         }
         return ref;
     }
+
+    /**
+     * Extracts the simple class name from a fully qualified class name (FQCN).
+     * <p>
+     * Example: "com.c102.ourotest.dto.MemberResponse" -> "MemberResponse"
+     *
+     * @param fullName the fully qualified class name or simple class name
+     * @return the simple class name; if no '.' is present, returns the original string; null if input is null
+     */
+    public static String extractClassNameFromFullName(String fullName) {
+        if (fullName == null || fullName.isEmpty()) {
+            return fullName;
+        }
+
+        int lastDotIndex = fullName.lastIndexOf('.');
+        if (lastDotIndex == -1) {
+            return fullName;
+        }
+
+        return fullName.substring(lastDotIndex + 1);
+    }
 }

@@ -284,7 +284,16 @@ public class RestSchemaValidator {
         // Create missing schemas
         int created = 0;
         for (String schemaName : referencedSchemas) {
-            if (!schemas.containsKey(schemaName)) {
+            // Check if schema exists with either FQCN or simple class name
+            boolean schemaExists = schemas.containsKey(schemaName);
+
+            if (!schemaExists) {
+                // Try normalized name (simple class name)
+                String normalizedName = extractSimpleClassName(schemaName);
+                schemaExists = schemas.containsKey(normalizedName);
+            }
+
+            if (!schemaExists) {
                 log.warn("🔧 Auto-creating missing schema: {}", schemaName);
                 schemas.put(schemaName, createEmptySchema());
                 created++;
@@ -347,5 +356,26 @@ public class RestSchemaValidator {
         schema.put("properties", new LinkedHashMap<>());
         schema.put("x-ouroboros-orders", new ArrayList<>());
         return schema;
+    }
+
+    /**
+     * Extracts the simple class name from a fully qualified class name (FQCN).
+     * <p>
+     * Example: "com.c102.ourotest.dto.MemberResponse" -> "MemberResponse"
+     *
+     * @param fullName the fully qualified class name or simple class name
+     * @return the simple class name; if no '.' is present, returns the original string
+     */
+    private String extractSimpleClassName(String fullName) {
+        if (fullName == null || fullName.isEmpty()) {
+            return fullName;
+        }
+
+        int lastDotIndex = fullName.lastIndexOf('.');
+        if (lastDotIndex == -1) {
+            return fullName;
+        }
+
+        return fullName.substring(lastDotIndex + 1);
     }
 }
