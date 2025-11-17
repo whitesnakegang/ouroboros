@@ -954,7 +954,7 @@ export function ApiEditorLayout() {
   const [statusCodes, setStatusCodes] = useState<StatusCode[]>([]);
 
   // WebSocket state
-  const [wsEntryPoint, setWsEntryPoint] = useState("");
+  const [wsEntryPoint, setWsEntryPoint] = useState("/ws");
   const [wsProtocol, setWsProtocol] = useState<"ws" | "wss">("ws");
   const [wsSummary, setWsSummary] = useState("");
   const [wsDescription, setWsDescription] = useState("");
@@ -1160,10 +1160,8 @@ export function ApiEditorLayout() {
   const handleSave = async () => {
     // WebSocket 저장 로직
     if (protocol === "WebSocket") {
-      if (!wsEntryPoint) {
-        alert("Entry Point를 입력해주세요.");
-        return;
-      }
+      // pathname이 비어있으면 기본값 /ws 사용
+      const pathname = wsEntryPoint.trim() || "/ws";
 
       try {
         // receiver와 reply를 ChannelMessageInfo 형식으로 변환
@@ -1189,7 +1187,7 @@ export function ApiEditorLayout() {
 
         const request: CreateOperationRequest = {
           protocol: wsProtocol,
-          pathname: wsEntryPoint,
+          pathname: pathname,
           receives: receives,
           replies: replies,
           tags:
@@ -1205,7 +1203,7 @@ export function ApiEditorLayout() {
           // 수정 로직
           await updateWebSocketOperation(selectedEndpoint.id, {
             protocol: wsProtocol,
-            pathname: wsEntryPoint,
+            pathname: pathname,
             receive: receives && receives.length > 0 ? receives[0] : undefined,
             reply: replies && replies.length > 0 ? replies[0] : undefined,
             tags:
@@ -1564,7 +1562,7 @@ export function ApiEditorLayout() {
 
     // 프로토콜에 따른 추가 초기화
     if (protocol === "WebSocket") {
-      setWsEntryPoint("");
+      setWsEntryPoint("/ws");
       setWsProtocol("ws");
       setWsSummary("");
       setWsDescription("");
