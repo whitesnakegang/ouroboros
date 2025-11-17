@@ -239,16 +239,20 @@ export class StompClient {
  * @param path WebSocket 경로 (예: "/ws")
  * @returns 완전한 WebSocket URL (예: "ws://localhost:8080/ws")
  */
-export function buildWebSocketUrl(path: string): string {
+export function buildWebSocketUrl(path: string, protocol?: "ws" | "wss"): string {
   // 백엔드 서버 주소 가져오기 (환경 변수 또는 기본값)
   const backendUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
   
   // URL 파싱하여 호스트와 포트 추출
   const backendUrlObj = new URL(backendUrl);
-  const protocol = backendUrlObj.protocol === "https:" ? "wss:" : "ws:";
+  
+  // protocol 파라미터가 제공되면 사용, 없으면 백엔드 URL 기반으로 결정
+  const wsProtocol = protocol 
+    ? `${protocol}:` 
+    : backendUrlObj.protocol === "https:" ? "wss:" : "ws:";
   const host = backendUrlObj.host; // hostname:port 형태
   
   const wsPath = path.startsWith("/") ? path : `/${path}`;
-  return `${protocol}//${host}${wsPath}`;
+  return `${wsProtocol}//${host}${wsPath}`;
 }
 

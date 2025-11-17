@@ -24,6 +24,7 @@ export interface Endpoint {
   protocol?: Protocol; // 프로토콜 정보 추가
   operationName?: string; // WebSocket operation name (조회용)
   entrypoint?: string; // WebSocket entrypoint (pathname)
+  wsProtocol?: "ws" | "wss" | null; // WebSocket protocol (ws/wss/null)
 }
 
 export interface EndpointData {
@@ -192,6 +193,9 @@ function convertOperationToEndpoint(
   // entrypoint 추출 (operation.entrypoint 또는 기본값)
   const entrypoint = (operation as any).entrypoint || "/ws";
 
+  // protocol 추출 (operationResponse.protocol 또는 기본값 "ws")
+  const wsProtocol = operationResponse.protocol || "ws";
+
   return {
     id: operation.id || operationName,
     method: method,
@@ -207,6 +211,7 @@ function convertOperationToEndpoint(
     protocol: "WebSocket",
     operationName: operationName,
     entrypoint: entrypoint, // WebSocket entrypoint 저장
+    wsProtocol: wsProtocol, // WebSocket protocol 저장 (ws/wss/null)
   };
 }
 

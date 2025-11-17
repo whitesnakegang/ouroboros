@@ -811,7 +811,11 @@ export function ApiEditorLayout() {
       const entrypoint = operationData.operation.entrypoint || "/ws";
       setWsEntryPoint(entrypoint);
       setWsEntryPointError(""); // 에러 상태 초기화
-
+      
+      // Protocol 설정 (백엔드에서 제공하는 protocol 값 사용)
+      const protocol = operationData.protocol || "ws"; // null이면 기본값 "ws"
+      setWsProtocol(protocol as "ws" | "wss");
+      
       // selectedEndpoint에 entrypoint 업데이트
       if (selectedEndpoint) {
         setSelectedEndpoint({

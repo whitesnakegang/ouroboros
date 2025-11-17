@@ -871,6 +871,7 @@ export interface OperationResponse {
   operationName: string;
   tag?: string;
   operation: Operation;
+  protocol?: "ws" | "wss" | null; // WebSocket protocol (ws/wss/null)
 }
 
 export interface ChannelMessageInfo {

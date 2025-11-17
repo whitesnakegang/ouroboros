@@ -117,7 +117,9 @@ export function WsTestRequestPanel() {
     if (selectedEndpoint && selectedEndpoint.protocol === "WebSocket") {
       // WebSocket 엔드포인트의 entrypoint는 entrypoint 필드에 저장되어 있음
       const entrypoint = selectedEndpoint.entrypoint || "/ws";
-      const wsUrl = buildWebSocketUrl(entrypoint);
+      // protocol 정보 사용 (ws/wss/null, null이면 기본값 "ws")
+      const protocol = selectedEndpoint.wsProtocol || "ws";
+      const wsUrl = buildWebSocketUrl(entrypoint, protocol);
       setEntryPoint(wsUrl);
     } else {
       setEntryPoint("");

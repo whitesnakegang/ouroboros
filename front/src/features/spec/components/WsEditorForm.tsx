@@ -176,12 +176,25 @@ export function WsEditorForm({
 
   // entryPoint 파싱 (기존 데이터 로드 시)
   useEffect(() => {
+    // 외부에서 protocol이 전달되면 그것을 우선 사용 (백엔드에서 받은 protocol 값)
+    if (externalProtocol && setExternalProtocol) {
+      setExternalProtocol(externalProtocol);
+    }
+    
     if (entryPoint && entryPoint.includes("://")) {
-      // ws://localhost:8080/ws 형태 파싱
-      const match = entryPoint.match(/^(ws|wss):\/\/[^/]+(\/.*)?$/);
-      if (match) {
-        setProtocol(match[1] as "ws" | "wss");
-        setPathname(match[2] || "/ws");
+      // ws://localhost:8080/ws 형태 파싱 (외부 protocol이 없을 때만)
+      if (!externalProtocol) {
+        const match = entryPoint.match(/^(ws|wss):\/\/[^/]+(\/.*)?$/);
+        if (match) {
+          setProtocol(match[1] as "ws" | "wss");
+          setPathname(match[2] || "/ws");
+        }
+      } else {
+        // 외부 protocol이 있으면 pathname만 추출
+        const pathMatch = entryPoint.match(/^[^:]+:\/\/[^/]+(\/.*)?$/);
+        if (pathMatch) {
+          setPathname(pathMatch[1] || "/ws");
+        }
       }
     } else if (entryPoint) {
       // /ws 형태만 있으면 pathname으로
@@ -194,7 +207,7 @@ export function WsEditorForm({
       setEntryPointError("");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entryPoint, setProtocol]);
+  }, [entryPoint, externalProtocol, setProtocol]);
 
   // Messages 목록 로드
   const loadMessages = async () => {
