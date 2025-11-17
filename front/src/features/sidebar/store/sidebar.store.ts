@@ -53,24 +53,6 @@ interface SidebarState {
   setProtocol: (protocol: Protocol) => void;
 }
 
-// 주소에서 도메인 추출 (첫 번째 경로 세그먼트)
-function extractDomainFromAddress(address: string): string {
-  if (!address || address === "/unknown") {
-    return "OTHERS";
-  }
-
-  // "/"로 시작하는 주소에서 첫 번째 경로 세그먼트 추출
-  const parts = address.split("/").filter((part) => part.length > 0);
-
-  if (parts.length === 0) {
-    return "OTHERS";
-  }
-
-  // 첫 번째 경로 세그먼트를 도메인으로 사용 (대문자로 변환)
-  const domain = parts[0];
-  return domain.charAt(0).toUpperCase() + domain.slice(1).toLowerCase();
-}
-
 // 백엔드 스펙을 프론트엔드 엔드포인트 형태로 변환
 function convertSpecToEndpoint(spec: RestApiSpecResponse): Endpoint {
   // tag 매핑: none=미구현, implementing=구현중, bugfix=수정중
