@@ -42,6 +42,7 @@ public class WebSocketSpecSyncHelper {
         Map<String, List<Operation>> channelNameOperationMap = new HashMap<>();
         if (operationMap != null) {
             for (Entry<String, Operation> operationEntry : operationMap.entrySet()) {
+                if(operationEntry.getValue().getAction().equals("send")) continue;
                 String channelRef = operationEntry.getValue().getChannel().getRef();
                 channelNameOperationMap
                     .computeIfAbsent(channelRef, k -> new ArrayList<>())
