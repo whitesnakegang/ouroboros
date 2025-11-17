@@ -4,11 +4,13 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.co.ouroboros.core.global.Protocol;
 import kr.co.ouroboros.core.global.manager.OuroApiSpecManager;
+import kr.co.ouroboros.core.global.spec.SpecValidationUtil;
 import kr.co.ouroboros.core.websocket.common.dto.ChannelReference;
 import kr.co.ouroboros.core.websocket.common.dto.MessageReference;
 import kr.co.ouroboros.core.websocket.common.dto.Operation;
 import kr.co.ouroboros.core.websocket.common.dto.Reply;
 import kr.co.ouroboros.core.websocket.common.yaml.WebSocketYamlParser;
+import kr.co.ouroboros.core.websocket.spec.util.RefCleanupUtil;
 import kr.co.ouroboros.core.websocket.spec.util.ReferenceConverter;
 import kr.co.ouroboros.ui.websocket.spec.dto.*;
 import lombok.RequiredArgsConstructor;
@@ -62,6 +64,9 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                 throw new IllegalArgumentException("Pathname must be provided");
             }
 
+            // Validate pathname does not contain Korean characters
+            SpecValidationUtil.validateNoKorean(request.getPathname(), "Pathname");
+
             // Ensure server entry point exists
             serverManager.ensureServerExists(asyncApiDoc, request.getProtocol(), request.getPathname());
 
@@ -73,10 +78,25 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                 throw new IllegalArgumentException("At least one receive or reply channel must be provided");
             }
 
+            // Validate that all message names are simple class names (not package-qualified)
+            if (hasReceives) {
+                for (ChannelMessageInfo receive : request.getReceives()) {
+                    SpecValidationUtil.validateSimpleClassNames(receive.getMessages(), "Receive message name");
+                }
+            }
+            if (hasReplies) {
+                for (ChannelMessageInfo reply : request.getReplies()) {
+                    SpecValidationUtil.validateSimpleClassNames(reply.getMessages(), "Reply message name");
+                }
+            }
+
             // Reply-only operations
             if (!hasReceives && hasReplies) {
                 for (ChannelMessageInfo reply : request.getReplies()) {
                     String replyChannelName = channelManager.ensureChannelExists(asyncApiDoc, reply);
+
+                    // Check for duplicate operation (send-only: entrypoint + send + replyChannel)
+                    validateNoDuplicateOperation(asyncApiDoc, request.getPathname(), "send", replyChannelName, null);
 
                     // Generate unique operation name
                     String operationName = generateOperationName(null, replyChannelName, asyncApiDoc);
@@ -110,6 +130,10 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
 
                     if (!hasReplies) {
                         // No reply - create receive-only operation
+
+                        // Check for duplicate operation (receive-only: entrypoint + receive + receiveChannel)
+                        validateNoDuplicateOperation(asyncApiDoc, request.getPathname(), "receive", receiveChannelName, null);
+
                         String operationName = generateOperationName(receiveChannelName, null, asyncApiDoc);
 
                         // Build operation definition without reply
@@ -137,6 +161,9 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                         // With replies - create all combinations
                         for (ChannelMessageInfo reply : request.getReplies()) {
                             String replyChannelName = channelManager.ensureChannelExists(asyncApiDoc, reply);
+
+                            // Check for duplicate operation (receive-reply: entrypoint + receive + receiveChannel + replyChannel)
+                            validateNoDuplicateOperation(asyncApiDoc, request.getPathname(), "receive", receiveChannelName, replyChannelName);
 
                             // Generate unique operation name
                             String operationName = generateOperationName(receiveChannelName, replyChannelName, asyncApiDoc);
@@ -304,10 +331,23 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                 String pathname = request.getPathname() != null ? request.getPathname() :
                         serverManager.extractPathname(asyncApiDoc);
 
+                // Validate pathname does not contain Korean characters if pathname is being updated
+                if (request.getPathname() != null) {
+                    SpecValidationUtil.validateNoKorean(request.getPathname(), "Pathname");
+                }
+
                 if (protocol != null && pathname != null) {
                     serverManager.ensureServerExists(asyncApiDoc, protocol, pathname);
                     updatedPathname = pathname;
                 }
+            }
+
+            // Validate that all message names are simple class names (not package-qualified)
+            if (request.getReceive() != null && request.getReceive().getMessages() != null) {
+                SpecValidationUtil.validateSimpleClassNames(request.getReceive().getMessages(), "Receive message name");
+            }
+            if (request.getReply() != null && request.getReply().getMessages() != null) {
+                SpecValidationUtil.validateSimpleClassNames(request.getReply().getMessages(), "Reply message name");
             }
 
             // Extract old channel references before update
@@ -422,6 +462,19 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
             // Find channels that were removed (in old but not in new)
             Set<String> removedChannels = new HashSet<>(oldChannelRefs);
             removedChannels.removeAll(newChannelRefs);
+
+            // Validate no duplicate after update (exclude current operation)
+            String updatedEntrypoint = (String) updatedOperation.get("x-ouroboros-entrypoint");
+            String updatedAction = (String) updatedOperation.get("action");
+            String updatedChannelName = extractChannelNameFromRef(updatedOperation.get("channel"));
+            String updatedReplyChannelName = null;
+            Object updatedReplyObj = updatedOperation.get("reply");
+            if (updatedReplyObj instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> updatedReplyMap = (Map<String, Object>) updatedReplyObj;
+                updatedReplyChannelName = extractChannelNameFromRef(updatedReplyMap.get("channel"));
+            }
+            validateNoDuplicateOperation(asyncApiDoc, updatedEntrypoint, updatedAction, updatedChannelName, updatedReplyChannelName, id);
 
             // Apply the update to the actual document
             existingOperation.clear();
@@ -624,6 +677,153 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
     }
 
     /**
+     * Validates that no duplicate operation exists for the given combination.
+     * <p>
+     * An operation is considered duplicate if it has the same:
+     * <ul>
+     *   <li>entrypoint (WebSocket pathname)</li>
+     *   <li>action (send or receive)</li>
+     *   <li>channel (main channel name)</li>
+     *   <li>reply channel (if applicable)</li>
+     * </ul>
+     *
+     * @param asyncApiDoc the AsyncAPI document to check
+     * @param entrypoint the WebSocket pathname (e.g., /ws)
+     * @param action the operation action (send or receive)
+     * @param channelName the main channel name
+     * @param replyChannelName the reply channel name (can be null)
+     * @throws IllegalArgumentException if a duplicate operation exists
+     */
+    private void validateNoDuplicateOperation(
+            Map<String, Object> asyncApiDoc,
+            String entrypoint,
+            String action,
+            String channelName,
+            String replyChannelName) {
+        validateNoDuplicateOperation(asyncApiDoc, entrypoint, action, channelName, replyChannelName, null);
+    }
+
+    /**
+     * Validates that no duplicate operation exists for the given combination.
+     * <p>
+     * An operation is considered duplicate if it has the same:
+     * <ul>
+     *   <li>entrypoint (WebSocket pathname)</li>
+     *   <li>action (send or receive)</li>
+     *   <li>channel (main channel name)</li>
+     *   <li>reply channel (if applicable)</li>
+     * </ul>
+     *
+     * @param asyncApiDoc the AsyncAPI document to check
+     * @param entrypoint the WebSocket pathname (e.g., /ws)
+     * @param action the operation action (send or receive)
+     * @param channelName the main channel name
+     * @param replyChannelName the reply channel name (can be null)
+     * @param excludeOperationId operation ID to exclude from duplicate check (typically the current operation being updated)
+     * @throws IllegalArgumentException if a duplicate operation exists
+     */
+    private void validateNoDuplicateOperation(
+            Map<String, Object> asyncApiDoc,
+            String entrypoint,
+            String action,
+            String channelName,
+            String replyChannelName,
+            String excludeOperationId) {
+
+        Map<String, Object> operations = yamlParser.getOperations(asyncApiDoc);
+        if (operations == null || operations.isEmpty()) {
+            return;
+        }
+
+        for (Map.Entry<String, Object> entry : operations.entrySet()) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> operation = (Map<String, Object>) entry.getValue();
+
+            // Exclude current operation being updated
+            if (excludeOperationId != null) {
+                String operationId = (String) operation.get("x-ouroboros-id");
+                if (Objects.equals(excludeOperationId, operationId)) {
+                    continue;
+                }
+            }
+
+            // Check entrypoint
+            String existingEntrypoint = (String) operation.get("x-ouroboros-entrypoint");
+            if (!Objects.equals(entrypoint, existingEntrypoint)) {
+                continue;
+            }
+
+            // Check action
+            String existingAction = (String) operation.get("action");
+            if (!Objects.equals(action, existingAction)) {
+                continue;
+            }
+
+            // Check main channel name
+            String existingChannelName = extractChannelNameFromRef(operation.get("channel"));
+            if (!Objects.equals(channelName, existingChannelName)) {
+                continue;
+            }
+
+            // Check reply channel name (if applicable)
+            String existingReplyChannelName = null;
+            Object replyObj = operation.get("reply");
+            if (replyObj instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> replyMap = (Map<String, Object>) replyObj;
+                existingReplyChannelName = extractChannelNameFromRef(replyMap.get("channel"));
+            }
+
+            if (!Objects.equals(replyChannelName, existingReplyChannelName)) {
+                continue;
+            }
+
+            // All criteria match - this is a duplicate
+            String duplicateMsg = buildDuplicateMessage(entrypoint, action, channelName, replyChannelName);
+            throw new IllegalArgumentException(duplicateMsg);
+        }
+    }
+
+    /**
+     * Extracts channel name from a channel reference object.
+     * <p>
+     * Example: {"$ref": "#/channels/userMessages"} -> "userMessages"
+     *
+     * @param channelObj the channel reference object (can be null)
+     * @return the channel name, or null if not found
+     */
+    @SuppressWarnings("unchecked")
+    private String extractChannelNameFromRef(Object channelObj) {
+        if (channelObj instanceof Map) {
+            Map<String, Object> channelMap = (Map<String, Object>) channelObj;
+            String ref = (String) channelMap.get("$ref");
+            if (ref != null && ref.startsWith("#/channels/")) {
+                return ref.substring("#/channels/".length());
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Builds a descriptive error message for duplicate operation.
+     *
+     * @param entrypoint the WebSocket pathname
+     * @param action the operation action
+     * @param channelName the main channel name
+     * @param replyChannelName the reply channel name (can be null)
+     * @return formatted error message
+     */
+    private String buildDuplicateMessage(String entrypoint, String action, String channelName, String replyChannelName) {
+        if (replyChannelName != null) {
+            return String.format("WebSocket operation already exists: %s [%s] channel=%s reply=%s",
+                    entrypoint, action.toUpperCase(), channelName, replyChannelName);
+        } else {
+            return String.format("WebSocket operation already exists: %s [%s] channel=%s",
+                    entrypoint, action.toUpperCase(), channelName);
+        }
+    }
+
+    /**
      * Generates a unique operation name from receive and reply channel names.
      *
      * @param receiveChannelName receive channel name (can be null for send-only)
@@ -667,8 +867,11 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
      */
     @SuppressWarnings("unchecked")
     private Operation convertMapToOperation(Map<String, Object> operationMap) {
+        // Cleanup: remove package names from all $ref values before conversion
+        Map<String, Object> cleanedMap = RefCleanupUtil.cleanupPackageNamesInRefs(operationMap);
+
         // Preprocess: convert $ref to ref for Jackson deserialization
-        Map<String, Object> processedMap = ReferenceConverter.convertDollarRefToRef(operationMap);
+        Map<String, Object> processedMap = ReferenceConverter.convertDollarRefToRef(cleanedMap);
         
         try {
             return objectMapper.convertValue(processedMap, Operation.class);
@@ -885,26 +1088,36 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                         .build();
             }
 
-            // Step 4: Sync missing schemas and messages from cache to file first
+            // Step 4: Sync servers from cache to file if file has no servers
+            syncServersFromCache(cacheDoc, fileDoc);
+
+            // Step 5: Sync missing schemas and messages from cache to file
             syncMissingSchemasAndMessagesFromCache(cacheDoc, fileDoc);
 
-            // Step 5: Deep copy operation from cache
+            // Step 6: Deep copy operation from cache
             Map<String, Object> operationToAdd = deepCopyOperation(cacheOperation);
 
-            // Step 5.1: Reset Ouroboros custom fields to default values when syncing to file
+            // Step 7: Reset Ouroboros custom fields to default values when syncing to file
             // WebSocket operations use: x-ouroboros-progress, x-ouroboros-diff (no x-ouroboros-tag)
             operationToAdd.put("x-ouroboros-progress", "none");
             operationToAdd.put("x-ouroboros-diff", "none");
-            
-            // Step 5.1.1: Set x-ouroboros-entrypoint from the first server's pathname in file document
-            // (Deep copy already contains cache operation's entrypoint, but we override with file's server value)
-            String entrypoint = serverManager.extractPathname(fileDoc);
-            if (entrypoint != null) {
-                operationToAdd.put("x-ouroboros-entrypoint", entrypoint);
-            }
-            // If file has no server, keep the existing entrypoint from cache operation (already in operationToAdd)
 
-            // Step 5.2: Update all $ref references in operation to use class names instead of full package names
+            // Step 8: Set x-ouroboros-entrypoint from servers
+            // Priority: fileDoc servers > cacheDoc servers > default
+            String entrypoint = serverManager.extractPathname(fileDoc);
+            if (entrypoint == null) {
+                // Try to get from cache document if file doesn't have servers
+                entrypoint = serverManager.extractPathname(cacheDoc);
+                log.debug("File has no servers, using entrypoint from cache: {}", entrypoint);
+            }
+            if (entrypoint == null) {
+                // Neither has servers - this shouldn't happen after Step 4, but use default as fallback
+                entrypoint = "/ws";
+                log.warn("No servers found in file or cache, using default entrypoint: {}", entrypoint);
+            }
+            operationToAdd.put("x-ouroboros-entrypoint", entrypoint);
+
+            // Step 9: Update all $ref references in operation to use class names instead of full package names
             Map<String, Object> cacheSchemas = yamlParser.getSchemas(cacheDoc);
             Map<String, Object> cacheMessages = yamlParser.getMessages(cacheDoc);
             Map<String, String> packageToClassNameMap = new HashMap<>();
@@ -913,7 +1126,7 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                 updateSchemaAndMessageReferences(operationToAdd, packageToClassNameMap);
             }
 
-            // Step 5.3: Ensure referenced channels exist in file
+            // Step 10: Ensure referenced channels exist in file
             @SuppressWarnings("unchecked")
             Map<String, Object> channelRef = (Map<String, Object>) operationToAdd.get("channel");
             if (channelRef != null) {
@@ -921,7 +1134,7 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                 if (channelRefStr != null && channelRefStr.startsWith("#/channels/")) {
                     String channelName = channelRefStr.substring("#/channels/".length());
                     // Extract class name if channel name has package prefix
-                    String className = extractClassNameFromFullName(channelName);
+                    String className = RefCleanupUtil.extractClassNameFromFullName(channelName);
                     if (className != null && !className.equals(channelName)) {
                         // Update channel reference to use class name
                         channelRef.put("$ref", "#/channels/" + className);
@@ -934,10 +1147,10 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                         // Check both full name and class name in cache channels
                         @SuppressWarnings("unchecked")
                         Map<String, Object> cacheChannel = (Map<String, Object>) cacheChannels.get(channelName);
-                        if (cacheChannel == null && !channelName.equals(extractClassNameFromFullName(channelName))) {
+                        if (cacheChannel == null && !channelName.equals(RefCleanupUtil.extractClassNameFromFullName(channelName))) {
                             // Try to find by full package name
                             for (String key : cacheChannels.keySet()) {
-                                if (extractClassNameFromFullName(key).equals(channelName)) {
+                                if (RefCleanupUtil.extractClassNameFromFullName(key).equals(channelName)) {
                                     @SuppressWarnings("unchecked")
                                     Map<String, Object> foundChannel = (Map<String, Object>) cacheChannels.get(key);
                                     cacheChannel = foundChannel;
@@ -958,7 +1171,7 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                                     Map<String, Object> updatedMessagesMap = new LinkedHashMap<>();
                                     for (Map.Entry<String, Object> messageEntry : messagesMap.entrySet()) {
                                         String fullMessageKey = messageEntry.getKey();
-                                        String messageClassName = extractClassNameFromFullName(fullMessageKey);
+                                        String messageClassName = RefCleanupUtil.extractClassNameFromFullName(fullMessageKey);
                                         Object messageValue = messageEntry.getValue();
                                         
                                         // Update $ref in message value if it exists
@@ -984,13 +1197,13 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                 }
             }
 
-            // Step 6: Add operation to file
+            // Step 11: Add operation to file
             yamlParser.putOperation(fileDoc, operationName, operationToAdd);
 
-            // Step 7: Write document to file
+            // Step 12: Write document to file
             yamlParser.writeDocument(fileDoc);
 
-            // Step 8: Update cache (validates with scanned state + updates cache)
+            // Step 13: Update cache (validates with scanned state + updates cache)
             specManager.processAndCacheSpec(Protocol.WEB_SOCKET, fileDoc);
 
             log.info("Synced cache-only operation '{}' to file (ID: {})", operationName, id);
@@ -1002,6 +1215,44 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                     .build();
         } finally {
             lock.writeLock().unlock();
+        }
+    }
+
+    /**
+     * Syncs servers from cache to file document if file has no servers.
+     * <p>
+     * Copies all servers from cache to file to ensure entrypoint can be extracted.
+     * If cache also has no servers, creates a default server with protocol "ws" and pathname "/ws".
+     *
+     * @param cacheDoc the cached document containing servers
+     * @param fileDoc the file document to sync into
+     */
+    @SuppressWarnings("unchecked")
+    private void syncServersFromCache(Map<String, Object> cacheDoc, Map<String, Object> fileDoc) {
+        Map<String, Object> fileServers = yamlParser.getServers(fileDoc);
+        if (fileServers != null && !fileServers.isEmpty()) {
+            // File already has servers, no need to sync
+            return;
+        }
+
+        Map<String, Object> cacheServers = yamlParser.getServers(cacheDoc);
+        if (cacheServers != null && !cacheServers.isEmpty()) {
+            // Deep copy servers from cache to file
+            try {
+                byte[] bytes = objectMapper.writeValueAsBytes(cacheServers);
+                Map<String, Object> serversCopy = objectMapper.readValue(bytes, new TypeReference<Map<String, Object>>() {});
+
+                // Set servers in fileDoc
+                fileDoc.put("servers", serversCopy);
+                log.info("Synced {} server(s) from cache to file", serversCopy.size());
+            } catch (Exception e) {
+                log.error("Failed to sync servers from cache to file", e);
+            }
+        } else {
+            // Cache has no servers either, create default server
+            log.debug("No servers found in cache, creating default server");
+            serverManager.ensureServerExists(fileDoc, "ws", "/ws");
+            log.info("Created default server (ws:///ws) in file");
         }
     }
 
@@ -1030,7 +1281,7 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
             int syncedCount = 0;
             for (Map.Entry<String, Object> cacheEntry : cacheSchemas.entrySet()) {
                 String cacheSchemaName = cacheEntry.getKey();
-                String className = extractClassNameFromFullName(cacheSchemaName);
+                String className = RefCleanupUtil.extractClassNameFromFullName(cacheSchemaName);
                 if (className == null || className.isEmpty()) {
                     className = cacheSchemaName;
                 }
@@ -1067,7 +1318,7 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
             int syncedCount = 0;
             for (Map.Entry<String, Object> cacheEntry : cacheMessages.entrySet()) {
                 String cacheMessageName = cacheEntry.getKey();
-                String className = extractClassNameFromFullName(cacheMessageName);
+                String className = RefCleanupUtil.extractClassNameFromFullName(cacheMessageName);
                 if (className == null || className.isEmpty()) {
                     className = cacheMessageName;
                 }
@@ -1085,7 +1336,7 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                         Object nameObj = messageToAdd.get("name");
                         if (nameObj instanceof String) {
                             String fullName = (String) nameObj;
-                            String nameClassName = extractClassNameFromFullName(fullName);
+                            String nameClassName = RefCleanupUtil.extractClassNameFromFullName(fullName);
                             if (nameClassName != null && !nameClassName.equals(fullName)) {
                                 messageToAdd.put("name", nameClassName);
                             }
@@ -1119,7 +1370,7 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
         
         if (cacheSchemas != null) {
             for (String fullName : cacheSchemas.keySet()) {
-                String className = extractClassNameFromFullName(fullName);
+                String className = RefCleanupUtil.extractClassNameFromFullName(fullName);
                 if (className != null && !className.equals(fullName)) {
                     map.put(fullName, className);
                 }
@@ -1128,7 +1379,7 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
         
         if (cacheMessages != null) {
             for (String fullName : cacheMessages.keySet()) {
-                String className = extractClassNameFromFullName(fullName);
+                String className = RefCleanupUtil.extractClassNameFromFullName(fullName);
                 if (className != null && !className.equals(fullName)) {
                     map.put(fullName, className);
                 }
@@ -1136,27 +1387,6 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
         }
         
         return map;
-    }
-
-    /**
-     * Extracts the simple class name from a package-qualified name.
-     * <p>
-     * Example: "com.c102.ourotest.dto.User" -> "User"
-     *
-     * @param fullName the package-qualified name
-     * @return the simple class name, or the original string if no '.' is present
-     */
-    private String extractClassNameFromFullName(String fullName) {
-        if (fullName == null || fullName.isEmpty()) {
-            return fullName;
-        }
-        
-        int lastDotIndex = fullName.lastIndexOf('.');
-        if (lastDotIndex == -1) {
-            return fullName;
-        }
-        
-        return fullName.substring(lastDotIndex + 1);
     }
 
     /**
@@ -1220,7 +1450,7 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
             }
             if (className == null) {
                 // Fallback: extract class name directly from ref
-                className = extractClassNameFromFullName(fullSchemaName);
+                className = RefCleanupUtil.extractClassNameFromFullName(fullSchemaName);
             }
             if (className != null && !className.equals(fullSchemaName)) {
                 return "#/components/schemas/" + className;
@@ -1236,7 +1466,7 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
             }
             if (className == null) {
                 // Fallback: extract class name directly from ref
-                className = extractClassNameFromFullName(fullMessageName);
+                className = RefCleanupUtil.extractClassNameFromFullName(fullMessageName);
             }
             if (className != null && !className.equals(fullMessageName)) {
                 return "#/components/messages/" + className;
@@ -1254,7 +1484,7 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
             }
             if (className == null) {
                 // Fallback: extract class name directly from ref
-                className = extractClassNameFromFullName(fullMessageName);
+                className = RefCleanupUtil.extractClassNameFromFullName(fullMessageName);
             }
             if (className != null && !className.equals(fullMessageName)) {
                 return prefix + className;
@@ -1298,7 +1528,7 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                     String ref = (String) refObj;
                     if (ref.startsWith("#/components/schemas/")) {
                         String fullSchemaName = ref.substring("#/components/schemas/".length());
-                        String className = extractClassNameFromFullName(fullSchemaName);
+                        String className = RefCleanupUtil.extractClassNameFromFullName(fullSchemaName);
                         if (className != null && !className.equals(fullSchemaName)) {
                             headers.put("$ref", "#/components/schemas/" + className);
                         }
@@ -1329,7 +1559,7 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                 String ref = (String) refObj;
                 if (ref.startsWith("#/components/schemas/")) {
                     String fullSchemaName = ref.substring("#/components/schemas/".length());
-                    String className = extractClassNameFromFullName(fullSchemaName);
+                    String className = RefCleanupUtil.extractClassNameFromFullName(fullSchemaName);
                     if (className != null && !className.equals(fullSchemaName)) {
                         schemaMap.put("$ref", "#/components/schemas/" + className);
                     }

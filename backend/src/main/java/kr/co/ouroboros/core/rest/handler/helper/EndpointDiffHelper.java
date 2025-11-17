@@ -62,6 +62,10 @@ public final class EndpointDiffHelper {
                     op.setXOuroborosId(UUID.randomUUID().toString());
                     log.debug("Generated x-ouroboros-id for {} {}: {}", method, url, op.getXOuroborosId());
                 }
+                // Normalize tags to uppercase
+                if (op.getTags() != null) {
+                    op.setTags(kr.co.ouroboros.core.global.spec.SpecValidationUtil.normalizeRestTags(op.getTags()));
+                }
                 op.setXOuroborosDiff("endpoint");
                 op.setXOuroborosTag("none");
                 
@@ -431,6 +435,11 @@ public final class EndpointDiffHelper {
         if (scanOp.getXOuroborosId() == null) {
             scanOp.setXOuroborosId(UUID.randomUUID().toString());
             log.debug("Generated x-ouroboros-id for {} {}: {}", method, url, scanOp.getXOuroborosId());
+        }
+
+        // Normalize tags to uppercase
+        if (scanOp.getTags() != null) {
+            scanOp.setTags(kr.co.ouroboros.core.global.spec.SpecValidationUtil.normalizeRestTags(scanOp.getTags()));
         }
 
         setOperationByMethod(pathItem, method, scanOp);

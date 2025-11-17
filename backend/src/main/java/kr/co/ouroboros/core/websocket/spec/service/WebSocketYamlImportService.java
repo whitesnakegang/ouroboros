@@ -1,5 +1,6 @@
 package kr.co.ouroboros.core.websocket.spec.service;
 
+import kr.co.ouroboros.core.global.spec.SpecValidationUtil;
 import kr.co.ouroboros.core.websocket.common.yaml.WebSocketYamlParser;
 import kr.co.ouroboros.ui.websocket.spec.dto.ImportYamlResponse;
 import kr.co.ouroboros.ui.websocket.spec.dto.RenamedItem;
@@ -393,6 +394,40 @@ public class WebSocketYamlImportService {
 
             // Enrich operation with Ouroboros fields
             Map<String, Object> operation = (Map<String, Object>) entry.getValue();
+            
+            // Normalize tags to uppercase (AsyncAPI format: List<Map<String, String>>)
+            if (operation.containsKey("tags") && operation.get("tags") instanceof List) {
+                @SuppressWarnings("unchecked")
+                List<Object> tagsObj = (List<Object>) operation.get("tags");
+                if (tagsObj != null && !tagsObj.isEmpty()) {
+                    List<Map<String, String>> tagMaps = new ArrayList<>();
+                    for (Object tagObj : tagsObj) {
+                        if (tagObj instanceof Map) {
+                            @SuppressWarnings("unchecked")
+                            Map<String, String> tagMap = (Map<String, String>) tagObj;
+                            if (tagMap.containsKey("name")) {
+                                Map<String, String> normalizedTag = new LinkedHashMap<>(tagMap);
+                                String name = normalizedTag.get("name");
+                                if (name != null) {
+                                    normalizedTag.put("name", name.toUpperCase());
+                                }
+                                tagMaps.add(normalizedTag);
+                            } else {
+                                tagMaps.add(tagMap);
+                            }
+                        } else if (tagObj instanceof String) {
+                            // Handle string tags (convert to AsyncAPI format)
+                            Map<String, String> tagMap = new LinkedHashMap<>();
+                            tagMap.put("name", ((String) tagObj).toUpperCase());
+                            tagMaps.add(tagMap);
+                        }
+                    }
+                    if (!tagMaps.isEmpty()) {
+                        operation.put("tags", tagMaps);
+                    }
+                }
+            }
+            
             enrichOperationWithOuroborosFields(operation, entrypoint);
 
             // Update message references in operation
