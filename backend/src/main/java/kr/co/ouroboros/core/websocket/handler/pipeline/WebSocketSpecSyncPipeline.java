@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.UUID;
 import kr.co.ouroboros.core.global.handler.SpecSyncPipeline;
 import kr.co.ouroboros.core.global.spec.OuroApiSpec;
+import kr.co.ouroboros.core.global.spec.SpecValidationUtil;
 import kr.co.ouroboros.core.websocket.common.dto.MessageReference;
 import kr.co.ouroboros.core.websocket.common.dto.Operation;
 import kr.co.ouroboros.core.websocket.common.dto.OuroWebSocketApiSpec;
@@ -47,6 +48,10 @@ public class WebSocketSpecSyncPipeline implements SpecSyncPipeline {
                     // Generate x-ouroboros-id if not present
                     if (operation.getXOuroborosId() == null) {
                         operation.setXOuroborosId(java.util.UUID.randomUUID().toString());
+                    }
+                    // Normalize tags to uppercase
+                    if (operation.getTags() != null) {
+                        operation.setTags(SpecValidationUtil.normalizeWebSocketTags(operation.getTags()));
                     }
                     operation.setXOuroborosDiff("channel");
                     operation.setXOuroborosProgress("none");
@@ -91,6 +96,10 @@ public class WebSocketSpecSyncPipeline implements SpecSyncPipeline {
             
             // 파일에 없는 경우 추가
             if(!fileChannelNameOperationMap.containsKey(channelRef)){
+                // Normalize tags to uppercase
+                if (scanOp.getTags() != null) {
+                    scanOp.setTags(SpecValidationUtil.normalizeWebSocketTags(scanOp.getTags()));
+                }
 
                 scanOp.setXOuroborosDiff("channel");
                 scanOp.setXOuroborosId(UUID.randomUUID().toString());

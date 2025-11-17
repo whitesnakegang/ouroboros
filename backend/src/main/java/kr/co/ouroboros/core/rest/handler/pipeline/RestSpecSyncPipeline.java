@@ -59,6 +59,10 @@ public class RestSpecSyncPipeline implements SpecSyncPipeline {
                             operationByMethod.setXOuroborosId(java.util.UUID.randomUUID().toString());
                             log.debug("Generated x-ouroboros-id for {} {}: {}", httpMethod, url, operationByMethod.getXOuroborosId());
                         }
+                        // Normalize tags to uppercase
+                        if (operationByMethod.getTags() != null) {
+                            operationByMethod.setTags(kr.co.ouroboros.core.global.spec.SpecValidationUtil.normalizeRestTags(operationByMethod.getTags()));
+                        }
                         operationByMethod.setXOuroborosDiff("endpoint");
                         operationByMethod.setXOuroborosTag("none");
                     }

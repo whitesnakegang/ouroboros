@@ -3,6 +3,7 @@ package kr.co.ouroboros.core.websocket.spec.service;
 import kr.co.ouroboros.core.global.Protocol;
 import kr.co.ouroboros.core.global.manager.OuroApiSpecManager;
 import kr.co.ouroboros.core.websocket.common.yaml.WebSocketYamlParser;
+import kr.co.ouroboros.core.websocket.spec.util.RefCleanupUtil;
 import kr.co.ouroboros.core.websocket.spec.util.ReferenceConverter;
 import kr.co.ouroboros.ui.websocket.spec.dto.CreateMessageRequest;
 import kr.co.ouroboros.ui.websocket.spec.dto.MessageResponse;
@@ -245,13 +246,26 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
     }
 
     private MessageResponse convertToResponse(String messageName, Map<String, Object> messageDefinition) {
-        // Convert $ref to ref for JSON API
+        // Clean package names and convert $ref to ref for JSON API
         Map<String, Object> headers = safeGetMap(messageDefinition, "headers");
         Map<String, Object> payload = safeGetMap(messageDefinition, "payload");
-        
+
+        // Clean package names from $ref values
+        if (headers != null) {
+            headers = RefCleanupUtil.cleanupPackageNamesInRefs(headers);
+        }
+        if (payload != null) {
+            payload = RefCleanupUtil.cleanupPackageNamesInRefs(payload);
+        }
+
+        // Clean package names from messageName and name fields
+        String cleanedMessageName = RefCleanupUtil.extractClassNameFromFullName(messageName);
+        String name = safeGetString(messageDefinition, "name");
+        String cleanedName = name != null ? RefCleanupUtil.extractClassNameFromFullName(name) : null;
+
         return MessageResponse.builder()
-                .messageName(messageName)
-                .name(safeGetString(messageDefinition, "name"))
+                .messageName(cleanedMessageName)
+                .name(cleanedName)
                 .contentType(safeGetString(messageDefinition, "contentType"))
                 .description(safeGetString(messageDefinition, "description"))
                 .headers(headers != null ? ReferenceConverter.convertDollarRefToRef(headers) : null)

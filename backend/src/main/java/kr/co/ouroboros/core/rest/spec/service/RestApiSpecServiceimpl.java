@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.co.ouroboros.core.global.Protocol;
 import kr.co.ouroboros.core.global.manager.OuroApiSpecManager;
+import kr.co.ouroboros.core.global.spec.SpecValidationUtil;
 import kr.co.ouroboros.core.rest.common.yaml.RestApiYamlParser;
 import kr.co.ouroboros.core.rest.handler.helper.RequestDiffHelper;
 import kr.co.ouroboros.core.rest.mock.model.EndpointMeta;
@@ -68,6 +69,9 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
     public RestApiSpecResponse createRestApiSpec(CreateRestApiRequest request) throws Exception {
         lock.writeLock().lock();
         try {
+            // Validate path does not contain Korean characters
+            SpecValidationUtil.validateNoKorean(request.getPath(), "Path");
+
             // Generate UUID if not provided
             String id = request.getId() != null ? request.getId() : UUID.randomUUID().toString();
 
@@ -264,6 +268,11 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
 
             if (operation == null) {
                 throw new IllegalArgumentException("REST API specification with ID '" + id + "' not found");
+            }
+
+            // Validate path does not contain Korean characters if path is being updated
+            if (request.getPath() != null) {
+                SpecValidationUtil.validateNoKorean(request.getPath(), "Path");
             }
 
             // Determine final path and method
