@@ -451,6 +451,43 @@ export function ApiEditorLayout() {
         }
       }
 
+      // rootSchemaType이 ref인 경우 스키마를 조회해서 fields 채우기 (json/xml 타입)
+      if (
+        loadedRequestBody.rootSchemaType &&
+        isRefSchema(loadedRequestBody.rootSchemaType) &&
+        (loadedRequestBody.type === "json" ||
+          loadedRequestBody.type === "xml") &&
+        (!loadedRequestBody.fields || loadedRequestBody.fields.length === 0)
+      ) {
+        try {
+          const schemaResponse = await getSchema(
+            loadedRequestBody.rootSchemaType.schemaName
+          );
+          const schemaData = schemaResponse.data;
+
+          if (schemaData.properties) {
+            const fields = Object.entries(schemaData.properties).map(
+              ([key, propSchema]: [string, any]) => {
+                return parseOpenAPISchemaToSchemaField(key, propSchema);
+              }
+            );
+
+            // required 필드 설정
+            if (schemaData.required && Array.isArray(schemaData.required)) {
+              fields.forEach((field) => {
+                if (schemaData.required!.includes(field.key)) {
+                  field.required = true;
+                }
+              });
+            }
+
+            loadedRequestBody.fields = fields;
+          }
+        } catch {
+          // 스키마 조회 실패 시 무시
+        }
+      }
+
       // rootSchemaType이 array이고 items가 ref인 경우 스키마 조회
       if (
         loadedRequestBody.rootSchemaType &&

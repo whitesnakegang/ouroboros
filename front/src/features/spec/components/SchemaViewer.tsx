@@ -27,17 +27,25 @@ export function SchemaViewer({
   const [loadedFields, setLoadedFields] = useState<SchemaField[]>([]);
   const [isLoadingSchema, setIsLoadingSchema] = useState(false);
 
-  // schemaRef가 있을 때 스키마를 조회하여 필드들을 로드
+  // schemaRef 또는 rootSchemaType이 ref인 경우 스키마를 조회하여 필드들을 로드
   useEffect(() => {
     const loadSchemaFields = async () => {
-      if (!schemaRef) {
+      // schemaRef가 있으면 사용
+      let schemaName: string | undefined = schemaRef;
+      
+      // schemaRef가 없고 rootSchemaType이 ref인 경우 사용
+      if (!schemaName && schemaType && isRefSchema(schemaType)) {
+        schemaName = schemaType.schemaName;
+      }
+
+      if (!schemaName) {
         setLoadedFields([]);
         return;
       }
 
       setIsLoadingSchema(true);
       try {
-        const response = await getSchema(schemaRef);
+        const response = await getSchema(schemaName);
         const schemaData = response.data;
 
         if (schemaData.properties) {
@@ -63,7 +71,7 @@ export function SchemaViewer({
     };
 
     loadSchemaFields();
-  }, [schemaRef]);
+  }, [schemaRef, schemaType]);
   // SchemaField를 재귀적으로 렌더링하는 함수
   const renderField = (field: SchemaField, depth: number = 0): React.ReactElement => {
     const getTypeString = (schemaType: SchemaType): string => {
@@ -166,8 +174,8 @@ export function SchemaViewer({
 
   // Root schema type에서 fields 추출
   const getFieldsFromSchemaType = (): SchemaField[] => {
-    // schemaRef가 있고 로드된 필드가 있으면 우선 사용
-    if (schemaRef && loadedFields.length > 0) {
+    // schemaRef 또는 rootSchemaType이 ref인 경우 로드된 필드가 있으면 우선 사용
+    if (loadedFields.length > 0) {
       return loadedFields;
     }
     if (fields && fields.length > 0) {

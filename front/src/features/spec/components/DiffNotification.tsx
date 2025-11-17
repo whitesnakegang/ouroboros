@@ -156,7 +156,7 @@ export function DiffNotification({
         </div>
 
         {/* 상세 로그 정보 */}
-        {diffDetails.type === "request" && reqLog && (
+        {diffDetails.type === "request" && reqLog && reqLog.trim() !== "" && (
           <div className="bg-white dark:bg-amber-950/30 rounded-md p-3 border border-amber-200 dark:border-amber-800">
             <h4 className="text-xs font-semibold text-amber-900 dark:text-amber-200 mb-2 flex items-center gap-1">
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -172,7 +172,7 @@ export function DiffNotification({
           </div>
         )}
 
-        {diffDetails.type === "response" && resLog && (
+        {diffDetails.type === "response" && resLog && resLog.trim() !== "" && (
           <div className="bg-white dark:bg-amber-950/30 rounded-md p-3 border border-amber-200 dark:border-amber-800">
             <h4 className="text-xs font-semibold text-amber-900 dark:text-amber-200 mb-2 flex items-center gap-1">
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -188,7 +188,7 @@ export function DiffNotification({
           </div>
         )}
 
-        {diffDetails.type === "both" && (reqLog || resLog) && (
+        {diffDetails.type === "both" && ((reqLog && reqLog.trim() !== "") || (resLog && resLog.trim() !== "")) && (
           <div className="bg-white dark:bg-amber-950/30 rounded-md p-3 border border-amber-200 dark:border-amber-800">
             <h4 className="text-xs font-semibold text-amber-900 dark:text-amber-200 mb-2 flex items-center gap-1">
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
