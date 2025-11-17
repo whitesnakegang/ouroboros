@@ -32,6 +32,14 @@ public class Operation {
     private Reply reply;
 
     /**
+     * Tags for categorizing and grouping operations.
+     * <p>
+     * Each tag is an object with a "name" field (and optionally "description").
+     * Tag names are automatically converted to uppercase on storage.
+     */
+    private List<Map<String, String>> tags;
+
+    /**
      * Ouroboros custom field: unique identifier for the operation.
      * <p>
      * Stored in YAML as x-ouroboros-id.

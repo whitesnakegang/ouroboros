@@ -85,7 +85,8 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                     Map<String, Object> operationDefinition = buildOperationDefinition(
                             null, null,
                             replyChannelName, reply.getMessages(),
-                            request.getPathname()
+                            request.getPathname(),
+                            request.getTags()
                     );
 
                     // Add operation to document
@@ -115,7 +116,8 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                         Map<String, Object> operationDefinition = buildOperationDefinition(
                                 receiveChannelName, receive.getMessages(),
                                 null, null,
-                                request.getPathname()
+                                request.getPathname(),
+                                request.getTags()
                         );
 
                         // Add operation to document
@@ -143,7 +145,8 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                             Map<String, Object> operationDefinition = buildOperationDefinition(
                                     receiveChannelName, receive.getMessages(),
                                     replyChannelName, reply.getMessages(),
-                                    request.getPathname()
+                                    request.getPathname(),
+                                    request.getTags()
                             );
 
                             // Add operation to document
@@ -316,6 +319,24 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
             // Update x-ouroboros-entrypoint if pathname was provided
             if (updatedPathname != null) {
                 updatedOperation.put("x-ouroboros-entrypoint", updatedPathname);
+            }
+
+            // Update tags (convert to uppercase and AsyncAPI format)
+            if (request.getTags() != null) {
+                List<Map<String, String>> tagObjects = request.getTags().stream()
+                        .filter(tag -> tag != null && !tag.isBlank())
+                        .map(tag -> {
+                            Map<String, String> tagObj = new LinkedHashMap<>();
+                            tagObj.put("name", tag.toUpperCase());
+                            return tagObj;
+                        })
+                        .collect(Collectors.toList());
+
+                if (!tagObjects.isEmpty()) {
+                    updatedOperation.put("tags", tagObjects);
+                } else {
+                    updatedOperation.remove("tags");
+                }
             }
 
             // Determine action automatically based on provided fields
@@ -499,7 +520,8 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
     private Map<String, Object> buildOperationDefinition(
             String receiveChannelName, List<String> receiveMessages,
             String replyChannelName, List<String> replyMessages,
-            String pathname) {
+            String pathname,
+            List<String> tags) {
 
         Map<String, Object> operation = new LinkedHashMap<>();
 
@@ -572,6 +594,22 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
 
         // Store entry point (pathname) for this operation
         operation.put("x-ouroboros-entrypoint", pathname);
+
+        // Add tags (convert to uppercase and AsyncAPI format)
+        if (tags != null && !tags.isEmpty()) {
+            List<Map<String, String>> tagObjects = tags.stream()
+                    .filter(tag -> tag != null && !tag.isBlank())
+                    .map(tag -> {
+                        Map<String, String> tagObj = new LinkedHashMap<>();
+                        tagObj.put("name", tag.toUpperCase());
+                        return tagObj;
+                    })
+                    .collect(Collectors.toList());
+
+            if (!tagObjects.isEmpty()) {
+                operation.put("tags", tagObjects);
+            }
+        }
 
         // Add STOMP bindings
         Map<String, Object> bindings = new LinkedHashMap<>();
