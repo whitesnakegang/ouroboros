@@ -126,9 +126,6 @@ function convertOperationToEndpoint(
     method = "SEND";
   }
   
-  // entrypoint
-  const entrypoint = operation.entrypoint || "/ws";
-
   // receiver address 추출
   const channelRef = operation.channel?.ref || "";
   const channelName = channelRef.replace('#/channels/', '');
@@ -157,9 +154,9 @@ function convertOperationToEndpoint(
 
   // tags 결정: 백엔드에서 관리하는 tags 사용 (REST와 동일하게)
   const operationTags = (operation as any).tags;
-  const tags = operationTags && Array.isArray(operationTags) && operationTags.length > 0
+  const tags: string[] | undefined = operationTags && Array.isArray(operationTags) && operationTags.length > 0
     ? operationTags // 백엔드에서 받은 tags 사용
-    : null; // tags가 없으면 null로 설정하여 그룹화 로직에서 도메인 사용
+    : undefined; // tags가 없으면 undefined로 설정하여 그룹화 로직에서 도메인 사용
 
   return {
     id: operation.id || operationName,

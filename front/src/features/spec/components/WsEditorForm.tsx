@@ -152,7 +152,7 @@ export function WsEditorForm({
       // /ws 형태만 있으면 pathname으로
       setPathname(entryPoint);
     }
-  }, [entryPoint]);
+  }, [entryPoint, setProtocol]);
 
   // Messages 목록 로드
   const loadMessages = async () => {
@@ -234,40 +234,37 @@ export function WsEditorForm({
   // const updateReceiverSchemaField = (index: number, field: SchemaField) => { ... }
 
   // Reply Schema 관리 (현재 사용하지 않음 - Schema 섹션 제거됨)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const addReplySchemaField = () => {
-    if (isReadOnly || !reply) return;
-    const currentFields = reply.schema.fields || [];
-    setReply({
-      ...reply,
-      schema: {
-        ...reply.schema,
-        fields: [...currentFields, createDefaultField()],
-      },
-    });
-  };
+  // const addReplySchemaField = () => {
+  //   if (isReadOnly || !reply) return;
+  //   const currentFields = reply.schema.fields || [];
+  //   setReply({
+  //     ...reply,
+  //     schema: {
+  //       ...reply.schema,
+  //       fields: [...currentFields, createDefaultField()],
+  //     },
+  //   });
+  // };
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const removeReplySchemaField = (index: number) => {
-    if (isReadOnly || !reply) return;
-    const currentFields = reply.schema.fields || [];
-    setReply({
-      ...reply,
-      schema: {
-        ...reply.schema,
-        fields: currentFields.filter((_, i) => i !== index),
-      },
-    });
-  };
+  // const removeReplySchemaField = (index: number) => {
+  //   if (isReadOnly || !reply) return;
+  //   const currentFields = reply.schema.fields || [];
+  //   setReply({
+  //     ...reply,
+  //     schema: {
+  //       ...reply.schema,
+  //       fields: currentFields.filter((_, i) => i !== index),
+  //     },
+  //   });
+  // };
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const updateReplySchemaField = (index: number, field: SchemaField) => {
-    if (isReadOnly || !reply) return;
-    const currentFields = reply.schema.fields || [];
-    const updated = [...currentFields];
-    updated[index] = field;
-    setReply({ ...reply, schema: { ...reply.schema, fields: updated } });
-  };
+  // const updateReplySchemaField = (index: number, field: SchemaField) => {
+  //   if (isReadOnly || !reply) return;
+  //   const currentFields = reply.schema.fields || [];
+  //   const updated = [...currentFields];
+  //   updated[index] = field;
+  //   setReply({ ...reply, schema: { ...reply.schema, fields: updated } });
+  // };
 
   // 메시지 작성 관련 함수들
   const addMessageHeader = () => {
@@ -474,57 +471,56 @@ export function WsEditorForm({
   };
 
   // 채널 선택 또는 생성 (현재 사용하지 않음 - 채널 선택 모드로 대체됨)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleChannelSelect = async (
-    address: string,
-    selectedMessages: string[],
-    type: "receiver" | "reply"
-  ) => {
-    if (!address.trim() || selectedMessages.length === 0) {
-      return;
-    }
+  // const handleChannelSelect = async (
+  //   address: string,
+  //   selectedMessages: string[],
+  //   type: "receiver" | "reply"
+  // ) => {
+  //   if (!address.trim() || selectedMessages.length === 0) {
+  //     return;
+  //   }
 
-    // 기존 채널 중에서 주소와 메시지가 일치하는 채널 찾기
-    const matchingChannel = channels.find((ch) => {
-      if (ch.channel.address !== address) return false;
-      const channelMessageNames = Object.keys(ch.channel.messages || {});
-      return selectedMessages.every((msg) => channelMessageNames.includes(msg));
-    });
+  //   // 기존 채널 중에서 주소와 메시지가 일치하는 채널 찾기
+  //   const matchingChannel = channels.find((ch) => {
+  //     if (ch.channel.address !== address) return false;
+  //     const channelMessageNames = Object.keys(ch.channel.messages || {});
+  //     return selectedMessages.every((msg) => channelMessageNames.includes(msg));
+  //   });
 
-    if (matchingChannel) {
-      // 기존 채널 사용
-      if (type === "receiver" && receiver) {
-        setReceiver({
-          ...receiver,
-          address: matchingChannel.channel.address,
-          messages: selectedMessages,
-        });
-      } else if (type === "reply" && reply) {
-        setReply({
-          ...reply,
-          address: matchingChannel.channel.address,
-          messages: selectedMessages,
-        });
-      }
-      alert(`기존 채널 "${matchingChannel.channelName}"을 사용합니다.`);
-    } else {
-      // 새 채널 생성 (현재는 주소와 메시지만 저장)
-      if (type === "receiver" && receiver) {
-        setReceiver({
-          ...receiver,
-          address: address,
-          messages: selectedMessages,
-        });
-      } else if (type === "reply" && reply) {
-        setReply({
-          ...reply,
-          address: address,
-          messages: selectedMessages,
-        });
-      }
-      alert("새 채널 정보가 저장되었습니다. (채널 생성 API는 추후 구현 예정)");
-    }
-  };
+  //   if (matchingChannel) {
+  //     // 기존 채널 사용
+  //     if (type === "receiver" && receiver) {
+  //       setReceiver({
+  //         ...receiver,
+  //         address: matchingChannel.channel.address,
+  //         messages: selectedMessages,
+  //       });
+  //     } else if (type === "reply" && reply) {
+  //       setReply({
+  //         ...reply,
+  //         address: matchingChannel.channel.address,
+  //         messages: selectedMessages,
+  //       });
+  //     }
+  //     alert(`기존 채널 "${matchingChannel.channelName}"을 사용합니다.`);
+  //   } else {
+  //     // 새 채널 생성 (현재는 주소와 메시지만 저장)
+  //     if (type === "receiver" && receiver) {
+  //       setReceiver({
+  //         ...receiver,
+  //         address: address,
+  //         messages: selectedMessages,
+  //       });
+  //     } else if (type === "reply" && reply) {
+  //       setReply({
+  //         ...reply,
+  //         address: address,
+  //         messages: selectedMessages,
+  //       });
+  //     }
+  //     alert("새 채널 정보가 저장되었습니다. (채널 생성 API는 추후 구현 예정)");
+  //   }
+  // };
 
   // Schema 선택 처리
   const handleReceiverSchemaSelect = (selectedSchema: {
