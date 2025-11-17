@@ -272,7 +272,7 @@ export function TestRequestPanel() {
           <label className="text-xs font-medium text-[#8B949E]">Headers</label>
           <button
             onClick={addRequestHeader}
-            className="text-xs px-2 py-1 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-colors"
+            className="text-xs px-2 py-1 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none"
           >
             + Add
           </button>
@@ -330,7 +330,7 @@ export function TestRequestPanel() {
             </label>
             <button
               onClick={addQueryParam}
-              className="text-xs px-2 py-1 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-colors"
+              className="text-xs px-2 py-1 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none"
             >
               + Add
             </button>

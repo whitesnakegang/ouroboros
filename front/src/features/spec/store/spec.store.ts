@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-type Protocol = "REST" | "GraphQL" | "WebSocket";
+type Protocol = "REST" | "WebSocket" | null;
 
 interface SpecState {
   protocol: Protocol;

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback, useRef } from "react";
 import { ApiRequestCard } from "./ApiRequestCard";
 import { ApiResponseCard } from "./ApiResponseCard";
@@ -8,27 +9,30 @@ import { TestLayout } from "@/features/testing/components/TestLayout";
 import { DiffNotification } from "./DiffNotification";
 import { WsEditorForm } from "./WsEditorForm";
 import type { RequestBody } from "../types/schema.types";
-import {
-  useSidebarStore,
-  type Endpoint,
-} from "@/features/sidebar/store/sidebar.store";
+import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
 import { useTestingStore } from "@/features/testing/store/testing.store";
 import axios from "axios";
-import { downloadMarkdown } from "../utils/markdownExporter";
 import { downloadYaml } from "../utils/yamlExporter";
 import {
   importYaml,
   type ImportYamlResponse,
   exportYaml,
+  exportWebSocketYaml,
+  importWebSocketYaml,
 } from "../services/api";
+import { MarkdownPreviewModal } from "./MarkdownPreviewModal";
+// FilenameOptions removed
+import { WsChannelMessageTree } from "./WsChannelMessageTree";
 import {
   createRestApiSpec,
   updateRestApiSpec,
   deleteRestApiSpec,
   getRestApiSpec,
+  syncRestApiSpec,
   getSchema,
   getWebSocketOperation,
   updateWebSocketOperation,
+  syncWebSocketOperation,
   getWebSocketChannel,
   type RestApiSpecResponse,
 } from "../services/api";
@@ -91,6 +95,9 @@ export function ApiEditorLayout() {
     setProtocol: setTestingProtocol,
   } = useTestingStore();
   const [activeTab, setActiveTab] = useState<"form" | "test">("form");
+  const [specTab, setSpecTab] = useState<"request" | "response" | "schema">(
+    "request"
+  );
   const [isCodeSnippetOpen, setIsCodeSnippetOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isNewFormMode, setIsNewFormMode] = useState(false);
@@ -103,6 +110,15 @@ export function ApiEditorLayout() {
   >("idle");
   const [isAuthorizationInputOpen, setIsAuthorizationInputOpen] =
     useState(false);
+  const [reqLog, setReqLog] = useState<string | undefined>(undefined);
+  const [resLog, setResLog] = useState<string | undefined>(undefined);
+  // Markdown Preview
+  const [isMdPreviewOpen, setIsMdPreviewOpen] = useState(false);
+  const [mdPreviewContent, setMdPreviewContent] = useState("");
+  const [mdPreviewFilename, setMdPreviewFilename] = useState(
+    "API_DOCUMENTATION.md"
+  );
+  // Removed filename option states; use automatic filenames instead
 
   // Diff가 있는지 확인 (boolean으로 명시적 변환)
   const hasDiff = !!(
@@ -114,6 +130,9 @@ export function ApiEditorLayout() {
 
   // 수정/삭제 불가능한 상태인지 확인 (completed인 경우만, mock 상태는 diff가 있어도 수정/삭제 가능)
   const isReadOnly = isCompleted;
+
+  // 완성된 명세 화면에서는 schema 탭 제거
+  const isCompletedView = isCompleted && !isEditMode && !isNewFormMode;
 
   // 에러 메시지에서 localhost 주소 제거 및 사용자 친화적인 메시지로 변환
   const getErrorMessage = (error: unknown): string => {
@@ -208,6 +227,13 @@ export function ApiEditorLayout() {
     }
   }, [endpoints, selectedEndpoint, setSelectedEndpoint]);
 
+  // 완료 상태에서 schema 탭이 선택된 경우 안전한 탭으로 전환
+  useEffect(() => {
+    if (isCompletedView && specTab === "schema") {
+      setSpecTab("request");
+    }
+  }, [isCompletedView, specTab]);
+
   // Load selected endpoint data when endpoint is clicked
   useEffect(() => {
     if (selectedEndpoint && selectedEndpoint.id) {
@@ -279,6 +305,10 @@ export function ApiEditorLayout() {
     try {
       const response = await getRestApiSpec(id);
       const spec = response.data;
+
+      // diff 로그 정보 저장
+      setReqLog(response.reqLog);
+      setResLog(response.resLog);
 
       // 스펙 정보 저장 (CodeSnippetPanel에서 사용)
       setCurrentSpec(spec);
@@ -877,16 +907,6 @@ export function ApiEditorLayout() {
 
   const methods = ["GET", "POST", "PUT", "PATCH", "DELETE"];
 
-  // 진행률: 전체 엔드포인트 대비 completed 비율
-  const allEndpoints = Object.values(endpoints || {}).flat();
-  const totalEndpoints = allEndpoints.length || 0;
-  const completedEndpoints = allEndpoints.filter(
-    (ep) => ep.progress?.toLowerCase() === "completed"
-  ).length;
-  const progressPercentage = totalEndpoints
-    ? Math.round((completedEndpoints / totalEndpoints) * 100)
-    : 0;
-
   /**
    * queryParams를 OpenAPI parameters 구조로 변환
    */
@@ -1271,6 +1291,8 @@ export function ApiEditorLayout() {
     // 현재는 REST만 지원하지만, 나중에 WebSocket/GraphQL 지원 시 확장 가능
     setSelectedEndpoint(null);
     setIsNewFormMode(true);
+    setReqLog(undefined);
+    setResLog(undefined);
     setMethod("POST");
     // 값은 비워 placeholder가 보이도록 처리
     setUrl("");
@@ -1347,12 +1369,21 @@ export function ApiEditorLayout() {
       }
 
       try {
-        // Import 실행
-        const result: ImportYamlResponse = await importYaml(file);
-
-        // 모달로 결과 표시
-        setImportResult(result);
-        setIsImportModalOpen(true);
+        // Import 실행 (프로토콜 분기) - 결과 모달 표시
+        if (protocol === "WebSocket") {
+          const wsResult = await importWebSocketYaml(file); // GlobalApiResponse
+          const data = wsResult?.data;
+          if (data) {
+            setImportResult({ data } as unknown as ImportYamlResponse);
+            setIsImportModalOpen(true);
+          } else {
+            alert("WebSocket YAML Import가 완료되었습니다.");
+          }
+        } else {
+          const restResult: ImportYamlResponse = await importYaml(file);
+          setImportResult(restResult);
+          setIsImportModalOpen(true);
+        }
 
         // 사이드바 목록 새로고침
         await loadEndpoints();
@@ -1370,41 +1401,63 @@ export function ApiEditorLayout() {
   const handleSyncDiffToSpec = async () => {
     if (!selectedEndpoint) return;
 
+    const diffType = selectedEndpoint.diff?.toLowerCase() || "";
+
     if (
       confirm(
         "실제 구현의 내용을 명세에 자동으로 반영하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다."
       )
     ) {
       try {
-        // 현재 엔드포인트의 정보를 백엔드에서 가져옴
-        const response = await getRestApiSpec(selectedEndpoint.id);
-        const spec = response.data;
+        // diff가 "endpoint"인 경우 sync API 호출 (캐시 -> 파일 동기화)
+        if (diffType === "endpoint") {
+          const syncResponse = await syncRestApiSpec(selectedEndpoint.id);
 
-        // 현재 명세 정보를 그대로 업데이트 요청으로 전달
-        // 백엔드의 updateRestApiSpec 메서드에서 자동으로 x-ouroboros-diff를 "none"으로 설정함
-        const updateRequest = {
-          path: spec.path,
-          method: spec.method,
-          summary: spec.summary,
-          description: spec.description,
-          tags: spec.tags || [],
-          parameters: spec.parameters || [],
-          requestBody: spec.requestBody || undefined,
-          responses: spec.responses || {},
-          security: spec.security || [],
-        };
+          // 엔드포인트 데이터 다시 로드하여 최신 상태 반영
+          await loadEndpointData(selectedEndpoint.id);
 
-        await updateRestApiSpec(selectedEndpoint.id, updateRequest);
+          // 사이드바 목록도 다시 로드하여 diff 상태 업데이트
+          await loadEndpoints();
 
-        // 엔드포인트 데이터 다시 로드하여 최신 상태 반영
-        await loadEndpointData(selectedEndpoint.id);
+          // selectedEndpoint 업데이트
+          const updatedSpec = syncResponse.data;
+          if (updatedSpec) {
+            setSelectedEndpoint({
+              ...selectedEndpoint,
+              diff: updatedSpec.diff || "none",
+              progress: updatedSpec.progress || selectedEndpoint.progress,
+            });
+          }
 
-        // 사이드바 목록도 다시 로드하여 diff 상태 업데이트
-        await loadEndpoints();
+          alert("실제 구현이 명세에 성공적으로 반영되었습니다!");
+        } else {
+          // 다른 diff 타입 (request, response, both)은 기존 로직 유지
+          const response = await getRestApiSpec(selectedEndpoint.id);
+          const spec = response.data;
 
-        alert(" 실제 구현이 명세에 성공적으로 반영되었습니다!");
+          const updateRequest = {
+            path: spec.path,
+            method: spec.method,
+            summary: spec.summary,
+            description: spec.description,
+            tags: spec.tags || [],
+            parameters: spec.parameters || [],
+            requestBody: spec.requestBody || undefined,
+            responses: spec.responses || {},
+            security: spec.security || [],
+          };
+
+          await updateRestApiSpec(selectedEndpoint.id, updateRequest);
+
+          // 엔드포인트 데이터 다시 로드하여 최신 상태 반영
+          await loadEndpointData(selectedEndpoint.id);
+
+          // 사이드바 목록도 다시 로드하여 diff 상태 업데이트
+          await loadEndpoints();
+
+          alert("실제 구현이 명세에 성공적으로 반영되었습니다!");
+        }
       } catch (error: unknown) {
-        console.error("명세 동기화 실패:", error);
         const errorMessage = getErrorMessage(error);
         alert(`명세 동기화에 실패했습니다: ${errorMessage}`);
       }
@@ -1422,12 +1475,39 @@ export function ApiEditorLayout() {
       return;
     }
 
+    const diffType = selectedEndpoint.diff?.toLowerCase() || "";
+
     if (
       confirm(
         "실제 구현의 Channel 정보를 명세에 자동으로 반영하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다."
       )
     ) {
       try {
+        // diff가 "channel"인 경우 sync API 호출 (캐시 -> 파일 동기화)
+        if (diffType === "channel") {
+          const syncResponse = await syncWebSocketOperation(operationId);
+
+          // Operation 데이터 다시 로드하여 최신 상태 반영
+          await loadWebSocketOperationData(operationId);
+
+          // 사이드바 목록도 다시 로드하여 diff 상태 업데이트
+          await loadEndpoints();
+
+          // selectedEndpoint 업데이트
+          const updatedOperation = syncResponse.data?.operation;
+          if (updatedOperation) {
+            setSelectedEndpoint({
+              ...selectedEndpoint,
+              diff: updatedOperation.diff || "none",
+              progress: updatedOperation.progress || selectedEndpoint.progress,
+            });
+          }
+
+          alert("실제 구현의 Channel이 명세에 성공적으로 반영되었습니다!");
+          return;
+        }
+
+        // payload diff는 기존 로직 유지 (update API 사용)
         // UUID로 operation 정보 조회
         const response = await getWebSocketOperation(operationId);
         const operation = response.data.operation;
@@ -1463,19 +1543,8 @@ export function ApiEditorLayout() {
           };
         }
 
-        console.log("🔄 WebSocket Update Request:", updateRequest);
-        console.log("📝 operationId (UUID):", operationId);
-        console.log("📊 업데이트 전 diff 상태:", selectedEndpoint.diff);
-
         // UUID로 업데이트
-        const updateResponse = await updateWebSocketOperation(
-          operationId,
-          updateRequest
-        );
-
-        // ✅ 업데이트 응답에서 diff 상태 확인
-        const updatedDiff = updateResponse.data?.operation?.diff || "none";
-        console.log("📊 업데이트 후 응답의 diff 상태:", updatedDiff);
+        await updateWebSocketOperation(operationId, updateRequest);
 
         // UUID로 다시 로드
         await loadWebSocketOperationData(operationId);
@@ -1483,45 +1552,7 @@ export function ApiEditorLayout() {
         // 사이드바 목록도 다시 로드하여 diff 상태 업데이트
         await loadEndpoints();
 
-        // ✅ 사이드바 새로고침 후 실제 diff 상태 확인
-        setTimeout(() => {
-          const allEndpoints = useSidebarStore.getState().endpoints;
-          let foundEndpoint: Endpoint | null = null;
-
-          for (const group of Object.values(allEndpoints)) {
-            const ep = (group as Endpoint[]).find((e) => e?.id === operationId);
-            if (ep) {
-              foundEndpoint = ep;
-              break;
-            }
-          }
-
-          if (foundEndpoint) {
-            console.log(
-              "📊 사이드바 새로고침 후 diff 상태:",
-              foundEndpoint.diff
-            );
-            console.log(
-              "📊 사이드바 새로고침 후 전체 endpoint:",
-              foundEndpoint
-            );
-
-            // selectedEndpoint도 최신 상태로 업데이트
-            if (foundEndpoint.diff !== selectedEndpoint.diff) {
-              setSelectedEndpoint(foundEndpoint);
-              console.log(
-                "✅ selectedEndpoint diff 상태 업데이트 완료:",
-                foundEndpoint.diff
-              );
-            }
-          } else {
-            console.warn(
-              "⚠️ 사이드바에서 업데이트된 endpoint를 찾을 수 없습니다."
-            );
-          }
-        }, 200);
-
-        alert("✅ 실제 구현이 명세에 성공적으로 반영되었습니다!");
+        alert("실제 구현이 명세에 성공적으로 반영되었습니다!");
       } catch (error: unknown) {
         console.error("명세 동기화 실패:", error);
         const errorMessage = getErrorMessage(error);
@@ -1730,7 +1761,7 @@ export function ApiEditorLayout() {
           <div className="flex gap-1 border-b border-gray-200 dark:border-[#2D333B]">
             <button
               onClick={() => setActiveTab("form")}
-              className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+              className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 focus:outline-none focus-visible:outline-none ${
                 activeTab === "form"
                   ? "text-gray-900 dark:text-[#E6EDF3] border-[#2563EB]"
                   : "text-gray-500 dark:text-[#8B949E] border-transparent hover:text-gray-900 dark:hover:text-[#E6EDF3]"
@@ -1747,7 +1778,7 @@ export function ApiEditorLayout() {
                 setActiveTab("test");
               }}
               disabled={!selectedEndpoint}
-              className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+              className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 focus:outline-none focus-visible:outline-none ${
                 activeTab === "test"
                   ? "text-gray-900 dark:text-[#E6EDF3] border-[#2563EB]"
                   : "text-gray-500 dark:text-[#8B949E] border-transparent hover:text-gray-900 dark:hover:text-[#E6EDF3]"
@@ -1760,30 +1791,9 @@ export function ApiEditorLayout() {
             </button>
           </div>
 
-          {/* Right: Progress Bar & Actions - 조건부 표시 */}
+          {/* Right: Actions - 조건부 표시 */}
           {activeTab === "form" ? (
             <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4 lg:gap-6">
-              {/* Progress Bar */}
-              <div className="flex items-center gap-3">
-                <div className="text-right hidden sm:block">
-                  <div className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
-                    진행률
-                  </div>
-                  <div className="text-xs text-gray-600 dark:text-[#8B949E]">
-                    {completedEndpoints}/{totalEndpoints} 완료
-                  </div>
-                </div>
-                <div className="w-24 sm:w-32 h-2 bg-gray-200 dark:bg-[#161B22] border border-gray-300 dark:border-[#2D333B] rounded-md overflow-hidden">
-                  <div
-                    className="h-full bg-[#2563EB] transition-all duration-500 ease-out"
-                    style={{ width: `${progressPercentage}%` }}
-                  />
-                </div>
-                <span className="text-sm font-medium text-gray-900 dark:text-[#E6EDF3] min-w-[3rem]">
-                  {progressPercentage}%
-                </span>
-              </div>
-
               {/* Action Buttons - Utility만 유지 */}
               <div className="flex flex-wrap items-center gap-2">
                 {/* Utility Buttons */}
@@ -1809,16 +1819,21 @@ export function ApiEditorLayout() {
                 <button
                   onClick={async () => {
                     try {
-                      const yaml = await exportYaml();
-                      const { convertYamlToMarkdown } = await import(
-                        "../utils/markdownExporter"
-                      );
-                      const md = convertYamlToMarkdown(yaml);
-                      downloadMarkdown(
-                        md,
-                        `API_DOCUMENTATION_${new Date().getTime()}.md`
-                      );
-                      alert("Markdown 파일이 다운로드되었습니다.");
+                      const { convertYamlToMarkdown, convertWsYamlToMarkdown } =
+                        await import("../utils/markdownExporter");
+                      if (protocol === "WebSocket") {
+                        const wsYaml = await exportWebSocketYaml();
+                        const wsMd = convertWsYamlToMarkdown(wsYaml);
+                        setMdPreviewContent(wsMd);
+                        setMdPreviewFilename("WS_API_DOCUMENTATION.md");
+                        setIsMdPreviewOpen(true);
+                      } else {
+                        const yaml = await exportYaml();
+                        const md = convertYamlToMarkdown(yaml);
+                        setMdPreviewContent(md);
+                        setMdPreviewFilename("API_DOCUMENTATION.md");
+                        setIsMdPreviewOpen(true);
+                      }
                     } catch (e) {
                       console.error("Markdown 내보내기 오류:", e);
                       const errorMsg = getErrorMessage(e);
@@ -1847,10 +1862,15 @@ export function ApiEditorLayout() {
                 <button
                   onClick={async () => {
                     try {
-                      const yaml = await exportYaml();
+                      const yaml =
+                        protocol === "WebSocket"
+                          ? await exportWebSocketYaml()
+                          : await exportYaml();
                       downloadYaml(
                         yaml,
-                        `ourorest_${new Date().getTime()}.yml`
+                        protocol === "WebSocket"
+                          ? "ourowebsocket.yml"
+                          : "ourorest.yml"
                       );
                       alert("YAML 파일이 다운로드되었습니다.");
                     } catch (e) {
@@ -1859,7 +1879,7 @@ export function ApiEditorLayout() {
                       alert(`YAML 내보내기에 실패했습니다.\n오류: ${errorMsg}`);
                     }
                   }}
-                  className="px-3 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-colors text-sm font-medium flex items-center gap-2"
+                  className="px-3 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none text-sm font-medium flex items-center gap-2"
                   title="API YAML 파일 생성"
                 >
                   <svg
@@ -1892,7 +1912,7 @@ export function ApiEditorLayout() {
                 {!isAuthorizationInputOpen ? (
                   <button
                     onClick={() => setIsAuthorizationInputOpen(true)}
-                    className={`px-3 py-2 rounded-md border transition-colors text-sm font-medium flex items-center gap-2 ${
+                    className={`px-3 py-2 rounded-md border transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus-visible:outline-none active:translate-y-[1px] ${
                       authorization && authorization.trim()
                         ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300"
                         : "bg-white dark:bg-[#0D1117] border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22]"
@@ -1979,53 +1999,55 @@ export function ApiEditorLayout() {
                   </div>
                 )}
               </div>
-              {/* Run Button */}
-              <button
-                onClick={handleRun}
-                disabled={isLoading}
-                className="px-6 py-2 bg-[#2563EB] hover:bg-[#1E40AF] disabled:bg-gray-200 dark:disabled:bg-[#161B22] disabled:text-gray-400 dark:disabled:text-[#8B949E] text-white rounded-md transition-colors text-sm font-medium flex items-center gap-2 disabled:cursor-not-allowed"
-              >
-                {isLoading ? (
-                  <>
-                    <svg
-                      className="animate-spin h-5 w-5 text-white"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      />
-                      <path
-                        className="opacity-75"
+              {/* Run Button - REST일 때만 표시 */}
+              {protocol === "REST" && (
+                <button
+                  onClick={handleRun}
+                  disabled={isLoading}
+                  className="px-6 py-2 bg-[#2563EB] hover:bg-[#1E40AF] disabled:bg-gray-200 dark:disabled:bg-[#161B22] disabled:text-gray-400 dark:disabled:text-[#8B949E] text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none text-sm font-medium flex items-center gap-2 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? (
+                    <>
+                      <svg
+                        className="animate-spin h-5 w-5 text-white"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
+                      </svg>
+                      <span className="hidden sm:inline">실행 중...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg
+                        className="w-5 h-5"
                         fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      />
-                    </svg>
-                    <span className="hidden sm:inline">실행 중...</span>
-                  </>
-                ) : (
-                  <>
-                    <svg
-                      className="w-5 h-5"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    RUN
-                  </>
-                )}
-              </button>
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      RUN
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -2060,10 +2082,7 @@ export function ApiEditorLayout() {
             <TestLayout />
           </>
         ) : (
-          <div
-            id="api-form-container"
-            className="w-full max-w-6xl mx-auto px-6 py-8"
-          >
+          <div id="api-form-container" className="w-full max-w-6xl mx-auto p-6">
             {/* Protocol not selected or not supported message */}
             {(protocol === null ||
               (protocol !== null &&
@@ -2111,6 +2130,9 @@ export function ApiEditorLayout() {
                   reply={wsReply}
                   setReply={setWsReply}
                   isReadOnly={!!(selectedEndpoint && !isEditMode)}
+                  isDocumentView={
+                    !isEditMode && !isNewFormMode && selectedEndpoint !== null
+                  }
                   diff={selectedEndpoint?.diff}
                   operationInfo={
                     selectedEndpoint
@@ -2171,6 +2193,8 @@ export function ApiEditorLayout() {
                 diff={selectedEndpoint.diff || "none"}
                 progress={selectedEndpoint.progress}
                 onSyncToSpec={handleSyncDiffToSpec}
+                reqLog={reqLog}
+                resLog={resLog}
               />
             )}
 
@@ -2219,68 +2243,36 @@ export function ApiEditorLayout() {
                       </button>
                     )}
                   </div>
-                  <p className="text-xs text-gray-600 dark:text-[#8B949E] mb-4">
-                    HTTP 메서드와 엔드포인트 URL을 입력하세요
-                  </p>
 
-                  <div className="space-y-4">
-                    <div className="flex flex-col sm:flex-row gap-4">
-                      <div className="relative sm:w-auto w-full">
-                        <select
-                          value={method}
-                          onChange={(e) => setMethod(e.target.value)}
-                          disabled={!!(selectedEndpoint && !isEditMode)}
-                          className={`appearance-none w-full sm:w-auto px-3 py-2 pr-10 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm font-medium min-w-[120px] ${
-                            selectedEndpoint && !isEditMode
-                              ? "opacity-60 cursor-not-allowed"
-                              : ""
+                  {/* 작성된 명세서: 문서 형식 표시 */}
+                  {selectedEndpoint && !isEditMode && !isNewFormMode ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3">
+                        <span
+                          className={`inline-flex items-center rounded-[4px] border border-gray-300 dark:border-[#2D333B] bg-white dark:bg-[#0D1117] px-2.5 py-1 text-xs font-mono font-semibold ${
+                            method === "GET"
+                              ? "text-[#10B981]"
+                              : method === "POST"
+                              ? "text-[#2563EB]"
+                              : method === "PUT"
+                              ? "text-[#F59E0B]"
+                              : method === "PATCH"
+                              ? "text-[#F59E0B]"
+                              : "text-red-500"
                           }`}
                         >
-                          {methods.map((m) => (
-                            <option key={m} value={m}>
-                              {m}
-                            </option>
-                          ))}
-                        </select>
-                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                          <svg
-                            className="w-4 h-4 text-gray-500 dark:text-[#8B949E]"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M19 9l-7 7-7-7"
-                            />
-                          </svg>
-                        </div>
-                      </div>
-                      <div className="relative flex-1">
-                        <input
-                          type="text"
-                          value={url}
-                          onChange={(e) => setUrl(e.target.value)}
-                          placeholder="예: /api/users, /api/auth/login"
-                          disabled={!!(selectedEndpoint && !isEditMode)}
-                          className={`w-full px-3 py-2 ${
-                            hasDiff ? "pr-10" : ""
-                          } rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm font-mono ${
-                            selectedEndpoint && !isEditMode
-                              ? "opacity-60 cursor-not-allowed"
-                              : ""
-                          }`}
-                        />
-                        {/* Diff 주의 표시 아이콘 (URL 우측) */}
+                          {method}
+                        </span>
+                        <span className="text-base font-mono text-gray-900 dark:text-[#E6EDF3]">
+                          {url}
+                        </span>
                         {hasDiff && (
                           <div
-                            className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"
+                            className="flex items-center gap-1 text-amber-500"
                             title="명세와 실제 구현이 일치하지 않습니다"
                           >
                             <svg
-                              className="w-4 h-4 text-amber-500"
+                              className="w-4 h-4"
                               fill="none"
                               stroke="currentColor"
                               viewBox="0 0 24 24"
@@ -2295,125 +2287,293 @@ export function ApiEditorLayout() {
                           </div>
                         )}
                       </div>
-                    </div>
 
-                    {/* Method Badge */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-600 dark:text-[#8B949E]">
-                        Method:
-                      </span>
-                      <span
-                        className={`inline-flex items-center rounded-[4px] border border-gray-300 dark:border-[#2D333B] bg-white dark:bg-[#0D1117] px-2 py-[2px] text-[10px] font-mono font-semibold ${
-                          method === "GET"
-                            ? "text-[#10B981]"
-                            : method === "POST"
-                            ? "text-[#2563EB]"
-                            : method === "PUT"
-                            ? "text-[#F59E0B]"
-                            : method === "PATCH"
-                            ? "text-[#F59E0B]"
-                            : "text-red-500"
+                      {summary && (
+                        <div>
+                          <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-1">
+                            Summary
+                          </h3>
+                          <p className="text-sm text-gray-900 dark:text-[#E6EDF3]">
+                            {summary}
+                          </p>
+                        </div>
+                      )}
+
+                      {description && (
+                        <div>
+                          <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-1">
+                            Description
+                          </h3>
+                          <p className="text-sm text-gray-900 dark:text-[#E6EDF3]">
+                            {description}
+                          </p>
+                        </div>
+                      )}
+
+                      {tags && (
+                        <div>
+                          <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-1">
+                            Tags
+                          </h3>
+                          <div className="flex flex-wrap gap-2">
+                            {tags.split(",").map((tag, idx) => (
+                              <span
+                                key={idx}
+                                className="px-2 py-1 bg-gray-100 dark:bg-[#21262D] text-gray-700 dark:text-[#C9D1D9] rounded text-xs"
+                              >
+                                {tag.trim()}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    /* 편집 모드: 입력 필드 표시 */
+                    <>
+                      <p className="text-xs text-gray-600 dark:text-[#8B949E] mb-4">
+                        HTTP 메서드와 엔드포인트 URL을 입력하세요
+                      </p>
+
+                      <div className="space-y-4">
+                        <div className="flex flex-col sm:flex-row gap-4">
+                          <div className="relative sm:w-auto w-full">
+                            <select
+                              value={method}
+                              onChange={(e) => setMethod(e.target.value)}
+                              disabled={!!(selectedEndpoint && !isEditMode)}
+                              className={`appearance-none w-full sm:w-auto px-3 py-2 pr-10 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm font-medium min-w-[120px] ${
+                                selectedEndpoint && !isEditMode
+                                  ? "opacity-60 cursor-not-allowed"
+                                  : ""
+                              }`}
+                            >
+                              {methods.map((m) => (
+                                <option key={m} value={m}>
+                                  {m}
+                                </option>
+                              ))}
+                            </select>
+                            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                              <svg
+                                className="w-4 h-4 text-gray-500 dark:text-[#8B949E]"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M19 9l-7 7-7-7"
+                                />
+                              </svg>
+                            </div>
+                          </div>
+                          <div className="relative flex-1">
+                            <input
+                              type="text"
+                              value={url}
+                              onChange={(e) => setUrl(e.target.value)}
+                              placeholder="예: /api/users, /api/auth/login"
+                              disabled={!!(selectedEndpoint && !isEditMode)}
+                              className={`w-full px-3 py-2 ${
+                                hasDiff ? "pr-10" : ""
+                              } rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm font-mono ${
+                                selectedEndpoint && !isEditMode
+                                  ? "opacity-60 cursor-not-allowed"
+                                  : ""
+                              }`}
+                            />
+                            {/* Diff 주의 표시 아이콘 (URL 우측) */}
+                            {hasDiff && (
+                              <div
+                                className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"
+                                title="명세와 실제 구현이 일치하지 않습니다"
+                              >
+                                <svg
+                                  className="w-4 h-4 text-amber-500"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                                  />
+                                </svg>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Method Badge */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-600 dark:text-[#8B949E]">
+                            Method:
+                          </span>
+                          <span
+                            className={`inline-flex items-center rounded-[4px] border border-gray-300 dark:border-[#2D333B] bg-white dark:bg-[#0D1117] px-2 py-[2px] text-[10px] font-mono font-semibold ${
+                              method === "GET"
+                                ? "text-[#10B981]"
+                                : method === "POST"
+                                ? "text-[#2563EB]"
+                                : method === "PUT"
+                                ? "text-[#F59E0B]"
+                                : method === "PATCH"
+                                ? "text-[#F59E0B]"
+                                : "text-red-500"
+                            }`}
+                          >
+                            {method}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
+                              Tags/Category
+                            </label>
+                            <input
+                              type="text"
+                              value={tags}
+                              onChange={(e) => setTags(e.target.value)}
+                              placeholder="예: AUTH, USER, PRODUCT, ORDER"
+                              disabled={!!(selectedEndpoint && !isEditMode)}
+                              className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
+                                selectedEndpoint && !isEditMode
+                                  ? "opacity-60 cursor-not-allowed"
+                                  : ""
+                              }`}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
+                              Summary
+                            </label>
+                            <input
+                              type="text"
+                              value={summary}
+                              onChange={(e) => setSummary(e.target.value)}
+                              placeholder="예: 사용자 로그인 생성"
+                              disabled={!!(selectedEndpoint && !isEditMode)}
+                              className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
+                                selectedEndpoint && !isEditMode
+                                  ? "opacity-60 cursor-not-allowed"
+                                  : ""
+                              }`}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Description */}
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
+                            Description
+                          </label>
+                          <input
+                            type="text"
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            placeholder="예: 사용자 로그인, 상품 목록 조회, 주문 생성"
+                            disabled={!!(selectedEndpoint && !isEditMode)}
+                            className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
+                              selectedEndpoint && !isEditMode
+                                ? "opacity-60 cursor-not-allowed"
+                                : ""
+                            }`}
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+            {/* Request/Response/Schema 탭 */}
+            {protocol === "REST" &&
+              (selectedEndpoint !== null || isNewFormMode) && (
+                <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] shadow-sm mb-6 overflow-hidden">
+                  {/* 탭 헤더 - 폴더 느낌으로 통합 */}
+                  <div className="bg-gray-50 dark:bg-[#0D1117] border-b border-gray-200 dark:border-[#2D333B] px-4 pt-2">
+                    <div className="flex gap-0.5 -mb-px">
+                      <button
+                        onClick={() => setSpecTab("request")}
+                        className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ${
+                          specTab === "request"
+                            ? "text-gray-900 dark:text-[#E6EDF3] bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] border-b-white dark:border-b-[#161B22] relative z-10"
+                            : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
                         }`}
                       >
-                        {method}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                          Tags/Category
-                        </label>
-                        <input
-                          type="text"
-                          value={tags}
-                          onChange={(e) => setTags(e.target.value)}
-                          placeholder="예: AUTH, USER, PRODUCT, ORDER"
-                          disabled={!!(selectedEndpoint && !isEditMode)}
-                          className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
-                            selectedEndpoint && !isEditMode
-                              ? "opacity-60 cursor-not-allowed"
-                              : ""
-                          }`}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                          Summary
-                        </label>
-                        <input
-                          type="text"
-                          value={summary}
-                          onChange={(e) => setSummary(e.target.value)}
-                          placeholder="예: 사용자 로그인 생성"
-                          disabled={!!(selectedEndpoint && !isEditMode)}
-                          className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
-                            selectedEndpoint && !isEditMode
-                              ? "opacity-60 cursor-not-allowed"
-                              : ""
-                          }`}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Description */}
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                        Description
-                      </label>
-                      <input
-                        type="text"
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        placeholder="예: 사용자 로그인, 상품 목록 조회, 주문 생성"
-                        disabled={!!(selectedEndpoint && !isEditMode)}
-                        className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
-                          selectedEndpoint && !isEditMode
-                            ? "opacity-60 cursor-not-allowed"
-                            : ""
+                        Request
+                      </button>
+                      <button
+                        onClick={() => setSpecTab("response")}
+                        className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ${
+                          specTab === "response"
+                            ? "text-gray-900 dark:text-[#E6EDF3] bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] border-b-white dark:border-b-[#161B22] relative z-10"
+                            : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
                         }`}
-                      />
+                      >
+                        Response
+                      </button>
+                      {!isCompletedView && (
+                        <button
+                          onClick={() => setSpecTab("schema")}
+                          className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ${
+                            specTab === "schema"
+                              ? "text-gray-900 dark:text-[#E6EDF3] bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] border-b-white dark:border-b-[#161B22] relative z-10"
+                              : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
+                          }`}
+                        >
+                          Schema
+                        </button>
+                      )}
                     </div>
                   </div>
-                </div>
-              )}
 
-            {/* Request Card */}
-            {protocol === "REST" &&
-              (selectedEndpoint !== null || isNewFormMode) && (
-                <ApiRequestCard
-                  queryParams={queryParams}
-                  setQueryParams={setQueryParams}
-                  requestHeaders={requestHeaders}
-                  setRequestHeaders={setRequestHeaders}
-                  requestBody={requestBody}
-                  setRequestBody={setRequestBody}
-                  auth={auth}
-                  setAuth={setAuth}
-                  isReadOnly={!!(selectedEndpoint && !isEditMode)}
-                />
-              )}
-
-            {/* Response Card */}
-            {protocol === "REST" &&
-              (selectedEndpoint !== null || isNewFormMode) && (
-                <div className="mt-6">
-                  <ApiResponseCard
-                    statusCodes={statusCodes}
-                    setStatusCodes={setStatusCodes}
-                    isReadOnly={!!(selectedEndpoint && !isEditMode)}
-                  />
-                </div>
-              )}
-
-            {/* Schema Card */}
-            {protocol === "REST" &&
-              (selectedEndpoint !== null || isNewFormMode) && (
-                <div className="mt-6">
-                  <SchemaCard
-                    isReadOnly={!!(selectedEndpoint && !isEditMode)}
-                    protocol="REST"
-                  />
+                  {/* 탭 내용 */}
+                  <div className="p-4 bg-white dark:bg-[#161B22]">
+                    {specTab === "request" && (
+                      <ApiRequestCard
+                        queryParams={queryParams}
+                        setQueryParams={setQueryParams}
+                        requestHeaders={requestHeaders}
+                        setRequestHeaders={setRequestHeaders}
+                        requestBody={requestBody}
+                        setRequestBody={setRequestBody}
+                        auth={auth}
+                        setAuth={setAuth}
+                        isReadOnly={!!(selectedEndpoint && !isEditMode)}
+                        isDocumentView={
+                          !isEditMode &&
+                          !isNewFormMode &&
+                          selectedEndpoint !== null
+                        }
+                      />
+                    )}
+                    {specTab === "response" && (
+                      <ApiResponseCard
+                        statusCodes={statusCodes}
+                        setStatusCodes={setStatusCodes}
+                        isReadOnly={!!(selectedEndpoint && !isEditMode)}
+                        isDocumentView={
+                          !isEditMode &&
+                          !isNewFormMode &&
+                          selectedEndpoint !== null
+                        }
+                      />
+                    )}
+                    {specTab === "schema" && !isCompletedView && (
+                      <SchemaCard
+                        isReadOnly={!!(selectedEndpoint && !isEditMode)}
+                        protocol="REST"
+                        isDocumentView={false}
+                      />
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -2423,7 +2583,7 @@ export function ApiEditorLayout() {
       </div>
 
       {/* 하단 수정/삭제 버튼 - 선택된 엔드포인트가 있을 때만 표시 (명세서 폼에서만) */}
-      {activeTab === "form" && selectedEndpoint && (
+      {activeTab === "form" && selectedEndpoint && !isNewFormMode && (
         <div className="border-t border-gray-200 dark:border-[#2D333B] px-6 py-4 bg-white dark:bg-[#0D1117]">
           <div className="flex items-center justify-end gap-3">
             {isEditMode ? (
@@ -2436,7 +2596,7 @@ export function ApiEditorLayout() {
                 </button>
                 <button
                   onClick={handleSave}
-                  className="px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md transition-colors text-sm font-medium flex items-center gap-2"
+                  className="px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none text-sm font-medium flex items-center gap-2"
                 >
                   저장
                 </button>
@@ -2484,7 +2644,7 @@ export function ApiEditorLayout() {
             </button>
             <button
               onClick={handleSave}
-              className="px-3 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-colors text-sm font-medium flex items-center gap-2"
+              className="px-3 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none text-sm font-medium flex items-center gap-2"
             >
               생성
             </button>
@@ -2499,6 +2659,13 @@ export function ApiEditorLayout() {
         spec={currentSpec}
       />
 
+      {/* WebSocket Channels/Messages Tree */}
+      {protocol === "WebSocket" && activeTab === "form" && (
+        <div className="px-6 py-4">
+          <WsChannelMessageTree />
+        </div>
+      )}
+
       {/* Import Result Modal */}
       {importResult && (
         <ImportResultModal
@@ -2507,9 +2674,17 @@ export function ApiEditorLayout() {
             setIsImportModalOpen(false);
             setImportResult(null);
           }}
-          result={importResult.data}
+          result={(importResult as any).data || (importResult as any)}
         />
       )}
+
+      {/* Markdown Preview Modal */}
+      <MarkdownPreviewModal
+        isOpen={isMdPreviewOpen}
+        onClose={() => setIsMdPreviewOpen(false)}
+        content={mdPreviewContent}
+        filename={mdPreviewFilename}
+      />
     </div>
   );
 }

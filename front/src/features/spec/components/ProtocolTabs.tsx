@@ -1,6 +1,6 @@
 interface ProtocolTabsProps {
-  selectedProtocol: "REST" | "GraphQL" | "WebSocket" | null;
-  onProtocolChange: (protocol: "REST" | "GraphQL" | "WebSocket" | null) => void;
+  selectedProtocol: "REST" | "WebSocket" | null;
+  onProtocolChange: (protocol: "REST" | "WebSocket" | null) => void;
   onNewForm?: () => void; // 새 작성 폼을 위한 콜백
   compact?: boolean; // 사이드바용 작은 사이즈
 }
@@ -11,13 +11,12 @@ export function ProtocolTabs({
   onNewForm,
   compact = false,
 }: ProtocolTabsProps) {
-  const protocols: Array<"REST" | "GraphQL" | "WebSocket"> = [
+  const protocols: Array<"REST" | "WebSocket"> = [
     "REST",
     "WebSocket",
-    "GraphQL",
   ];
 
-  const handleProtocolChange = (protocol: "REST" | "GraphQL" | "WebSocket") => {
+  const handleProtocolChange = (protocol: "REST" | "WebSocket") => {
     // 토글 로직: 같은 프로토콜을 클릭하면 선택 해제 (null)
     if (selectedProtocol === protocol) {
       onProtocolChange(null);
@@ -38,7 +37,7 @@ export function ProtocolTabs({
             <button
               key={protocol}
               onClick={() => handleProtocolChange(protocol)}
-              className={`flex-1 py-2 px-3 text-xs font-medium rounded-md transition-colors ${
+              className={`flex-1 py-2 px-3 text-xs font-medium rounded-md transition-colors focus:outline-none focus-visible:outline-none ${
                 selectedProtocol === protocol
                   ? "bg-white dark:bg-[#0D1117] text-[#2563EB] shadow-sm"
                   : "text-gray-600 dark:text-[#8B949E] hover:text-gray-900 dark:hover:text-[#E6EDF3]"
@@ -60,7 +59,7 @@ export function ProtocolTabs({
           <button
             key={protocol}
             onClick={() => handleProtocolChange(protocol)}
-            className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+            className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 focus:outline-none focus-visible:outline-none ${
               selectedProtocol === protocol
                 ? "text-gray-900 dark:text-[#E6EDF3] border-[#2563EB]"
                 : "text-gray-500 dark:text-[#8B949E] border-transparent hover:text-gray-900 dark:hover:text-[#E6EDF3]"

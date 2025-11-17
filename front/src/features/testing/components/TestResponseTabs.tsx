@@ -43,9 +43,8 @@ export function TestResponseTabs() {
         const response = await getTryMethodList(tryId);
         setMethodList(response.data.methods);
         setTotalDurationMs(response.data.totalDurationMs);
-      } catch (error) {
-        console.error("Try 메서드 리스트 로드 실패:", error);
-        setMethodList(null);
+        } catch (error) {
+          setMethodList(null);
         setTotalDurationMs(null);
       } finally {
         setIsLoadingMethods(false);
@@ -159,9 +158,8 @@ export function TestResponseTabs() {
               try {
                 const response = await getTryTrace(tryId);
                 setTraceData(response.data);
-              } catch (error) {
-                console.error("Trace 조회 실패:", error);
-                setTraceData(null);
+                } catch (error) {
+                  setTraceData(null);
               } finally {
                 setIsLoadingTrace(false);
               }
@@ -436,7 +434,7 @@ function TestContent({
               <button
                 onClick={() => onShowTrace()}
                 disabled={isLoadingTrace || !tryId}
-                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-[#2D333B] disabled:text-gray-500 dark:disabled:text-[#8B949E] text-white rounded-md transition-colors text-sm font-medium flex items-center gap-2 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-[#2D333B] disabled:text-gray-500 dark:disabled:text-[#8B949E] text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none text-sm font-medium flex items-center gap-2 disabled:cursor-not-allowed"
               >
                 {isLoadingTrace ? (
                   <>

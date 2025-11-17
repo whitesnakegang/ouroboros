@@ -11,13 +11,11 @@ interface SidebarProps {
 
 export function Sidebar({ onAddNew }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeFilter, setActiveFilter] = useState<"mock" | "completed">(
-    "mock"
+  const [activeFilter, setActiveFilter] = useState<"mock" | "completed" | "all">(
+    "all"
   );
 
   const {
-    isDarkMode,
-    toggleDarkMode,
     toggle,
     endpoints,
     loadEndpoints,
@@ -64,10 +62,14 @@ export function Sidebar({ onAddNew }: SidebarProps) {
           if (!matchesSearch) return false;
         }
 
-        // REST 전용: Mock/Completed 필터 적용
+        // REST 전용: Mock/Completed/All 필터 적용
         // WebSocket, GraphQL: 필터 적용 안 함 (모두 표시)
         const endpointProtocol = endpoint.protocol || "REST"; // 기본값은 REST
         if (endpointProtocol === "REST") {
+          // "all" 탭일 때는 필터링 없이 모두 표시
+          if (activeFilter === "all") {
+            return true;
+          }
           const ep = endpoint as { progress?: string };
           const progressLower = ep.progress?.toLowerCase();
           if (activeFilter === "mock") {
@@ -92,60 +94,26 @@ export function Sidebar({ onAddNew }: SidebarProps) {
   return (
     <div className="h-full flex flex-col bg-white dark:bg-[#0D1117] transition-colors">
       <div className="p-4 border-b border-gray-200 dark:border-[#2D333B]">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-[#E6EDF3]">
-              API 엔드포인트
-            </h2>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={toggle}
-              className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#161B22] transition-colors"
-              aria-label="사이드바 닫기"
+        <div className="flex items-center justify-end mb-4">
+          <button
+            onClick={toggle}
+            className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#161B22] transition-colors"
+            aria-label="사이드바 닫기"
+          >
+            <svg
+              className="w-5 h-5 text-gray-600 dark:text-[#8B949E]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
             >
-              <svg
-                className="w-5 h-5 text-gray-600 dark:text-[#8B949E]"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-            <button
-              onClick={toggleDarkMode}
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#161B22] transition-colors"
-              title={isDarkMode ? "라이트 모드로 전환" : "다크 모드로 전환"}
-            >
-              {isDarkMode ? (
-                <svg
-                  className="w-5 h-5 text-yellow-500"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              ) : (
-                <svg
-                  className="w-5 h-5 text-gray-600 dark:text-[#8B949E]"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
-                </svg>
-              )}
-            </button>
-          </div>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
         </div>
 
         <ProtocolTabs
@@ -211,7 +179,7 @@ export function Sidebar({ onAddNew }: SidebarProps) {
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className={`flex-1 overflow-y-auto ${protocol === "REST" ? "bg-white dark:bg-[#0D1117]" : ""}`}>
         {isLoading ? (
           <div className="p-4 text-center text-gray-500 dark:text-[#8B949E] text-sm">
             로딩 중...

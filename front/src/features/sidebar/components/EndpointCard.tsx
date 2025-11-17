@@ -3,7 +3,7 @@ import type { Endpoint } from "../store/sidebar.store";
 
 interface EndpointCardProps {
   endpoint: Endpoint;
-  filterType: "mock" | "completed";
+  filterType: "mock" | "completed" | "all";
 }
 
 // HTTP Method 색상 (텍스트 컬러만)
@@ -18,12 +18,15 @@ const methodTextColors = {
   DUPLEX: "text-[#EC4899]", // 핑크색 (양방향)
 };
 
-// Mock 상태 표시 색상
+// Mock 상태 표시 색상 (육안으로 확실히 구분 가능한 색상)
 const mockStatusColors = {
-  "not-implemented": "bg-[#8B949E]",
-  "in-progress": "bg-blue-500",
-  modifying: "bg-orange-500",
+  "not-implemented": "bg-[#8B949E]", // 회색
+  "in-progress": "bg-[#EAB308]", // 노란색 (주의)
+  modifying: "bg-[#F97316]", // 주황색 (주의)
 };
+
+// Completed 상태 표시 색상 (육안으로 확실히 구분 가능한 색상)
+const completedStatusColor = "bg-[#10B981]"; // 초록색
 
 // WebSocket Progress 상태 표시 색상 (점 스타일)
 const wsProgressColors = {
@@ -77,6 +80,34 @@ export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
                 : "수정중"
             }
           />
+        )}
+
+        {/* REST: All 탭에서 mock 상태의 tag와 completed 상태를 배지로 표시 */}
+        {!isWebSocket && filterType === "all" && (
+          <>
+            {/* Mock 상태: tag 상태에 따른 배지 */}
+            {(endpoint as { progress?: string }).progress?.toLowerCase() !== "completed" && endpoint.implementationStatus && (
+              <div
+                className={`w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0 ${
+                  mockStatusColors[endpoint.implementationStatus]
+                }`}
+                title={
+                  endpoint.implementationStatus === "not-implemented"
+                    ? "미구현"
+                    : endpoint.implementationStatus === "in-progress"
+                    ? "구현중"
+                    : "수정중"
+                }
+              />
+            )}
+            {/* Completed 상태: 초록색 배지 */}
+            {(endpoint as { progress?: string }).progress?.toLowerCase() === "completed" && (
+              <div
+                className={`w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0 ${completedStatusColor}`}
+                title="완료됨"
+              />
+            )}
+          </>
         )}
 
         {/* WebSocket: Progress 상태 표시 점 */}

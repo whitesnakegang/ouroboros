@@ -22,7 +22,7 @@ export interface EndpointData {
   [group: string]: Endpoint[];
 }
 
-export type Protocol = "REST" | "GraphQL" | "WebSocket" | null;
+export type Protocol = "REST" | "WebSocket" | null;
 
 interface SidebarState {
   isOpen: boolean;

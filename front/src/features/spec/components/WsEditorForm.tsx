@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { SchemaFieldEditor } from "./SchemaFieldEditor";
 import { SchemaModal } from "./SchemaModal";
 import { SchemaCard } from "./SchemaCard";
+import { SchemaViewer } from "./SchemaViewer";
 import { getAllSchemas, getAllWebSocketMessages, type SchemaResponse, type MessageResponse } from "../services/api";
 import type { SchemaField, RequestBody } from "../types/schema.types";
 import { createDefaultField } from "../types/schema.types";
@@ -41,6 +42,7 @@ interface WsEditorFormProps {
   reply: Reply | null;
   setReply: (reply: Reply | null) => void;
   isReadOnly?: boolean;
+  isDocumentView?: boolean;
   diff?: string; // 명세 불일치 정보
   operationInfo?: {
     operationName?: string;
@@ -64,6 +66,7 @@ export function WsEditorForm({
   reply,
   setReply,
   isReadOnly = false,
+  isDocumentView = false,
   diff,
   operationInfo,
   onSyncToActual,
@@ -72,6 +75,7 @@ export function WsEditorForm({
   const [messages, setMessages] = useState<MessageResponse[]>([]);
   const [isReceiverSchemaModalOpen, setIsReceiverSchemaModalOpen] = useState(false);
   const [isReplySchemaModalOpen, setIsReplySchemaModalOpen] = useState(false);
+  const [wsTab, setWsTab] = useState<"receiver" | "reply" | "schema">("receiver");
   
   // Protocol state (entryPoint에서 분리)
   const [protocol, setProtocol] = useState<"ws" | "wss">("ws");
@@ -293,17 +297,7 @@ export function WsEditorForm({
     setIsReplySchemaModalOpen(false);
   };
 
-  // Diff 불일치 메시지 생성
-  const getDiffMessage = (diffType?: string) => {
-    switch (diffType) {
-      case "payload":
-        return "메시지 Payload 구조가 명세와 실제 구현이 다릅니다.";
-      case "channel":
-        return "Channel 정보가 명세와 실제 구현이 다릅니다.";
-      default:
-        return "명세서가 실제 구현과 일치하지 않습니다.";
-    }
-  };
+  // removed unused getDiffMessage
 
   // Diff 타입별 상세 정보 (REST DiffNotification 스타일과 동일)
   const getDiffDetails = (diffType?: string) => {
@@ -333,110 +327,237 @@ export function WsEditorForm({
     };
   };
 
-  return (
-    <div className="w-full max-w-6xl mx-auto px-6 py-8">
-      {/* Diff 불일치 경고 메시지 (amber 배경 2단 레이아웃) */}
-      {diff && diff !== "none" && (() => {
-        const details = getDiffDetails(diff);
-        const progressLower = operationInfo?.progress?.toLowerCase() || "none";
-        const isCompleted = progressLower === "completed";
-        
-        return (
-          <div className="rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 shadow-sm mb-6">
-            {/* 헤더 */}
-            <div className="p-4 border-b border-amber-200 dark:border-amber-800">
-              <div className="flex items-start gap-3">
-                <svg
-                  className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                  />
+  // Diff 알림 렌더링 (문서 뷰와 편집 뷰 모두에서 표시)
+  const renderDiffNotification = () => {
+    if (!diff || diff === "none") return null;
+
+    const details = getDiffDetails(diff);
+    const progressLower = operationInfo?.progress?.toLowerCase() || "none";
+    const isCompleted = progressLower === "completed";
+    
+    return (
+      <div className="rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 shadow-sm mb-6">
+        {/* 헤더 */}
+        <div className="p-4 border-b border-amber-200 dark:border-amber-800">
+          <div className="flex items-start gap-3">
+            <svg
+              className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
+            </svg>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                  명세와 실제 구현의 불일치
+                </h3>
+                <span className="px-2 py-0.5 bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200 text-xs font-medium rounded">
+                  {details.label}
+                </span>
+              </div>
+              <p className="text-sm text-amber-700 dark:text-amber-400">
+                {details.description}
+              </p>
+              <p className="text-xs text-amber-600 dark:text-amber-500 mt-2">
+                {isCompleted
+                  ? "이 Operation은 completed 상태로 실제 구현이 완료되었습니다."
+                  : "이 Operation은 진행 중입니다."}
+                {details.canSync && " 아래 버튼으로 명세를 갱신할 수 있습니다."}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* 상세 정보 */}
+        <div className="p-4 space-y-3">
+          <div className="bg-white dark:bg-amber-950/30 rounded-md p-3 border border-amber-200 dark:border-amber-800">
+            <h4 className="text-xs font-semibold text-amber-900 dark:text-amber-200 mb-2 flex items-center gap-1">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              안내사항
+            </h4>
+            <ul className="space-y-2">
+              <li className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
+                <svg className="w-3 h-3 text-amber-600 dark:text-amber-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-                      명세와 실제 구현의 불일치
-                    </h3>
-                    <span className="px-2 py-0.5 bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200 text-xs font-medium rounded">
-                      {details.label}
-                    </span>
-                  </div>
-                  <p className="text-sm text-amber-700 dark:text-amber-400">
-                    {details.description}
-                  </p>
-                  <p className="text-xs text-amber-600 dark:text-amber-500 mt-2">
-                    {isCompleted
-                      ? "이 Operation은 completed 상태로 실제 구현이 완료되었습니다."
-                      : "이 Operation은 진행 중입니다."}
-                    {details.canSync && " 아래 버튼으로 명세를 갱신할 수 있습니다."}
-                  </p>
+                <span>
+                  백엔드에서{" "}
+                  <code className="px-1 py-0.5 bg-amber-100 dark:bg-amber-900 border border-amber-300 dark:border-amber-700 rounded text-[10px] font-mono text-amber-900 dark:text-amber-200">
+                    x-ouroboros-diff
+                  </code>{" "}
+                  필드를 통해 불일치가 감지되었습니다.
+                </span>
+              </li>
+              {details.type === "channel" && (
+                <li className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
+                  <svg className="w-3 h-3 text-amber-600 dark:text-amber-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>
+                    실제 구현에 존재하지만 명세에 없는 Channel이 있다면, 아래 버튼을 클릭하여 명세에 자동으로 추가할 수 있습니다.
+                  </span>
+                </li>
+              )}
+            </ul>
+          </div>
+
+          {details.canSync && onSyncToActual && (
+            <button
+              onClick={onSyncToActual}
+              className="w-full px-4 py-3 bg-amber-600 hover:bg-amber-700 dark:bg-amber-700 dark:hover:bg-amber-800 text-white rounded-md transition-colors text-sm font-semibold flex items-center justify-center gap-2 shadow-md"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              실제 구현을 명세에 반영
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // 문서 형식 뷰
+  if (isDocumentView) {
+    return (
+      <div className="space-y-6">
+        {/* Diff 알림 */}
+        {renderDiffNotification()}
+        {/* Entry Point */}
+        <div>
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">Entry Point</h3>
+          <div className="flex items-start gap-3 text-sm">
+            <span className="font-mono text-gray-900 dark:text-[#E6EDF3]">{entryPoint || <span className="text-gray-400 italic">(empty)</span>}</span>
+          </div>
+        </div>
+
+        {/* Summary */}
+        {summary && (
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">Summary</h3>
+            <div className="text-sm text-gray-900 dark:text-[#E6EDF3]">{summary}</div>
+          </div>
+        )}
+
+        {/* Description */}
+        {description && (
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">Description</h3>
+            <div className="text-sm text-gray-900 dark:text-[#E6EDF3]">{description}</div>
+          </div>
+        )}
+
+        {/* Tags */}
+        {tags && (
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">Tags</h3>
+            <div className="flex flex-wrap gap-2">
+              {tags.split(",").map((tag, index) => (
+                <span
+                  key={index}
+                  className="px-2 py-1 bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs rounded"
+                >
+                  {tag.trim()}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Receiver */}
+        {receiver && (
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-3">Receiver</h3>
+            <div className="space-y-4 ml-4">
+              <div>
+                <h4 className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] mb-2">Address</h4>
+                <div className="flex items-start gap-3 text-sm">
+                  <span className="font-mono text-gray-900 dark:text-[#E6EDF3]">{receiver.address || <span className="text-gray-400 italic">(empty)</span>}</span>
                 </div>
               </div>
-            </div>
 
-            {/* 상세 정보 */}
-            <div className="p-4 space-y-3">
-              <div className="bg-white dark:bg-amber-950/30 rounded-md p-3 border border-amber-200 dark:border-amber-800">
-                <h4 className="text-xs font-semibold text-amber-900 dark:text-amber-200 mb-2 flex items-center gap-1">
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  안내사항
-                </h4>
-                <ul className="space-y-2">
-                  <li className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
-                    <svg className="w-3 h-3 text-amber-600 dark:text-amber-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>
-                      백엔드에서{" "}
-                      <code className="px-1 py-0.5 bg-amber-100 dark:bg-amber-900 border border-amber-300 dark:border-amber-700 rounded text-[10px] font-mono text-amber-900 dark:text-amber-200">
-                        x-ouroboros-diff
-                      </code>{" "}
-                      필드를 통해 불일치가 감지되었습니다.
-                    </span>
-                  </li>
-                  <li className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
-                    <svg className="w-3 h-3 text-amber-600 dark:text-amber-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>명세서의 수정 및 삭제가 제한됩니다.</span>
-                  </li>
-                  {details.type === "channel" && (
-                    <li className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
-                      <svg className="w-3 h-3 text-amber-600 dark:text-amber-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <span>
-                        실제 구현에 존재하지만 명세에 없는 Channel이 있다면, 아래 버튼을 클릭하여 명세에 자동으로 추가할 수 있습니다.
-                      </span>
-                    </li>
-                  )}
-                </ul>
-              </div>
+              {receiver.headers && receiver.headers.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] mb-2">Headers</h4>
+                  <div className="space-y-2">
+                    {receiver.headers.map((header, index) => (
+                      <div key={index} className="flex items-start gap-3 text-sm">
+                        <span className="font-mono text-gray-900 dark:text-[#E6EDF3] min-w-[120px]">{header.key}</span>
+                        <span className="text-gray-600 dark:text-[#8B949E]">:</span>
+                        <span className="text-gray-900 dark:text-[#E6EDF3] flex-1">{header.value || <span className="text-gray-400 italic">(empty)</span>}</span>
+                        {header.required && (
+                          <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-xs rounded">Required</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-              {details.canSync && onSyncToActual && (
-                <button
-                  onClick={onSyncToActual}
-                  className="w-full px-4 py-3 bg-amber-600 hover:bg-amber-700 dark:bg-amber-700 dark:hover:bg-amber-800 text-white rounded-md transition-colors text-sm font-semibold flex items-center justify-center gap-2 shadow-md"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  실제 구현을 명세에 반영
-                </button>
+              {receiver.schema && (
+                <div>
+                  <h4 className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] mb-2">Schema</h4>
+                  <SchemaViewer
+                    schemaType={receiver.schema.rootSchemaType}
+                    fields={receiver.schema.fields}
+                    schemaRef={receiver.schema.schemaRef}
+                    description={receiver.schema.description}
+                    contentType="application/json"
+                  />
+                </div>
               )}
             </div>
           </div>
-        );
-      })()}
+        )}
+
+        {/* Reply */}
+        {reply && (
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-3">Reply</h3>
+            <div className="space-y-4 ml-4">
+              <div>
+                <h4 className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] mb-2">Address</h4>
+                <div className="flex items-start gap-3 text-sm">
+                  <span className="font-mono text-gray-900 dark:text-[#E6EDF3]">{reply.address || <span className="text-gray-400 italic">(empty)</span>}</span>
+                </div>
+              </div>
+
+              {reply.schema && (
+                <div>
+                  <h4 className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] mb-2">Schema</h4>
+                  <SchemaViewer
+                    schemaType={reply.schema.rootSchemaType}
+                    fields={reply.schema.fields}
+                    schemaRef={reply.schema.schemaRef}
+                    description={reply.schema.description}
+                    contentType="application/json"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {!receiver && !reply && (
+          <div className="text-sm text-gray-500 dark:text-[#8B949E] italic">No WebSocket configuration.</div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full max-w-6xl mx-auto px-6 py-8">
+      {/* Diff 알림 */}
+      {renderDiffNotification()}
 
       {/* Entry Point & Metadata */}
       <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm mb-6">
@@ -597,47 +718,85 @@ export function WsEditorForm({
         </div>
       )}
 
-      {/* Receivers & Replies - 이분할 레이아웃 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Receiver 섹션 */}
-        <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-[#E6EDF3]">
+      {/* Receiver/Reply/Schema 탭 */}
+      <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] shadow-sm mb-6 overflow-hidden">
+        {/* 탭 헤더 - 폴더 느낌으로 통합 */}
+        <div className="bg-gray-50 dark:bg-[#0D1117] border-b border-gray-200 dark:border-[#2D333B] px-4 pt-2">
+          <div className="flex gap-0.5 -mb-px">
+            <button
+              onClick={() => setWsTab("receiver")}
+              className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ${
+                wsTab === "receiver"
+                  ? "text-gray-900 dark:text-[#E6EDF3] bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] border-b-white dark:border-b-[#161B22] relative z-10"
+                  : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
+              }`}
+            >
               Receiver
-            </h2>
-            {!isReadOnly && (
-              <div className="flex gap-2">
-                {receiver ? (
-                  <button
-                    onClick={() => setReceiver(null)}
-                    className="text-red-500 hover:text-red-700 text-sm font-medium"
-                  >
-                    제거
-                  </button>
-                ) : (
-                  <button
-                    onClick={initializeReceiver}
-                    className="px-3 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md text-sm font-medium transition-colors flex items-center gap-2"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 4v16m8-8H4"
-                      />
-                    </svg>
-                    추가
-                  </button>
+            </button>
+            <button
+              onClick={() => setWsTab("reply")}
+              className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ${
+                wsTab === "reply"
+                  ? "text-gray-900 dark:text-[#E6EDF3] bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] border-b-white dark:border-b-[#161B22] relative z-10"
+                  : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
+              }`}
+            >
+              Reply
+            </button>
+            <button
+              onClick={() => setWsTab("schema")}
+              className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ${
+                wsTab === "schema"
+                  ? "text-gray-900 dark:text-[#E6EDF3] bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] border-b-white dark:border-b-[#161B22] relative z-10"
+                  : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
+              }`}
+            >
+              Schema
+            </button>
+          </div>
+        </div>
+
+        {/* 탭 내용 */}
+        <div className="p-4 bg-white dark:bg-[#161B22]">
+          {wsTab === "receiver" && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
+                  Receiver
+                </h3>
+                {!isReadOnly && (
+                  <div className="flex gap-2">
+                    {receiver ? (
+                      <button
+                        onClick={() => setReceiver(null)}
+                        className="text-red-500 hover:text-red-700 text-sm font-medium"
+                      >
+                        제거
+                      </button>
+                    ) : (
+                      <button
+                        onClick={initializeReceiver}
+                        className="px-3 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md text-sm font-medium transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none flex items-center gap-2"
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 4v16m8-8H4"
+                          />
+                        </svg>
+                        추가
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
-          </div>
 
           {receiver ? (
             <div className="space-y-4">
@@ -872,47 +1031,48 @@ export function WsEditorForm({
               <p>Receiver가 없습니다. "추가" 버튼을 클릭하여 추가하세요.</p>
             </div>
           )}
-        </div>
+            </div>
+          )}
 
-        {/* Reply 섹션 */}
-        <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-[#E6EDF3]">
-              Reply
-            </h2>
-            {!isReadOnly && (
-              <div className="flex gap-2">
-                {reply ? (
-                  <button
-                    onClick={() => setReply(null)}
-                    className="text-red-500 hover:text-red-700 text-sm font-medium"
-                  >
-                    제거
-                  </button>
-                ) : (
-                  <button
-                    onClick={initializeReply}
-                    className="px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md text-sm font-medium transition-colors flex items-center gap-2"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 4v16m8-8H4"
-                      />
-                    </svg>
-                    추가
-                  </button>
+          {wsTab === "reply" && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
+                  Reply
+                </h3>
+                {!isReadOnly && (
+                  <div className="flex gap-2">
+                    {reply ? (
+                      <button
+                        onClick={() => setReply(null)}
+                        className="text-red-500 hover:text-red-700 text-sm font-medium"
+                      >
+                        제거
+                      </button>
+                    ) : (
+                      <button
+                        onClick={initializeReply}
+                        className="px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md text-sm font-medium transition-colors flex items-center gap-2"
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 4v16m8-8H4"
+                          />
+                        </svg>
+                        추가
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
-          </div>
 
           {reply ? (
             <div className="space-y-4">
@@ -1084,6 +1244,15 @@ export function WsEditorForm({
               <p>Reply가 없습니다. "추가" 버튼을 클릭하여 추가하세요.</p>
             </div>
           )}
+            </div>
+          )}
+
+          {wsTab === "schema" && (
+            <SchemaCard
+              isReadOnly={isReadOnly}
+              protocol="WebSocket"
+            />
+          )}
         </div>
       </div>
 
@@ -1103,11 +1272,6 @@ export function WsEditorForm({
         schemas={schemas}
         setSchemas={setSchemas}
       />
-
-      {/* Schema Card - Schema 관리 */}
-      <div className="mt-6">
-        <SchemaCard isReadOnly={isReadOnly} protocol="WebSocket" />
-      </div>
     </div>
   );
 }

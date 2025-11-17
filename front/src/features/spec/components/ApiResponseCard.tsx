@@ -1,7 +1,14 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from "react";
 import React from "react";
 import { SchemaModal } from "./SchemaModal";
+import { SchemaViewer } from "./SchemaViewer";
 import { getAllSchemas, type SchemaResponse } from "../services/api";
+import type {
+  SchemaField,
+  SchemaType,
+  PrimitiveTypeName,
+} from "../types/schema.types";
 
 interface StatusCode {
   code: string;
@@ -22,12 +29,14 @@ interface ApiResponseCardProps {
   statusCodes: StatusCode[];
   setStatusCodes: (codes: StatusCode[]) => void;
   isReadOnly?: boolean;
+  isDocumentView?: boolean;
 }
 
 export function ApiResponseCard({
   statusCodes,
   setStatusCodes,
   isReadOnly = false,
+  isDocumentView = false,
 }: ApiResponseCardProps) {
   const statusCodeTemplates: StatusCode[] = [
     { code: "200", type: "Success", message: "요청이 성공적으로 처리됨" },
@@ -106,6 +115,141 @@ export function ApiResponseCard({
     }
   }, [isResponseSchemaModalOpen]);
 
+  // 문서 형식 뷰
+  if (isDocumentView) {
+    return (
+      <div className="space-y-4">
+        {statusCodes.length > 0 ? (
+          statusCodes.map((statusCode, index) => (
+            <div
+              key={index}
+              className="border-b border-gray-200 dark:border-[#2D333B] pb-4 last:border-b-0 last:pb-0"
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <span
+                  className={`px-2 py-1 rounded text-sm font-semibold ${
+                    statusCode.type === "Success"
+                      ? "bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300"
+                      : "bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300"
+                  }`}
+                >
+                  {statusCode.code}
+                </span>
+                <span className="text-sm font-medium text-gray-900 dark:text-[#E6EDF3]">
+                  {statusCode.message}
+                </span>
+              </div>
+              {statusCode.schema && (
+                <div className="mt-4">
+                  {(() => {
+                    // StatusCode schema를 SchemaField[]로 변환
+                    const convertSchemaToFields = ():
+                      | SchemaField[]
+                      | undefined => {
+                      if (statusCode.schema?.ref) {
+                        return undefined; // ref는 SchemaViewer에서 처리
+                      }
+                      if (statusCode.schema?.properties) {
+                        return Object.entries(statusCode.schema.properties).map(
+                          ([key, prop]: [string, any]) => {
+                            const field: SchemaField = {
+                              key,
+                              description: prop.description,
+                              required: prop.required || false,
+                              schemaType:
+                                prop.type === "array"
+                                  ? {
+                                      kind: "array" as const,
+                                      items: prop.items?.$ref
+                                        ? {
+                                            kind: "ref" as const,
+                                            schemaName: prop.items.$ref.replace(
+                                              "#/components/schemas/",
+                                              ""
+                                            ),
+                                          }
+                                        : {
+                                            kind: "primitive" as const,
+                                            type: (prop.items?.type ||
+                                              "string") as PrimitiveTypeName,
+                                          },
+                                    }
+                                  : prop.$ref
+                                  ? {
+                                      kind: "ref" as const,
+                                      schemaName: prop.$ref.replace(
+                                        "#/components/schemas/",
+                                        ""
+                                      ),
+                                    }
+                                  : {
+                                      kind: "primitive" as const,
+                                      type: (prop.type ||
+                                        "string") as PrimitiveTypeName,
+                                    },
+                            };
+                            return field;
+                          }
+                        );
+                      }
+                      return undefined;
+                    };
+
+                    const fields = convertSchemaToFields();
+                    const schemaType: SchemaType | undefined =
+                      statusCode.schema?.type && !statusCode.schema?.ref
+                        ? statusCode.schema.isArray
+                          ? {
+                              kind: "array" as const,
+                              items: {
+                                kind: "primitive" as const,
+                                type: statusCode.schema
+                                  .type as PrimitiveTypeName,
+                              },
+                            }
+                          : {
+                              kind: "primitive" as const,
+                              type: statusCode.schema.type as PrimitiveTypeName,
+                            }
+                        : undefined;
+
+                    return (
+                      <SchemaViewer
+                        schemaType={schemaType}
+                        fields={fields}
+                        schemaRef={statusCode.schema?.ref}
+                        contentType="application/json"
+                      />
+                    );
+                  })()}
+                </div>
+              )}
+              {statusCode.headers && statusCode.headers.length > 0 && (
+                <div className="mt-2 ml-5 space-y-1">
+                  <div className="text-xs font-semibold text-gray-700 dark:text-[#C9D1D9]">
+                    Headers:
+                  </div>
+                  {statusCode.headers.map((header, hIndex) => (
+                    <div
+                      key={hIndex}
+                      className="text-xs text-gray-600 dark:text-[#8B949E] ml-2"
+                    >
+                      {header.key}: {header.value}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))
+        ) : (
+          <div className="text-sm text-gray-500 dark:text-[#8B949E] italic">
+            No response codes configured.
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm">
       {/* Header */}
@@ -132,7 +276,7 @@ export function ApiResponseCard({
       {/* Content */}
       <div className="space-y-4">
         <div>
-            <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-4">
             <p className="text-sm text-gray-600 dark:text-gray-400">
               HTTP 상태 코드 관리
             </p>
@@ -175,7 +319,7 @@ export function ApiResponseCard({
                 </select>
                 <button
                   onClick={() => addStatusCode()}
-                  className="px-3 py-1 text-sm text-[#2563EB] font-medium border border-[#2563EB] rounded-md hover:bg-[#2563EB] hover:text-white transition-colors"
+                  className="px-3 py-1 text-sm text-[#2563EB] font-medium border border-[#2563EB] rounded-md hover:bg-[#2563EB] hover:text-white transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none focus-visible:[box-shadow:inset_2px_0_0_#3B82F6] dark:focus-visible:[box-shadow:inset_2px_0_0_#60A5FA]"
                 >
                   + Add Custom
                 </button>
@@ -258,7 +402,8 @@ export function ApiResponseCard({
                             {/* Kind 선택 (Schema / Primitive / None) */}
                             <select
                               value={
-                                statusCode.schema?.ref || statusCode.schema?.properties
+                                statusCode.schema?.ref ||
+                                statusCode.schema?.properties
                                   ? "schema"
                                   : statusCode.schema?.type
                                   ? "primitive"
@@ -295,7 +440,9 @@ export function ApiResponseCard({
                               }}
                               disabled={isReadOnly}
                               className={`px-3 py-1.5 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] ${
-                                isReadOnly ? "opacity-60 cursor-not-allowed" : ""
+                                isReadOnly
+                                  ? "opacity-60 cursor-not-allowed"
+                                  : ""
                               }`}
                             >
                               <option value="none">None</option>
@@ -304,56 +451,69 @@ export function ApiResponseCard({
                             </select>
 
                             {/* Schema 선택 버튼 (Kind가 schema일 때 항상 표시) */}
-                            {(!statusCode.schema?.type && (statusCode.schema?.ref || statusCode.schema?.properties || statusCode.schema)) && (
-                              <button
-                                onClick={() => {
-                                  if (isReadOnly) return;
-                                  setSelectedStatusCodeIndex(index);
-                                  setIsResponseSchemaModalOpen(true);
-                                }}
-                                disabled={isReadOnly}
-                                className={`px-3 py-1.5 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] transition-colors min-w-[150px] text-left ${
-                                  isReadOnly ? "opacity-60 cursor-not-allowed" : ""
-                                }`}
-                              >
-                                {statusCode.schema?.ref || "Select Schema..."}
-                              </button>
-                            )}
+                            {!statusCode.schema?.type &&
+                              (statusCode.schema?.ref ||
+                                statusCode.schema?.properties ||
+                                statusCode.schema) && (
+                                <button
+                                  onClick={() => {
+                                    if (isReadOnly) return;
+                                    setSelectedStatusCodeIndex(index);
+                                    setIsResponseSchemaModalOpen(true);
+                                  }}
+                                  disabled={isReadOnly}
+                                  className={`px-3 py-1.5 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] transition-colors min-w-[150px] text-left ${
+                                    isReadOnly
+                                      ? "opacity-60 cursor-not-allowed"
+                                      : ""
+                                  }`}
+                                >
+                                  {statusCode.schema?.ref || "Select Schema..."}
+                                </button>
+                              )}
 
                             {/* Primitive 타입 선택 */}
-                            {statusCode.schema?.type && !statusCode.schema?.ref && !statusCode.schema?.properties && (
-                              <select
-                                value={statusCode.schema.type}
-                                onChange={(e) => {
-                                  if (isReadOnly) return;
-                                  const updated = [...statusCodes];
-                                  updated[index] = {
-                                    ...updated[index],
-                                    schema: {
-                                      ...updated[index].schema!,
-                                      type: e.target.value,
-                                    },
-                                  };
-                                  setStatusCodes(updated);
-                                }}
-                                disabled={isReadOnly}
-                                className={`px-3 py-1.5 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] ${
-                                  isReadOnly ? "opacity-60 cursor-not-allowed" : ""
-                                }`}
-                              >
-                                <option value="string">string</option>
-                                <option value="integer">integer</option>
-                                <option value="number">number</option>
-                                <option value="boolean">boolean</option>
-                              </select>
-                            )}
+                            {statusCode.schema?.type &&
+                              !statusCode.schema?.ref &&
+                              !statusCode.schema?.properties && (
+                                <select
+                                  value={statusCode.schema.type}
+                                  onChange={(e) => {
+                                    if (isReadOnly) return;
+                                    const updated = [...statusCodes];
+                                    updated[index] = {
+                                      ...updated[index],
+                                      schema: {
+                                        ...updated[index].schema!,
+                                        type: e.target.value,
+                                      },
+                                    };
+                                    setStatusCodes(updated);
+                                  }}
+                                  disabled={isReadOnly}
+                                  className={`px-3 py-1.5 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] ${
+                                    isReadOnly
+                                      ? "opacity-60 cursor-not-allowed"
+                                      : ""
+                                  }`}
+                                >
+                                  <option value="string">string</option>
+                                  <option value="integer">integer</option>
+                                  <option value="number">number</option>
+                                  <option value="boolean">boolean</option>
+                                </select>
+                              )}
 
                             {/* Array 체크박스 */}
                             {statusCode.schema && (
                               <>
-                                <label className={`flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap ${
-                                  isReadOnly ? "opacity-60 cursor-not-allowed" : ""
-                                }`}>
+                                <label
+                                  className={`flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap ${
+                                    isReadOnly
+                                      ? "opacity-60 cursor-not-allowed"
+                                      : ""
+                                  }`}
+                                >
                                   <input
                                     type="checkbox"
                                     checked={statusCode.schema.isArray || false}
@@ -387,7 +547,9 @@ export function ApiResponseCard({
                                   }}
                                   disabled={isReadOnly}
                                   className={`p-1 text-red-500 hover:text-red-600 ${
-                                    isReadOnly ? "opacity-50 cursor-not-allowed" : ""
+                                    isReadOnly
+                                      ? "opacity-50 cursor-not-allowed"
+                                      : ""
                                   }`}
                                   title="Clear"
                                 >
@@ -423,14 +585,18 @@ export function ApiResponseCard({
                                       ...updated[index],
                                       schema: {
                                         ...updated[index].schema!,
-                                        minItems: e.target.value ? parseInt(e.target.value) : undefined,
+                                        minItems: e.target.value
+                                          ? parseInt(e.target.value)
+                                          : undefined,
                                       },
                                     };
                                     setStatusCodes(updated);
                                   }}
                                   disabled={isReadOnly}
                                   className={`w-16 px-2 py-1 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] ${
-                                    isReadOnly ? "opacity-60 cursor-not-allowed" : ""
+                                    isReadOnly
+                                      ? "opacity-60 cursor-not-allowed"
+                                      : ""
                                   }`}
                                   placeholder="1"
                                   min="0"
@@ -448,14 +614,18 @@ export function ApiResponseCard({
                                       ...updated[index],
                                       schema: {
                                         ...updated[index].schema!,
-                                        maxItems: e.target.value ? parseInt(e.target.value) : undefined,
+                                        maxItems: e.target.value
+                                          ? parseInt(e.target.value)
+                                          : undefined,
                                       },
                                     };
                                     setStatusCodes(updated);
                                   }}
                                   disabled={isReadOnly}
                                   className={`w-16 px-2 py-1 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] ${
-                                    isReadOnly ? "opacity-60 cursor-not-allowed" : ""
+                                    isReadOnly
+                                      ? "opacity-60 cursor-not-allowed"
+                                      : ""
                                   }`}
                                   placeholder="3"
                                   min="1"
@@ -567,7 +737,9 @@ export function ApiResponseCard({
                                 }}
                                 disabled={isReadOnly}
                                 className={`px-3 py-1 text-xs text-blue-600 dark:text-blue-400 border border-blue-600 dark:border-blue-400 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 ${
-                                  isReadOnly ? "opacity-50 cursor-not-allowed" : ""
+                                  isReadOnly
+                                    ? "opacity-50 cursor-not-allowed"
+                                    : ""
                                 }`}
                               >
                                 + Add Header
@@ -591,7 +763,9 @@ export function ApiResponseCard({
                                   placeholder="Header Key (e.g., Content-Type)"
                                   disabled={isReadOnly}
                                   className={`flex-1 px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                                    isReadOnly ? "opacity-60 cursor-not-allowed" : ""
+                                    isReadOnly
+                                      ? "opacity-60 cursor-not-allowed"
+                                      : ""
                                   }`}
                                 />
                                 <input
@@ -607,7 +781,9 @@ export function ApiResponseCard({
                                   placeholder="Header Value (e.g., application/json)"
                                   disabled={isReadOnly}
                                   className={`flex-1 px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                                    isReadOnly ? "opacity-60 cursor-not-allowed" : ""
+                                    isReadOnly
+                                      ? "opacity-60 cursor-not-allowed"
+                                      : ""
                                   }`}
                                 />
                                 <button
@@ -623,7 +799,9 @@ export function ApiResponseCard({
                                   }}
                                   disabled={isReadOnly}
                                   className={`p-2 text-red-500 hover:text-red-600 ${
-                                    isReadOnly ? "opacity-50 cursor-not-allowed" : ""
+                                    isReadOnly
+                                      ? "opacity-50 cursor-not-allowed"
+                                      : ""
                                   }`}
                                 >
                                   <svg

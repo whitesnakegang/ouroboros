@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { SchemaModal } from "./SchemaModal";
 import { SchemaFieldEditor } from "./SchemaFieldEditor";
+import { SchemaViewer } from "./SchemaViewer";
 import { getAllSchemas, type SchemaResponse } from "../services/api";
 import type { RequestBody, SchemaField, SchemaType, PrimitiveTypeName } from "../types/schema.types";
 import { 
@@ -58,6 +59,7 @@ interface ApiRequestCardProps {
   auth: AuthConfig;
   setAuth: (auth: AuthConfig) => void;
   isReadOnly?: boolean;
+  isDocumentView?: boolean;
 }
 
 export function ApiRequestCard({
@@ -70,6 +72,7 @@ export function ApiRequestCard({
   auth,
   setAuth,
   isReadOnly = false,
+  isDocumentView = false,
 }: ApiRequestCardProps) {
   const bodyTypes: RequestBody["type"][] = [
     "none",
@@ -162,6 +165,86 @@ export function ApiRequestCard({
       });
     }
   };
+
+  // 문서 형식 뷰
+  if (isDocumentView) {
+    return (
+      <div className="space-y-6">
+        {/* Query Parameters */}
+        {queryParams.length > 0 && (
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">Query Parameters</h3>
+            <div className="space-y-2">
+              {queryParams.map((param, index) => (
+                <div key={index} className="flex items-start gap-3 text-sm">
+                  <span className="font-mono text-gray-900 dark:text-[#E6EDF3] min-w-[120px]">{param.key}</span>
+                  <span className="text-gray-600 dark:text-[#8B949E]">:</span>
+                  <span className="text-gray-900 dark:text-[#E6EDF3] flex-1">{param.value || <span className="text-gray-400 italic">(empty)</span>}</span>
+                  {param.required && (
+                    <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-xs rounded">Required</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Request Headers */}
+        {requestHeaders.length > 0 && (
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">Headers</h3>
+            <div className="space-y-2">
+              {requestHeaders.map((header, index) => (
+                <div key={index} className="flex items-start gap-3 text-sm">
+                  <span className="font-mono text-gray-900 dark:text-[#E6EDF3] min-w-[120px]">{header.key}</span>
+                  <span className="text-gray-600 dark:text-[#8B949E]">:</span>
+                  <span className="text-gray-900 dark:text-[#E6EDF3] flex-1">{header.value || <span className="text-gray-400 italic">(empty)</span>}</span>
+                  {header.required && (
+                    <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-xs rounded">Required</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Request Body */}
+        {requestBody.type !== "none" && (
+          <div>
+            <SchemaViewer
+              schemaType={requestBody.rootSchemaType}
+              fields={requestBody.fields}
+              schemaRef={requestBody.schemaRef}
+              description={requestBody.description}
+              contentType={
+                requestBody.type === "json"
+                  ? "application/json"
+                  : requestBody.type === "xml"
+                  ? "application/xml"
+                  : requestBody.type === "form-data"
+                  ? "multipart/form-data"
+                  : "application/x-www-form-urlencoded"
+              }
+            />
+          </div>
+        )}
+
+        {/* Auth */}
+        {auth.type !== "none" && (
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">Authentication</h3>
+            <div className="text-sm text-gray-900 dark:text-[#E6EDF3]">
+              Type: <span className="font-mono">{auth.type}</span>
+            </div>
+          </div>
+        )}
+
+        {queryParams.length === 0 && requestHeaders.length === 0 && requestBody.type === "none" && auth.type === "none" && (
+          <div className="text-sm text-gray-500 dark:text-[#8B949E] italic">No request parameters configured.</div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm mb-6">

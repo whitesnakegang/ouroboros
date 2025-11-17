@@ -1,17 +1,19 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useTestingStore } from "../store/testing.store";
-import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
-import type { TryMethod, TryTraceData } from "@/features/spec/services/api";
-import { getTryMethodList, getTryTrace } from "@/features/spec/services/api";
-import { TraceModal } from "./TraceModal";
+// removed unused useSidebarStore import
+import { MessageDetailModal } from "./MessageDetailModal";
 import type { WebSocketMessage } from "../store/testing.store";
 // JSON 포맷팅을 위한 간단한 컴포넌트
-const JsonHighlighter = ({ 
-  code, 
-  isSent 
-}: { 
-  code: string; 
+const JsonHighlighter = ({
+  code,
+  isSent,
+  useMonospace = true,
+  softWrap = true,
+}: {
+  code: string;
   isSent: boolean;
+  useMonospace?: boolean;
+  softWrap?: boolean;
 }) => {
   const formatJson = (text: string): string => {
     try {
@@ -23,15 +25,15 @@ const JsonHighlighter = ({
 
   const highlightJson = (jsonStr: string): React.ReactElement => {
     const formatted = formatJson(jsonStr);
-    const lines = formatted.split('\n');
-    
+    const lines = formatted.split("\n");
+
     return (
       <>
         {lines.map((line, lineIndex) => {
           // 간단한 JSON 하이라이팅
           const parts: (string | React.ReactElement)[] = [];
           let lastIndex = 0;
-          
+
           // 키 (따옴표로 감싸진 문자열 뒤에 콜론)
           const keyMatch = line.match(/("(?:[^"\\]|\\.)*")\s*:/);
           if (keyMatch && keyMatch.index !== undefined) {
@@ -39,63 +41,87 @@ const JsonHighlighter = ({
               parts.push(line.substring(lastIndex, keyMatch.index));
             }
             parts.push(
-              <span key={`key-${lineIndex}`} className={isSent ? "text-blue-300" : "text-blue-400"}>
+              <span
+                key={`key-${lineIndex}`}
+                className={isSent ? "text-blue-300" : "text-blue-400"}
+              >
                 {keyMatch[0]}
               </span>
             );
             lastIndex = keyMatch.index + keyMatch[0].length;
           }
-          
+
           // 문자열 값
           const stringValueMatch = line.match(/:\s*("(?:[^"\\]|\\.)*")/);
-          if (stringValueMatch && stringValueMatch.index !== undefined && stringValueMatch.index >= lastIndex) {
+          if (
+            stringValueMatch &&
+            stringValueMatch.index !== undefined &&
+            stringValueMatch.index >= lastIndex
+          ) {
             if (stringValueMatch.index > lastIndex) {
               parts.push(line.substring(lastIndex, stringValueMatch.index));
             }
             parts.push(
-              <span key={`str-${lineIndex}`} className={isSent ? "text-green-300" : "text-green-400"}>
+              <span
+                key={`str-${lineIndex}`}
+                className={isSent ? "text-green-300" : "text-green-400"}
+              >
                 {stringValueMatch[0]}
               </span>
             );
             lastIndex = stringValueMatch.index + stringValueMatch[0].length;
           }
-          
+
           // 숫자 값
           const numberMatch = line.match(/:\s*(\d+\.?\d*)/);
-          if (numberMatch && numberMatch.index !== undefined && numberMatch.index >= lastIndex) {
+          if (
+            numberMatch &&
+            numberMatch.index !== undefined &&
+            numberMatch.index >= lastIndex
+          ) {
             if (numberMatch.index > lastIndex) {
               parts.push(line.substring(lastIndex, numberMatch.index));
             }
             parts.push(
-              <span key={`num-${lineIndex}`} className={isSent ? "text-yellow-300" : "text-yellow-400"}>
+              <span
+                key={`num-${lineIndex}`}
+                className={isSent ? "text-yellow-300" : "text-yellow-400"}
+              >
                 {numberMatch[0]}
               </span>
             );
             lastIndex = numberMatch.index + numberMatch[0].length;
           }
-          
+
           // boolean/null 값
           const boolMatch = line.match(/:\s*(true|false|null)\b/);
-          if (boolMatch && boolMatch.index !== undefined && boolMatch.index >= lastIndex) {
+          if (
+            boolMatch &&
+            boolMatch.index !== undefined &&
+            boolMatch.index >= lastIndex
+          ) {
             if (boolMatch.index > lastIndex) {
               parts.push(line.substring(lastIndex, boolMatch.index));
             }
             parts.push(
-              <span key={`bool-${lineIndex}`} className={isSent ? "text-purple-300" : "text-purple-400"}>
+              <span
+                key={`bool-${lineIndex}`}
+                className={isSent ? "text-purple-300" : "text-purple-400"}
+              >
                 {boolMatch[0]}
               </span>
             );
             lastIndex = boolMatch.index + boolMatch[0].length;
           }
-          
+
           if (lastIndex < line.length) {
             parts.push(line.substring(lastIndex));
           }
-          
+
           return (
             <span key={lineIndex}>
               {parts.length > 0 ? parts : line}
-              {lineIndex < lines.length - 1 && '\n'}
+              {lineIndex < lines.length - 1 && "\n"}
             </span>
           );
         })}
@@ -103,46 +129,44 @@ const JsonHighlighter = ({
     );
   };
 
+  const fontClass = useMonospace ? "font-mono" : "font-sans";
+  const wrapClass = softWrap
+    ? "whitespace-pre-wrap break-words"
+    : "whitespace-pre";
+
   return (
-    <pre className={`p-3 text-sm font-mono overflow-x-auto rounded ${
-      isSent 
-        ? "bg-black/20 text-white" 
-        : "bg-[#1e1e1e] text-[#d4d4d4]"
-    }`}>
+    <pre
+      tabIndex={0}
+      className={`p-3 text-sm ${fontClass} ${wrapClass} overflow-x-auto rounded ${
+        isSent ? "bg-black/20 text-white" : "bg-[#1e1e1e] text-[#d4d4d4]"
+      } focus-visible:outline-none focus-visible:[box-shadow:inset_2px_0_0_#3B82F6] dark:focus-visible:[box-shadow:inset_2px_0_0_#60A5FA]`}
+    >
       <code>{highlightJson(code)}</code>
     </pre>
   );
 };
 
 export function WsTestResponseTabs() {
-  const {
-    wsMessages,
-    wsConnectionStatus,
-    wsStats,
-    wsConnectionStartTime,
-    methodList,
-    totalDurationMs,
-    tryId,
-    setMethodList,
-    setTotalDurationMs,
-  } = useTestingStore();
-  const { selectedEndpoint } = useSidebarStore();
+  const { wsMessages, wsConnectionStatus, wsStats, wsConnectionStartTime } =
+    useTestingStore();
+  // removed unused selectedEndpoint
 
-  const [activeTab, setActiveTab] = useState<"response" | "test">("response");
-  const [messageFilter, setMessageFilter] = useState<"all" | "sent" | "received">("all");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [messageFilter, setMessageFilter] = useState<
+    "all" | "sent" | "received"
+  >("all");
+  const [searchQuery, setSearchQuery] = useState<string>(() => {
+    try {
+      return localStorage.getItem("ws-log-search") || "";
+    } catch {
+      return "";
+    }
+  });
   const [isJsonFormatted, setIsJsonFormatted] = useState(true);
-  const [isLoadingMethods, setIsLoadingMethods] = useState(false);
-  const [isTraceModalOpen, setIsTraceModalOpen] = useState(false);
-  const [traceData, setTraceData] = useState<TryTraceData | null>(null);
-  const [isLoadingTrace, setIsLoadingTrace] = useState(false);
-  const [initialExpandedSpanId, setInitialExpandedSpanId] = useState<string | null>(null);
+  const [selectedMessage, setSelectedMessage] =
+    useState<WebSocketMessage | null>(null);
+  const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  // Mock 엔드포인트인지 확인
-  const isMockEndpoint =
-    selectedEndpoint?.progress?.toLowerCase() !== "completed";
 
   // 메시지 로그 자동 스크롤
   useEffect(() => {
@@ -151,29 +175,14 @@ export function WsTestResponseTabs() {
     }
   }, [wsMessages]);
 
-  // Test 탭이 활성화되고 tryId가 있을 때 메서드 리스트 로드
+  // 검색어 저장 (항상 입력창 유지 및 복원)
   useEffect(() => {
-    const loadTryMethods = async () => {
-      if (!tryId || isMockEndpoint) return;
-
-      setIsLoadingMethods(true);
-      try {
-        const response = await getTryMethodList(tryId);
-        setMethodList(response.data.methods);
-        setTotalDurationMs(response.data.totalDurationMs);
-      } catch (error) {
-        console.error("Try 메서드 리스트 로드 실패:", error);
-        setMethodList(null);
-        setTotalDurationMs(null);
-      } finally {
-        setIsLoadingMethods(false);
-      }
-    };
-
-    if (activeTab === "test" && tryId && !isMockEndpoint) {
-      loadTryMethods();
+    try {
+      localStorage.setItem("ws-log-search", searchQuery);
+    } catch {
+      // no-op: localStorage not available
     }
-  }, [activeTab, tryId, isMockEndpoint, setMethodList, setTotalDurationMs]);
+  }, [searchQuery]);
 
   // 필터링된 메시지
   const filteredMessages = wsMessages.filter((msg) => {
@@ -189,6 +198,19 @@ export function WsTestResponseTabs() {
     }
     return true;
   });
+
+  // 받은 값과 보낸 값 분리
+  const receivedMessages = filteredMessages.filter(
+    (msg) => msg.direction === "received"
+  );
+  const sentMessages = filteredMessages.filter(
+    (msg) => msg.direction === "sent"
+  );
+
+  const handleMessageClick = (message: WebSocketMessage) => {
+    setSelectedMessage(message);
+    setIsMessageModalOpen(true);
+  };
 
   // 연결 지속 시간 포맷팅
   const formatConnectionDuration = (durationMs: number | null): string => {
@@ -215,6 +237,8 @@ export function WsTestResponseTabs() {
     const milliseconds = date.getMilliseconds().toString().padStart(3, "0");
     return `${hours}:${minutes}:${seconds}.${milliseconds}`;
   };
+
+  // JSON 포맷팅은 렌더 단계에서 처리
 
   // 메시지 로그 내보내기
   const exportMessages = (format: "json" | "csv") => {
@@ -251,12 +275,12 @@ export function WsTestResponseTabs() {
 
   return (
     <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] shadow-sm">
-      {/* Response Header */}
+      {/* Log Header */}
       <div className="px-4 py-3 border-b border-gray-200 dark:border-[#2D333B] bg-gray-50 dark:bg-[#0D1117]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
-              Response
+              Log
             </span>
             {wsConnectionStatus === "connected" ? (
               <span className="px-2 py-0.5 text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full flex items-center gap-1.5">
@@ -282,15 +306,35 @@ export function WsTestResponseTabs() {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-[#8B949E]">
               <div className="flex items-center gap-1">
-                <svg className="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
+                <svg
+                  className="w-3.5 h-3.5 text-blue-500"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M7 11l5-5m0 0l5 5m-5-5v12"
+                  />
                 </svg>
                 <span className="font-medium">{wsStats.totalSent}</span>
               </div>
               <div className="w-px h-4 bg-gray-300 dark:bg-[#2D333B]"></div>
               <div className="flex items-center gap-1">
-                <svg className="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
+                <svg
+                  className="w-3.5 h-3.5 text-green-500"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M17 13l-5 5m0 0l-5-5m5 5V6"
+                  />
                 </svg>
                 <span className="font-medium">{wsStats.totalReceived}</span>
               </div>
@@ -299,91 +343,173 @@ export function WsTestResponseTabs() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-gray-200 dark:border-[#2D333B]">
-        <button
-          onClick={() => setActiveTab("response")}
-          className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-            activeTab === "response"
-              ? "text-[#2563EB] border-b-2 border-[#2563EB] bg-blue-50 dark:bg-blue-900/20"
-              : "text-gray-600 dark:text-[#8B949E] hover:text-gray-900 dark:hover:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#0D1117]"
-          }`}
-        >
-          Response
-        </button>
-        <button
-          onClick={() => setActiveTab("test")}
-          className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-            activeTab === "test"
-              ? "text-[#2563EB] border-b-2 border-[#2563EB] bg-blue-50 dark:bg-blue-900/20"
-              : "text-gray-600 dark:text-[#8B949E] hover:text-gray-900 dark:hover:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#0D1117]"
-          }`}
-        >
-          Test
-        </button>
-      </div>
-
-      {/* Tab Content */}
+      {/* Log Content */}
       <div className="p-4">
-        {activeTab === "response" ? (
-              <ResponseContent
-                messages={filteredMessages}
-                messageFilter={messageFilter}
-                setMessageFilter={setMessageFilter}
-                searchQuery={searchQuery}
-                setSearchQuery={setSearchQuery}
-                isJsonFormatted={isJsonFormatted}
-                setIsJsonFormatted={setIsJsonFormatted}
-                formatTimestamp={formatTimestamp}
-                exportMessages={exportMessages}
-                messagesEndRef={messagesEndRef}
-              />
-        ) : (
-          <TestContent
-            methodList={methodList}
-            totalDurationMs={totalDurationMs}
-            isMockEndpoint={isMockEndpoint}
-            isLoading={isLoadingMethods}
-            tryId={tryId}
-            onShowTrace={async (spanId?: string) => {
-              if (!tryId) return;
-              setIsLoadingTrace(true);
-              setIsTraceModalOpen(true);
-              setInitialExpandedSpanId(spanId || null);
-              try {
-                const response = await getTryTrace(tryId);
-                setTraceData(response.data);
-              } catch (error) {
-                console.error("Trace 조회 실패:", error);
-                setTraceData(null);
-              } finally {
-                setIsLoadingTrace(false);
-              }
-            }}
-            isLoadingTrace={isLoadingTrace}
-          />
-        )}
+        <ResponseContent
+          receivedMessages={receivedMessages}
+          sentMessages={sentMessages}
+          messageFilter={messageFilter}
+          setMessageFilter={setMessageFilter}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          isJsonFormatted={isJsonFormatted}
+          setIsJsonFormatted={setIsJsonFormatted}
+          formatTimestamp={formatTimestamp}
+          exportMessages={exportMessages}
+          messagesEndRef={messagesEndRef}
+          onMessageClick={handleMessageClick}
+        />
       </div>
 
-      {/* Trace Modal */}
-      {traceData && (
-        <TraceModal
-          isOpen={isTraceModalOpen}
+      {/* Message Detail Modal */}
+      {selectedMessage && (
+        <MessageDetailModal
+          isOpen={isMessageModalOpen}
           onClose={() => {
-            setIsTraceModalOpen(false);
-            setTraceData(null);
-            setInitialExpandedSpanId(null);
+            setIsMessageModalOpen(false);
+            setSelectedMessage(null);
           }}
-          traceData={traceData}
-          initialExpandedSpanId={initialExpandedSpanId}
+          message={selectedMessage}
         />
       )}
     </div>
   );
 }
 
+// 메시지 그룹핑 관련 상수
+const GAP_THRESHOLD_MS = 30000;
+const GROUP_MIN_COUNT = 3;
+
+// Divider 생성 함수
+function createDivider(
+  message: WebSocketMessage,
+  prev: WebSocketMessage,
+  formatTimestamp: (timestamp: number) => string
+): React.ReactElement {
+  const delta = message.timestamp - prev.timestamp;
+  const sec = Math.floor(delta / 1000);
+  const min = Math.floor(sec / 60);
+  const gapLabel = min > 0 ? `+${min}m ${sec % 60}s` : `+${sec}s`;
+
+  return (
+    <div key={`divider-${message.id}`} className="flex items-center gap-3 my-2">
+      <div className="h-px flex-1 bg-gray-200 dark:bg-[#2D333B]" />
+      <span className="text-[10px] text-gray-500 dark:text-[#8B949E] px-2 py-0.5 rounded-full bg-gray-50 dark:bg-[#0D1117] border border-gray-200 dark:border-[#2D333B]">
+        {formatTimestamp(message.timestamp)} {gapLabel}
+      </span>
+      <div className="h-px flex-1 bg-gray-200 dark:bg-[#2D333B]" />
+    </div>
+  );
+}
+
+// Group Header 생성 함수
+function createGroupHeader(
+  message: WebSocketMessage,
+  runCount: number
+): React.ReactElement {
+  return (
+    <div
+      key={`group-${message.id}`}
+      className="mt-2 mb-1 flex items-center gap-2"
+    >
+      <span
+        className={`text-[11px] font-semibold ${
+          message.direction === "sent"
+            ? "text-blue-700 dark:text-blue-400"
+            : "text-green-700 dark:text-green-400"
+        }`}
+      >
+        {message.direction === "sent" ? "Sent" : "Received"} · {runCount}
+      </span>
+      <div className="h-px flex-1 bg-gray-200 dark:bg-[#2D333B]" />
+    </div>
+  );
+}
+
+// Divider 삽입 여부 확인
+function shouldInsertDivider(
+  current: WebSocketMessage,
+  prev: WebSocketMessage
+): boolean {
+  return current.timestamp - prev.timestamp >= GAP_THRESHOLD_MS;
+}
+
+// Group Header 삽입 여부 확인
+function shouldInsertGroupHeader(
+  index: number,
+  messages: WebSocketMessage[]
+): boolean {
+  if (index === 0) {
+    return countGroupRun(index, messages) >= GROUP_MIN_COUNT;
+  }
+  return (
+    messages[index - 1].direction !== messages[index].direction &&
+    countGroupRun(index, messages) >= GROUP_MIN_COUNT
+  );
+}
+
+// 같은 방향으로 연속된 메시지 개수 계산
+function countGroupRun(
+  startIndex: number,
+  messages: WebSocketMessage[]
+): number {
+  let count = 1;
+  const direction = messages[startIndex].direction;
+  for (let j = startIndex + 1; j < messages.length; j++) {
+    if (messages[j].direction === direction) {
+      count++;
+    } else {
+      break;
+    }
+  }
+  return count;
+}
+
+// 메시지 행 빌드 함수
+function buildMessageRows(
+  allMessages: WebSocketMessage[],
+  formatTimestamp: (timestamp: number) => string,
+  isJsonFormatted: boolean,
+  isCompact: boolean,
+  onMessageClick: (message: WebSocketMessage) => void
+): React.ReactElement[] {
+  const rows: React.ReactElement[] = [];
+
+  for (let i = 0; i < allMessages.length; i++) {
+    const message = allMessages[i];
+    const prev = i > 0 ? allMessages[i - 1] : null;
+
+    // Divider 추가
+    if (prev && shouldInsertDivider(message, prev)) {
+      rows.push(createDivider(message, prev, formatTimestamp));
+    }
+
+    // 그룹 헤더 추가
+    if (shouldInsertGroupHeader(i, allMessages)) {
+      const runCount = countGroupRun(i, allMessages);
+      rows.push(createGroupHeader(message, runCount));
+    }
+
+    // 메시지 추가
+    rows.push(
+      <MessageBubble
+        key={message.id}
+        message={message}
+        formatTimestamp={formatTimestamp}
+        prevTimestamp={prev?.timestamp ?? null}
+        isJsonFormatted={isJsonFormatted}
+        compactMode={isCompact}
+        onClick={() => onMessageClick(message)}
+      />
+    );
+  }
+
+  return rows;
+}
+
 function ResponseContent({
-  messages,
+  receivedMessages,
+  sentMessages,
   messageFilter,
   setMessageFilter,
   searchQuery,
@@ -393,8 +519,10 @@ function ResponseContent({
   formatTimestamp,
   exportMessages,
   messagesEndRef,
+  onMessageClick,
 }: {
-  messages: WebSocketMessage[];
+  receivedMessages: WebSocketMessage[];
+  sentMessages: WebSocketMessage[];
   messageFilter: "all" | "sent" | "received";
   setMessageFilter: (filter: "all" | "sent" | "received") => void;
   searchQuery: string;
@@ -404,36 +532,16 @@ function ResponseContent({
   formatTimestamp: (timestamp: number) => string;
   exportMessages: (format: "json" | "csv") => void;
   messagesEndRef: React.RefObject<HTMLDivElement | null>;
+  onMessageClick: (message: WebSocketMessage) => void;
 }) {
-  if (messages.length === 0) {
-    return (
-      <div className="text-center py-12 text-gray-600 dark:text-[#8B949E]">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] flex items-center justify-center">
-          <svg
-            className="w-8 h-8 text-gray-500 dark:text-[#8B949E]"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
-            />
-          </svg>
-        </div>
-        <p className="text-sm">메시지가 없습니다</p>
-        <p className="text-xs mt-1 text-gray-500 dark:text-[#6B7280]">
-          연결 후 메시지를 전송하거나 수신하면 여기에 표시됩니다
-        </p>
-      </div>
-    );
-  }
+  const allMessages = [...sentMessages, ...receivedMessages].sort(
+    (a, b) => a.timestamp - b.timestamp
+  );
+  const isCompact = allMessages.length >= 200;
 
   return (
     <div>
-      {/* Filters & Actions Bar */}
+      {/* Filters & Actions Bar (상단 고정 해제) */}
       <div className="mb-4 bg-gray-50 dark:bg-[#0D1117] border border-gray-200 dark:border-[#2D333B] rounded-md p-3">
         <div className="flex flex-wrap items-center gap-3">
           {/* Search Bar */}
@@ -455,9 +563,33 @@ function ResponseContent({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setSearchQuery("");
+              }}
               placeholder="Search messages..."
-              className="w-full pl-9 pr-3 py-2 text-sm rounded-md bg-white dark:bg-[#161B22] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
+              className="w-full pl-9 pr-9 py-2 text-sm rounded-md bg-white dark:bg-[#161B22] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
             />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-[#8B949E]"
+                title="검색어 지우기 (Esc)"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            )}
           </div>
 
           {/* Filter Buttons */}
@@ -480,8 +612,18 @@ function ResponseContent({
                   : "text-gray-700 dark:text-[#8B949E] hover:bg-gray-100 dark:hover:bg-[#0D1117]"
               }`}
             >
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
+              <svg
+                className="w-3 h-3"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M7 11l5-5m0 0l5 5m-5-5v12"
+                />
               </svg>
               Sent
             </button>
@@ -493,8 +635,18 @@ function ResponseContent({
                   : "text-gray-700 dark:text-[#8B949E] hover:bg-gray-100 dark:hover:bg-[#0D1117]"
               }`}
             >
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
+              <svg
+                className="w-3 h-3"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17 13l-5 5m0 0l-5-5m5 5V6"
+                />
               </svg>
               Received
             </button>
@@ -502,22 +654,45 @@ function ResponseContent({
 
           {/* Options */}
           <div className="flex items-center gap-2 ml-auto">
-            <label className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-[#8B949E] hover:bg-white dark:hover:bg-[#161B22] rounded-md transition-colors cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isJsonFormatted}
-                onChange={(e) => setIsJsonFormatted(e.target.checked)}
-                className="rounded"
-              />
-              Format JSON
-            </label>
+            <div className="inline-flex rounded-md border border-gray-300 dark:border-[#2D333B] overflow-hidden">
+              <button
+                onClick={() => setIsJsonFormatted(true)}
+                className={`px-3 py-1.5 text-xs ${
+                  isJsonFormatted
+                    ? "bg-[#2563EB] text-white"
+                    : "bg-white dark:bg-[#161B22] text-gray-700 dark:text-[#8B949E]"
+                }`}
+              >
+                Pretty
+              </button>
+              <button
+                onClick={() => setIsJsonFormatted(false)}
+                className={`px-3 py-1.5 text-xs ${
+                  !isJsonFormatted
+                    ? "bg-[#2563EB] text-white"
+                    : "bg-white dark:bg-[#161B22] text-gray-700 dark:text-[#8B949E]"
+                }`}
+              >
+                Raw
+              </button>
+            </div>
 
             <button
               onClick={() => exportMessages("json")}
               className="px-3 py-1.5 text-xs font-medium bg-white dark:bg-[#161B22] text-gray-700 dark:text-[#8B949E] hover:bg-gray-100 dark:hover:bg-[#0D1117] rounded-md transition-colors border border-gray-300 dark:border-[#2D333B] flex items-center gap-1.5"
             >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                />
               </svg>
               Export
             </button>
@@ -525,17 +700,70 @@ function ResponseContent({
         </div>
       </div>
 
-      {/* Message Log */}
-      <div className="space-y-3 max-h-[600px] overflow-y-auto">
-        {messages.map((message) => (
-            <MessageBubble
-              key={message.id}
-              message={message}
-              formatTimestamp={formatTimestamp}
-            />
-        ))}
-        <div ref={messagesEndRef} />
-      </div>
+      {/* Message Log 또는 빈 상태 */}
+      {allMessages.length === 0 ? (
+        <div className="text-center py-12 text-gray-600 dark:text-[#8B949E]">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] flex items-center justify-center">
+            <svg
+              className="w-8 h-8 text-gray-500 dark:text-[#8B949E]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
+              />
+            </svg>
+          </div>
+          <p className="text-sm">메시지가 없습니다</p>
+          <p className="text-xs mt-1 text-gray-500 dark:text-[#6B7280]">
+            {searchQuery ? (
+              <>
+                검색어 "<span className="font-mono">{searchQuery}</span>"에
+                해당하는 메시지가 없습니다.
+              </>
+            ) : (
+              <>연결 후 메시지를 전송하거나 수신하면 여기에 표시됩니다</>
+            )}
+          </p>
+          {(searchQuery || messageFilter !== "all") && (
+            <div className="mt-3 flex items-center justify-center gap-2">
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="px-3 py-1.5 text-xs border rounded-md"
+                  title="검색 초기화"
+                >
+                  검색 초기화
+                </button>
+              )}
+              {messageFilter !== "all" && (
+                <button
+                  onClick={() => setMessageFilter("all")}
+                  className="px-3 py-1.5 text-xs border rounded-md"
+                  title="필터 초기화"
+                >
+                  필터 초기화
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-3 max-h-[600px] overflow-y-auto">
+          {buildMessageRows(
+            allMessages,
+            formatTimestamp,
+            isJsonFormatted,
+            isCompact,
+            onMessageClick
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+      )}
     </div>
   );
 }
@@ -543,9 +771,21 @@ function ResponseContent({
 function MessageBubble({
   message,
   formatTimestamp,
+  prevTimestamp = null,
+  isJsonFormatted = true,
+  useMonospace = true,
+  softWrap = true,
+  compactMode = false,
+  onClick,
 }: {
   message: WebSocketMessage;
   formatTimestamp: (timestamp: number) => string;
+  prevTimestamp?: number | null;
+  isJsonFormatted?: boolean;
+  useMonospace?: boolean;
+  softWrap?: boolean;
+  compactMode?: boolean;
+  onClick?: () => void;
 }) {
   const isSent = message.direction === "sent";
   const isJson = (() => {
@@ -557,26 +797,65 @@ function MessageBubble({
     }
   })();
 
+  const relativeBadge = (() => {
+    if (!prevTimestamp) return null;
+    const deltaMs = message.timestamp - prevTimestamp;
+    if (deltaMs < 0) return null;
+    const sec = (deltaMs / 1000).toFixed(1);
+    return (
+      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-[#0D1117] text-gray-600 dark:text-[#8B949E]">
+        +{sec}s
+      </span>
+    );
+  })();
+
   return (
     <div className="group relative">
       <div
-        className={`flex items-start gap-3 p-4 rounded-lg border transition-all hover:shadow-md ${
+        onClick={onClick}
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (onClick && (e.key === "Enter" || e.key === " ")) {
+            e.preventDefault();
+            onClick();
+          }
+        }}
+        className={`flex items-start gap-3 ${
+          compactMode ? "p-3" : "p-4"
+        } rounded-lg border transition-all hover:shadow-md focus-visible:outline-none focus-visible:[box-shadow:inset_2px_0_0_#3B82F6] dark:focus-visible:[box-shadow:inset_2px_0_0_#60A5FA] ${
+          onClick ? "cursor-pointer" : ""
+        } ${
           isSent
             ? "bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800/50"
             : "bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800/50"
         }`}
       >
         {/* Direction Icon */}
-        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-          isSent
-            ? "bg-blue-500 text-white"
-            : "bg-green-500 text-white"
-        }`}>
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div
+          className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+            isSent ? "bg-blue-500 text-white" : "bg-green-500 text-white"
+          }`}
+        >
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
             {isSent ? (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M7 11l5-5m0 0l5 5m-5-5v12"
+              />
             ) : (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17 13l-5 5m0 0l-5-5m5 5V6"
+              />
             )}
           </svg>
         </div>
@@ -585,16 +864,19 @@ function MessageBubble({
         <div className="flex-1 min-w-0">
           {/* Header */}
           <div className="flex items-center gap-2 mb-2">
-            <span className={`text-xs font-bold uppercase tracking-wide ${
-              isSent
-                ? "text-blue-700 dark:text-blue-400"
-                : "text-green-700 dark:text-green-400"
-            }`}>
+            <span
+              className={`text-xs font-bold uppercase tracking-wide ${
+                isSent
+                  ? "text-blue-700 dark:text-blue-400"
+                  : "text-green-700 dark:text-green-400"
+              }`}
+            >
               {isSent ? "Sent" : "Received"}
             </span>
-            <span className="text-xs text-gray-500 dark:text-[#8B949E]">
+            <span className="text-xs text-gray-600 dark:text-[#C9D1D9]">
               {formatTimestamp(message.timestamp)}
             </span>
+            {relativeBadge}
             {message.tryId && (
               <span className="ml-auto text-xs font-mono text-gray-500 dark:text-[#8B949E] opacity-0 group-hover:opacity-100 transition-opacity">
                 #{message.tryId.slice(0, 8)}
@@ -603,10 +885,29 @@ function MessageBubble({
           </div>
 
           {/* Destination/Address */}
-          <div className="mb-3 flex items-center gap-2">
-            <svg className="w-3.5 h-3.5 text-gray-400 dark:text-[#8B949E]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+          <div
+            className={`${
+              compactMode ? "mb-2" : "mb-3"
+            } flex items-center gap-2`}
+          >
+            <svg
+              className="w-3.5 h-3.5 text-gray-400 dark:text-[#C9D1D9]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+              />
             </svg>
             <span className="text-xs font-mono text-gray-700 dark:text-[#E6EDF3]">
               {message.address}
@@ -615,16 +916,28 @@ function MessageBubble({
 
           {/* Body */}
           <div className="relative">
-            {isJson ? (
+            {isJson && isJsonFormatted ? (
               <div className="rounded-md overflow-hidden border border-gray-200 dark:border-[#2D333B]">
-                <JsonHighlighter 
-                  code={message.content} 
+                <JsonHighlighter
+                  code={message.content}
                   isSent={isSent}
+                  useMonospace={useMonospace}
+                  softWrap={softWrap}
                 />
               </div>
             ) : (
-              <div className="whitespace-pre-wrap break-words text-sm font-mono bg-white dark:bg-[#0D1117] p-3 rounded-md border border-gray-200 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3]">
-                {message.content || <span className="text-gray-400 dark:text-[#8B949E] italic">(empty)</span>}
+              <div
+                className={`${
+                  compactMode ? "text-[12px]" : "text-sm"
+                } font-mono whitespace-pre-wrap break-words bg-white dark:bg-[#0D1117] ${
+                  compactMode ? "p-2" : "p-3"
+                } rounded-md border border-gray-200 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3]`}
+              >
+                {message.content || (
+                  <span className="text-gray-500 dark:text-[#C9D1D9] italic">
+                    (empty)
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -634,7 +947,17 @@ function MessageBubble({
   );
 }
 
-function TestContent({
+interface TryMethodLite {
+  spanId?: string;
+  name: string;
+  className: string;
+  parameters?: Array<{ type: string; name: string }>;
+  selfDurationMs: number;
+  selfPercentage: number;
+  percentage?: number;
+}
+
+export function TestContent({
   methodList,
   totalDurationMs,
   isMockEndpoint,
@@ -643,7 +966,7 @@ function TestContent({
   onShowTrace,
   isLoadingTrace,
 }: {
-  methodList: TryMethod[] | null;
+  methodList: TryMethodLite[] | null;
   totalDurationMs: number | null;
   isMockEndpoint: boolean;
   isLoading: boolean;
@@ -788,7 +1111,7 @@ function TestContent({
               <button
                 onClick={() => onShowTrace()}
                 disabled={isLoadingTrace || !tryId}
-                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-[#2D333B] text-white rounded-md transition-colors text-sm font-medium flex items-center gap-2 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-[#2D333B] text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none text-sm font-medium flex items-center gap-2 disabled:cursor-not-allowed"
               >
                 {isLoadingTrace ? (
                   <>
@@ -844,7 +1167,7 @@ function TestContent({
           메서드별 실행 시간 ({methodList.length}개)
         </div>
         <div className="space-y-2">
-          {methodList.map((method: TryMethod, index: number) => (
+          {methodList.map((method: TryMethodLite, index: number) => (
             <div
               key={method.spanId || index}
               onClick={() => onShowTrace(method.spanId)}
@@ -861,7 +1184,10 @@ function TestContent({
                   {method.parameters && method.parameters.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1">
                       {method.parameters.map(
-                        (param: any, paramIndex: number) => (
+                        (
+                          param: { type: string; name: string },
+                          paramIndex: number
+                        ) => (
                           <span
                             key={paramIndex}
                             className="px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded"
@@ -902,4 +1228,3 @@ function TestContent({
     </div>
   );
 }
-

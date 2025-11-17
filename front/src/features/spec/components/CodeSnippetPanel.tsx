@@ -258,7 +258,7 @@ export function CodeSnippetPanel({
               <button
                 onClick={copyToClipboard}
                 disabled={loading || !snippet}
-                className="px-3 py-1 text-sm bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-1 text-sm bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {copied ? "복사됨" : "복사"}
               </button>
