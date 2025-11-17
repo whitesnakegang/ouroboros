@@ -134,5 +134,35 @@ public class WebSocketServerManager {
 
         return null;
     }
+
+    /**
+     * Extracts protocol from server matching the given pathname.
+     * <p>
+     * Searches all servers for one with a matching pathname and returns its protocol.
+     *
+     * @param asyncApiDoc AsyncAPI document
+     * @param pathname the pathname to search for
+     * @return protocol (ws or wss), or null if no matching server found
+     */
+    @SuppressWarnings("unchecked")
+    public String extractProtocolByPathname(Map<String, Object> asyncApiDoc, String pathname) {
+        Map<String, Object> servers = yamlParser.getServers(asyncApiDoc);
+        if (servers == null || servers.isEmpty()) {
+            return null;
+        }
+
+        // Find server with matching pathname
+        for (Map.Entry<String, Object> entry : servers.entrySet()) {
+            if (entry.getValue() instanceof Map) {
+                Map<String, Object> server = (Map<String, Object>) entry.getValue();
+                String serverPathname = (String) server.get("pathname");
+                if (pathname != null && pathname.equals(serverPathname)) {
+                    return (String) server.get("protocol");
+                }
+            }
+        }
+
+        return null;
+    }
 }
 
