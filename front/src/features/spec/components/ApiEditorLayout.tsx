@@ -1502,31 +1502,19 @@ export function ApiEditorLayout() {
             const receiverAddress =
               receives && receives.length > 0 ? receives[0].address : "";
 
-            // extractDomainFromAddress 함수와 동일한 로직 사용
-            const extractDomain = (address: string): string => {
-              if (!address || address === "/unknown") {
-                return "OTHERS";
-              }
-              const parts = address
-                .split("/")
-                .filter((part) => part.length > 0);
-              if (parts.length === 0) {
-                return "OTHERS";
-              }
-              const domain = parts[0];
-              return (
-                domain.charAt(0).toUpperCase() + domain.slice(1).toLowerCase()
-              );
-            };
-            // 그룹 결정: 백엔드에서 받은 tags 사용 (REST와 동일하게)
-            // 백엔드에서 tags를 반환하므로 operation.tags 사용
-            const operationTags = (operation as any).tags;
+            // 그룹 결정: 명세 작성 시 사용자가 입력한 wsTags 사용
+            // wsTags가 있으면 첫 번째 tag 사용, 없으면 "OTHERS"
+            const userTags =
+              wsTags && wsTags.trim()
+                ? wsTags
+                    .split(",")
+                    .map((t) => t.trim())
+                    .filter((t) => t.length > 0)
+                : [];
             const group =
-              operationTags &&
-              Array.isArray(operationTags) &&
-              operationTags.length > 0
-                ? operationTags[0] // REST와 동일하게 첫 번째 tag 사용
-                : extractDomain(receiverAddress);
+              userTags.length > 0
+                ? userTags[0] // 사용자가 입력한 첫 번째 tag 사용
+                : "OTHERS"; // tag가 없으면 "OTHERS"
 
             // tag에 따라 method 결정
             const tag = createdOperation.tag || operation.action || "receive";
