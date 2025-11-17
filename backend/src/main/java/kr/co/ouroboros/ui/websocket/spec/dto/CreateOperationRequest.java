@@ -51,5 +51,13 @@ public class CreateOperationRequest {
      * Channels are auto-created if they don't exist.
      */
     private List<ChannelMessageInfo> replies;
+
+    /**
+     * Tags for categorizing and grouping operations.
+     * <p>
+     * Tag names will be automatically converted to uppercase on storage.
+     * Example: ["user", "chat"] will be stored as ["USER", "CHAT"]
+     */
+    private List<String> tags;
 }
 

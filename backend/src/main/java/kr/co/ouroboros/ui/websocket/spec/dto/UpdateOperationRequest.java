@@ -57,5 +57,13 @@ public class UpdateOperationRequest {
      * If only reply is provided (no receive), action is automatically set to "send".
      */
     private ChannelMessageInfo reply;
+
+    /**
+     * Updated tags for categorizing and grouping operations.
+     * <p>
+     * Tag names will be automatically converted to uppercase on storage.
+     * Example: ["user", "chat"] will be stored as ["USER", "CHAT"]
+     */
+    private List<String> tags;
 }
 
