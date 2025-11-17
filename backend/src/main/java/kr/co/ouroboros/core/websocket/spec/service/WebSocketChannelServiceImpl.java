@@ -6,6 +6,7 @@ import kr.co.ouroboros.core.global.manager.OuroApiSpecManager;
 import kr.co.ouroboros.core.websocket.common.dto.Channel;
 import kr.co.ouroboros.core.websocket.common.dto.MessageReference;
 import kr.co.ouroboros.core.websocket.common.yaml.WebSocketYamlParser;
+import kr.co.ouroboros.core.websocket.spec.util.RefCleanupUtil;
 import kr.co.ouroboros.core.websocket.spec.util.ReferenceConverter;
 import kr.co.ouroboros.ui.websocket.spec.dto.ChannelResponse;
 import lombok.RequiredArgsConstructor;
@@ -61,8 +62,11 @@ public class WebSocketChannelServiceImpl implements WebSocketChannelService {
 
                 Channel channel = convertMapToChannel(channelDefinition);
 
+                // Clean package name from channelName
+                String cleanedChannelName = RefCleanupUtil.extractClassNameFromFullName(channelName);
+
                 responses.add(ChannelResponse.builder()
-                        .channelName(channelName)
+                        .channelName(cleanedChannelName)
                         .channel(channel)
                         .build());
             }
@@ -91,8 +95,11 @@ public class WebSocketChannelServiceImpl implements WebSocketChannelService {
 
             Channel channel = convertMapToChannel(channelDefinition);
 
+            // Clean package name from channelName
+            String cleanedChannelName = RefCleanupUtil.extractClassNameFromFullName(channelName);
+
             return ChannelResponse.builder()
-                    .channelName(channelName)
+                    .channelName(cleanedChannelName)
                     .channel(channel)
                     .build();
         } finally {
@@ -104,33 +111,39 @@ public class WebSocketChannelServiceImpl implements WebSocketChannelService {
      * Converts a Map to a Channel DTO.
      * <p>
      * Handles conversion between YAML format ($ref) and JSON format (ref).
+     * Removes package names from message keys and $ref values.
      *
      * @param channelMap channel definition map from YAML
      * @return Channel DTO
      */
     private Channel convertMapToChannel(Map<String, Object> channelMap) {
         try {
-            // Convert $ref to ref in messages for JSON API using ReferenceConverter
+            // Clean up package names and convert $ref to ref in messages
             @SuppressWarnings("unchecked")
             Map<String, Object> messages = (Map<String, Object>) channelMap.get("messages");
             if (messages != null) {
                 Map<String, Object> convertedMessages = new LinkedHashMap<>();
                 for (Map.Entry<String, Object> entry : messages.entrySet()) {
+                    // Clean message key (remove package name)
+                    String messageKey = entry.getKey();
+                    String cleanedKey = RefCleanupUtil.extractClassNameFromFullName(messageKey);
+
                     Object messageObj = entry.getValue();
                     if (messageObj instanceof Map) {
                         @SuppressWarnings("unchecked")
                         Map<String, Object> messageMap = (Map<String, Object>) messageObj;
-                        // Convert $ref to ref using ReferenceConverter
-                        Map<String, Object> convertedMessage = ReferenceConverter.convertDollarRefToRef(messageMap);
-                        convertedMessages.put(entry.getKey(), convertedMessage);
+                        // Clean $ref value and convert to ref
+                        Map<String, Object> cleanedMessage = RefCleanupUtil.cleanupPackageNamesInRefs(messageMap);
+                        Map<String, Object> convertedMessage = ReferenceConverter.convertDollarRefToRef(cleanedMessage);
+                        convertedMessages.put(cleanedKey, convertedMessage);
                     } else {
-                        convertedMessages.put(entry.getKey(), messageObj);
+                        convertedMessages.put(cleanedKey, messageObj);
                     }
                 }
                 channelMap = new LinkedHashMap<>(channelMap);
                 channelMap.put("messages", convertedMessages);
             }
-            
+
             return objectMapper.convertValue(channelMap, Channel.class);
         } catch (Exception e) {
             log.error("Failed to convert channel map to Channel DTO", e);

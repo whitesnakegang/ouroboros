@@ -1,5 +1,6 @@
 package kr.co.ouroboros.core.websocket.spec.service;
 
+import kr.co.ouroboros.core.global.spec.SpecValidationUtil;
 import kr.co.ouroboros.core.websocket.common.yaml.WebSocketYamlParser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +35,9 @@ public class WebSocketServerManager {
      * @param pathname WebSocket pathname (entry point)
      */
     public void ensureServerExists(Map<String, Object> asyncApiDoc, String protocol, String pathname) {
+        // Validate pathname does not contain Korean characters
+        SpecValidationUtil.validateNoKorean(pathname, "Pathname");
+
         // Generate server name from protocol + pathname
         String serverName = generateServerName(protocol, pathname);
 

@@ -139,7 +139,52 @@ Regular requests without the Try header will work normally, and no Try-related i
 curl -X GET "http://localhost:8080/api/your-endpoint"
 ```
 
-### 3.4. How the Try Feature Works
+### 3.4. Using WebSocket Try
+
+When using the Try feature with WebSocket, **the server's message broker must be configured to use the `/queue` prefix**.
+
+#### Server Configuration (Spring WebSocket)
+
+The server-side WebSocket message broker configuration must enable the `/queue` prefix:
+
+```java
+@Override
+public void configureMessageBroker(MessageBrokerRegistry config) {
+    // Enable /queue prefix (required)
+    config.enableSimpleBroker("/queue", "/topic");
+    
+    // When using external message brokers like RabbitMQ, ActiveMQ:
+    // config.enableStompBrokerRelay("/queue", "/topic")
+    //     .setRelayHost("localhost")
+    //     .setRelayPort(61613);
+}
+```
+
+> **Important**: For the Try feature to work properly, the message broker's `/queue` prefix must be enabled. The Ouroboros SDK sends Try request metadata to the `/queue/ouro/try` topic.
+
+#### Client Configuration Example (JavaScript)
+
+Clients can subscribe to the `/user/queue/ouro/try` topic to receive Try results:
+
+```javascript
+// STOMP client connection
+const client = new StompJs.Client({
+    brokerURL: 'ws://localhost:8080/ws'
+});
+
+client.onConnect = (frame) => {
+    // Subscribe to /queue/ouro/try topic
+    client.subscribe('/user/queue/ouro/try', (message) => {
+        const tryData = JSON.parse(message.body);
+        console.log('Try ID:', tryData.tryId);
+        // Handle Try results
+    });
+};
+
+client.activate();
+```
+
+### 3.5. How the Try Feature Works
 
 1. **Request Detection**: Detects requests containing the `X-Ouroboros-Try: on` header
 2. **Try ID Generation**: Generates a unique Try ID (UUID)
@@ -157,21 +202,14 @@ curl -X GET "http://localhost:8080/api/your-endpoint"
 
 > **Note**: Internal method tracing is **disabled by default**. If you need to trace internal method calls in the Try feature, you must enable this configuration.
 
-> **⚠️ Required Settings**: To use method tracing, you must configure both Ouroboros method tracing and Micrometer sampling settings.
-
 ```properties
 # Enable Method Tracing
 ouroboros.method-tracing.enabled=true
 ouroboros.method-tracing.allowed-packages=your.package.name
-
-# Micrometer Tracing (Required for Method Tracing)
-# Set sampling probability to 1.0 to capture all traces
-management.tracing.sampling.probability=1.0
 ```
 
 > **Note**: 
 > - Specify the package paths to apply tracing. Examples: `com.example.yourproject`, `your.package.name`, etc.
-> - `management.tracing.sampling.probability=1.0` is **required** to capture all method traces. Without this setting, method traces may not be captured.
 
 ### 4.2. Tempo Integration (Optional)
 
@@ -202,9 +240,6 @@ ouroboros.tempo.base-url=http://${TEMPO_HOST:localhost}:${TEMPO_UI_PORT:3200}
 # Using HTTP protocol (port 4318)
 management.tracing.enabled=true
 management.otlp.tracing.endpoint=http://${TEMPO_HOST:localhost}:${TEMPO_HTTP_PORT:4318}/v1/traces
-
-# Micrometer Tracing
-management.tracing.sampling.probability=1.0
 ```
 
 > **Note**: `${TEMPO_HOST:localhost}` and `${TEMPO_HTTP_PORT:4318}` reference environment variables set in the `.env` file.
@@ -347,8 +382,8 @@ docker-compose.override.yml
 
 1. **Check Method Tracing Configuration**: Verify `ouroboros.method-tracing.enabled=true` is set
 2. **Check Allowed Packages**: Verify `ouroboros.method-tracing.allowed-packages` is correctly configured with your package paths
-3. **Check Micrometer Sampling**: Verify `management.tracing.sampling.probability=1.0` is set (required for method tracing)
-4. **Check Package Names**: Ensure the classes you want to trace are in the allowed packages
+3. **Check Package Names**: Ensure the classes you want to trace are in the allowed packages
+4. **Check Self-Invocation**: If you're calling methods within the same class directly, it may be a self-invocation issue. See [Self-Invocation Solution](#self-invocation-solution) in the QnA section.
 5. **Check Logging**: Enable debug logging to see if method traces are being created
 
 ### Tempo Integration Not Working
@@ -414,10 +449,53 @@ A. Change `TEMPO_UI_PORT=3300` in the `.env` file, then restart with `docker com
 A. Ensure the following settings are configured:
 1. `ouroboros.method-tracing.enabled=true`
 2. `ouroboros.method-tracing.allowed-packages=your.package.name` (with your actual package)
-3. `management.tracing.sampling.probability=1.0` (required - without this, method traces won't be captured)
 
-**Q. Do I need `management.tracing.sampling.probability=1.0` for basic Try feature?**  
-A. No. This setting is only required when using Method Tracing. The basic Try feature works without it.
+Also, if you're calling methods within the same class directly, it may be a self-invocation issue. See [Self-Invocation Solution](#self-invocation-solution) for details.
+
+### Self-Invocation Solution
+
+**Q. Method Tracing doesn't work when I call methods within the same class.**  
+A. Due to Spring AOP limitations, direct method calls within the same class bypass the proxy, so AOP is not applied. Use one of the following solutions:
+
+1. **Self Injection (Recommended)**: Inject the proxy instance of the same class
+```java
+@Service
+public class OrderService {
+    private final OrderService self; // Inject self
+    
+    public OrderService(OrderService self) {
+        this.self = self;
+    }
+    
+    public void processOrder() {
+        // Call through self instead of direct call
+        self.validateOrder(); // AOP applied
+    }
+    
+    public void validateOrder() {
+        // ...
+    }
+}
+```
+
+2. **Get Proxy from ApplicationContext**: Retrieve proxy instance through ApplicationContext
+```java
+@Service
+public class OrderService {
+    private final ApplicationContext applicationContext;
+    
+    public OrderService(ApplicationContext applicationContext) {
+        this.applicationContext = applicationContext;
+    }
+    
+    public void processOrder() {
+        OrderService proxy = applicationContext.getBean(OrderService.class);
+        proxy.validateOrder(); // AOP applied
+    }
+}
+```
+
+3. **Extract to Separate Class**: Extract internal methods to a separate service class
 
 ---
 

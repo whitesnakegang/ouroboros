@@ -4,6 +4,7 @@ import kr.co.ouroboros.core.global.Protocol;
 import kr.co.ouroboros.core.global.manager.OuroApiSpecManager;
 import kr.co.ouroboros.core.websocket.common.yaml.WebSocketYamlParser;
 import kr.co.ouroboros.core.websocket.spec.model.Property;
+import kr.co.ouroboros.core.websocket.spec.util.RefCleanupUtil;
 import kr.co.ouroboros.core.websocket.spec.util.ReferenceConverter;
 import kr.co.ouroboros.ui.websocket.spec.dto.CreateSchemaRequest;
 import kr.co.ouroboros.ui.websocket.spec.dto.SchemaResponse;
@@ -433,8 +434,11 @@ public class WebSocketSchemaServiceImpl implements WebsocketSchemaService {
     }
 
     private SchemaResponse convertToResponse(String schemaName, Map<String, Object> schemaDefinition) {
+        // Clean package name from schemaName
+        String cleanedSchemaName = RefCleanupUtil.extractClassNameFromFullName(schemaName);
+
         SchemaResponse.SchemaResponseBuilder builder = SchemaResponse.builder()
-                .schemaName(schemaName)
+                .schemaName(cleanedSchemaName)
                 .type(safeGetString(schemaDefinition, "type"))
                 .title(safeGetString(schemaDefinition, "title"))
                 .description(safeGetString(schemaDefinition, "description"))
@@ -478,15 +482,11 @@ public class WebSocketSchemaServiceImpl implements WebsocketSchemaService {
         String dollarRef = safeGetString(propertyDefinition, "$ref");
         String ref = safeGetString(propertyDefinition, "ref");
         String refValue = dollarRef != null ? dollarRef : ref;
-        
+
         if (refValue != null) {
-            // Convert $ref or ref to simplified ref for client
-            if (refValue.startsWith("#/components/schemas/")) {
-                String simplifiedRef = refValue.substring("#/components/schemas/".length());
-                builder.ref(simplifiedRef);
-            } else {
-                builder.ref(refValue);
-            }
+            // Convert $ref or ref to simplified ref for client (remove prefix and package name)
+            String simplifiedRef = RefCleanupUtil.cleanRefValue(refValue);
+            builder.ref(simplifiedRef);
             return builder.build(); // Reference mode: return early
         }
 

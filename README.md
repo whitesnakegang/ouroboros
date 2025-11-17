@@ -122,6 +122,7 @@
 - **`core/rest/spec`**: API specification CRUD services
 - **`core/rest/mock`**: Mock server filter and registry
 - **`core/rest/validation`**: OpenAPI validation and enrichment
+- **`core/rest/tryit`**: Internal method call tracing for try requests
 - **`ui/controller`**: REST API endpoints
 
 #### Frontend (React + TypeScript)
@@ -166,7 +167,7 @@ dependencies {
 
 ### Configuration (Optional)
 
-> **Method Tracing**: Internal method tracing is **disabled by default**. If you need internal method tracing in the Try feature, you must add the `method-tracing` configuration and set `management.tracing.sampling.probability=1.0` to capture all method traces.
+> **Method Tracing**: Internal method tracing is **disabled by default**. If you need internal method tracing in the Try feature, you must add the `method-tracing` configuration.
 
 `application.yml`:
 ```yaml
@@ -176,16 +177,10 @@ ouroboros:
     url: http://localhost:8080
     description: Local Development Server
   # Method Tracing configuration (required for internal method tracing in Try feature)
+  # Internal method tracing is disabled by default
   method-tracing:
     enabled: true
     allowed-packages: your.package.name  # Specify package paths to trace
-
-# Micrometer Tracing (Required for Method Tracing)
-# Set sampling probability to 1.0 to capture all traces
-management:
-  tracing:
-    sampling:
-      probability: 1.0
 ```
 
 ### Getting Started
