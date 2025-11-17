@@ -1015,7 +1015,7 @@ export function WsEditorForm({
       {/* Diff 알림 */}
       {renderDiffNotification()}
 
-      {/* Entry Point & Metadata */}
+      {/* Protocol & Pathname */}
       <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm mb-6">
         <div className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3] mb-2 flex items-center gap-2">
           <svg
@@ -1031,10 +1031,10 @@ export function WsEditorForm({
               d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
             />
           </svg>
-          <span>Entry Point & Metadata</span>
+          <span>Protocol & Pathname</span>
         </div>
         <p className="text-xs text-gray-600 dark:text-[#8B949E] mb-4">
-          WebSocket 연결 엔드포인트와 기본 정보를 입력하세요
+          WebSocket 프로토콜과 엔드포인트 경로를 입력하세요
         </p>
 
         {/* Operation 정보 (읽기 전용 모드) */}
@@ -1115,13 +1115,13 @@ export function WsEditorForm({
             </div>
             <div className="lg:col-span-2">
               <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                Summary
+                Owner
               </label>
               <input
                 type="text"
                 value={summary}
                 onChange={(e) => setSummary(e.target.value)}
-                placeholder="예: 실시간 채팅 WebSocket 연결"
+                placeholder="예: 홍길동"
                 disabled={isReadOnly}
                 className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
                   isReadOnly ? "opacity-60 cursor-not-allowed" : ""
