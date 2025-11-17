@@ -86,6 +86,8 @@ public class WebSocketSpecSyncPipeline implements SpecSyncPipeline {
             if (scanOp == null || scanOp.getChannel() == null) {
                 continue;
             }
+            
+            if(scanOp.getAction().equals("send")) continue;
 
             String channelRef = scanOp.getChannel().getRef();
             if (channelRef == null) {
