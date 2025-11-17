@@ -45,6 +45,8 @@ interface Reply {
 interface WsEditorFormProps {
   entryPoint: string;
   setEntryPoint: (entryPoint: string) => void;
+  entryPointError?: string; // entryPoint 한글 검증 에러
+  setEntryPointError?: (error: string) => void; // entryPoint 에러 설정 함수
   protocol?: "ws" | "wss";
   setProtocol?: (protocol: "ws" | "wss") => void;
   summary: string;
@@ -73,6 +75,8 @@ interface WsEditorFormProps {
 export function WsEditorForm({
   entryPoint,
   setEntryPoint,
+  entryPointError: externalEntryPointError,
+  setEntryPointError: setExternalEntryPointError,
   protocol: externalProtocol,
   setProtocol: setExternalProtocol,
   summary,
@@ -147,6 +151,17 @@ export function WsEditorForm({
   const setProtocol = setExternalProtocol ?? setInternalProtocol;
   const [pathname, setPathname] = useState("/ws");
 
+  // EntryPoint 에러 state (내부 또는 외부)
+  const [internalEntryPointError, setInternalEntryPointError] = useState("");
+  const entryPointError = externalEntryPointError ?? internalEntryPointError;
+  const setEntryPointError =
+    setExternalEntryPointError ?? setInternalEntryPointError;
+
+  // 한글 감지 함수
+  const hasKorean = (text: string): boolean => {
+    return /[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(text);
+  };
+
   // Schema 이름에서 마지막 부분만 추출 (예: com.example.dto.UserDTO -> UserDTO)
   const getShortSchemaName = (fullName: string | undefined): string => {
     if (!fullName) return "";
@@ -167,6 +182,13 @@ export function WsEditorForm({
       // /ws 형태만 있으면 pathname으로
       setPathname(entryPoint);
     }
+    // entryPoint 변경 시 한글 검증
+    if (entryPoint && hasKorean(entryPoint)) {
+      setEntryPointError("한글로 생성할 수 없습니다");
+    } else {
+      setEntryPointError("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entryPoint, setProtocol]);
 
   // Messages 목록 로드
@@ -1086,13 +1108,40 @@ export function WsEditorForm({
                   const newPathname = e.target.value;
                   setPathname(newPathname);
                   setEntryPoint(newPathname);
+                  // 한글 검증
+                  if (hasKorean(newPathname)) {
+                    setEntryPointError("한글로 생성할 수 없습니다");
+                  } else {
+                    setEntryPointError("");
+                  }
+                }}
+                onKeyPress={(e) => {
+                  // 한글 입력 방지 (IME 입력 차단)
+                  const char = e.key;
+                  if (/[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(char)) {
+                    e.preventDefault();
+                  }
                 }}
                 placeholder="예: /ws, /websocket, /chat"
                 disabled={isReadOnly}
-                className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm font-mono ${
+                className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border ${
+                  entryPointError
+                    ? "border-red-500 dark:border-red-500"
+                    : "border-gray-300 dark:border-[#2D333B]"
+                } text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 ${
+                  entryPointError
+                    ? "focus:ring-red-500 focus:border-red-500"
+                    : "focus:ring-[#2563EB] focus:border-[#2563EB]"
+                } text-sm font-mono ${
                   isReadOnly ? "opacity-60 cursor-not-allowed" : ""
                 }`}
               />
+              {/* 한글 입력 에러 메시지 */}
+              {entryPointError && (
+                <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+                  {entryPointError}
+                </p>
+              )}
             </div>
           </div>
 

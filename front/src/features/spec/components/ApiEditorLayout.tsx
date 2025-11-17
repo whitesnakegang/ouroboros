@@ -280,6 +280,7 @@ export function ApiEditorLayout() {
       setIsEditMode(false);
       setMethod("POST");
       setUrl("");
+      setUrlError(""); // 에러 상태 초기화
       setTags("");
       setDescription("");
       setSummary("");
@@ -318,6 +319,7 @@ export function ApiEditorLayout() {
 
       setMethod(spec.method);
       setUrl(spec.path);
+      setUrlError(""); // 에러 상태 초기화
       setDescription(spec.description || "");
       setSummary(spec.summary || "");
       setTags(spec.tags ? spec.tags.join(", ") : "");
@@ -807,6 +809,7 @@ export function ApiEditorLayout() {
 
       // WebSocket form state 설정
       setWsEntryPoint(operationData.operation.entrypoint || "/ws");
+      setWsEntryPointError(""); // 에러 상태 초기화
       setWsSummary(""); // Operation에는 summary가 없음
       setWsDescription(operationData.operationName || ""); // operationName을 description으로
       // 백엔드에서 관리하는 tags 사용 (REST API와 동일하게)
@@ -1005,6 +1008,7 @@ export function ApiEditorLayout() {
   // Form state
   const [method, setMethod] = useState("POST");
   const [url, setUrl] = useState("");
+  const [urlError, setUrlError] = useState(""); // URL 한글 검증 에러
   const [tags, setTags] = useState("");
   const [currentSpec, setCurrentSpec] = useState<RestApiSpecResponse | null>(
     null
@@ -1043,6 +1047,7 @@ export function ApiEditorLayout() {
 
   // WebSocket state
   const [wsEntryPoint, setWsEntryPoint] = useState("/ws");
+  const [wsEntryPointError, setWsEntryPointError] = useState(""); // WebSocket entryPoint 한글 검증 에러
   const [wsProtocol, setWsProtocol] = useState<"ws" | "wss">("ws");
   const [wsSummary, setWsSummary] = useState("");
   const [wsDescription, setWsDescription] = useState("");
@@ -1072,6 +1077,38 @@ export function ApiEditorLayout() {
   }, [wsReceiver, wsReply, selectedEndpoint, isEditMode, isNewFormMode]);
 
   const methods = ["GET", "POST", "PUT", "PATCH", "DELETE"];
+
+  // 한글 감지 함수
+  const hasKorean = (text: string): boolean => {
+    return /[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(text);
+  };
+
+  // 필수 필드 검증 함수
+  const isFormValid = (): boolean => {
+    if (protocol === "REST") {
+      // REST API 필수 필드: method, url
+      return !!(method && url && url.trim() && !urlError);
+    } else if (protocol === "WebSocket") {
+      // WebSocket 필수 필드:
+      // 1. pathname (wsEntryPoint) 필수
+      // 2. receive나 reply 둘 중 하나는 무조건 작성되어야 함
+      const hasEntryPoint = !!(
+        wsEntryPoint &&
+        wsEntryPoint.trim() &&
+        !wsEntryPointError
+      );
+      const hasReceiver = !!(
+        wsReceiver &&
+        wsReceiver.address &&
+        wsReceiver.address.trim()
+      );
+      const hasReply = !!(wsReply && wsReply.address && wsReply.address.trim());
+      const hasReceiverOrReply = hasReceiver || hasReply;
+
+      return hasEntryPoint && hasReceiverOrReply;
+    }
+    return false;
+  };
 
   /**
    * queryParams를 OpenAPI parameters 구조로 변환
@@ -1258,6 +1295,11 @@ export function ApiEditorLayout() {
   };
 
   const handleSave = async () => {
+    // 필수 필드 및 한글 검증 체크
+    if (!isFormValid()) {
+      return; // 필수 필드가 비어있거나 한글이 포함되어 있으면 저장 불가
+    }
+
     // WebSocket 저장 로직
     if (protocol === "WebSocket") {
       // pathname이 비어있으면 기본값 /ws 사용
@@ -1458,7 +1500,9 @@ export function ApiEditorLayout() {
     }
 
     // REST 저장 로직
-    if (!method || !url) {
+    // 필수 필드 검증은 이미 isFormValid()에서 처리되므로 여기서는 추가 검증 불필요
+    // 하지만 안전을 위해 한 번 더 체크
+    if (protocol === "REST" && (!method || !url || !url.trim())) {
       alert("Method와 URL을 입력해주세요.");
       return;
     }
@@ -1590,6 +1634,7 @@ export function ApiEditorLayout() {
         setSelectedEndpoint(null);
         setMethod("POST");
         setUrl("/api/auth/login");
+        setUrlError(""); // 에러 상태 초기화
         setTags("AUTH");
         setDescription("사용자 로그인");
         setIsEditMode(false);
@@ -1622,6 +1667,7 @@ export function ApiEditorLayout() {
     if (confirm("작성 중인 내용을 초기화하시겠습니까?")) {
       setMethod("POST");
       setUrl("");
+      setUrlError(""); // 에러 상태 초기화
       setTags("");
       setDescription("");
       setSummary("");
@@ -1648,6 +1694,7 @@ export function ApiEditorLayout() {
     setMethod("POST");
     // 값은 비워 placeholder가 보이도록 처리
     setUrl("");
+    setUrlError(""); // 에러 상태 초기화
     setTags("");
     setDescription("");
     setSummary("");
@@ -1663,6 +1710,7 @@ export function ApiEditorLayout() {
     // 프로토콜에 따른 추가 초기화
     if (protocol === "WebSocket") {
       setWsEntryPoint("/ws");
+      setWsEntryPointError(""); // 에러 상태 초기화
       setWsProtocol("ws");
       setWsSummary("");
       setWsDescription("");
@@ -2473,6 +2521,8 @@ export function ApiEditorLayout() {
                   <WsEditorForm
                     entryPoint={wsEntryPoint}
                     setEntryPoint={setWsEntryPoint}
+                    entryPointError={wsEntryPointError}
+                    setEntryPointError={setWsEntryPointError}
                     protocol={wsProtocol}
                     setProtocol={setWsProtocol}
                     summary={wsSummary}
@@ -2733,19 +2783,43 @@ export function ApiEditorLayout() {
                             <input
                               type="text"
                               value={url}
-                              onChange={(e) => setUrl(e.target.value)}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                setUrl(value);
+                                // 한글 검증
+                                if (hasKorean(value)) {
+                                  setUrlError("한글로 생성할 수 없습니다");
+                                } else {
+                                  setUrlError("");
+                                }
+                              }}
+                              onKeyPress={(e) => {
+                                // 한글 입력 방지 (IME 입력 차단)
+                                const char = e.key;
+                                if (/[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(char)) {
+                                  e.preventDefault();
+                                }
+                              }}
                               placeholder="예: /api/users, /api/auth/login"
                               disabled={!!(selectedEndpoint && !isEditMode)}
                               className={`w-full px-3 py-2 ${
                                 hasDiff ? "pr-10" : ""
-                              } rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm font-mono ${
+                              } rounded-md bg-white dark:bg-[#0D1117] border ${
+                                urlError
+                                  ? "border-red-500 dark:border-red-500"
+                                  : "border-gray-300 dark:border-[#2D333B]"
+                              } text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 ${
+                                urlError
+                                  ? "focus:ring-red-500 focus:border-red-500"
+                                  : "focus:ring-[#2563EB] focus:border-[#2563EB]"
+                              } text-sm font-mono ${
                                 selectedEndpoint && !isEditMode
                                   ? "opacity-60 cursor-not-allowed"
                                   : ""
                               }`}
                             />
                             {/* Diff 주의 표시 아이콘 (URL 우측) */}
-                            {hasDiff && (
+                            {hasDiff && !urlError && (
                               <div
                                 className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"
                                 title="명세와 실제 구현이 일치하지 않습니다"
@@ -2764,6 +2838,12 @@ export function ApiEditorLayout() {
                                   />
                                 </svg>
                               </div>
+                            )}
+                            {/* 한글 입력 에러 메시지 */}
+                            {urlError && (
+                              <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+                                {urlError}
+                              </p>
                             )}
                           </div>
                         </div>
@@ -2957,7 +3037,12 @@ export function ApiEditorLayout() {
                 </button>
                 <button
                   onClick={handleSave}
-                  className="px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none text-sm font-medium flex items-center gap-2"
+                  disabled={!isFormValid()}
+                  className={`px-3 py-2 rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none text-sm font-medium flex items-center gap-2 ${
+                    !isFormValid()
+                      ? "bg-gray-300 dark:bg-[#21262D] text-gray-500 dark:text-[#8B949E] cursor-not-allowed"
+                      : "bg-emerald-500 hover:bg-emerald-600 text-white"
+                  }`}
                 >
                   저장
                 </button>
@@ -3005,7 +3090,12 @@ export function ApiEditorLayout() {
             </button>
             <button
               onClick={handleSave}
-              className="px-3 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none text-sm font-medium flex items-center gap-2"
+              disabled={!isFormValid()}
+              className={`px-3 py-2 rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none text-sm font-medium flex items-center gap-2 ${
+                !isFormValid()
+                  ? "bg-gray-300 dark:bg-[#21262D] text-gray-500 dark:text-[#8B949E] cursor-not-allowed"
+                  : "bg-[#2563EB] hover:bg-[#1E40AF] text-white"
+              }`}
             >
               생성
             </button>
