@@ -20,7 +20,6 @@ export function WsTestRequestPanel() {
     updateWsStats,
     setWsConnectionStartTime,
     wsConnectionStartTime,
-    wsStats,
     setTryId,
   } = useTestingStore();
   const { selectedEndpoint, endpoints } = useSidebarStore();
@@ -226,7 +225,9 @@ export function WsTestRequestPanel() {
                     tryId: tryIdHeader,
                   };
                   addWsMessage(tryMessage);
-                  updateWsStats({ totalReceived: (wsStats?.totalReceived || 0) + 1 });
+                  updateWsStats((prev) => ({
+                    totalReceived: (prev?.totalReceived || 0) + 1,
+                  }));
                 } catch (parseError) {
                   // 파싱 실패 시 원본 body 그대로 표시
                   const tryMessage = {
@@ -238,7 +239,9 @@ export function WsTestRequestPanel() {
                     tryId: tryIdHeader,
                   };
                   addWsMessage(tryMessage);
-                  updateWsStats({ totalReceived: (wsStats?.totalReceived || 0) + 1 });
+                  updateWsStats((prev) => ({
+                    totalReceived: (prev?.totalReceived || 0) + 1,
+                  }));
                 }
               });
             }
@@ -320,7 +323,9 @@ export function WsTestRequestPanel() {
           tryId: tryIdHeader || undefined,
         };
         addWsMessage(message);
-        updateWsStats({ totalReceived: (wsStats?.totalReceived || 0) + 1 });
+        updateWsStats((prev) => ({
+          totalReceived: (prev?.totalReceived || 0) + 1,
+        }));
       });
 
       if (existingSubscription) {
@@ -449,7 +454,9 @@ export function WsTestRequestPanel() {
         content: messageBody,
       };
       addWsMessage(message);
-      updateWsStats({ totalSent: (wsStats?.totalSent || 0) + 1 });
+      updateWsStats((prev) => ({
+        totalSent: (prev?.totalSent || 0) + 1,
+      }));
 
       // Content 초기화
       setContent("");

@@ -84,7 +84,7 @@ interface TestingState {
   addWsMessage: (message: WebSocketMessage) => void;
   clearWsMessages: () => void;
   wsStats: WebSocketStats;
-  updateWsStats: (stats: Partial<WebSocketStats>) => void;
+  updateWsStats: (updater: Partial<WebSocketStats> | ((prev: WebSocketStats) => Partial<WebSocketStats>)) => void;
   wsConnectionStartTime: number | null;
   setWsConnectionStartTime: (time: number | null) => void;
 }
@@ -184,9 +184,12 @@ export const useTestingStore = create<TestingState>((set) => ({
     averageResponseTime: null,
     connectionDuration: null,
   },
-  updateWsStats: (stats) =>
+  updateWsStats: (updater) =>
     set((state) => ({
-      wsStats: { ...state.wsStats, ...stats },
+      wsStats:
+        typeof updater === "function"
+          ? { ...state.wsStats, ...updater(state.wsStats) }
+          : { ...state.wsStats, ...updater },
     })),
   wsConnectionStartTime: null,
   setWsConnectionStartTime: (time) => set({ wsConnectionStartTime: time }),

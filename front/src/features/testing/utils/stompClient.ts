@@ -45,13 +45,19 @@ export class StompClient {
           const decoder = new TextDecoder();
           data = decoder.decode(event.data);
         } else if (event.data instanceof Blob) {
-          // Blob은 비동기로 처리해야 하지만, 여기서는 동기적으로 처리
-          event.data.text().then((text: string) => {
-            const frame = this.parseFrame(text);
-            if (frame) {
-              this.handleFrame(frame);
-            }
-          });
+          // Blob은 비동기로 처리
+          event.data.text()
+            .then((text: string) => {
+              const frame = this.parseFrame(text);
+              if (frame) {
+                this.handleFrame(frame);
+              }
+            })
+            .catch((error) => {
+              if (this.onErrorCallback) {
+                this.onErrorCallback(error instanceof Error ? error : new Error("Failed to process Blob data"));
+              }
+            });
           return;
         } else {
           data = event.data;

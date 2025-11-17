@@ -319,7 +319,7 @@ export function ApiResponseCard({
                 </select>
                 <button
                   onClick={() => addStatusCode()}
-                  className="px-3 py-1 text-sm text-[#2563EB] font-medium border border-[#2563EB] rounded-md hover:bg-[#2563EB] hover:text-white transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none"
+                  className="px-3 py-1 text-sm text-[#2563EB] font-medium border border-[#2563EB] rounded-md hover:bg-[#2563EB] hover:text-white transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none focus-visible:[box-shadow:inset_2px_0_0_#3B82F6] dark:focus-visible:[box-shadow:inset_2px_0_0_#60A5FA]"
                 >
                   + Add Custom
                 </button>

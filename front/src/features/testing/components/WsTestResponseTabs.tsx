@@ -376,6 +376,137 @@ export function WsTestResponseTabs() {
   );
 }
 
+// 메시지 그룹핑 관련 상수
+const GAP_THRESHOLD_MS = 30000;
+const GROUP_MIN_COUNT = 3;
+
+// Divider 생성 함수
+function createDivider(
+  message: WebSocketMessage,
+  prev: WebSocketMessage,
+  formatTimestamp: (timestamp: number) => string
+): React.ReactElement {
+  const delta = message.timestamp - prev.timestamp;
+  const sec = Math.floor(delta / 1000);
+  const min = Math.floor(sec / 60);
+  const gapLabel = min > 0 ? `+${min}m ${sec % 60}s` : `+${sec}s`;
+
+  return (
+    <div key={`divider-${message.id}`} className="flex items-center gap-3 my-2">
+      <div className="h-px flex-1 bg-gray-200 dark:bg-[#2D333B]" />
+      <span className="text-[10px] text-gray-500 dark:text-[#8B949E] px-2 py-0.5 rounded-full bg-gray-50 dark:bg-[#0D1117] border border-gray-200 dark:border-[#2D333B]">
+        {formatTimestamp(message.timestamp)} {gapLabel}
+      </span>
+      <div className="h-px flex-1 bg-gray-200 dark:bg-[#2D333B]" />
+    </div>
+  );
+}
+
+// Group Header 생성 함수
+function createGroupHeader(
+  message: WebSocketMessage,
+  runCount: number
+): React.ReactElement {
+  return (
+    <div
+      key={`group-${message.id}`}
+      className="mt-2 mb-1 flex items-center gap-2"
+    >
+      <span
+        className={`text-[11px] font-semibold ${
+          message.direction === "sent"
+            ? "text-blue-700 dark:text-blue-400"
+            : "text-green-700 dark:text-green-400"
+        }`}
+      >
+        {message.direction === "sent" ? "Sent" : "Received"} · {runCount}
+      </span>
+      <div className="h-px flex-1 bg-gray-200 dark:bg-[#2D333B]" />
+    </div>
+  );
+}
+
+// Divider 삽입 여부 확인
+function shouldInsertDivider(
+  current: WebSocketMessage,
+  prev: WebSocketMessage
+): boolean {
+  return current.timestamp - prev.timestamp >= GAP_THRESHOLD_MS;
+}
+
+// Group Header 삽입 여부 확인
+function shouldInsertGroupHeader(
+  index: number,
+  messages: WebSocketMessage[]
+): boolean {
+  if (index === 0) {
+    return countGroupRun(index, messages) >= GROUP_MIN_COUNT;
+  }
+  return (
+    messages[index - 1].direction !== messages[index].direction &&
+    countGroupRun(index, messages) >= GROUP_MIN_COUNT
+  );
+}
+
+// 같은 방향으로 연속된 메시지 개수 계산
+function countGroupRun(
+  startIndex: number,
+  messages: WebSocketMessage[]
+): number {
+  let count = 1;
+  const direction = messages[startIndex].direction;
+  for (let j = startIndex + 1; j < messages.length; j++) {
+    if (messages[j].direction === direction) {
+      count++;
+    } else {
+      break;
+    }
+  }
+  return count;
+}
+
+// 메시지 행 빌드 함수
+function buildMessageRows(
+  allMessages: WebSocketMessage[],
+  formatTimestamp: (timestamp: number) => string,
+  isJsonFormatted: boolean,
+  isCompact: boolean,
+  onMessageClick: (message: WebSocketMessage) => void
+): React.ReactElement[] {
+  const rows: React.ReactElement[] = [];
+
+  for (let i = 0; i < allMessages.length; i++) {
+    const message = allMessages[i];
+    const prev = i > 0 ? allMessages[i - 1] : null;
+
+    // Divider 추가
+    if (prev && shouldInsertDivider(message, prev)) {
+      rows.push(createDivider(message, prev, formatTimestamp));
+    }
+
+    // 그룹 헤더 추가
+    if (shouldInsertGroupHeader(i, allMessages)) {
+      const runCount = countGroupRun(i, allMessages);
+      rows.push(createGroupHeader(message, runCount));
+    }
+
+    // 메시지 추가
+    rows.push(
+      <MessageBubble
+        key={message.id}
+        message={message}
+        formatTimestamp={formatTimestamp}
+        prevTimestamp={prev?.timestamp ?? null}
+        isJsonFormatted={isJsonFormatted}
+        compactMode={isCompact}
+        onClick={() => onMessageClick(message)}
+      />
+    );
+  }
+
+  return rows;
+}
+
 function ResponseContent({
   receivedMessages,
   sentMessages,
@@ -623,78 +754,13 @@ function ResponseContent({
         </div>
       ) : (
         <div className="space-y-3 max-h-[600px] overflow-y-auto">
-          {(() => {
-            const rows: React.ReactElement[] = [];
-            const thresholdMs = 30000;
-            for (let i = 0; i < allMessages.length; i++) {
-              const message = allMessages[i];
-              const prev = i > 0 ? allMessages[i - 1] : null;
-              // Divider for long gaps
-              if (prev) {
-                const delta = message.timestamp - prev.timestamp;
-                if (delta >= thresholdMs) {
-                  const sec = Math.floor(delta / 1000);
-                  const min = Math.floor(sec / 60);
-                  const gapLabel =
-                    min > 0 ? `+${min}m ${sec % 60}s` : `+${sec}s`;
-                  rows.push(
-                    <div
-                      key={`divider-${message.id}`}
-                      className="flex items-center gap-3 my-2"
-                    >
-                      <div className="h-px flex-1 bg-gray-200 dark:bg-[#2D333B]" />
-                      <span className="text-[10px] text-gray-500 dark:text-[#8B949E] px-2 py-0.5 rounded-full bg-gray-50 dark:bg-[#0D1117] border border-gray-200 dark:border-[#2D333B]">
-                        {formatTimestamp(message.timestamp)} {gapLabel}
-                      </span>
-                      <div className="h-px flex-1 bg-gray-200 dark:bg-[#2D333B]" />
-                    </div>
-                  );
-                }
-              }
-              // Group header for 3+ same-direction run
-              const isGroupStart =
-                i === 0 || (prev && prev.direction !== message.direction);
-              if (isGroupStart) {
-                let run = 1;
-                for (let j = i + 1; j < allMessages.length; j++) {
-                  if (allMessages[j].direction === message.direction) run++;
-                  else break;
-                }
-                if (run >= 3) {
-                  rows.push(
-                    <div
-                      key={`group-${message.id}`}
-                      className="mt-2 mb-1 flex items-center gap-2"
-                    >
-                      <span
-                        className={`text-[11px] font-semibold ${
-                          message.direction === "sent"
-                            ? "text-blue-700 dark:text-blue-400"
-                            : "text-green-700 dark:text-green-400"
-                        }`}
-                      >
-                        {message.direction === "sent" ? "Sent" : "Received"} ·{" "}
-                        {run}
-                      </span>
-                      <div className="h-px flex-1 bg-gray-200 dark:bg-[#2D333B]" />
-                    </div>
-                  );
-                }
-              }
-              rows.push(
-                <MessageBubble
-                  key={message.id}
-                  message={message}
-                  formatTimestamp={formatTimestamp}
-                  prevTimestamp={prev ? prev.timestamp : null}
-                  isJsonFormatted={isJsonFormatted}
-                  compactMode={isCompact}
-                  onClick={() => onMessageClick(message)}
-                />
-              );
-            }
-            return rows;
-          })()}
+          {buildMessageRows(
+            allMessages,
+            formatTimestamp,
+            isJsonFormatted,
+            isCompact,
+            onMessageClick
+          )}
           <div ref={messagesEndRef} />
         </div>
       )}

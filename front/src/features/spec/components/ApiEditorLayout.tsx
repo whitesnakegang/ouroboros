@@ -227,6 +227,13 @@ export function ApiEditorLayout() {
     }
   }, [endpoints, selectedEndpoint, setSelectedEndpoint]);
 
+  // 완료 상태에서 schema 탭이 선택된 경우 안전한 탭으로 전환
+  useEffect(() => {
+    if (isCompletedView && specTab === "schema") {
+      setSpecTab("request");
+    }
+  }, [isCompletedView, specTab]);
+
   // Load selected endpoint data when endpoint is clicked
   useEffect(() => {
     if (selectedEndpoint && selectedEndpoint.id) {

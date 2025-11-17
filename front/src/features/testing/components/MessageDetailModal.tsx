@@ -11,6 +11,26 @@ interface MessageDetailModalProps {
   message: WebSocketMessage;
 }
 
+// TryMethod를 TryMethodLite로 변환하는 헬퍼 함수
+function convertToTryMethodLite(methods: TryMethod[]): Array<{
+  spanId?: string;
+  name: string;
+  className: string;
+  parameters?: Array<{ type: string; name: string }>;
+  selfDurationMs: number;
+  selfPercentage: number;
+  percentage?: number;
+}> {
+  return methods.map((method) => ({
+    spanId: method.spanId,
+    name: method.name,
+    className: method.className,
+    parameters: method.parameters ?? undefined,
+    selfDurationMs: method.selfDurationMs,
+    selfPercentage: method.selfPercentage,
+  }));
+}
+
 export function MessageDetailModal({ isOpen, onClose, message }: MessageDetailModalProps) {
   const [activeTab, setActiveTab] = useState<"message" | "test">("message");
   const [methodList, setMethodList] = useState<TryMethod[] | null>(null);
@@ -211,7 +231,7 @@ export function MessageDetailModal({ isOpen, onClose, message }: MessageDetailMo
             </div>
           ) : (
             <TestContent
-              methodList={methodList}
+              methodList={methodList ? convertToTryMethodLite(methodList) : null}
               totalDurationMs={totalDurationMs}
               isMockEndpoint={false}
               isLoading={isLoadingMethods}
