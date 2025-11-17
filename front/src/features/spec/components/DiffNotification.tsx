@@ -59,7 +59,7 @@ export function DiffNotification({
   };
 
   const diffDetails = parseDiffType(diff);
-  
+
   // progress 상태 확인 (기본값: "mock")
   const progressLower = progress?.toLowerCase() || "mock";
   const isCompleted = progressLower === "completed";
@@ -113,7 +113,8 @@ export function DiffNotification({
               {isCompleted
                 ? "이 API는 completed 상태로 실제 구현이 완료되었습니다."
                 : "이 API는 mock 상태입니다."}
-              {diffDetails.type === "endpoint" && " 아래 버튼으로 명세를 갱신할 수 있습니다."}
+              {diffDetails.type === "endpoint" &&
+                " 아래 버튼으로 명세를 갱신할 수 있습니다."}
             </p>
           </div>
         </div>
@@ -121,46 +122,22 @@ export function DiffNotification({
 
       {/* 상세 정보 */}
       <div className="p-4 space-y-3">
-        {/* 기본 안내사항 */}
-        <div className="bg-white dark:bg-amber-950/30 rounded-md p-3 border border-amber-200 dark:border-amber-800">
-          <h4 className="text-xs font-semibold text-amber-900 dark:text-amber-200 mb-2 flex items-center gap-1">
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            안내사항
-          </h4>
-          <ul className="space-y-2">
-            <li className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
-              <svg className="w-3 h-3 text-amber-600 dark:text-amber-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span>
-                백엔드에서{" "}
-                <code className="px-1 py-0.5 bg-amber-100 dark:bg-amber-900 border border-amber-300 dark:border-amber-700 rounded text-[10px] font-mono text-amber-900 dark:text-amber-200">
-                  x-ouroboros-diff
-                </code>{" "}
-                필드를 통해 불일치가 감지되었습니다.
-              </span>
-            </li>
-            {diffDetails.type === "endpoint" && (
-              <li className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
-                <svg className="w-3 h-3 text-amber-600 dark:text-amber-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>
-                  실제 구현에 존재하지만 명세에 없는 Endpoint가 있습니다. 아래 버튼을 클릭하여 명세에 자동으로 추가할 수 있습니다.
-                </span>
-              </li>
-            )}
-          </ul>
-        </div>
-
         {/* 상세 로그 정보 */}
         {diffDetails.type === "request" && reqLog && reqLog.trim() !== "" && (
           <div className="bg-white dark:bg-amber-950/30 rounded-md p-3 border border-amber-200 dark:border-amber-800">
             <h4 className="text-xs font-semibold text-amber-900 dark:text-amber-200 mb-2 flex items-center gap-1">
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              <svg
+                className="w-3 h-3"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
               </svg>
               요청(Request) 불일치 상세 정보
             </h4>
@@ -175,8 +152,18 @@ export function DiffNotification({
         {diffDetails.type === "response" && resLog && resLog.trim() !== "" && (
           <div className="bg-white dark:bg-amber-950/30 rounded-md p-3 border border-amber-200 dark:border-amber-800">
             <h4 className="text-xs font-semibold text-amber-900 dark:text-amber-200 mb-2 flex items-center gap-1">
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              <svg
+                className="w-3 h-3"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
               </svg>
               응답(Response) 불일치 상세 정보
             </h4>
@@ -188,50 +175,72 @@ export function DiffNotification({
           </div>
         )}
 
-        {diffDetails.type === "both" && ((reqLog && reqLog.trim() !== "") || (resLog && resLog.trim() !== "")) && (
-          <div className="bg-white dark:bg-amber-950/30 rounded-md p-3 border border-amber-200 dark:border-amber-800">
-            <h4 className="text-xs font-semibold text-amber-900 dark:text-amber-200 mb-2 flex items-center gap-1">
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              불일치 상세 정보
-            </h4>
-            <div className="space-y-3 mt-2">
-              {reqLog && (
-                <div>
-                  <h5 className="text-xs font-medium text-amber-800 dark:text-amber-300 mb-1">
-                    요청(Request) 불일치:
-                  </h5>
-                  <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded border border-amber-300 dark:border-amber-700">
-                    <pre className="text-xs text-amber-900 dark:text-amber-200 whitespace-pre-wrap break-words font-mono">
-                      {reqLog}
-                    </pre>
+        {diffDetails.type === "both" &&
+          ((reqLog && reqLog.trim() !== "") ||
+            (resLog && resLog.trim() !== "")) && (
+            <div className="bg-white dark:bg-amber-950/30 rounded-md p-3 border border-amber-200 dark:border-amber-800">
+              <h4 className="text-xs font-semibold text-amber-900 dark:text-amber-200 mb-2 flex items-center gap-1">
+                <svg
+                  className="w-3 h-3"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+                불일치 상세 정보
+              </h4>
+              <div className="space-y-3 mt-2">
+                {reqLog && (
+                  <div>
+                    <h5 className="text-xs font-medium text-amber-800 dark:text-amber-300 mb-1">
+                      요청(Request) 불일치:
+                    </h5>
+                    <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded border border-amber-300 dark:border-amber-700">
+                      <pre className="text-xs text-amber-900 dark:text-amber-200 whitespace-pre-wrap break-words font-mono">
+                        {reqLog}
+                      </pre>
+                    </div>
                   </div>
-                </div>
-              )}
-              {resLog && (
-                <div>
-                  <h5 className="text-xs font-medium text-amber-800 dark:text-amber-300 mb-1">
-                    응답(Response) 불일치:
-                  </h5>
-                  <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded border border-amber-300 dark:border-amber-700">
-                    <pre className="text-xs text-amber-900 dark:text-amber-200 whitespace-pre-wrap break-words font-mono">
-                      {resLog}
-                    </pre>
+                )}
+                {resLog && (
+                  <div>
+                    <h5 className="text-xs font-medium text-amber-800 dark:text-amber-300 mb-1">
+                      응답(Response) 불일치:
+                    </h5>
+                    <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded border border-amber-300 dark:border-amber-700">
+                      <pre className="text-xs text-amber-900 dark:text-amber-200 whitespace-pre-wrap break-words font-mono">
+                        {resLog}
+                      </pre>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
         {onSyncToSpec && diffDetails.type === "endpoint" && (
           <button
             onClick={onSyncToSpec}
             className="w-full px-4 py-3 bg-amber-600 hover:bg-amber-700 dark:bg-amber-700 dark:hover:bg-amber-800 text-white rounded-md transition-colors text-sm font-semibold flex items-center justify-center gap-2 shadow-md"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
             </svg>
             실제 구현을 명세에 반영
           </button>

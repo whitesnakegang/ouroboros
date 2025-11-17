@@ -282,6 +282,7 @@ export function ApiEditorLayout() {
       setSummary("");
       setQueryParams([]);
       setRequestHeaders([]);
+      setPathParams([]);
       setRequestBody({
         type: "none",
         fields: [],
@@ -359,10 +360,11 @@ export function ApiEditorLayout() {
       // Parameters를 폼 state와 테스트 스토어로 분리
       const formHeaders: KeyValuePair[] = [];
       const formQueryParams: KeyValuePair[] = [];
+      const formPathParams: KeyValuePair[] = [];
       const testHeaders: Array<{ key: string; value: string }> = [];
       const testQueryParams: Array<{ key: string; value: string }> = [];
 
-      // Parameters를 헤더와 쿼리 파라미터로 분리
+      // Parameters를 헤더, 쿼리 파라미터, path 파라미터로 분리
       if (spec.parameters && Array.isArray(spec.parameters)) {
         spec.parameters.forEach((param: any) => {
           if (param.in === "header") {
@@ -393,6 +395,19 @@ export function ApiEditorLayout() {
               key: param.name || "",
               value: param.example || param.schema?.default || "",
             });
+          } else if (param.in === "path") {
+            // 폼 state (편집용)
+            // schema 타입 추출: query parameter와 동일한 방식으로 처리
+            const schema = param.schema as any;
+            const paramType = schema?.type || "string";
+
+            formPathParams.push({
+              key: param.name || "",
+              value: schema?.default || param.example || "",
+              required: param.required !== false, // path parameter는 기본적으로 required
+              description: param.description || "",
+              type: paramType,
+            });
           }
         });
       }
@@ -400,6 +415,7 @@ export function ApiEditorLayout() {
       // 폼 state 업데이트
       setQueryParams(formQueryParams);
       setRequestHeaders(formHeaders);
+      setPathParams(formPathParams);
 
       // RequestBody 처리 (새로운 schemaConverter 사용)
       let loadedRequestBody: RequestBody = { type: "none", fields: [] };
@@ -917,6 +933,7 @@ export function ApiEditorLayout() {
 
   // Request state
   const [queryParams, setQueryParams] = useState<KeyValuePair[]>([]);
+  const [pathParams, setPathParams] = useState<KeyValuePair[]>([]);
   const [requestHeaders, setRequestHeaders] = useState<KeyValuePair[]>([]);
   const [requestBody, setRequestBody] = useState<RequestBody>({
     type: "none",
@@ -1312,6 +1329,7 @@ export function ApiEditorLayout() {
       setSummary("");
       setQueryParams([]);
       setRequestHeaders([]);
+      setPathParams([]);
       setAuth({ type: "none" });
       setRequestBody({
         type: "json",
@@ -2576,6 +2594,8 @@ export function ApiEditorLayout() {
                       <ApiRequestCard
                         queryParams={queryParams}
                         setQueryParams={setQueryParams}
+                        pathParams={pathParams}
+                        setPathParams={setPathParams}
                         requestHeaders={requestHeaders}
                         setRequestHeaders={setRequestHeaders}
                         requestBody={requestBody}
