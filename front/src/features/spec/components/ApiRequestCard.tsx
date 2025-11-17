@@ -1081,6 +1081,7 @@ export function ApiRequestCard({
         onSelect={handleSchemaSelect}
         schemas={schemas}
         setSchemas={setSchemas}
+        protocol="REST"
       />
     </div>
   );

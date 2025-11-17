@@ -22,7 +22,6 @@ import {
 } from "../services/api";
 import { MarkdownPreviewModal } from "./MarkdownPreviewModal";
 // FilenameOptions removed
-import { WsChannelMessageTree } from "./WsChannelMessageTree";
 import {
   createRestApiSpec,
   updateRestApiSpec,
@@ -2658,13 +2657,6 @@ export function ApiEditorLayout() {
         onClose={() => setIsCodeSnippetOpen(false)}
         spec={currentSpec}
       />
-
-      {/* WebSocket Channels/Messages Tree */}
-      {protocol === "WebSocket" && activeTab === "form" && (
-        <div className="px-6 py-4">
-          <WsChannelMessageTree />
-        </div>
-      )}
 
       {/* Import Result Modal */}
       {importResult && (
