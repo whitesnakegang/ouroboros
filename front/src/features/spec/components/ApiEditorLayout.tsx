@@ -99,7 +99,25 @@ export function ApiEditorLayout() {
   const [specTab, setSpecTab] = useState<"request" | "response" | "schema">(
     "request"
   );
+  // WebSocket 탭 기본값: SEND 타입이면 reply, 아니면 receiver
+  const getDefaultWsSpecTab = (endpoint: any): "receiver" | "reply" => {
+    // method가 "SEND"이거나 tag가 "send"/"sendto"인 경우 reply 탭
+    const method = endpoint?.method?.toLowerCase();
+    const tag = endpoint?.tag?.toLowerCase();
+    if (method === "send" || tag === "send" || tag === "sendto") {
+      return "reply";
+    }
+    return "receiver";
+  };
   const [wsSpecTab, setWsSpecTab] = useState<"receiver" | "reply">("receiver");
+  
+  // selectedEndpoint가 변경될 때 기본 탭 설정
+  useEffect(() => {
+    if (selectedEndpoint && selectedEndpoint.protocol === "WebSocket") {
+      const defaultTab = getDefaultWsSpecTab(selectedEndpoint);
+      setWsSpecTab(defaultTab);
+    }
+  }, [selectedEndpoint?.id, selectedEndpoint?.method, selectedEndpoint?.tag]);
   const [isCodeSnippetOpen, setIsCodeSnippetOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isNewFormMode, setIsNewFormMode] = useState(false);
@@ -850,7 +868,7 @@ export function ApiEditorLayout() {
       }
       setWsTags(tagsString);
 
-      // Receiver 설정
+      // Receiver 설정 (action === "receive"인 경우만)
       if (
         operationData.operation.action === "receive" &&
         operationData.operation.channel
@@ -908,68 +926,19 @@ export function ApiEditorLayout() {
           schema: { type: "json", fields: [] },
           messages: messageNames.length > 0 ? messageNames : undefined,
         });
-      } else if (
-        operationData.operation.action === "send" &&
-        operationData.operation.channel
-      ) {
-        // Send-only operation의 경우도 channel을 receiver로 설정
-        const channelRef = operationData.operation.channel.ref || "";
-        const channelName = channelRef.replace("#/channels/", "");
-
-        let actualAddress = channelName;
-        try {
-          const channelResponse = await getWebSocketChannel(channelName);
-          actualAddress = channelResponse.data.channel?.address || channelName;
-        } catch {
-          // Channel 조회 실패 시 channel name 사용
-        }
-
-        // operation.messages에서 메시지 이름 추출
-        const messageNames: string[] = [];
-        if (
-          operationData.operation.messages &&
-          Array.isArray(operationData.operation.messages)
-        ) {
-          operationData.operation.messages.forEach((msg: any) => {
-            if (typeof msg === "string") {
-              messageNames.push(msg);
-            } else if (msg.$ref) {
-              const refPath = msg.$ref;
-              if (refPath.includes("/messages/")) {
-                const messageName = refPath.split("/messages/")[1];
-                if (messageName) {
-                  messageNames.push(messageName);
-                }
-              }
-            } else if (msg.ref) {
-              const refPath = msg.ref;
-              if (refPath.includes("/messages/")) {
-                const messageName = refPath.split("/messages/")[1];
-                if (messageName) {
-                  messageNames.push(messageName);
-                }
-              } else {
-                messageNames.push(refPath);
-              }
-            }
-          });
-        }
-
-        setWsReceiver({
-          address: actualAddress,
-          headers: [],
-          schema: { type: "json", fields: [] },
-          messages: messageNames.length > 0 ? messageNames : undefined,
-        });
       } else {
+        // action === "send"인 경우 receiver는 null
         setWsReceiver(null);
       }
 
-      // Reply 설정 (reply가 있는 경우)
+      // Reply 설정
+      // 1. operation.reply이 있는 경우 (DUPLEX)
+      // 2. action === "send"인 경우 channel을 reply로 설정
       if (
         operationData.operation.reply &&
         operationData.operation.reply.channel
       ) {
+        // DUPLEX: reply.channel 사용
         const replyChannelRef = operationData.operation.reply.channel.ref || "";
         const replyChannelName = replyChannelRef.replace("#/channels/", "");
 
@@ -1019,6 +988,58 @@ export function ApiEditorLayout() {
           schema: { type: "json", fields: [] },
           messages:
             replyMessageNames.length > 0 ? replyMessageNames : undefined,
+        });
+      } else if (
+        operationData.operation.action === "send" &&
+        operationData.operation.channel
+      ) {
+        // SEND: operation.channel을 reply로 설정
+        const channelRef = operationData.operation.channel.ref || "";
+        const channelName = channelRef.replace("#/channels/", "");
+
+        let actualAddress = channelName;
+        try {
+          const channelResponse = await getWebSocketChannel(channelName);
+          actualAddress = channelResponse.data.channel?.address || channelName;
+        } catch {
+          // Channel 조회 실패 시 channel name 사용
+        }
+
+        // operation.messages에서 메시지 이름 추출
+        const messageNames: string[] = [];
+        if (
+          operationData.operation.messages &&
+          Array.isArray(operationData.operation.messages)
+        ) {
+          operationData.operation.messages.forEach((msg: any) => {
+            if (typeof msg === "string") {
+              messageNames.push(msg);
+            } else if (msg.$ref) {
+              const refPath = msg.$ref;
+              if (refPath.includes("/messages/")) {
+                const messageName = refPath.split("/messages/")[1];
+                if (messageName) {
+                  messageNames.push(messageName);
+                }
+              }
+            } else if (msg.ref) {
+              const refPath = msg.ref;
+              if (refPath.includes("/messages/")) {
+                const messageName = refPath.split("/messages/")[1];
+                if (messageName) {
+                  messageNames.push(messageName);
+                }
+              } else {
+                messageNames.push(refPath);
+              }
+            }
+          });
+        }
+
+        setWsReply({
+          address: actualAddress,
+          schema: { type: "json", fields: [] },
+          messages: messageNames.length > 0 ? messageNames : undefined,
         });
       } else {
         setWsReply(null);
