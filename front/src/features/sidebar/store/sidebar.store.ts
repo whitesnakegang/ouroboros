@@ -261,45 +261,36 @@ export const useSidebarStore = create<SidebarState>()(
                   channelMap.set(channelName, address);
                 }
               });
-              console.log("✅ Loaded channel mappings:", channelMap);
-            } catch (channelError) {
-              console.warn("Channel 로드 실패, 추정 값 사용:", channelError);
+            } catch {
+              // Channel 로드 실패 시 추정 값 사용
             }
 
             // 2. Operations 로드
             const wsResponse = await getAllWebSocketOperations();
             const wsOperations = wsResponse.data;
 
-            // 3. WebSocket Operations를 그룹화 (tags가 있으면 tags 사용, 없으면 도메인 사용)
+            // 3. WebSocket Operations를 그룹화
+            // 실제 구현 후 명세에 반영된 경우(loadEndpoints)는 도메인 이름으로 그룹화
             wsOperations.forEach((operation) => {
               const endpoint = convertOperationToEndpoint(operation, channelMap);
               
-              // 그룹 결정: REST와 동일하게 tags의 첫 번째 항목 사용, 없으면 도메인 사용
-              // 백엔드에서 tags를 관리하므로 REST와 동일한 로직 사용
-              const group =
-                endpoint.tags && endpoint.tags.length > 0
-                  ? endpoint.tags[0] // REST와 동일하게 첫 번째 tag 사용
-                  : (() => {
-                      // tags가 없으면 도메인 사용
-                      const receiverAddress = endpoint.path?.split(" - ")[0] || "/unknown";
-                      return extractDomainFromAddress(receiverAddress);
-                    })();
+              // 그룹 결정: 실제 구현 반영 시에는 도메인 이름으로 그룹화
+              // (명세 작성 시에는 ApiEditorLayout에서 wsTags 기준으로 그룹화)
+              const receiverAddress = endpoint.path?.split(" - ")[0] || "/unknown";
+              const group = extractDomainFromAddress(receiverAddress);
 
               if (!grouped[group]) {
                 grouped[group] = [];
               }
               grouped[group].push(endpoint);
             });
-            
-            console.log("✅ WebSocket operations loaded successfully");
-          } catch (wsError) {
-            console.warn("WebSocket Operations 로드 실패:", wsError);
-            // WebSocket 로드 실패 시 에러만 로그
+          } catch {
+            // WebSocket Operations 로드 실패 시 무시
           }
 
           set({ endpoints: grouped, isLoading: false });
-        } catch (error) {
-          console.error("API 목록 로드 실패:", error);
+        } catch {
+          // API 목록 로드 실패
           set({ isLoading: false });
           // 에러 발생 시 빈 객체로 설정
           set({ endpoints: {} });

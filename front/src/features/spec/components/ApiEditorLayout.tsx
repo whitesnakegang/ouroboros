@@ -99,6 +99,7 @@ export function ApiEditorLayout() {
   const [specTab, setSpecTab] = useState<"request" | "response" | "schema">(
     "request"
   );
+  const [wsSpecTab, setWsSpecTab] = useState<"receiver" | "reply">("receiver");
   const [isCodeSnippetOpen, setIsCodeSnippetOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isNewFormMode, setIsNewFormMode] = useState(false);
@@ -279,6 +280,7 @@ export function ApiEditorLayout() {
       setIsEditMode(false);
       setMethod("POST");
       setUrl("");
+      setUrlError(""); // 에러 상태 초기화
       setTags("");
       setDescription("");
       setSummary("");
@@ -317,6 +319,7 @@ export function ApiEditorLayout() {
 
       setMethod(spec.method);
       setUrl(spec.path);
+      setUrlError(""); // 에러 상태 초기화
       setDescription(spec.description || "");
       setSummary(spec.summary || "");
       setTags(spec.tags ? spec.tags.join(", ") : "");
@@ -804,10 +807,9 @@ export function ApiEditorLayout() {
       const response = await getWebSocketOperation(operationId);
       const operationData = response.data;
 
-      console.log("✅ Loaded WebSocket operation:", operationData);
-
       // WebSocket form state 설정
       setWsEntryPoint(operationData.operation.entrypoint || "/ws");
+      setWsEntryPointError(""); // 에러 상태 초기화
       setWsSummary(""); // Operation에는 summary가 없음
       setWsDescription(operationData.operationName || ""); // operationName을 description으로
       // 백엔드에서 관리하는 tags 사용 (REST API와 동일하게)
@@ -834,20 +836,49 @@ export function ApiEditorLayout() {
           const channelResponse = await getWebSocketChannel(channelName);
           actualAddress = channelResponse.data.channel?.address || channelName;
         } catch {
-          console.warn("Channel 조회 실패, channel name 사용:", channelName);
+          // Channel 조회 실패 시 channel name 사용
+        }
+
+        // operation.messages에서 메시지 이름 추출
+        const messageNames: string[] = [];
+        if (
+          operationData.operation.messages &&
+          Array.isArray(operationData.operation.messages)
+        ) {
+          operationData.operation.messages.forEach((msg: any) => {
+            if (typeof msg === "string") {
+              // 문자열인 경우 그대로 사용
+              messageNames.push(msg);
+            } else if (msg.$ref) {
+              // $ref 형태: "#/channels/_chat_{roomId}/messages/ChatMessage" -> "ChatMessage"
+              const refPath = msg.$ref;
+              if (refPath.includes("/messages/")) {
+                const messageName = refPath.split("/messages/")[1];
+                if (messageName) {
+                  messageNames.push(messageName);
+                }
+              }
+            } else if (msg.ref) {
+              // ref 형태 (간단한 참조)
+              const refPath = msg.ref;
+              if (refPath.includes("/messages/")) {
+                const messageName = refPath.split("/messages/")[1];
+                if (messageName) {
+                  messageNames.push(messageName);
+                }
+              } else {
+                // 직접 메시지 이름인 경우
+                messageNames.push(refPath);
+              }
+            }
+          });
         }
 
         setWsReceiver({
           address: actualAddress,
-          headers: [
-            {
-              key: "accept-version",
-              value: "1.1",
-              required: true,
-              description: "STOMP 프로토콜 버전 (필수)",
-            },
-          ],
+          headers: [], // accept-version 하드코딩 제거, 실제 메시지에서 가져온 정보만 사용
           schema: { type: "json", fields: [] },
+          messages: messageNames.length > 0 ? messageNames : undefined,
         });
       } else if (
         operationData.operation.action === "send" &&
@@ -862,13 +893,45 @@ export function ApiEditorLayout() {
           const channelResponse = await getWebSocketChannel(channelName);
           actualAddress = channelResponse.data.channel?.address || channelName;
         } catch {
-          console.warn("Channel 조회 실패, channel name 사용:", channelName);
+          // Channel 조회 실패 시 channel name 사용
+        }
+
+        // operation.messages에서 메시지 이름 추출
+        const messageNames: string[] = [];
+        if (
+          operationData.operation.messages &&
+          Array.isArray(operationData.operation.messages)
+        ) {
+          operationData.operation.messages.forEach((msg: any) => {
+            if (typeof msg === "string") {
+              messageNames.push(msg);
+            } else if (msg.$ref) {
+              const refPath = msg.$ref;
+              if (refPath.includes("/messages/")) {
+                const messageName = refPath.split("/messages/")[1];
+                if (messageName) {
+                  messageNames.push(messageName);
+                }
+              }
+            } else if (msg.ref) {
+              const refPath = msg.ref;
+              if (refPath.includes("/messages/")) {
+                const messageName = refPath.split("/messages/")[1];
+                if (messageName) {
+                  messageNames.push(messageName);
+                }
+              } else {
+                messageNames.push(refPath);
+              }
+            }
+          });
         }
 
         setWsReceiver({
           address: actualAddress,
           headers: [],
           schema: { type: "json", fields: [] },
+          messages: messageNames.length > 0 ? messageNames : undefined,
         });
       } else {
         setWsReceiver(null);
@@ -889,21 +952,49 @@ export function ApiEditorLayout() {
           actualReplyAddress =
             channelResponse.data.channel?.address || replyChannelName;
         } catch {
-          console.warn(
-            "Reply channel 조회 실패, channel name 사용:",
-            replyChannelName
-          );
+          // Reply channel 조회 실패 시 channel name 사용
+        }
+
+        // reply.messages에서 메시지 이름 추출
+        const replyMessageNames: string[] = [];
+        if (
+          operationData.operation.reply.messages &&
+          Array.isArray(operationData.operation.reply.messages)
+        ) {
+          operationData.operation.reply.messages.forEach((msg: any) => {
+            if (typeof msg === "string") {
+              replyMessageNames.push(msg);
+            } else if (msg.$ref) {
+              const refPath = msg.$ref;
+              if (refPath.includes("/messages/")) {
+                const messageName = refPath.split("/messages/")[1];
+                if (messageName) {
+                  replyMessageNames.push(messageName);
+                }
+              }
+            } else if (msg.ref) {
+              const refPath = msg.ref;
+              if (refPath.includes("/messages/")) {
+                const messageName = refPath.split("/messages/")[1];
+                if (messageName) {
+                  replyMessageNames.push(messageName);
+                }
+              } else {
+                replyMessageNames.push(refPath);
+              }
+            }
+          });
         }
 
         setWsReply({
           address: actualReplyAddress,
           schema: { type: "json", fields: [] },
+          messages:
+            replyMessageNames.length > 0 ? replyMessageNames : undefined,
         });
       } else {
         setWsReply(null);
       }
-
-      console.log("✅ WebSocket form state 설정 완료");
     } catch (error) {
       console.error("WebSocket Operation 로드 실패:", error);
       alert(
@@ -917,6 +1008,7 @@ export function ApiEditorLayout() {
   // Form state
   const [method, setMethod] = useState("POST");
   const [url, setUrl] = useState("");
+  const [urlError, setUrlError] = useState(""); // URL 한글 검증 에러
   const [tags, setTags] = useState("");
   const [currentSpec, setCurrentSpec] = useState<RestApiSpecResponse | null>(
     null
@@ -954,7 +1046,8 @@ export function ApiEditorLayout() {
   const [statusCodes, setStatusCodes] = useState<StatusCode[]>([]);
 
   // WebSocket state
-  const [wsEntryPoint, setWsEntryPoint] = useState("");
+  const [wsEntryPoint, setWsEntryPoint] = useState("/ws");
+  const [wsEntryPointError, setWsEntryPointError] = useState(""); // WebSocket entryPoint 한글 검증 에러
   const [wsProtocol, setWsProtocol] = useState<"ws" | "wss">("ws");
   const [wsSummary, setWsSummary] = useState("");
   const [wsDescription, setWsDescription] = useState("");
@@ -971,7 +1064,166 @@ export function ApiEditorLayout() {
     messages?: string[];
   } | null>(null);
 
+  // REST 수정 모드 진입 시 초기 상태 저장 (수정사항 확인용)
+  const restInitialStateRef = useRef<{
+    method: string;
+    url: string;
+    summary: string;
+    description: string;
+    tags: string;
+    queryParams: KeyValuePair[];
+    pathParams: KeyValuePair[];
+    requestHeaders: KeyValuePair[];
+    requestBody: RequestBody;
+    statusCodes: StatusCode[];
+    auth: typeof auth;
+  } | null>(null);
+
+  // WebSocket 수정 모드 진입 시 초기 상태 저장 (수정사항 확인용)
+  const wsInitialStateRef = useRef<{
+    entryPoint: string;
+    protocol: "ws" | "wss";
+    tags: string;
+    receiver: typeof wsReceiver;
+    reply: typeof wsReply;
+  } | null>(null);
+
+  // wsReceiver나 wsReply가 하나만 있을 때 기본 탭 설정
+  useEffect(() => {
+    if (selectedEndpoint && !isEditMode && !isNewFormMode) {
+      // receive만 있으면 receiver 탭으로, reply만 있으면 reply 탭으로 설정
+      if (wsReceiver && !wsReply) {
+        setWsSpecTab("receiver");
+      } else if (wsReply && !wsReceiver) {
+        setWsSpecTab("reply");
+      }
+    }
+  }, [wsReceiver, wsReply, selectedEndpoint, isEditMode, isNewFormMode]);
+
   const methods = ["GET", "POST", "PUT", "PATCH", "DELETE"];
+
+  // 한글 감지 함수
+  const hasKorean = (text: string): boolean => {
+    return /[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(text);
+  };
+
+  // 필수 필드 검증 함수
+  const isFormValid = (): boolean => {
+    if (protocol === "REST") {
+      // REST API 필수 필드: method, url
+      return !!(method && url && url.trim() && !urlError);
+    } else if (protocol === "WebSocket") {
+      // WebSocket 필수 필드:
+      // 1. pathname (wsEntryPoint) 필수
+      // 2. receive나 reply 둘 중 하나는 무조건 작성되어야 함
+      const hasEntryPoint = !!(
+        wsEntryPoint &&
+        wsEntryPoint.trim() &&
+        !wsEntryPointError
+      );
+      const hasReceiver = !!(
+        wsReceiver &&
+        wsReceiver.address &&
+        wsReceiver.address.trim()
+      );
+      const hasReply = !!(wsReply && wsReply.address && wsReply.address.trim());
+      const hasReceiverOrReply = hasReceiver || hasReply;
+
+      return hasEntryPoint && hasReceiverOrReply;
+    }
+    return false;
+  };
+
+  // REST 수정사항 확인 함수
+  const hasRestChanges = (): boolean => {
+    if (protocol !== "REST" || !isEditMode || !restInitialStateRef.current) {
+      return true; // 수정 모드가 아니거나 초기 상태가 없으면 변경사항 있다고 간주
+    }
+
+    const initial = restInitialStateRef.current;
+
+    // Method 변경 확인
+    if (initial.method !== method) return true;
+
+    // URL 변경 확인
+    if (initial.url !== url) return true;
+
+    // Summary 변경 확인
+    if (initial.summary !== summary) return true;
+
+    // Description 변경 확인
+    if (initial.description !== description) return true;
+
+    // Tags 변경 확인
+    if (initial.tags !== tags) return true;
+
+    // QueryParams 변경 확인
+    if (JSON.stringify(initial.queryParams) !== JSON.stringify(queryParams))
+      return true;
+
+    // PathParams 변경 확인
+    if (JSON.stringify(initial.pathParams) !== JSON.stringify(pathParams))
+      return true;
+
+    // RequestHeaders 변경 확인
+    if (
+      JSON.stringify(initial.requestHeaders) !== JSON.stringify(requestHeaders)
+    )
+      return true;
+
+    // RequestBody 변경 확인
+    if (JSON.stringify(initial.requestBody) !== JSON.stringify(requestBody))
+      return true;
+
+    // StatusCodes 변경 확인
+    if (JSON.stringify(initial.statusCodes) !== JSON.stringify(statusCodes))
+      return true;
+
+    // Auth 변경 확인
+    if (JSON.stringify(initial.auth) !== JSON.stringify(auth)) return true;
+
+    return false; // 변경사항 없음
+  };
+
+  // WebSocket 수정사항 확인 함수
+  const hasWebSocketChanges = (): boolean => {
+    if (protocol !== "WebSocket" || !isEditMode || !wsInitialStateRef.current) {
+      return true; // 수정 모드가 아니거나 초기 상태가 없으면 변경사항 있다고 간주
+    }
+
+    const initial = wsInitialStateRef.current;
+
+    // EntryPoint 변경 확인
+    if (initial.entryPoint !== wsEntryPoint) return true;
+
+    // Protocol 변경 확인
+    if (initial.protocol !== wsProtocol) return true;
+
+    // Tags 변경 확인
+    if (initial.tags !== wsTags) return true;
+
+    // Receiver 변경 확인
+    const receiverChanged =
+      (initial.receiver === null) !== (wsReceiver === null) ||
+      (initial.receiver &&
+        wsReceiver &&
+        (initial.receiver.address !== wsReceiver.address ||
+          JSON.stringify(initial.receiver.messages || []) !==
+            JSON.stringify(wsReceiver.messages || [])));
+    if (receiverChanged) return true;
+
+    // Reply 변경 확인
+    const replyChanged =
+      (initial.reply === null) !== (wsReply === null) ||
+      (initial.reply &&
+        wsReply &&
+        (initial.reply.address !== wsReply.address ||
+          JSON.stringify(initial.reply.messages || []) !==
+            JSON.stringify(wsReply.messages || [])));
+    if (replyChanged) return true;
+
+    return false; // 변경사항 없음
+  };
 
   /**
    * queryParams를 OpenAPI parameters 구조로 변환
@@ -1158,12 +1410,15 @@ export function ApiEditorLayout() {
   };
 
   const handleSave = async () => {
+    // 필수 필드 및 한글 검증 체크
+    if (!isFormValid()) {
+      return; // 필수 필드가 비어있거나 한글이 포함되어 있으면 저장 불가
+    }
+
     // WebSocket 저장 로직
     if (protocol === "WebSocket") {
-      if (!wsEntryPoint) {
-        alert("Entry Point를 입력해주세요.");
-        return;
-      }
+      // pathname이 비어있으면 기본값 /ws 사용
+      const pathname = wsEntryPoint.trim() || "/ws";
 
       try {
         // receiver와 reply를 ChannelMessageInfo 형식으로 변환
@@ -1189,7 +1444,7 @@ export function ApiEditorLayout() {
 
         const request: CreateOperationRequest = {
           protocol: wsProtocol,
-          pathname: wsEntryPoint,
+          pathname: pathname,
           receives: receives,
           replies: replies,
           tags:
@@ -1203,9 +1458,15 @@ export function ApiEditorLayout() {
 
         if (selectedEndpoint && isEditMode) {
           // 수정 로직
+          // receive나 reply 중 하나는 필수
+          if (!receives && !replies) {
+            alert("Receiver 또는 Reply 중 하나는 반드시 입력해야 합니다.");
+            return;
+          }
+
           await updateWebSocketOperation(selectedEndpoint.id, {
             protocol: wsProtocol,
-            pathname: wsEntryPoint,
+            pathname: pathname,
             receive: receives && receives.length > 0 ? receives[0] : undefined,
             reply: replies && replies.length > 0 ? replies[0] : undefined,
             tags:
@@ -1217,6 +1478,9 @@ export function ApiEditorLayout() {
                 : undefined, // 백엔드로 tags 전달
           });
           alert("WebSocket Operation이 수정되었습니다.");
+
+          // 초기 상태 참조 초기화
+          wsInitialStateRef.current = null;
 
           // 사이드바 목록 다시 로드
           await loadEndpoints();
@@ -1238,31 +1502,19 @@ export function ApiEditorLayout() {
             const receiverAddress =
               receives && receives.length > 0 ? receives[0].address : "";
 
-            // extractDomainFromAddress 함수와 동일한 로직 사용
-            const extractDomain = (address: string): string => {
-              if (!address || address === "/unknown") {
-                return "OTHERS";
-              }
-              const parts = address
-                .split("/")
-                .filter((part) => part.length > 0);
-              if (parts.length === 0) {
-                return "OTHERS";
-              }
-              const domain = parts[0];
-              return (
-                domain.charAt(0).toUpperCase() + domain.slice(1).toLowerCase()
-              );
-            };
-            // 그룹 결정: 백엔드에서 받은 tags 사용 (REST와 동일하게)
-            // 백엔드에서 tags를 반환하므로 operation.tags 사용
-            const operationTags = (operation as any).tags;
+            // 그룹 결정: 명세 작성 시 사용자가 입력한 wsTags 사용
+            // wsTags가 있으면 첫 번째 tag 사용, 없으면 "OTHERS"
+            const userTags =
+              wsTags && wsTags.trim()
+                ? wsTags
+                    .split(",")
+                    .map((t) => t.trim())
+                    .filter((t) => t.length > 0)
+                : [];
             const group =
-              operationTags &&
-              Array.isArray(operationTags) &&
-              operationTags.length > 0
-                ? operationTags[0] // REST와 동일하게 첫 번째 tag 사용
-                : extractDomain(receiverAddress);
+              userTags.length > 0
+                ? userTags[0] // 사용자가 입력한 첫 번째 tag 사용
+                : "OTHERS"; // tag가 없으면 "OTHERS"
 
             // tag에 따라 method 결정
             const tag = createdOperation.tag || operation.action || "receive";
@@ -1341,8 +1593,8 @@ export function ApiEditorLayout() {
                 tag: latestOperationData.tag || newEndpoint.tag,
                 tags: (latestOperation as any).tags || newEndpoint.tags, // 백엔드에서 받은 tags 사용
               });
-            } catch (error) {
-              console.warn("최신 operation 정보 로드 실패:", error);
+            } catch {
+              // 최신 operation 정보 로드 실패 시 무시
             }
           } else {
             alert("WebSocket Operation이 생성되었습니다.");
@@ -1360,7 +1612,9 @@ export function ApiEditorLayout() {
     }
 
     // REST 저장 로직
-    if (!method || !url) {
+    // 필수 필드 검증은 이미 isFormValid()에서 처리되므로 여기서는 추가 검증 불필요
+    // 하지만 안전을 위해 한 번 더 체크
+    if (protocol === "REST" && (!method || !url || !url.trim())) {
       alert("Method와 URL을 입력해주세요.");
       return;
     }
@@ -1384,6 +1638,9 @@ export function ApiEditorLayout() {
         };
 
         await updateRestApiSpec(selectedEndpoint.id, updateRequest);
+
+        // 초기 상태 참조 초기화
+        restInitialStateRef.current = null;
 
         alert("API 스펙이 수정되었습니다.");
         setIsEditMode(false);
@@ -1492,6 +1749,7 @@ export function ApiEditorLayout() {
         setSelectedEndpoint(null);
         setMethod("POST");
         setUrl("/api/auth/login");
+        setUrlError(""); // 에러 상태 초기화
         setTags("AUTH");
         setDescription("사용자 로그인");
         setIsEditMode(false);
@@ -1510,6 +1768,35 @@ export function ApiEditorLayout() {
       alert("이미 완료(completed)된 API는 수정할 수 없습니다.");
       return;
     }
+
+    // REST 수정 모드 진입 시 초기 상태 저장
+    if (protocol === "REST") {
+      restInitialStateRef.current = {
+        method,
+        url,
+        summary,
+        description,
+        tags,
+        queryParams: JSON.parse(JSON.stringify(queryParams)),
+        pathParams: JSON.parse(JSON.stringify(pathParams)),
+        requestHeaders: JSON.parse(JSON.stringify(requestHeaders)),
+        requestBody: JSON.parse(JSON.stringify(requestBody)),
+        statusCodes: JSON.parse(JSON.stringify(statusCodes)),
+        auth: JSON.parse(JSON.stringify(auth)),
+      };
+    }
+
+    // WebSocket 수정 모드 진입 시 초기 상태 저장
+    if (protocol === "WebSocket") {
+      wsInitialStateRef.current = {
+        entryPoint: wsEntryPoint,
+        protocol: wsProtocol,
+        tags: wsTags,
+        receiver: wsReceiver ? JSON.parse(JSON.stringify(wsReceiver)) : null,
+        reply: wsReply ? JSON.parse(JSON.stringify(wsReply)) : null,
+      };
+    }
+
     setIsEditMode(true);
   };
 
@@ -1524,6 +1811,7 @@ export function ApiEditorLayout() {
     if (confirm("작성 중인 내용을 초기화하시겠습니까?")) {
       setMethod("POST");
       setUrl("");
+      setUrlError(""); // 에러 상태 초기화
       setTags("");
       setDescription("");
       setSummary("");
@@ -1550,6 +1838,7 @@ export function ApiEditorLayout() {
     setMethod("POST");
     // 값은 비워 placeholder가 보이도록 처리
     setUrl("");
+    setUrlError(""); // 에러 상태 초기화
     setTags("");
     setDescription("");
     setSummary("");
@@ -1564,7 +1853,8 @@ export function ApiEditorLayout() {
 
     // 프로토콜에 따른 추가 초기화
     if (protocol === "WebSocket") {
-      setWsEntryPoint("");
+      setWsEntryPoint("/ws");
+      setWsEntryPointError(""); // 에러 상태 초기화
       setWsProtocol("ws");
       setWsSummary("");
       setWsDescription("");
@@ -2371,44 +2661,50 @@ export function ApiEditorLayout() {
             )}
             {protocol === "WebSocket" &&
               (selectedEndpoint !== null || isNewFormMode) && (
-                <WsEditorForm
-                  entryPoint={wsEntryPoint}
-                  setEntryPoint={setWsEntryPoint}
-                  protocol={wsProtocol}
-                  setProtocol={setWsProtocol}
-                  summary={wsSummary}
-                  setSummary={setWsSummary}
-                  description={wsDescription}
-                  setDescription={setWsDescription}
-                  tags={wsTags}
-                  setTags={setWsTags}
-                  receiver={wsReceiver}
-                  setReceiver={setWsReceiver}
-                  reply={wsReply}
-                  setReply={setWsReply}
-                  isReadOnly={!!(selectedEndpoint && !isEditMode)}
-                  isDocumentView={
-                    !isEditMode && !isNewFormMode && selectedEndpoint !== null
-                  }
-                  diff={selectedEndpoint?.diff}
-                  operationInfo={
-                    selectedEndpoint
-                      ? {
-                          operationName: (selectedEndpoint as any)
-                            .operationName,
-                          tag: selectedEndpoint.method?.toLowerCase(),
-                          progress: selectedEndpoint.progress,
-                        }
-                      : undefined
-                  }
-                  onSyncToActual={
-                    selectedEndpoint &&
-                    selectedEndpoint.diff &&
-                    selectedEndpoint.diff !== "none"
-                      ? handleSyncWebSocketToActual
-                      : undefined
-                  }
-                />
+                <>
+                  <WsEditorForm
+                    entryPoint={wsEntryPoint}
+                    setEntryPoint={setWsEntryPoint}
+                    entryPointError={wsEntryPointError}
+                    setEntryPointError={setWsEntryPointError}
+                    protocol={wsProtocol}
+                    setProtocol={setWsProtocol}
+                    summary={wsSummary}
+                    setSummary={setWsSummary}
+                    description={wsDescription}
+                    setDescription={setWsDescription}
+                    tags={wsTags}
+                    setTags={setWsTags}
+                    receiver={wsReceiver}
+                    setReceiver={setWsReceiver}
+                    reply={wsReply}
+                    setReply={setWsReply}
+                    isReadOnly={!!(selectedEndpoint && !isEditMode)}
+                    isDocumentView={
+                      !isEditMode && !isNewFormMode && selectedEndpoint !== null
+                    }
+                    wsSpecTab={wsSpecTab}
+                    setWsSpecTab={setWsSpecTab}
+                    diff={selectedEndpoint?.diff}
+                    operationInfo={
+                      selectedEndpoint
+                        ? {
+                            operationName: (selectedEndpoint as any)
+                              .operationName,
+                            tag: selectedEndpoint.method?.toLowerCase(),
+                            progress: selectedEndpoint.progress,
+                          }
+                        : undefined
+                    }
+                    onSyncToActual={
+                      selectedEndpoint &&
+                      selectedEndpoint.diff &&
+                      selectedEndpoint.diff !== "none"
+                        ? handleSyncWebSocketToActual
+                        : undefined
+                    }
+                  />
+                </>
               )}
             {protocol !== null &&
               protocol !== "REST" &&
@@ -2444,7 +2740,7 @@ export function ApiEditorLayout() {
                 </div>
               )}
 
-            {/* Diff Notification - 불일치가 있을 때만 표시 (completed 또는 mock 상태 모두) */}
+            {/* Diff Notification - 불일치가 있을 때만 표시 (REST만, WebSocket은 WsEditorForm 내부에서 처리) */}
             {protocol === "REST" && selectedEndpoint && hasDiff && (
               <DiffNotification
                 diff={selectedEndpoint.diff || "none"}
@@ -2631,19 +2927,43 @@ export function ApiEditorLayout() {
                             <input
                               type="text"
                               value={url}
-                              onChange={(e) => setUrl(e.target.value)}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                setUrl(value);
+                                // 한글 검증
+                                if (hasKorean(value)) {
+                                  setUrlError("한글로 생성할 수 없습니다");
+                                } else {
+                                  setUrlError("");
+                                }
+                              }}
+                              onKeyPress={(e) => {
+                                // 한글 입력 방지 (IME 입력 차단)
+                                const char = e.key;
+                                if (/[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(char)) {
+                                  e.preventDefault();
+                                }
+                              }}
                               placeholder="예: /api/users, /api/auth/login"
                               disabled={!!(selectedEndpoint && !isEditMode)}
                               className={`w-full px-3 py-2 ${
                                 hasDiff ? "pr-10" : ""
-                              } rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm font-mono ${
+                              } rounded-md bg-white dark:bg-[#0D1117] border ${
+                                urlError
+                                  ? "border-red-500 dark:border-red-500"
+                                  : "border-gray-300 dark:border-[#2D333B]"
+                              } text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 ${
+                                urlError
+                                  ? "focus:ring-red-500 focus:border-red-500"
+                                  : "focus:ring-[#2563EB] focus:border-[#2563EB]"
+                              } text-sm font-mono ${
                                 selectedEndpoint && !isEditMode
                                   ? "opacity-60 cursor-not-allowed"
                                   : ""
                               }`}
                             />
                             {/* Diff 주의 표시 아이콘 (URL 우측) */}
-                            {hasDiff && (
+                            {hasDiff && !urlError && (
                               <div
                                 className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"
                                 title="명세와 실제 구현이 일치하지 않습니다"
@@ -2662,6 +2982,12 @@ export function ApiEditorLayout() {
                                   />
                                 </svg>
                               </div>
+                            )}
+                            {/* 한글 입력 에러 메시지 */}
+                            {urlError && (
+                              <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+                                {urlError}
+                              </p>
                             )}
                           </div>
                         </div>
@@ -2714,7 +3040,7 @@ export function ApiEditorLayout() {
                               type="text"
                               value={summary}
                               onChange={(e) => setSummary(e.target.value)}
-                              placeholder="예: 심연수"
+                              placeholder="예: 홍길동"
                               disabled={!!(selectedEndpoint && !isEditMode)}
                               className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
                                 selectedEndpoint && !isEditMode
@@ -2855,7 +3181,18 @@ export function ApiEditorLayout() {
                 </button>
                 <button
                   onClick={handleSave}
-                  className="px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none text-sm font-medium flex items-center gap-2"
+                  disabled={
+                    !isFormValid() ||
+                    (protocol === "REST" && !hasRestChanges()) ||
+                    (protocol === "WebSocket" && !hasWebSocketChanges())
+                  }
+                  className={`px-3 py-2 rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none text-sm font-medium flex items-center gap-2 ${
+                    !isFormValid() ||
+                    (protocol === "REST" && !hasRestChanges()) ||
+                    (protocol === "WebSocket" && !hasWebSocketChanges())
+                      ? "bg-gray-300 dark:bg-[#21262D] text-gray-500 dark:text-[#8B949E] cursor-not-allowed"
+                      : "bg-emerald-500 hover:bg-emerald-600 text-white"
+                  }`}
                 >
                   저장
                 </button>
@@ -2903,7 +3240,12 @@ export function ApiEditorLayout() {
             </button>
             <button
               onClick={handleSave}
-              className="px-3 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none text-sm font-medium flex items-center gap-2"
+              disabled={!isFormValid()}
+              className={`px-3 py-2 rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none text-sm font-medium flex items-center gap-2 ${
+                !isFormValid()
+                  ? "bg-gray-300 dark:bg-[#21262D] text-gray-500 dark:text-[#8B949E] cursor-not-allowed"
+                  : "bg-[#2563EB] hover:bg-[#1E40AF] text-white"
+              }`}
             >
               생성
             </button>

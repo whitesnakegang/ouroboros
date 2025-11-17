@@ -227,11 +227,14 @@ export function ApiRequestCard({
                     {param.key}
                   </span>
                   <span className="text-gray-600 dark:text-[#8B949E]">:</span>
-                  <span className="text-gray-900 dark:text-[#E6EDF3] flex-1">
-                    {param.value || (
-                      <span className="text-gray-400 italic">(empty)</span>
-                    )}
+                  <span className="text-gray-500 dark:text-[#8B949E] text-xs">
+                    ({param.type || "string"})
                   </span>
+                  {param.value && (
+                    <span className="text-gray-900 dark:text-[#E6EDF3] flex-1">
+                      {param.value}
+                    </span>
+                  )}
                   {param.required && (
                     <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-xs rounded">
                       Required
