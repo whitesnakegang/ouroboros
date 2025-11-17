@@ -884,6 +884,7 @@ export interface CreateOperationRequest {
   pathname: string;
   receives?: ChannelMessageInfo[] | null;
   replies?: ChannelMessageInfo[] | null;
+  tags?: string[]; // 백엔드에서 관리할 tags 필드 추가
 }
 
 export interface UpdateOperationRequest {
@@ -891,6 +892,7 @@ export interface UpdateOperationRequest {
   pathname?: string;
   receive?: ChannelMessageInfo;
   reply?: ChannelMessageInfo;
+  tags?: string[]; // 백엔드에서 관리할 tags 필드 추가
 }
 
 export interface GetAllOperationsResponse {

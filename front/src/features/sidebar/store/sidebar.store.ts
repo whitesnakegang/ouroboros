@@ -155,6 +155,12 @@ function convertOperationToEndpoint(
     .replace(/_/g, ' ')
     .replace(/\./g, '.');
 
+  // tags 결정: 백엔드에서 관리하는 tags 사용 (REST와 동일하게)
+  const operationTags = (operation as any).tags;
+  const tags = operationTags && Array.isArray(operationTags) && operationTags.length > 0
+    ? operationTags // 백엔드에서 받은 tags 사용
+    : null; // tags가 없으면 null로 설정하여 그룹화 로직에서 도메인 사용
+
   return {
     id: operation.id || operationName,
     method: method,
@@ -162,7 +168,7 @@ function convertOperationToEndpoint(
     description: summary, // summary로 사용
     implementationStatus: mapTagToStatus(tag, operation.progress),
     hasSpecError: operation.diff && operation.diff !== "none" ? true : undefined,
-    tags: [entrypoint, receiverAddress, tag || ""], // [entrypoint, receiverAddress, tag] 저장
+    tags: tags,
     progress: operation.progress,
     tag: tag,
     diff: operation.diff,
@@ -267,18 +273,25 @@ export const useSidebarStore = create<SidebarState>()(
             const wsResponse = await getAllWebSocketOperations();
             const wsOperations = wsResponse.data;
 
-            // 3. WebSocket Operations를 도메인별로 그룹화
+            // 3. WebSocket Operations를 그룹화 (tags가 있으면 tags 사용, 없으면 도메인 사용)
             wsOperations.forEach((operation) => {
               const endpoint = convertOperationToEndpoint(operation, channelMap);
               
-              // receiverAddress에서 도메인 추출 (첫 번째 경로 세그먼트)
-              const receiverAddress = endpoint.tags?.[1] || "/unknown";
-              const domain = extractDomainFromAddress(receiverAddress);
+              // 그룹 결정: REST와 동일하게 tags의 첫 번째 항목 사용, 없으면 도메인 사용
+              // 백엔드에서 tags를 관리하므로 REST와 동일한 로직 사용
+              const group =
+                endpoint.tags && endpoint.tags.length > 0
+                  ? endpoint.tags[0] // REST와 동일하게 첫 번째 tag 사용
+                  : (() => {
+                      // tags가 없으면 도메인 사용
+                      const receiverAddress = endpoint.path?.split(" - ")[0] || "/unknown";
+                      return extractDomainFromAddress(receiverAddress);
+                    })();
 
-              if (!grouped[domain]) {
-                grouped[domain] = [];
+              if (!grouped[group]) {
+                grouped[group] = [];
               }
-              grouped[domain].push(endpoint);
+              grouped[group].push(endpoint);
             });
             
             console.log("✅ WebSocket operations loaded successfully");

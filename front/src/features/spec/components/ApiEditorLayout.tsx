@@ -810,7 +810,15 @@ export function ApiEditorLayout() {
       setWsEntryPoint(operationData.operation.entrypoint || "/ws");
       setWsSummary(""); // Operation에는 summary가 없음
       setWsDescription(operationData.operationName || ""); // operationName을 description으로
-      setWsTags(""); // 필요시 추가
+      // 백엔드에서 관리하는 tags 사용 (REST API와 동일하게)
+      const operationTags = (operationData.operation as any).tags;
+      setWsTags(
+        operationTags &&
+          Array.isArray(operationTags) &&
+          operationTags.length > 0
+          ? operationTags.join(", ") // REST와 동일하게 쉼표로 구분된 문자열로 변환
+          : ""
+      );
 
       // Receiver 설정
       if (
@@ -1184,6 +1192,13 @@ export function ApiEditorLayout() {
           pathname: wsEntryPoint,
           receives: receives,
           replies: replies,
+          tags:
+            wsTags && wsTags.trim()
+              ? wsTags
+                  .split(",")
+                  .map((t) => t.trim())
+                  .filter((t) => t.length > 0)
+              : undefined, // 백엔드로 tags 전달
         };
 
         if (selectedEndpoint && isEditMode) {
@@ -1193,23 +1208,149 @@ export function ApiEditorLayout() {
             pathname: wsEntryPoint,
             receive: receives && receives.length > 0 ? receives[0] : undefined,
             reply: replies && replies.length > 0 ? replies[0] : undefined,
+            tags:
+              wsTags && wsTags.trim()
+                ? wsTags
+                    .split(",")
+                    .map((t) => t.trim())
+                    .filter((t) => t.length > 0)
+                : undefined, // 백엔드로 tags 전달
           });
           alert("WebSocket Operation이 수정되었습니다.");
-        } else {
-          // 생성 로직
-          await createWebSocketOperation(request);
-          alert("WebSocket Operation이 생성되었습니다.");
-        }
 
-        // 사이드바 목록 다시 로드
-        await loadEndpoints();
+          // 사이드바 목록 다시 로드
+          await loadEndpoints();
 
-        // 수정 모드인 경우 다시 로드
-        if (selectedEndpoint && isEditMode) {
+          // 저장 후 다시 로드하여 백엔드에서 최신 데이터 가져오기
           await loadEndpointData(selectedEndpoint.id);
         } else {
-          // 새로 생성한 경우 폼 초기화
-          handleReset();
+          // 생성 로직
+          const response = await createWebSocketOperation(request);
+          const createdOperation =
+            response.data && response.data.length > 0 ? response.data[0] : null;
+
+          if (createdOperation) {
+            // 생성된 operation을 endpoint 형태로 변환
+            const operation = createdOperation.operation;
+            const operationId = operation.id || createdOperation.operationName;
+
+            // receiver address 추출
+            const receiverAddress =
+              receives && receives.length > 0 ? receives[0].address : "";
+
+            // extractDomainFromAddress 함수와 동일한 로직 사용
+            const extractDomain = (address: string): string => {
+              if (!address || address === "/unknown") {
+                return "OTHERS";
+              }
+              const parts = address
+                .split("/")
+                .filter((part) => part.length > 0);
+              if (parts.length === 0) {
+                return "OTHERS";
+              }
+              const domain = parts[0];
+              return (
+                domain.charAt(0).toUpperCase() + domain.slice(1).toLowerCase()
+              );
+            };
+            // 그룹 결정: 백엔드에서 받은 tags 사용 (REST와 동일하게)
+            // 백엔드에서 tags를 반환하므로 operation.tags 사용
+            const operationTags = (operation as any).tags;
+            const group =
+              operationTags &&
+              Array.isArray(operationTags) &&
+              operationTags.length > 0
+                ? operationTags[0] // REST와 동일하게 첫 번째 tag 사용
+                : extractDomain(receiverAddress);
+
+            // tag에 따라 method 결정
+            const tag = createdOperation.tag || operation.action || "receive";
+            let method = "RECEIVE";
+            if (tag === "duplicate") {
+              method = "DUPLEX";
+            } else if (tag === "receive") {
+              method = "RECEIVE";
+            } else if (tag === "sendto") {
+              method = "SEND";
+            }
+
+            // Path 생성
+            let path = receiverAddress;
+            if (replies && replies.length > 0 && replies[0].address) {
+              path = `${receiverAddress} - ${replies[0].address}`;
+            }
+
+            // Summary 생성
+            const summary = createdOperation.operationName
+              .replace(/^_/, "")
+              .replace(/_to_/g, " → ")
+              .replace(/_/g, " ")
+              .replace(/\./g, ".");
+
+            const newEndpoint = {
+              id: operationId,
+              method: method,
+              path: path,
+              description: summary,
+              implementationStatus: (() => {
+                if (operation.progress?.toLowerCase() === "completed")
+                  return undefined;
+                if (operation.progress?.toLowerCase() === "mock")
+                  return "in-progress" as const;
+                return "not-implemented" as const;
+              })(),
+              hasSpecError:
+                operation.diff && operation.diff !== "none" ? true : undefined,
+              tags: (operation as any).tags || [], // 백엔드에서 받은 tags 사용
+              progress: operation.progress || "none",
+              tag: tag,
+              diff: operation.diff || "none",
+              protocol: "WebSocket" as const,
+              operationName: createdOperation.operationName,
+            };
+
+            // 사이드바에 추가
+            const { addEndpoint } = useSidebarStore.getState();
+            addEndpoint(newEndpoint, group);
+
+            alert(`WebSocket Operation이 생성되었습니다.`);
+
+            // 사이드바 목록 다시 로드
+            await loadEndpoints();
+
+            // 생성된 엔드포인트를 선택 (wsTags 정보 유지)
+            setSelectedEndpoint(newEndpoint);
+            setIsNewFormMode(false); // 저장 후 새 폼 모드 해제
+
+            // 생성 후 다시 로드하여 백엔드에서 최신 데이터 가져오기 (progress 등 최신 정보 반영)
+            await loadWebSocketOperationData(operationId);
+
+            // loadWebSocketOperationData 후 최신 operation 정보로 selectedEndpoint 업데이트
+            // 백엔드에서 tags를 관리하므로 백엔드에서 받은 tags 사용
+            try {
+              const latestResponse = await getWebSocketOperation(operationId);
+              const latestOperation = latestResponse.data.operation;
+              const latestOperationData = latestResponse.data;
+
+              // 최신 progress, diff, tags 정보로 업데이트
+              setSelectedEndpoint({
+                ...newEndpoint,
+                progress: latestOperation.progress || newEndpoint.progress,
+                diff: latestOperation.diff || newEndpoint.diff,
+                tag: latestOperationData.tag || newEndpoint.tag,
+                tags: (latestOperation as any).tags || newEndpoint.tags, // 백엔드에서 받은 tags 사용
+              });
+            } catch (error) {
+              console.warn("최신 operation 정보 로드 실패:", error);
+            }
+          } else {
+            alert("WebSocket Operation이 생성되었습니다.");
+            // 사이드바 목록 다시 로드
+            await loadEndpoints();
+            // 폼 초기화
+            handleReset();
+          }
         }
       } catch (error: any) {
         console.error("WebSocket Operation 저장 실패:", error);
