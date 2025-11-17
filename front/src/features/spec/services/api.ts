@@ -893,6 +893,7 @@ export interface UpdateOperationRequest {
   receive?: ChannelMessageInfo;
   reply?: ChannelMessageInfo;
   tags?: string[]; // 백엔드에서 관리할 tags 필드 추가
+  progress?: string; // progress 수동 관리용 (none/completed)
 }
 
 export interface GetAllOperationsResponse {

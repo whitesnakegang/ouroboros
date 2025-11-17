@@ -70,6 +70,7 @@ interface WsEditorFormProps {
     progress?: string;
   };
   onSyncToActual?: () => void; // 실제 구현을 명세에 반영하는 콜백
+  onProgressUpdate?: (progress: "none" | "completed") => Promise<void>; // progress 수동 업데이트 콜백
 }
 
 export function WsEditorForm({
@@ -96,6 +97,7 @@ export function WsEditorForm({
   diff,
   operationInfo,
   onSyncToActual,
+  onProgressUpdate,
 }: WsEditorFormProps) {
   const [schemas, setSchemas] = useState<SchemaResponse[]>([]);
   const [messages, setMessages] = useState<MessageResponse[]>([]);
@@ -144,6 +146,9 @@ export function WsEditorForm({
   const [selectedMessageSchema, setSelectedMessageSchema] = useState<
     string | null
   >(null);
+
+  // Progress 토글 로컬 상태 (즉시 UI 반영용)
+  const [localProgress, setLocalProgress] = useState<string | null>(null);
 
   // Protocol state (entryPoint에서 분리)
   const [internalProtocol, setInternalProtocol] = useState<"ws" | "wss">("ws");
@@ -230,6 +235,15 @@ export function WsEditorForm({
   useEffect(() => {
     loadSchemas();
   }, []);
+
+  // operationInfo.progress 변경 시 로컬 상태 동기화
+  useEffect(() => {
+    if (operationInfo?.progress) {
+      setLocalProgress(operationInfo.progress.toLowerCase());
+    } else {
+      setLocalProgress(null);
+    }
+  }, [operationInfo?.progress]);
 
   // Receiver 초기화
   const initializeReceiver = () => {
@@ -837,6 +851,76 @@ export function WsEditorForm({
         {/* Diff 알림 */}
         {renderDiffNotification()}
 
+        {/* Progress 수동 관리 토글 (읽기 전용 모드에서만 표시, DUPLEX나 SEND인 경우만) */}
+        {isReadOnly &&
+          operationInfo &&
+          (operationInfo.tag === "duplex" || operationInfo.tag === "send") &&
+          onProgressUpdate && (
+            <div className="mb-4 flex items-center justify-end gap-2">
+              <span className="text-xs text-gray-600 dark:text-[#8B949E] font-medium">
+                작업 완료:
+              </span>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={
+                    localProgress !== null
+                      ? localProgress === "completed"
+                      : operationInfo.progress?.toLowerCase() === "completed"
+                  }
+                  onChange={async (e) => {
+                    const newProgress = e.target.checked ? "completed" : "none";
+                    // 즉시 로컬 상태 업데이트
+                    setLocalProgress(newProgress);
+                    try {
+                      await onProgressUpdate(
+                        newProgress as "none" | "completed"
+                      );
+                      // 성공 시 로컬 상태 유지 (operationInfo가 업데이트되면 자동으로 동기화됨)
+                    } catch (error) {
+                      console.error("Progress 업데이트 실패:", error);
+                      // 에러 발생 시 이전 상태로 되돌리기
+                      setLocalProgress(
+                        operationInfo.progress?.toLowerCase() || "none"
+                      );
+                      alert(
+                        `Progress 업데이트에 실패했습니다: ${
+                          error instanceof Error
+                            ? error.message
+                            : "알 수 없는 오류"
+                        }`
+                      );
+                    }
+                  }}
+                  className="sr-only"
+                />
+                <div
+                  className={`w-10 h-5 rounded-full transition-colors duration-200 ease-in-out ${
+                    localProgress !== null
+                      ? localProgress === "completed"
+                        ? "bg-[#2563EB]"
+                        : "bg-gray-300 dark:bg-gray-600"
+                      : operationInfo.progress?.toLowerCase() === "completed"
+                      ? "bg-[#2563EB]"
+                      : "bg-gray-300 dark:bg-gray-600"
+                  }`}
+                >
+                  <div
+                    className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform duration-200 ease-in-out ${
+                      localProgress !== null
+                        ? localProgress === "completed"
+                          ? "translate-x-5"
+                          : "translate-x-0.5"
+                        : operationInfo.progress?.toLowerCase() === "completed"
+                        ? "translate-x-5"
+                        : "translate-x-0.5"
+                    } translate-y-0.5`}
+                  ></div>
+                </div>
+              </label>
+            </div>
+          )}
+
         <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] shadow-sm overflow-hidden">
           {/* 탭 내용 */}
           <div className="p-4 bg-white dark:bg-[#161B22]">
@@ -1206,40 +1290,73 @@ export function WsEditorForm({
         </div>
       </div>
 
-      {/* Operation Type 표시 (읽기 전용 모드) */}
-      {isReadOnly && operationInfo && (
-        <div className="mb-4 p-3 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border border-purple-200 dark:border-purple-800 rounded-md">
-          <div className="flex items-center gap-2">
-            <svg
-              className="w-5 h-5 text-purple-600 dark:text-purple-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+      {/* Progress 수동 관리 토글 (읽기 전용 모드에서만 표시, DUPLEX나 SEND인 경우만) */}
+      {isReadOnly &&
+        operationInfo &&
+        (operationInfo.tag === "duplex" || operationInfo.tag === "send") &&
+        onProgressUpdate && (
+          <div className="mb-4 flex items-center justify-end gap-2">
+            <span className="text-xs text-gray-600 dark:text-[#8B949E] font-medium">
+              작업 완료:
+            </span>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={
+                  localProgress !== null
+                    ? localProgress === "completed"
+                    : operationInfo.progress?.toLowerCase() === "completed"
+                }
+                onChange={async (e) => {
+                  const newProgress = e.target.checked ? "completed" : "none";
+                  // 즉시 로컬 상태 업데이트
+                  setLocalProgress(newProgress);
+                  try {
+                    await onProgressUpdate(newProgress as "none" | "completed");
+                    // 성공 시 로컬 상태 유지 (operationInfo가 업데이트되면 자동으로 동기화됨)
+                  } catch (error) {
+                    console.error("Progress 업데이트 실패:", error);
+                    // 에러 발생 시 이전 상태로 되돌리기
+                    setLocalProgress(
+                      operationInfo.progress?.toLowerCase() || "none"
+                    );
+                    alert(
+                      `Progress 업데이트에 실패했습니다: ${
+                        error instanceof Error
+                          ? error.message
+                          : "알 수 없는 오류"
+                      }`
+                    );
+                  }
+                }}
+                className="sr-only peer"
               />
-            </svg>
-            <div>
-              <span className="text-xs text-purple-600 dark:text-purple-500 font-medium mr-2">
-                Operation Type:
-              </span>
-              <span className="text-sm font-bold text-purple-800 dark:text-purple-300">
-                {operationInfo.tag === "duplicate"
-                  ? "DUPLEX (양방향 통신)"
-                  : operationInfo.tag === "receive"
-                  ? "RECEIVE (메시지 수신)"
-                  : operationInfo.tag === "sendto"
-                  ? "SEND (메시지 송신)"
-                  : operationInfo.tag}
-              </span>
-            </div>
+              <div
+                className={`w-10 h-5 rounded-full transition-colors duration-200 ease-in-out ${
+                  localProgress !== null
+                    ? localProgress === "completed"
+                      ? "bg-[#2563EB]"
+                      : "bg-gray-300 dark:bg-gray-600"
+                    : operationInfo.progress?.toLowerCase() === "completed"
+                    ? "bg-[#2563EB]"
+                    : "bg-gray-300 dark:bg-gray-600"
+                }`}
+              >
+                <div
+                  className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform duration-200 ease-in-out ${
+                    localProgress !== null
+                      ? localProgress === "completed"
+                        ? "translate-x-5"
+                        : "translate-x-0.5"
+                      : operationInfo.progress?.toLowerCase() === "completed"
+                      ? "translate-x-5"
+                      : "translate-x-0.5"
+                  } translate-y-0.5`}
+                ></div>
+              </div>
+            </label>
           </div>
-        </div>
-      )}
+        )}
 
       {/* 통합 탭 박스 */}
       <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] shadow-sm mb-6 overflow-hidden">

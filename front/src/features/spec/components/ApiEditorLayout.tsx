@@ -808,19 +808,43 @@ export function ApiEditorLayout() {
       const operationData = response.data;
 
       // WebSocket form state 설정
-      setWsEntryPoint(operationData.operation.entrypoint || "/ws");
+      const entrypoint = operationData.operation.entrypoint || "/ws";
+      setWsEntryPoint(entrypoint);
       setWsEntryPointError(""); // 에러 상태 초기화
+
+      // selectedEndpoint에 entrypoint 업데이트
+      if (selectedEndpoint) {
+        setSelectedEndpoint({
+          ...selectedEndpoint,
+          entrypoint: entrypoint,
+        });
+      }
       setWsSummary(""); // Operation에는 summary가 없음
       setWsDescription(operationData.operationName || ""); // operationName을 description으로
-      // 백엔드에서 관리하는 tags 사용 (REST API와 동일하게)
+      // 백엔드에서 관리하는 tags 사용
+      // WebSocket의 경우 tags는 [{name: "TAG_NAME"}] 형태
       const operationTags = (operationData.operation as any).tags;
-      setWsTags(
+      let tagsString = "";
+      if (
         operationTags &&
-          Array.isArray(operationTags) &&
-          operationTags.length > 0
-          ? operationTags.join(", ") // REST와 동일하게 쉼표로 구분된 문자열로 변환
-          : ""
-      );
+        Array.isArray(operationTags) &&
+        operationTags.length > 0
+      ) {
+        // tags에서 name 값만 추출
+        const tagNames = operationTags
+          .map((tag: any) => {
+            if (typeof tag === "string") {
+              return tag; // 이미 문자열인 경우 (호환성)
+            } else if (tag && typeof tag === "object" && tag.name) {
+              return tag.name; // {name: "TAG_NAME"} 형태에서 name 추출
+            }
+            return null;
+          })
+          .filter((tag: string | null): tag is string => tag !== null);
+
+        tagsString = tagNames.join(", ");
+      }
+      setWsTags(tagsString);
 
       // Receiver 설정
       if (
@@ -1486,7 +1510,8 @@ export function ApiEditorLayout() {
           await loadEndpoints();
 
           // 저장 후 다시 로드하여 백엔드에서 최신 데이터 가져오기
-          await loadEndpointData(selectedEndpoint.id);
+          // WebSocket의 경우 loadWebSocketOperationData 사용
+          await loadWebSocketOperationData(selectedEndpoint.id);
         } else {
           // 생성 로직
           const response = await createWebSocketOperation(request);
@@ -1554,7 +1579,29 @@ export function ApiEditorLayout() {
               })(),
               hasSpecError:
                 operation.diff && operation.diff !== "none" ? true : undefined,
-              tags: (operation as any).tags || [], // 백엔드에서 받은 tags 사용
+              tags: (() => {
+                // WebSocket tags는 [{name: "TAG_NAME"}] 형태이므로 name 값만 추출
+                const operationTags = (operation as any).tags;
+                if (
+                  operationTags &&
+                  Array.isArray(operationTags) &&
+                  operationTags.length > 0
+                ) {
+                  return operationTags
+                    .map((tag: any) => {
+                      if (typeof tag === "string") {
+                        return tag; // 이미 문자열인 경우 (호환성)
+                      } else if (tag && typeof tag === "object" && tag.name) {
+                        return tag.name; // {name: "TAG_NAME"} 형태에서 name 추출
+                      }
+                      return null;
+                    })
+                    .filter(
+                      (tag: string | null): tag is string => tag !== null
+                    );
+                }
+                return [];
+              })(),
               progress: operation.progress || "none",
               tag: tag,
               diff: operation.diff || "none",
@@ -2032,6 +2079,49 @@ export function ApiEditorLayout() {
         if (diffType === "channel") {
           const syncResponse = await syncWebSocketOperation(operationId);
 
+          // sync 후 도메인 이름을 tags.name으로 설정
+          const updatedOperation = syncResponse.data?.operation;
+          if (updatedOperation) {
+            // 도메인 추출 함수
+            const extractDomain = (address: string): string => {
+              if (!address || address === "/unknown") {
+                return "OTHERS";
+              }
+              const parts = address
+                .split("/")
+                .filter((part) => part.length > 0);
+              if (parts.length === 0) {
+                return "OTHERS";
+              }
+              const domain = parts[0];
+              return (
+                domain.charAt(0).toUpperCase() + domain.slice(1).toLowerCase()
+              );
+            };
+
+            // receiver address에서 도메인 추출
+            let domainName = "OTHERS";
+            if (updatedOperation.channel) {
+              const channelRef = updatedOperation.channel.ref || "";
+              const channelName = channelRef.replace("#/channels/", "");
+              try {
+                const channelResponse = await getWebSocketChannel(channelName);
+                const actualAddress =
+                  channelResponse.data.channel?.address || channelName;
+                domainName = extractDomain(actualAddress);
+              } catch {
+                // Channel 조회 실패 시 channel name에서 도메인 추출
+                domainName = extractDomain(channelName);
+              }
+            }
+
+            // 도메인 이름을 tags로 업데이트
+            // 백엔드에서 tags는 string[] 형태로 받지만, 실제 저장 시 [{name: "TAG_NAME"}] 형태로 변환됨
+            await updateWebSocketOperation(operationId, {
+              tags: [domainName], // 도메인 이름을 tags로 설정 (백엔드에서 {name: domainName} 형태로 변환)
+            });
+          }
+
           // Operation 데이터 다시 로드하여 최신 상태 반영
           await loadWebSocketOperationData(operationId);
 
@@ -2039,7 +2129,6 @@ export function ApiEditorLayout() {
           await loadEndpoints();
 
           // selectedEndpoint 업데이트
-          const updatedOperation = syncResponse.data?.operation;
           if (updatedOperation) {
             setSelectedEndpoint({
               ...selectedEndpoint,
@@ -2701,6 +2790,34 @@ export function ApiEditorLayout() {
                       selectedEndpoint.diff &&
                       selectedEndpoint.diff !== "none"
                         ? handleSyncWebSocketToActual
+                        : undefined
+                    }
+                    onProgressUpdate={
+                      selectedEndpoint
+                        ? async (progress: "none" | "completed") => {
+                            try {
+                              await updateWebSocketOperation(
+                                selectedEndpoint.id,
+                                { progress }
+                              );
+                              // Operation 데이터 다시 로드하여 최신 상태 반영
+                              await loadWebSocketOperationData(
+                                selectedEndpoint.id
+                              );
+                              // 사이드바 목록도 다시 로드하여 progress 상태 업데이트
+                              await loadEndpoints();
+                              // selectedEndpoint 업데이트
+                              if (selectedEndpoint) {
+                                setSelectedEndpoint({
+                                  ...selectedEndpoint,
+                                  progress,
+                                });
+                              }
+                            } catch (error) {
+                              console.error("Progress 업데이트 실패:", error);
+                              throw error;
+                            }
+                          }
                         : undefined
                     }
                   />
