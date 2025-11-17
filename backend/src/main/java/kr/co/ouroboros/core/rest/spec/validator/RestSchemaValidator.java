@@ -1,5 +1,6 @@
 package kr.co.ouroboros.core.rest.spec.validator;
 
+import kr.co.ouroboros.core.rest.handler.helper.RequestDiffHelper;
 import kr.co.ouroboros.core.rest.spec.model.Property;
 import kr.co.ouroboros.core.rest.spec.model.Schema;
 import lombok.extern.slf4j.Slf4j;
@@ -284,7 +285,16 @@ public class RestSchemaValidator {
         // Create missing schemas
         int created = 0;
         for (String schemaName : referencedSchemas) {
-            if (!schemas.containsKey(schemaName)) {
+            // Check if schema exists with either FQCN or simple class name
+            boolean schemaExists = schemas.containsKey(schemaName);
+
+            if (!schemaExists) {
+                // Try normalized name (simple class name)
+                String normalizedName = RequestDiffHelper.extractClassNameFromFullName(schemaName);
+                schemaExists = schemas.containsKey(normalizedName);
+            }
+
+            if (!schemaExists) {
                 log.warn("🔧 Auto-creating missing schema: {}", schemaName);
                 schemas.put(schemaName, createEmptySchema());
                 created++;
@@ -348,4 +358,5 @@ public class RestSchemaValidator {
         schema.put("x-ouroboros-orders", new ArrayList<>());
         return schema;
     }
+
 }

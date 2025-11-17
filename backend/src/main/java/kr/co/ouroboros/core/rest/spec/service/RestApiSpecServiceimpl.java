@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.co.ouroboros.core.global.Protocol;
 import kr.co.ouroboros.core.global.manager.OuroApiSpecManager;
 import kr.co.ouroboros.core.rest.common.yaml.RestApiYamlParser;
+import kr.co.ouroboros.core.rest.handler.helper.RequestDiffHelper;
 import kr.co.ouroboros.core.rest.mock.model.EndpointMeta;
 import kr.co.ouroboros.core.rest.mock.registry.RestMockRegistry;
 import kr.co.ouroboros.core.rest.mock.service.RestMockLoaderService;
@@ -1279,10 +1280,6 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
      */
     @SuppressWarnings("unchecked")
     private void updateSchemaReferences(Object obj, Map<String, String> schemaRenameMap) {
-        if (schemaRenameMap.isEmpty()) {
-            return; // No renames needed
-        }
-
         if (obj instanceof Map) {
             Map<String, Object> map = (Map<String, Object>) obj;
 
@@ -1291,8 +1288,19 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
                 String ref = (String) map.get("$ref");
                 if (ref != null && ref.startsWith("#/components/schemas/")) {
                     String schemaName = ref.substring("#/components/schemas/".length());
-                    if (schemaRenameMap.containsKey(schemaName)) {
-                        String newSchemaName = schemaRenameMap.get(schemaName);
+                    String newSchemaName = null;
+
+                    // First, check if it's in the rename map
+                    if (schemaRenameMap != null && schemaRenameMap.containsKey(schemaName)) {
+                        newSchemaName = schemaRenameMap.get(schemaName);
+                    }
+                    // Otherwise, if it's FQCN, extract simple class name
+                    else if (schemaName.contains(".")) {
+                        newSchemaName = RequestDiffHelper.extractClassNameFromFullName(schemaName);
+                    }
+
+                    // Update if we found a new name
+                    if (newSchemaName != null && !newSchemaName.equals(schemaName)) {
                         map.put("$ref", "#/components/schemas/" + newSchemaName);
                         log.debug("🔗 Updated $ref: {} -> {}", schemaName, newSchemaName);
                     }
@@ -1573,7 +1581,7 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
             String cacheSchemaName = cacheEntry.getKey();
             
             // Extract class name from package-qualified name (e.g., "com.c102.ourotest.dto.User" -> "User")
-            String className = extractClassNameFromFullName(cacheSchemaName);
+            String className = RequestDiffHelper.extractClassNameFromFullName(cacheSchemaName);
             if (className == null || className.isEmpty()) {
                 className = cacheSchemaName; // Fallback to original if extraction fails
             }
@@ -1616,33 +1624,12 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
     private Map<String, String> buildPackageToClassNameMap(Map<String, Object> cacheSchemas) {
         Map<String, String> map = new HashMap<>();
         for (String fullName : cacheSchemas.keySet()) {
-            String className = extractClassNameFromFullName(fullName);
+            String className = RequestDiffHelper.extractClassNameFromFullName(fullName);
             if (className != null && !className.equals(fullName)) {
                 map.put(fullName, className);
             }
         }
         return map;
-    }
-
-    /**
-     * Extracts the simple class name from a package-qualified name.
-     * <p>
-     * Example: "com.c102.ourotest.dto.User" -> "User"
-     *
-     * @param fullName the package-qualified name
-     * @return the simple class name, or the original string if no '.' is present
-     */
-    private String extractClassNameFromFullName(String fullName) {
-        if (fullName == null || fullName.isEmpty()) {
-            return fullName;
-        }
-        
-        int lastDotIndex = fullName.lastIndexOf('.');
-        if (lastDotIndex == -1) {
-            return fullName;
-        }
-        
-        return fullName.substring(lastDotIndex + 1);
     }
 
     /**
@@ -1666,7 +1653,7 @@ public class RestApiSpecServiceimpl implements RestApiSpecService {
                 String ref = (String) refObj;
                 if (ref.startsWith("#/components/schemas/")) {
                     String fullSchemaName = ref.substring("#/components/schemas/".length());
-                    String className = extractClassNameFromFullName(fullSchemaName);
+                    String className = RequestDiffHelper.extractClassNameFromFullName(fullSchemaName);
                     if (className != null && !className.equals(fullSchemaName)) {
                         // Update ref to use class name
                         schemaMap.put("$ref", "#/components/schemas/" + className);
