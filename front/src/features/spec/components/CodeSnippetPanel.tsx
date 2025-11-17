@@ -98,9 +98,9 @@ export function CodeSnippetPanel({
         onClick={onClose}
       />
       {/* Slide Panel */}
-      <div className="fixed right-0 top-0 h-full w-[600px] bg-white dark:bg-[#0D1117] z-50 shadow-2xl transform transition-transform duration-300">
+      <div className="fixed right-0 top-0 h-full w-[600px] bg-white dark:bg-[#0D1117] z-50 shadow-2xl transform transition-transform duration-300 flex flex-col">
         {/* Header */}
-        <div className="h-16 border-b border-gray-200 dark:border-[#2D333B] flex items-center justify-between px-6">
+        <div className="h-16 border-b border-gray-200 dark:border-[#2D333B] flex items-center justify-between px-6 flex-shrink-0">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-[#E6EDF3] flex items-center gap-2">
             <svg
               className="w-5 h-5 text-gray-500 dark:text-[#8B949E]"
@@ -138,7 +138,7 @@ export function CodeSnippetPanel({
         </div>
 
         {/* Language Tabs */}
-        <div className="border-b border-gray-200 dark:border-[#2D333B] px-6">
+        <div className="border-b border-gray-200 dark:border-[#2D333B] px-6 flex-shrink-0">
           <div className="flex gap-2 overflow-x-auto">
             {languages.map((lang) => (
               <button
@@ -157,9 +157,9 @@ export function CodeSnippetPanel({
         </div>
 
         {/* Code Display */}
-        <div className="flex-1 overflow-auto p-6">
+        <div className="flex-1 overflow-y-auto p-6 min-h-0">
           <div className="bg-gray-50 dark:bg-[#0D1117] rounded-md border border-gray-200 dark:border-[#2D333B] overflow-hidden">
-            <div className="flex items-center justify-between bg-white dark:bg-[#161B22] px-4 py-2 border-b border-gray-200 dark:border-[#2D333B]">
+            <div className="flex items-center justify-between bg-white dark:bg-[#161B22] px-4 py-2 border-b border-gray-200 dark:border-[#2D333B] flex-shrink-0">
               <span className="text-sm text-gray-600 dark:text-[#8B949E] font-mono">
                 {spec.method} {spec.path}
               </span>
@@ -171,15 +171,15 @@ export function CodeSnippetPanel({
                 {copied ? "복사됨" : "복사"}
               </button>
             </div>
-            <div className="bg-[#0D1117] dark:bg-[#010409] p-4 rounded-md">
+            <div className="bg-[#0D1117] dark:bg-[#010409] p-4 rounded-md max-h-[calc(100vh-250px)] overflow-y-auto">
               {loading ? (
                 <div className="text-sm text-[#E6EDF3] text-center py-8">
                   스니펫 생성 중...
                 </div>
               ) : (
-              <pre className="text-sm text-[#E6EDF3] whitespace-pre-wrap overflow-x-auto font-mono">
+                <pre className="text-sm text-[#E6EDF3] whitespace-pre-wrap overflow-x-auto font-mono">
                   <code>{snippet || "// 스니펫을 생성할 수 없습니다."}</code>
-              </pre>
+                </pre>
               )}
             </div>
           </div>
