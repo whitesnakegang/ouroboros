@@ -167,6 +167,30 @@ export function ApiEditorLayout() {
     message: "",
   });
 
+  // Export 타입 선택 모달 상태
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const exportDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Export 드롭다운 외부 클릭 시 닫기
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        exportDropdownRef.current &&
+        !exportDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsExportModalOpen(false);
+      }
+    };
+
+    if (isExportModalOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isExportModalOpen]);
+
   // Diff가 있는지 확인 (boolean으로 명시적 변환)
   const hasDiff = !!(
     selectedEndpoint?.diff && selectedEndpoint.diff !== "none"
@@ -2099,7 +2123,12 @@ export function ApiEditorLayout() {
       // 파일 확장자 검증
       const fileName = file.name.toLowerCase();
       if (!fileName.endsWith(".yml") && !fileName.endsWith(".yaml")) {
-        alert("YAML 파일(.yml 또는 .yaml)만 업로드 가능합니다.");
+        setAlertModal({
+          isOpen: true,
+          title: "파일 형식 오류",
+          message: "YAML 파일(.yml 또는 .yaml)만 업로드 가능합니다.",
+          variant: "warning",
+        });
         return;
       }
 
@@ -2112,7 +2141,12 @@ export function ApiEditorLayout() {
             setImportResult({ data } as unknown as ImportYamlResponse);
             setIsImportModalOpen(true);
           } else {
-            alert("WebSocket YAML Import가 완료되었습니다.");
+            setAlertModal({
+              isOpen: true,
+              title: "Import 완료",
+              message: "WebSocket YAML Import가 완료되었습니다.",
+              variant: "success",
+            });
           }
         } else {
           const restResult: ImportYamlResponse = await importYaml(file);
@@ -2125,12 +2159,80 @@ export function ApiEditorLayout() {
       } catch (error) {
         console.error("YAML Import 오류:", error);
         const errorMsg = getErrorMessage(error);
-        alert(`YAML Import 실패\n\n${errorMsg}`);
+        setAlertModal({
+          isOpen: true,
+          title: "Import 실패",
+          message: `YAML Import 실패\n\n${errorMsg}`,
+          variant: "error",
+        });
       }
     };
 
     // 파일 선택 다이얼로그 열기
     input.click();
+  };
+
+  const handleExportMD = async () => {
+    try {
+      const { convertYamlToMarkdown, convertWsYamlToMarkdown } =
+        await import("../utils/markdownExporter");
+      if (protocol === "WebSocket") {
+        const wsYaml = await exportWebSocketYaml();
+        const wsMd = convertWsYamlToMarkdown(wsYaml);
+        setMdPreviewContent(wsMd);
+        setMdPreviewFilename("WS_API_DOCUMENTATION.md");
+        setIsMdPreviewOpen(true);
+      } else {
+        const yaml = await exportYaml();
+        const md = convertYamlToMarkdown(yaml);
+        setMdPreviewContent(md);
+        setMdPreviewFilename("API_DOCUMENTATION.md");
+        setIsMdPreviewOpen(true);
+      }
+      setIsExportModalOpen(false);
+    } catch (e) {
+      console.error("Markdown 내보내기 오류:", e);
+      const errorMsg = getErrorMessage(e);
+      setAlertModal({
+        isOpen: true,
+        title: "Export 실패",
+        message: `Markdown 내보내기에 실패했습니다.\n오류: ${errorMsg}`,
+        variant: "error",
+      });
+      setIsExportModalOpen(false);
+    }
+  };
+
+  const handleExportYAML = async () => {
+    try {
+      const yaml =
+        protocol === "WebSocket"
+          ? await exportWebSocketYaml()
+          : await exportYaml();
+      downloadYaml(
+        yaml,
+        protocol === "WebSocket"
+          ? "ourowebsocket.yml"
+          : "ourorest.yml"
+      );
+      setAlertModal({
+        isOpen: true,
+        title: "다운로드 완료",
+        message: "YAML 파일이 다운로드되었습니다.",
+        variant: "success",
+      });
+      setIsExportModalOpen(false);
+    } catch (e) {
+      console.error("YAML 내보내기 오류:", e);
+      const errorMsg = getErrorMessage(e);
+      setAlertModal({
+        isOpen: true,
+        title: "Export 실패",
+        message: `YAML 내보내기에 실패했습니다.\n오류: ${errorMsg}`,
+        variant: "error",
+      });
+      setIsExportModalOpen(false);
+    }
   };
 
   const handleSyncDiffToSpec = async () => {
@@ -2571,114 +2673,38 @@ export function ApiEditorLayout() {
           {/* Right: Actions - 조건부 표시 */}
           {activeTab === "form" ? (
             <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4 lg:gap-6">
-              {/* Action Buttons - Utility만 유지 */}
+              {/* Action Buttons */}
               <div className="flex flex-wrap items-center gap-2">
-                {/* Utility Buttons */}
                 <button
                   onClick={handleImportYAML}
-                  className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2"
-                  title="YAML 파일 가져오기"
+                  className="px-4 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-lg bg-transparent transition-colors text-sm font-medium"
                 >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
-                    />
-                  </svg>
+                  Import
                 </button>
-                <button
-                  onClick={async () => {
-                    try {
-                      const { convertYamlToMarkdown, convertWsYamlToMarkdown } =
-                        await import("../utils/markdownExporter");
-                      if (protocol === "WebSocket") {
-                        const wsYaml = await exportWebSocketYaml();
-                        const wsMd = convertWsYamlToMarkdown(wsYaml);
-                        setMdPreviewContent(wsMd);
-                        setMdPreviewFilename("WS_API_DOCUMENTATION.md");
-                        setIsMdPreviewOpen(true);
-                      } else {
-                        const yaml = await exportYaml();
-                        const md = convertYamlToMarkdown(yaml);
-                        setMdPreviewContent(md);
-                        setMdPreviewFilename("API_DOCUMENTATION.md");
-                        setIsMdPreviewOpen(true);
-                      }
-                    } catch (e) {
-                      console.error("Markdown 내보내기 오류:", e);
-                      const errorMsg = getErrorMessage(e);
-                      alert(
-                        `Markdown 내보내기에 실패했습니다.\n오류: ${errorMsg}`
-                      );
-                    }
-                  }}
-                  className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2"
-                  title="Markdown 파일 내보내기"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+                <div className="relative" ref={exportDropdownRef}>
+                  <button
+                    onClick={() => setIsExportModalOpen(!isExportModalOpen)}
+                    className="px-4 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-lg bg-transparent transition-colors text-sm font-medium"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
-                </button>
-                <button
-                  onClick={async () => {
-                    try {
-                      const yaml =
-                        protocol === "WebSocket"
-                          ? await exportWebSocketYaml()
-                          : await exportYaml();
-                      downloadYaml(
-                        yaml,
-                        protocol === "WebSocket"
-                          ? "ourowebsocket.yml"
-                          : "ourorest.yml"
-                      );
-                      alert("YAML 파일이 다운로드되었습니다.");
-                    } catch (e) {
-                      console.error("YAML 내보내기 오류:", e);
-                      const errorMsg = getErrorMessage(e);
-                      alert(`YAML 내보내기에 실패했습니다.\n오류: ${errorMsg}`);
-                    }
-                  }}
-                  className="px-3 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none text-sm font-medium flex items-center gap-2"
-                  title="API YAML 파일 생성"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                    />
-                  </svg>
-                </button>
+                    Export
+                  </button>
+                  {isExportModalOpen && (
+                    <div className="absolute top-full right-0 mt-1 w-40 bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#30363D] rounded-lg shadow-lg z-50 overflow-hidden">
+                      <button
+                        onClick={handleExportMD}
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#21262D] transition-colors"
+                      >
+                        Markdown (MD)
+                      </button>
+                      <button
+                        onClick={handleExportYAML}
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#21262D] transition-colors border-t border-gray-200 dark:border-[#30363D]"
+                      >
+                        YAML
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           ) : (
@@ -3558,6 +3584,7 @@ export function ApiEditorLayout() {
         message={alertModal.message}
         variant={alertModal.variant}
       />
+
     </div>
   );
 }
