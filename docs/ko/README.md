@@ -122,6 +122,7 @@
 - **`core/rest/spec`**: API 명세 CRUD 서비스
 - **`core/rest/mock`**: Mock 서버 필터 및 레지스트리
 - **`core/rest/validation`**: OpenAPI 검증 및 Enrichment
+- **`core/rest/tryit`**: try 요청에 대한 내부 메서드 호출 추적
 - **`ui/controller`**: REST API 엔드포인트
 
 #### Frontend (React + TypeScript)
@@ -166,9 +167,7 @@ dependencies {
 
 ### 설정 (선택 사항)
 
-> **Method Tracing**: 내부 메서드 추적은 기본적으로 비활성화되어 있습니다. Try 기능에서 내부 메서드를 추적하려면 `method-tracing` 설정을 추가하고 `management.tracing.sampling.probability=1.0`을 함께 설정해야 합니다.
-
-> **⚠️ Method Tracing 필수 설정**: Method Tracing 사용 시 `management.tracing.sampling.probability=1.0`을 설정하여 모든 트레이스를 수집해야 합니다.
+> **Method Tracing**: 내부 메서드 추적은 기본적으로 비활성화되어 있습니다. Try 기능에서 내부 메서드를 추적하려면 `method-tracing` 설정을 추가해야 합니다.
 
 `application.yml`:
 ```yaml
@@ -182,13 +181,6 @@ ouroboros:
   method-tracing:
     enabled: true
     allowed-packages: your.package.name  # 추적할 패키지 경로 지정
-
-# Micrometer Tracing (Method Tracing 필수 설정)
-# 모든 트레이스를 수집하기 위해 sampling probability를 1.0으로 설정
-management:
-  tracing:
-    sampling:
-      probability: 1.0
 ```
 
 ### 사용 시작

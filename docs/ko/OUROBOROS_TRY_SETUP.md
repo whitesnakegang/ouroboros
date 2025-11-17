@@ -139,7 +139,52 @@ Try 헤더 없이 일반 요청을 보내면 정상적으로 동작하며, Try �
 curl -X GET "http://localhost:8080/api/your-endpoint"
 ```
 
-### 3.4. Try 기능 동작 원리
+### 3.4. WebSocket Try 사용하기
+
+WebSocket을 사용하여 Try 기능을 사용할 경우, **서버의 메시지 브로커가 `/queue` prefix를 사용하도록 설정**되어 있어야 합니다.
+
+#### 서버 설정 (Spring WebSocket)
+
+서버 측 WebSocket 메시지 브로커 설정에서 `/queue` prefix를 활성화해야 합니다:
+
+```java
+@Override
+public void configureMessageBroker(MessageBrokerRegistry config) {
+    // /queue prefix 활성화 (필수)
+    config.enableSimpleBroker("/queue", "/topic");
+    
+    // RabbitMQ, ActiveMQ 등의 외부 메시지 브로커를 사용하는 경우:
+    // config.enableStompBrokerRelay("/queue", "/topic")
+    //     .setRelayHost("localhost")
+    //     .setRelayPort(61613);
+}
+```
+
+> **중요**: Try 기능이 정상 동작하려면 메시지 브로커의 `/queue` prefix가 반드시 활성화되어 있어야 합니다. Ouroboros SDK는 `/queue/ouro/try` 토픽으로 Try 요청 메타데이터를 전송합니다.
+
+#### 클라이언트 설정 예시 (JavaScript)
+
+클라이언트는 `/user/queue/ouro/try` 토픽을 구독하여 Try 결과를 수신할 수 있습니다:
+
+```javascript
+// STOMP 클라이언트 연결
+const client = new StompJs.Client({
+    brokerURL: 'ws://localhost:8080/ws'
+});
+
+client.onConnect = (frame) => {
+    // /queue/ouro/try 토픽 구독
+    client.subscribe('/user/queue/ouro/try', (message) => {
+        const tryData = JSON.parse(message.body);
+        console.log('Try ID:', tryData.tryId);
+        // Try 결과 처리
+    });
+};
+
+client.activate();
+```
+
+### 3.5. Try 기능 동작 원리
 
 1. **요청 감지**: `X-Ouroboros-Try: on` 헤더가 포함된 요청을 감지
 2. **Try ID 생성**: 고유한 Try ID (UUID) 생성
@@ -157,21 +202,14 @@ curl -X GET "http://localhost:8080/api/your-endpoint"
 
 > **참고**: 기본적으로 내부 메소드 추적은 **비활성화**되어 있습니다. Try 기능에서 내부 메소드 호출을 추적하려면 반드시 이 설정을 활성화해야 합니다.
 
-> **⚠️ 필수 설정**: Method Tracing을 사용하려면 Ouroboros method tracing 설정과 Micrometer sampling 설정을 모두 구성해야 합니다.
-
 ```properties
 # Method Tracing 활성화
 ouroboros.method-tracing.enabled=true
 ouroboros.method-tracing.allowed-packages=your.package.name
-
-# Micrometer Tracing (Method Tracing 필수 설정)
-# 모든 트레이스를 수집하기 위해 sampling probability를 1.0으로 설정
-management.tracing.sampling.probability=1.0
 ```
 
 > **참고**: 
 > - `allowed-packages`에는 트레이싱을 적용할 패키지 경로를 지정합니다. 예: `com.example.yourproject`, `your.package.name` 등
-> - `management.tracing.sampling.probability=1.0` 설정은 **필수**입니다. 이 설정 없이는 메소드 트레이스가 수집되지 않을 수 있습니다.
 
 ### 4.2. Tempo 연동 (선택 사항)
 
@@ -202,9 +240,6 @@ ouroboros.tempo.base-url=http://${TEMPO_HOST:localhost}:${TEMPO_UI_PORT:3200}
 # HTTP 방식 사용 (포트 4318)
 management.tracing.enabled=true
 management.otlp.tracing.endpoint=http://${TEMPO_HOST:localhost}:${TEMPO_HTTP_PORT:4318}/v1/traces
-
-# Micrometer Tracing
-management.tracing.sampling.probability=1.0
 ```
 
 > **참고**: `${TEMPO_HOST:localhost}`와 `${TEMPO_HTTP_PORT:4318}`은 `.env` 파일에서 설정한 환경 변수를 참조합니다.
@@ -347,8 +382,8 @@ docker-compose.override.yml
 
 1. **Method Tracing 설정 확인**: `ouroboros.method-tracing.enabled=true` 설정 확인
 2. **Allowed Packages 확인**: `ouroboros.method-tracing.allowed-packages`에 올바른 패키지 경로가 설정되었는지 확인
-3. **Micrometer Sampling 확인**: `management.tracing.sampling.probability=1.0` 설정이 되어 있는지 확인 (Method Tracing 필수 설정)
-4. **패키지 이름 확인**: 추적하려는 클래스가 allowed-packages에 지정된 패키지에 속하는지 확인
+3. **패키지 이름 확인**: 추적하려는 클래스가 allowed-packages에 지정된 패키지에 속하는지 확인
+4. **Self-Invocation 확인**: 같은 클래스 내에서 메소드를 직접 호출하는 경우, self-invocation 문제일 수 있습니다. QnA 섹션의 [Self-Invocation 해결법](#self-invocation-해결법)을 참고하세요.
 5. **로깅 확인**: 디버그 로그를 활성화하여 메소드 트레이스가 생성되는지 확인
 
 ### Tempo 연동이 안 되는 경우
@@ -414,10 +449,53 @@ A. `.env` 파일에서 `TEMPO_UI_PORT=3300`으로 변경 후 `docker compose dow
 A. 다음 설정이 모두 구성되어 있는지 확인하세요:
 1. `ouroboros.method-tracing.enabled=true`
 2. `ouroboros.method-tracing.allowed-packages=your.package.name` (실제 패키지 경로)
-3. `management.tracing.sampling.probability=1.0` (필수 - 이 설정 없이는 메소드 트레이스가 수집되지 않습니다)
 
-**Q. 기본 Try 기능을 사용할 때도 `management.tracing.sampling.probability=1.0` 설정이 필요하나요?**  
-A. 아니요. 이 설정은 Method Tracing을 사용할 때만 필요합니다. 기본 Try 기능은 이 설정 없이도 동작합니다.
+또한 같은 클래스 내에서 메소드를 직접 호출하는 경우 self-invocation 문제일 수 있으므로, [Self-Invocation 해결법](#self-invocation-해결법)을 참고하세요.
+
+### Self-Invocation 해결법
+
+**Q. 같은 클래스 내에서 메소드를 호출할 때 Method Tracing이 동작하지 않아요.**  
+A. Spring AOP의 제한으로 인해 같은 클래스 내에서 메소드를 직접 호출하면 프록시를 거치지 않아 AOP가 적용되지 않습니다. 다음 방법 중 하나를 사용하세요:
+
+1. **Self Injection 사용 (권장)**: 같은 클래스의 프록시 인스턴스를 주입받아 사용
+```java
+@Service
+public class OrderService {
+    private final OrderService self; // 자기 자신을 주입
+    
+    public OrderService(OrderService self) {
+        this.self = self;
+    }
+    
+    public void processOrder() {
+        // 직접 호출 대신 self를 통해 호출
+        self.validateOrder(); // AOP 적용됨
+    }
+    
+    public void validateOrder() {
+        // ...
+    }
+}
+```
+
+2. **ApplicationContext에서 프록시 가져오기**: ApplicationContext를 통해 프록시 인스턴스 조회
+```java
+@Service
+public class OrderService {
+    private final ApplicationContext applicationContext;
+    
+    public OrderService(ApplicationContext applicationContext) {
+        this.applicationContext = applicationContext;
+    }
+    
+    public void processOrder() {
+        OrderService proxy = applicationContext.getBean(OrderService.class);
+        proxy.validateOrder(); // AOP 적용됨
+    }
+}
+```
+
+3. **별도 클래스로 분리**: 내부 메소드를 별도 서비스 클래스로 분리하여 호출
 
 ---
 
