@@ -856,6 +856,7 @@ export function ApiResponseCard({
         }}
         schemas={schemas}
         setSchemas={setSchemas}
+        protocol="REST"
       />
     </div>
   );

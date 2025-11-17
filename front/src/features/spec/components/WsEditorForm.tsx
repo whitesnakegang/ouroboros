@@ -3,8 +3,21 @@ import { SchemaFieldEditor } from "./SchemaFieldEditor";
 import { SchemaModal } from "./SchemaModal";
 import { SchemaCard } from "./SchemaCard";
 import { SchemaViewer } from "./SchemaViewer";
-import { getAllSchemas, getAllWebSocketMessages, type SchemaResponse, type MessageResponse } from "../services/api";
-import type { SchemaField, RequestBody } from "../types/schema.types";
+import {
+  getAllWebSocketSchemas,
+  getAllWebSocketMessages,
+  getAllWebSocketChannels,
+  createWebSocketMessage,
+  type SchemaResponse,
+  type MessageResponse,
+  type ChannelResponse,
+  type CreateMessageRequest,
+} from "../services/api";
+import type {
+  SchemaField,
+  RequestBody,
+  PrimitiveSchema,
+} from "../types/schema.types";
 import { createDefaultField } from "../types/schema.types";
 
 interface KeyValuePair {
@@ -31,6 +44,8 @@ interface Reply {
 interface WsEditorFormProps {
   entryPoint: string;
   setEntryPoint: (entryPoint: string) => void;
+  protocol?: "ws" | "wss";
+  setProtocol?: (protocol: "ws" | "wss") => void;
   summary: string;
   setSummary: (summary: string) => void;
   description: string;
@@ -55,6 +70,8 @@ interface WsEditorFormProps {
 export function WsEditorForm({
   entryPoint,
   setEntryPoint,
+  protocol: externalProtocol,
+  setProtocol: setExternalProtocol,
   summary,
   setSummary,
   description,
@@ -73,21 +90,55 @@ export function WsEditorForm({
 }: WsEditorFormProps) {
   const [schemas, setSchemas] = useState<SchemaResponse[]>([]);
   const [messages, setMessages] = useState<MessageResponse[]>([]);
-  const [isReceiverSchemaModalOpen, setIsReceiverSchemaModalOpen] = useState(false);
+  const [channels, setChannels] = useState<ChannelResponse[]>([]);
+  const [isReceiverSchemaModalOpen, setIsReceiverSchemaModalOpen] =
+    useState(false);
   const [isReplySchemaModalOpen, setIsReplySchemaModalOpen] = useState(false);
-  const [wsTab, setWsTab] = useState<"receiver" | "reply" | "schema">("receiver");
-  
+  const [isMessageSchemaModalOpen, setIsMessageSchemaModalOpen] =
+    useState(false);
+  // 통합 탭
+  const [wsTab, setWsTab] = useState<
+    "receiver" | "reply" | "schema" | "message"
+  >("receiver");
+
+  // 채널 선택 모드 (기존 채널 선택 vs 새 채널 생성)
+  const [receiverChannelMode, setReceiverChannelMode] = useState<
+    "select" | "create"
+  >("select");
+  const [replyChannelMode, setReplyChannelMode] = useState<"select" | "create">(
+    "select"
+  );
+
+  // 메시지 작성 상태
+  const [messageName, setMessageName] = useState("");
+  const [messageDescription, setMessageDescription] = useState("");
+  const [messageType, setMessageType] = useState<"header" | "schema" | "name">(
+    "name"
+  );
+  const [messageHeaders, setMessageHeaders] = useState<KeyValuePair[]>([]);
+  const [messagePayloadSchema, setMessagePayloadSchema] = useState<RequestBody>(
+    {
+      type: "json",
+      fields: [],
+    }
+  );
+  const [selectedMessageSchema, setSelectedMessageSchema] = useState<
+    string | null
+  >(null);
+
   // Protocol state (entryPoint에서 분리)
-  const [protocol, setProtocol] = useState<"ws" | "wss">("ws");
+  const [internalProtocol, setInternalProtocol] = useState<"ws" | "wss">("ws");
+  const protocol = externalProtocol ?? internalProtocol;
+  const setProtocol = setExternalProtocol ?? setInternalProtocol;
   const [pathname, setPathname] = useState("/ws");
-  
+
   // Schema 이름에서 마지막 부분만 추출 (예: com.example.dto.UserDTO -> UserDTO)
   const getShortSchemaName = (fullName: string | undefined): string => {
     if (!fullName) return "";
     const parts = fullName.split(".");
     return parts[parts.length - 1];
   };
-  
+
   // entryPoint 파싱 (기존 데이터 로드 시)
   useEffect(() => {
     if (entryPoint && entryPoint.includes("://")) {
@@ -101,8 +152,8 @@ export function WsEditorForm({
       // /ws 형태만 있으면 pathname으로
       setPathname(entryPoint);
     }
-  }, [entryPoint]);
-  
+  }, [entryPoint, setProtocol]);
+
   // Messages 목록 로드
   const loadMessages = async () => {
     try {
@@ -112,18 +163,29 @@ export function WsEditorForm({
       console.error("메시지 로드 실패:", err);
     }
   };
-  
+
+  // Channels 목록 로드
+  const loadChannels = async () => {
+    try {
+      const response = await getAllWebSocketChannels();
+      setChannels(response.data);
+    } catch (err) {
+      console.error("채널 로드 실패:", err);
+    }
+  };
+
   useEffect(() => {
     loadMessages();
+    loadChannels();
   }, []);
 
-  // 스키마 목록 로드 함수
+  // 스키마 목록 로드 함수 (WebSocket 전용)
   const loadSchemas = async () => {
     try {
-      const response = await getAllSchemas();
+      const response = await getAllWebSocketSchemas();
       setSchemas(response.data);
     } catch (err) {
-      console.error("스키마 로드 실패:", err);
+      console.error("WebSocket 스키마 로드 실패:", err);
     }
   };
 
@@ -137,19 +199,14 @@ export function WsEditorForm({
     if (receiver) return;
     setReceiver({
       address: "",
-      headers: [
-        {
-          key: "accept-version",
-          value: "1.1",
-          required: true,
-          description: "STOMP 프로토콜 버전 (필수)",
-        },
-      ],
+      headers: [],
       schema: {
         type: "json",
         fields: [],
       },
+      messages: [],
     });
+    setReceiverChannelMode("select");
   };
 
   // Reply 초기화
@@ -161,98 +218,309 @@ export function WsEditorForm({
         type: "json",
         fields: [],
       },
+      messages: [],
     });
+    setReplyChannelMode("select");
   };
 
-  // Receiver 헤더 관리
-  const addReceiverHeader = () => {
-    if (isReadOnly || !receiver) return;
-    setReceiver({
-      ...receiver,
-      headers: [...receiver.headers, { key: "", value: "", required: false }],
-    });
+  // Receiver 헤더 관리 (현재 사용하지 않음 - Header 섹션 제거됨)
+  // const addReceiverHeader = () => { ... }
+  // const removeReceiverHeader = (index: number) => { ... }
+  // const updateReceiverHeader = (index: number, field: "key" | "value", value: string) => { ... }
+
+  // Receiver Schema 관리 (현재 사용하지 않음 - Schema 섹션 제거됨)
+  // const addReceiverSchemaField = () => { ... }
+  // const removeReceiverSchemaField = (index: number) => { ... }
+  // const updateReceiverSchemaField = (index: number, field: SchemaField) => { ... }
+
+  // Reply Schema 관리 (현재 사용하지 않음 - Schema 섹션 제거됨)
+  // const addReplySchemaField = () => {
+  //   if (isReadOnly || !reply) return;
+  //   const currentFields = reply.schema.fields || [];
+  //   setReply({
+  //     ...reply,
+  //     schema: {
+  //       ...reply.schema,
+  //       fields: [...currentFields, createDefaultField()],
+  //     },
+  //   });
+  // };
+
+  // const removeReplySchemaField = (index: number) => {
+  //   if (isReadOnly || !reply) return;
+  //   const currentFields = reply.schema.fields || [];
+  //   setReply({
+  //     ...reply,
+  //     schema: {
+  //       ...reply.schema,
+  //       fields: currentFields.filter((_, i) => i !== index),
+  //     },
+  //   });
+  // };
+
+  // const updateReplySchemaField = (index: number, field: SchemaField) => {
+  //   if (isReadOnly || !reply) return;
+  //   const currentFields = reply.schema.fields || [];
+  //   const updated = [...currentFields];
+  //   updated[index] = field;
+  //   setReply({ ...reply, schema: { ...reply.schema, fields: updated } });
+  // };
+
+  // 메시지 작성 관련 함수들
+  const addMessageHeader = () => {
+    if (isReadOnly) return;
+    setMessageHeaders([
+      ...messageHeaders,
+      { key: "", value: "", required: false },
+    ]);
   };
 
-  const removeReceiverHeader = (index: number) => {
-    if (isReadOnly || !receiver) return;
-    setReceiver({
-      ...receiver,
-      headers: receiver.headers.filter((_, i) => i !== index),
-    });
+  const removeMessageHeader = (index: number) => {
+    if (isReadOnly) return;
+    setMessageHeaders(messageHeaders.filter((_, i) => i !== index));
   };
 
-  const updateReceiverHeader = (index: number, field: "key" | "value", value: string) => {
-    if (isReadOnly || !receiver) return;
-    const updated = [...receiver.headers];
+  const updateMessageHeader = (
+    index: number,
+    field: "key" | "value",
+    value: string
+  ) => {
+    if (isReadOnly) return;
+    const updated = [...messageHeaders];
     updated[index] = { ...updated[index], [field]: value };
-    setReceiver({ ...receiver, headers: updated });
+    setMessageHeaders(updated);
   };
 
-  // Receiver Schema 관리
-  const addReceiverSchemaField = () => {
-    if (isReadOnly || !receiver) return;
-    const currentFields = receiver.schema.fields || [];
-    setReceiver({
-      ...receiver,
-      schema: {
-        ...receiver.schema,
-        fields: [...currentFields, createDefaultField()],
-      },
+  const addMessagePayloadField = () => {
+    if (isReadOnly) return;
+    const currentFields = messagePayloadSchema.fields || [];
+    setMessagePayloadSchema({
+      ...messagePayloadSchema,
+      fields: [...currentFields, createDefaultField()],
     });
   };
 
-  const removeReceiverSchemaField = (index: number) => {
-    if (isReadOnly || !receiver) return;
-    const currentFields = receiver.schema.fields || [];
-    setReceiver({
-      ...receiver,
-      schema: {
-        ...receiver.schema,
-        fields: currentFields.filter((_, i) => i !== index),
-      },
+  const removeMessagePayloadField = (index: number) => {
+    if (isReadOnly) return;
+    const currentFields = messagePayloadSchema.fields || [];
+    setMessagePayloadSchema({
+      ...messagePayloadSchema,
+      fields: currentFields.filter((_, i) => i !== index),
     });
   };
 
-  const updateReceiverSchemaField = (index: number, field: SchemaField) => {
-    if (isReadOnly || !receiver) return;
-    const currentFields = receiver.schema.fields || [];
+  const updateMessagePayloadField = (index: number, field: SchemaField) => {
+    if (isReadOnly) return;
+    const currentFields = messagePayloadSchema.fields || [];
     const updated = [...currentFields];
     updated[index] = field;
-    setReceiver({ ...receiver, schema: { ...receiver.schema, fields: updated } });
+    setMessagePayloadSchema({ ...messagePayloadSchema, fields: updated });
   };
 
-  // Reply Schema 관리
-  const addReplySchemaField = () => {
-    if (isReadOnly || !reply) return;
-    const currentFields = reply.schema.fields || [];
-    setReply({
-      ...reply,
-      schema: {
-        ...reply.schema,
-        fields: [...currentFields, createDefaultField()],
-      },
-    });
+  // 메시지 생성
+  const handleCreateMessage = async () => {
+    if (!messageName.trim()) {
+      alert("메시지 이름을 입력해주세요.");
+      return;
+    }
+
+    try {
+      const request: CreateMessageRequest = {
+        messageName: messageName.trim(),
+        description: messageDescription || undefined,
+      };
+
+      if (messageType === "header" && messageHeaders.length > 0) {
+        const headersObj: Record<string, string> = {};
+        messageHeaders.forEach((h) => {
+          if (h.key) {
+            headersObj[h.key] = h.value || "";
+          }
+        });
+        request.headers = headersObj;
+      } else if (messageType === "schema") {
+        if (selectedMessageSchema) {
+          request.payload = {
+            $ref: `#/components/schemas/${selectedMessageSchema}`,
+          };
+        } else if (
+          messagePayloadSchema.fields &&
+          messagePayloadSchema.fields.length > 0
+        ) {
+          // 인라인 스키마로 변환
+          const properties: Record<
+            string,
+            { type: string; description?: string }
+          > = {};
+          messagePayloadSchema.fields.forEach((field) => {
+            const fieldType =
+              field.schemaType.kind === "primitive"
+                ? (field.schemaType as PrimitiveSchema).type
+                : field.schemaType.kind;
+            properties[field.key] = {
+              type: fieldType,
+              description: field.description,
+            };
+          });
+          request.payload = {
+            type: "object",
+            properties,
+          };
+        }
+      }
+
+      await createWebSocketMessage(request);
+      alert("메시지가 생성되었습니다.");
+
+      // 폼 초기화
+      setMessageName("");
+      setMessageDescription("");
+      setMessageType("name");
+      setMessageHeaders([]);
+      setMessagePayloadSchema({ type: "json", fields: [] });
+      setSelectedMessageSchema(null);
+
+      // 메시지 목록 새로고침
+      await loadMessages();
+    } catch (error) {
+      console.error("메시지 생성 실패:", error);
+      alert(
+        `메시지 생성 실패: ${
+          error instanceof Error ? error.message : "알 수 없는 오류"
+        }`
+      );
+    }
   };
 
-  const removeReplySchemaField = (index: number) => {
-    if (isReadOnly || !reply) return;
-    const currentFields = reply.schema.fields || [];
-    setReply({
-      ...reply,
-      schema: {
-        ...reply.schema,
-        fields: currentFields.filter((_, i) => i !== index),
-      },
-    });
+  // 기존 채널 선택 핸들러 (토글 방식 - 선택/선택해제)
+  const handleSelectExistingChannel = (
+    channel: ChannelResponse,
+    type: "receiver" | "reply"
+  ) => {
+    const channelMessageNames = Object.keys(channel.channel.messages || {});
+
+    if (type === "receiver") {
+      // 이미 선택된 채널인지 확인 (토글)
+      const isAlreadySelected =
+        receiver &&
+        receiver.address === channel.channel.address &&
+        receiver.messages?.length === channelMessageNames.length &&
+        receiver.messages.every((msg) => channelMessageNames.includes(msg));
+
+      if (isAlreadySelected) {
+        // 선택 해제
+        setReceiver({
+          address: "",
+          headers: [],
+          schema: {
+            type: "json",
+            fields: [],
+          },
+          messages: [],
+        });
+      } else {
+        // 선택
+        if (!receiver) {
+          initializeReceiver();
+        }
+        setReceiver({
+          address: channel.channel.address,
+          headers: [],
+          schema: {
+            type: "json",
+            fields: [],
+          },
+          messages: channelMessageNames,
+        });
+        setReceiverChannelMode("select");
+      }
+    } else if (type === "reply") {
+      // 이미 선택된 채널인지 확인 (토글)
+      const isAlreadySelected =
+        reply &&
+        reply.address === channel.channel.address &&
+        reply.messages?.length === channelMessageNames.length &&
+        reply.messages.every((msg) => channelMessageNames.includes(msg));
+
+      if (isAlreadySelected) {
+        // 선택 해제
+        setReply({
+          address: "",
+          schema: {
+            type: "json",
+            fields: [],
+          },
+          messages: [],
+        });
+      } else {
+        // 선택
+        if (!reply) {
+          initializeReply();
+        }
+        setReply({
+          address: channel.channel.address,
+          schema: {
+            type: "json",
+            fields: [],
+          },
+          messages: channelMessageNames,
+        });
+        setReplyChannelMode("select");
+      }
+    }
   };
 
-  const updateReplySchemaField = (index: number, field: SchemaField) => {
-    if (isReadOnly || !reply) return;
-    const currentFields = reply.schema.fields || [];
-    const updated = [...currentFields];
-    updated[index] = field;
-    setReply({ ...reply, schema: { ...reply.schema, fields: updated } });
-  };
+  // 채널 선택 또는 생성 (현재 사용하지 않음 - 채널 선택 모드로 대체됨)
+  // const handleChannelSelect = async (
+  //   address: string,
+  //   selectedMessages: string[],
+  //   type: "receiver" | "reply"
+  // ) => {
+  //   if (!address.trim() || selectedMessages.length === 0) {
+  //     return;
+  //   }
+
+  //   // 기존 채널 중에서 주소와 메시지가 일치하는 채널 찾기
+  //   const matchingChannel = channels.find((ch) => {
+  //     if (ch.channel.address !== address) return false;
+  //     const channelMessageNames = Object.keys(ch.channel.messages || {});
+  //     return selectedMessages.every((msg) => channelMessageNames.includes(msg));
+  //   });
+
+  //   if (matchingChannel) {
+  //     // 기존 채널 사용
+  //     if (type === "receiver" && receiver) {
+  //       setReceiver({
+  //         ...receiver,
+  //         address: matchingChannel.channel.address,
+  //         messages: selectedMessages,
+  //       });
+  //     } else if (type === "reply" && reply) {
+  //       setReply({
+  //         ...reply,
+  //         address: matchingChannel.channel.address,
+  //         messages: selectedMessages,
+  //       });
+  //     }
+  //     alert(`기존 채널 "${matchingChannel.channelName}"을 사용합니다.`);
+  //   } else {
+  //     // 새 채널 생성 (현재는 주소와 메시지만 저장)
+  //     if (type === "receiver" && receiver) {
+  //       setReceiver({
+  //         ...receiver,
+  //         address: address,
+  //         messages: selectedMessages,
+  //       });
+  //     } else if (type === "reply" && reply) {
+  //       setReply({
+  //         ...reply,
+  //         address: address,
+  //         messages: selectedMessages,
+  //       });
+  //     }
+  //     alert("새 채널 정보가 저장되었습니다. (채널 생성 API는 추후 구현 예정)");
+  //   }
+  // };
 
   // Schema 선택 처리
   const handleReceiverSchemaSelect = (selectedSchema: {
@@ -297,12 +565,26 @@ export function WsEditorForm({
     setIsReplySchemaModalOpen(false);
   };
 
+  // 메시지 작성용 Schema 선택 처리
+  const handleMessageSchemaSelect = (selectedSchema: {
+    name: string;
+    fields: SchemaField[];
+    type: string;
+  }) => {
+    if (selectedSchema.type === "object") {
+      setSelectedMessageSchema(selectedSchema.name);
+    } else {
+      alert("스키마는 object 타입만 지원됩니다.");
+    }
+    setIsMessageSchemaModalOpen(false);
+  };
+
   // removed unused getDiffMessage
 
   // Diff 타입별 상세 정보 (REST DiffNotification 스타일과 동일)
   const getDiffDetails = (diffType?: string) => {
     const lowerDiff = diffType?.toLowerCase() || "";
-    
+
     if (lowerDiff === "channel") {
       return {
         type: "channel" as const,
@@ -318,7 +600,7 @@ export function WsEditorForm({
         canSync: false,
       };
     }
-    
+
     return {
       type: "other" as const,
       label: "불일치",
@@ -334,7 +616,7 @@ export function WsEditorForm({
     const details = getDiffDetails(diff);
     const progressLower = operationInfo?.progress?.toLowerCase() || "none";
     const isCompleted = progressLower === "completed";
-    
+
     return (
       <div className="rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 shadow-sm mb-6">
         {/* 헤더 */}
@@ -379,15 +661,35 @@ export function WsEditorForm({
         <div className="p-4 space-y-3">
           <div className="bg-white dark:bg-amber-950/30 rounded-md p-3 border border-amber-200 dark:border-amber-800">
             <h4 className="text-xs font-semibold text-amber-900 dark:text-amber-200 mb-2 flex items-center gap-1">
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg
+                className="w-3 h-3"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
               안내사항
             </h4>
             <ul className="space-y-2">
               <li className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
-                <svg className="w-3 h-3 text-amber-600 dark:text-amber-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <svg
+                  className="w-3 h-3 text-amber-600 dark:text-amber-500 mt-0.5 flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
                 </svg>
                 <span>
                   백엔드에서{" "}
@@ -399,11 +701,22 @@ export function WsEditorForm({
               </li>
               {details.type === "channel" && (
                 <li className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
-                  <svg className="w-3 h-3 text-amber-600 dark:text-amber-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <svg
+                    className="w-3 h-3 text-amber-600 dark:text-amber-500 mt-0.5 flex-shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
                   </svg>
                   <span>
-                    실제 구현에 존재하지만 명세에 없는 Channel이 있다면, 아래 버튼을 클릭하여 명세에 자동으로 추가할 수 있습니다.
+                    실제 구현에 존재하지만 명세에 없는 Channel이 있다면, 아래
+                    버튼을 클릭하여 명세에 자동으로 추가할 수 있습니다.
                   </span>
                 </li>
               )}
@@ -415,8 +728,18 @@ export function WsEditorForm({
               onClick={onSyncToActual}
               className="w-full px-4 py-3 bg-amber-600 hover:bg-amber-700 dark:bg-amber-700 dark:hover:bg-amber-800 text-white rounded-md transition-colors text-sm font-semibold flex items-center justify-center gap-2 shadow-md"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
               </svg>
               실제 구현을 명세에 반영
             </button>
@@ -434,32 +757,48 @@ export function WsEditorForm({
         {renderDiffNotification()}
         {/* Entry Point */}
         <div>
-          <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">Entry Point</h3>
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">
+            Entry Point
+          </h3>
           <div className="flex items-start gap-3 text-sm">
-            <span className="font-mono text-gray-900 dark:text-[#E6EDF3]">{entryPoint || <span className="text-gray-400 italic">(empty)</span>}</span>
+            <span className="font-mono text-gray-900 dark:text-[#E6EDF3]">
+              {entryPoint || (
+                <span className="text-gray-400 italic">(empty)</span>
+              )}
+            </span>
           </div>
         </div>
 
         {/* Summary */}
         {summary && (
           <div>
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">Summary</h3>
-            <div className="text-sm text-gray-900 dark:text-[#E6EDF3]">{summary}</div>
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">
+              Summary
+            </h3>
+            <div className="text-sm text-gray-900 dark:text-[#E6EDF3]">
+              {summary}
+            </div>
           </div>
         )}
 
         {/* Description */}
         {description && (
           <div>
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">Description</h3>
-            <div className="text-sm text-gray-900 dark:text-[#E6EDF3]">{description}</div>
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">
+              Description
+            </h3>
+            <div className="text-sm text-gray-900 dark:text-[#E6EDF3]">
+              {description}
+            </div>
           </div>
         )}
 
         {/* Tags */}
         {tags && (
           <div>
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">Tags</h3>
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">
+              Tags
+            </h3>
             <div className="flex flex-wrap gap-2">
               {tags.split(",").map((tag, index) => (
                 <span
@@ -476,26 +815,51 @@ export function WsEditorForm({
         {/* Receiver */}
         {receiver && (
           <div>
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-3">Receiver</h3>
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-3">
+              Receiver
+            </h3>
             <div className="space-y-4 ml-4">
               <div>
-                <h4 className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] mb-2">Address</h4>
+                <h4 className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] mb-2">
+                  Address
+                </h4>
                 <div className="flex items-start gap-3 text-sm">
-                  <span className="font-mono text-gray-900 dark:text-[#E6EDF3]">{receiver.address || <span className="text-gray-400 italic">(empty)</span>}</span>
+                  <span className="font-mono text-gray-900 dark:text-[#E6EDF3]">
+                    {receiver.address || (
+                      <span className="text-gray-400 italic">(empty)</span>
+                    )}
+                  </span>
                 </div>
               </div>
 
               {receiver.headers && receiver.headers.length > 0 && (
                 <div>
-                  <h4 className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] mb-2">Headers</h4>
+                  <h4 className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] mb-2">
+                    Headers
+                  </h4>
                   <div className="space-y-2">
                     {receiver.headers.map((header, index) => (
-                      <div key={index} className="flex items-start gap-3 text-sm">
-                        <span className="font-mono text-gray-900 dark:text-[#E6EDF3] min-w-[120px]">{header.key}</span>
-                        <span className="text-gray-600 dark:text-[#8B949E]">:</span>
-                        <span className="text-gray-900 dark:text-[#E6EDF3] flex-1">{header.value || <span className="text-gray-400 italic">(empty)</span>}</span>
+                      <div
+                        key={index}
+                        className="flex items-start gap-3 text-sm"
+                      >
+                        <span className="font-mono text-gray-900 dark:text-[#E6EDF3] min-w-[120px]">
+                          {header.key}
+                        </span>
+                        <span className="text-gray-600 dark:text-[#8B949E]">
+                          :
+                        </span>
+                        <span className="text-gray-900 dark:text-[#E6EDF3] flex-1">
+                          {header.value || (
+                            <span className="text-gray-400 italic">
+                              (empty)
+                            </span>
+                          )}
+                        </span>
                         {header.required && (
-                          <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-xs rounded">Required</span>
+                          <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-xs rounded">
+                            Required
+                          </span>
                         )}
                       </div>
                     ))}
@@ -505,7 +869,9 @@ export function WsEditorForm({
 
               {receiver.schema && (
                 <div>
-                  <h4 className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] mb-2">Schema</h4>
+                  <h4 className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] mb-2">
+                    Schema
+                  </h4>
                   <SchemaViewer
                     schemaType={receiver.schema.rootSchemaType}
                     fields={receiver.schema.fields}
@@ -522,18 +888,28 @@ export function WsEditorForm({
         {/* Reply */}
         {reply && (
           <div>
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-3">Reply</h3>
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-3">
+              Reply
+            </h3>
             <div className="space-y-4 ml-4">
               <div>
-                <h4 className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] mb-2">Address</h4>
+                <h4 className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] mb-2">
+                  Address
+                </h4>
                 <div className="flex items-start gap-3 text-sm">
-                  <span className="font-mono text-gray-900 dark:text-[#E6EDF3]">{reply.address || <span className="text-gray-400 italic">(empty)</span>}</span>
+                  <span className="font-mono text-gray-900 dark:text-[#E6EDF3]">
+                    {reply.address || (
+                      <span className="text-gray-400 italic">(empty)</span>
+                    )}
+                  </span>
                 </div>
               </div>
 
               {reply.schema && (
                 <div>
-                  <h4 className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] mb-2">Schema</h4>
+                  <h4 className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] mb-2">
+                    Schema
+                  </h4>
                   <SchemaViewer
                     schemaType={reply.schema.rootSchemaType}
                     fields={reply.schema.fields}
@@ -548,7 +924,9 @@ export function WsEditorForm({
         )}
 
         {!receiver && !reply && (
-          <div className="text-sm text-gray-500 dark:text-[#8B949E] italic">No WebSocket configuration.</div>
+          <div className="text-sm text-gray-500 dark:text-[#8B949E] italic">
+            No WebSocket configuration.
+          </div>
         )}
       </div>
     );
@@ -584,8 +962,12 @@ export function WsEditorForm({
         {/* Operation 정보 (읽기 전용 모드) */}
         {isReadOnly && operationInfo && (
           <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
-            <div className="text-xs text-blue-600 dark:text-blue-500 font-medium mb-1">Operation Name</div>
-            <div className="text-sm text-blue-800 dark:text-blue-400 font-mono">{operationInfo.operationName}</div>
+            <div className="text-xs text-blue-600 dark:text-blue-500 font-medium mb-1">
+              Operation Name
+            </div>
+            <div className="text-sm text-blue-800 dark:text-blue-400 font-mono">
+              {operationInfo.operationName}
+            </div>
           </div>
         )}
 
@@ -613,7 +995,7 @@ export function WsEditorForm({
                 <option value="wss">wss</option>
               </select>
             </div>
-            
+
             {/* Pathname 입력 */}
             <div className="col-span-3">
               <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
@@ -707,20 +1089,26 @@ export function WsEditorForm({
               />
             </svg>
             <div>
-              <span className="text-xs text-purple-600 dark:text-purple-500 font-medium mr-2">Operation Type:</span>
+              <span className="text-xs text-purple-600 dark:text-purple-500 font-medium mr-2">
+                Operation Type:
+              </span>
               <span className="text-sm font-bold text-purple-800 dark:text-purple-300">
-                {operationInfo.tag === "duplicate" ? "DUPLEX (양방향 통신)" : 
-                 operationInfo.tag === "receive" ? "RECEIVE (메시지 수신)" : 
-                 operationInfo.tag === "sendto" ? "SEND (메시지 송신)" : operationInfo.tag}
+                {operationInfo.tag === "duplicate"
+                  ? "DUPLEX (양방향 통신)"
+                  : operationInfo.tag === "receive"
+                  ? "RECEIVE (메시지 수신)"
+                  : operationInfo.tag === "sendto"
+                  ? "SEND (메시지 송신)"
+                  : operationInfo.tag}
               </span>
             </div>
           </div>
         </div>
       )}
 
-      {/* Receiver/Reply/Schema 탭 */}
+      {/* 통합 탭 박스 */}
       <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] shadow-sm mb-6 overflow-hidden">
-        {/* 탭 헤더 - 폴더 느낌으로 통합 */}
+        {/* 탭 헤더 */}
         <div className="bg-gray-50 dark:bg-[#0D1117] border-b border-gray-200 dark:border-[#2D333B] px-4 pt-2">
           <div className="flex gap-0.5 -mb-px">
             <button
@@ -753,6 +1141,16 @@ export function WsEditorForm({
             >
               Schema
             </button>
+            <button
+              onClick={() => setWsTab("message")}
+              className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ${
+                wsTab === "message"
+                  ? "text-gray-900 dark:text-[#E6EDF3] bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] border-b-white dark:border-b-[#161B22] relative z-10"
+                  : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
+              }`}
+            >
+              Message
+            </button>
           </div>
         </div>
 
@@ -761,9 +1159,15 @@ export function WsEditorForm({
           {wsTab === "receiver" && (
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
-                  Receiver
-                </h3>
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
+                    Receiver
+                  </h3>
+                  <p className="text-xs text-gray-600 dark:text-[#8B949E] mt-1">
+                    메시지와 주소를 입력하면 채널을 생성하거나 기존 채널을
+                    선택할 수 있습니다.
+                  </p>
+                </div>
                 {!isReadOnly && (
                   <div className="flex gap-2">
                     {receiver ? (
@@ -798,248 +1202,253 @@ export function WsEditorForm({
                 )}
               </div>
 
-          {receiver ? (
-            <div className="space-y-4">
-              {/* 주소 */}
-              <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                  주소
-                </label>
-                <input
-                  type="text"
-                  value={receiver.address}
-                  onChange={(e) => setReceiver({ ...receiver, address: e.target.value })}
-                  placeholder="예: /chat/message"
-                  disabled={isReadOnly}
-                  className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
-                    isReadOnly ? "opacity-60 cursor-not-allowed" : ""
-                  }`}
-                />
-              </div>
-
-              {/* Header */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E]">
-                    Header
-                  </label>
-                  {!isReadOnly && (
-                    <button
-                      onClick={addReceiverHeader}
-                      className="text-[#2563EB] hover:text-[#1E40AF] text-xs font-medium"
-                    >
-                      + Add Header
-                    </button>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  {receiver.headers.map((header, index) => (
-                    <div key={index} className="flex gap-2">
-                      <input
-                        type="text"
-                        value={header.key}
-                        onChange={(e) => updateReceiverHeader(index, "key", e.target.value)}
-                        placeholder="Header 이름"
-                        disabled={isReadOnly}
-                        className={`flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
-                          isReadOnly ? "opacity-60 cursor-not-allowed" : ""
-                        }`}
-                      />
-                      <input
-                        type="text"
-                        value={header.value}
-                        onChange={(e) => updateReceiverHeader(index, "value", e.target.value)}
-                        placeholder="Header 값"
-                        disabled={isReadOnly}
-                        className={`flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
-                          isReadOnly ? "opacity-60 cursor-not-allowed" : ""
-                        }`}
-                      />
-                      {!isReadOnly && (
-                        <button
-                          onClick={() => removeReceiverHeader(index)}
-                          className="px-2 py-2 text-red-500 hover:text-red-700"
-                        >
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M6 18L18 6M6 6l12 12"
-                            />
-                          </svg>
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Messages */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E]">
-                    📨 Messages {messages.length > 0 && `(${messages.length})`}
-                  </label>
-                  {!isReadOnly && (
-                    <button
-                      onClick={loadMessages}
-                      className="text-[#2563EB] hover:text-[#1E40AF] text-xs"
-                      title="새로고침"
-                    >
-                      ↻
-                    </button>
-                  )}
-                </div>
-                <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-200 dark:border-[#2D333B] rounded-md p-3 bg-gray-50 dark:bg-[#0D1117]">
-                  {messages.length > 0 ? (
-                    messages.map((msg, idx) => {
-                      const messageName = msg.messageName || msg.name || "Unnamed";
-                      const isSelected = receiver.messages?.includes(messageName) || false;
-                      
-                      return (
-                        <label
-                          key={`${messageName}-${idx}`}
-                          className={`flex items-center gap-2 p-2.5 rounded-md cursor-pointer transition-colors ${
-                            isSelected
-                              ? "bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700"
-                              : "bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#2D333B] hover:bg-gray-100 dark:hover:bg-[#21262D]"
-                          } ${isReadOnly ? "opacity-60 cursor-not-allowed" : ""}`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={(e) => {
-                              if (isReadOnly) return;
-                              const currentMessages = receiver.messages || [];
-                              const newMessages = e.target.checked
-                                ? [...currentMessages, messageName]
-                                : currentMessages.filter((m) => m !== messageName);
-                              setReceiver({ ...receiver, messages: newMessages });
-                            }}
-                            disabled={isReadOnly}
-                            className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 flex-shrink-0"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm text-gray-900 dark:text-[#E6EDF3] font-medium truncate">
-                              {messageName}
-                            </div>
-                            {msg.description && (
-                              <div className="text-xs text-gray-500 dark:text-[#8B949E] truncate mt-0.5">
-                                {msg.description}
-                              </div>
-                            )}
-                          </div>
-                        </label>
-                      );
-                    })
-                  ) : (
-                    <div className="text-center py-6">
-                      <p className="text-sm text-gray-500 dark:text-[#8B949E] mb-2">
-                        사용 가능한 메시지가 없습니다
-                      </p>
-                      <p className="text-xs text-gray-400 dark:text-[#6E7681]">
-                        Message를 먼저 생성해주세요
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Schema */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E]">
-                    Schema
-                  </label>
-                  <div className="flex gap-2">
-                    {!isReadOnly && (
-                      <>
-                        <button
-                          onClick={() => setIsReceiverSchemaModalOpen(true)}
-                          className="text-[#2563EB] hover:text-[#1E40AF] text-xs font-medium"
-                        >
-                          Schema 선택
-                        </button>
-                        <button
-                          onClick={addReceiverSchemaField}
-                          className="text-[#2563EB] hover:text-[#1E40AF] text-xs font-medium"
-                        >
-                          + Add Field
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* Schema Reference 표시 */}
-                {receiver.schema.schemaRef && (
-                  <div className="mb-2 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
-                    <div className="flex items-center justify-between">
-                      <span 
-                        className="text-xs text-blue-700 dark:text-blue-300 font-medium"
-                        title={receiver.schema.schemaRef}
-                      >
-                        Schema: {getShortSchemaName(receiver.schema.schemaRef)}
-                      </span>
-                      {!isReadOnly && (
-                        <button
-                          onClick={() => {
+              {receiver ? (
+                <div className="space-y-4">
+                  {/* 채널 선택 모드 선택 */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
+                      채널 선택 방식
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setReceiverChannelMode("select");
+                          if (receiver) {
                             setReceiver({
                               ...receiver,
-                              schema: { ...receiver.schema, schemaRef: undefined },
+                              address: "",
+                              messages: [],
                             });
-                          }}
-                          className="text-blue-500 hover:text-blue-700 text-xs"
-                        >
-                          제거
-                        </button>
-                      )}
+                          }
+                        }}
+                        disabled={isReadOnly}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                          receiverChannelMode === "select"
+                            ? "bg-[#2563EB] text-white"
+                            : "bg-gray-100 dark:bg-[#21262D] text-gray-700 dark:text-[#C9D1D9] hover:bg-gray-200 dark:hover:bg-[#30363D]"
+                        } ${isReadOnly ? "opacity-60 cursor-not-allowed" : ""}`}
+                      >
+                        기존 채널 선택
+                      </button>
+                      <button
+                        onClick={() => {
+                          setReceiverChannelMode("create");
+                          if (receiver) {
+                            setReceiver({
+                              ...receiver,
+                              address: "",
+                              messages: [],
+                            });
+                          }
+                        }}
+                        disabled={isReadOnly}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                          receiverChannelMode === "create"
+                            ? "bg-[#2563EB] text-white"
+                            : "bg-gray-100 dark:bg-[#21262D] text-gray-700 dark:text-[#C9D1D9] hover:bg-gray-200 dark:hover:bg-[#30363D]"
+                        } ${isReadOnly ? "opacity-60 cursor-not-allowed" : ""}`}
+                      >
+                        새 채널 생성
+                      </button>
                     </div>
                   </div>
-                )}
 
-                {/* Schema Fields */}
-                <div className="space-y-2">
-                  {receiver.schema.fields && receiver.schema.fields.length > 0 ? (
-                    receiver.schema.fields.map((field, index) => (
-                      <SchemaFieldEditor
-                        key={index}
-                        field={field}
-                        onChange={(newField) => updateReceiverSchemaField(index, newField)}
-                        onRemove={() => removeReceiverSchemaField(index)}
-                        isReadOnly={isReadOnly}
-                        allowFileType={false}
-                        allowMockExpression={true}
-                      />
-                    ))
-                  ) : (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 text-center py-2">
-                      Schema 필드가 없습니다. "+ Add Field"를 클릭하여 추가하거나 Schema를 선택하세요.
-                    </p>
+                  {/* 기존 채널 선택 모드 */}
+                  {receiverChannelMode === "select" && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
+                        기존 채널 선택
+                      </label>
+                      {channels.length > 0 ? (
+                        <div className="max-h-64 overflow-y-auto space-y-2 border border-gray-200 dark:border-[#2D333B] rounded-md p-3 bg-gray-50 dark:bg-[#0D1117]">
+                          {channels.map((ch) => {
+                            const channelMessageNames = Object.keys(
+                              ch.channel.messages || {}
+                            );
+                            const isSelected =
+                              receiver &&
+                              receiver.address === ch.channel.address &&
+                              receiver.messages?.length ===
+                                channelMessageNames.length &&
+                              receiver.messages.every((msg) =>
+                                channelMessageNames.includes(msg)
+                              );
+
+                            return (
+                              <div
+                                key={ch.channelName}
+                                onClick={() =>
+                                  !isReadOnly &&
+                                  handleSelectExistingChannel(ch, "receiver")
+                                }
+                                className={`text-sm p-3 border rounded cursor-pointer transition-colors ${
+                                  isSelected
+                                    ? "bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700"
+                                    : "bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] hover:bg-gray-100 dark:hover:bg-[#21262D]"
+                                } ${
+                                  isReadOnly
+                                    ? "cursor-not-allowed opacity-60"
+                                    : ""
+                                }`}
+                              >
+                                <div className="font-mono text-gray-800 dark:text-[#E6EDF3] font-medium">
+                                  {ch.channelName}
+                                </div>
+                                <div className="text-xs text-gray-600 dark:text-[#8B949E] mt-1">
+                                  주소: {ch.channel.address}
+                                </div>
+                                <div className="text-xs text-gray-600 dark:text-[#8B949E] mt-1">
+                                  메시지:{" "}
+                                  {channelMessageNames.join(", ") || "없음"}
+                                </div>
+                                {isSelected && (
+                                  <div className="text-xs text-blue-600 dark:text-blue-400 mt-2 font-medium">
+                                    ✓ 선택됨
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="text-center py-6 border border-gray-200 dark:border-[#2D333B] rounded-md bg-gray-50 dark:bg-[#0D1117]">
+                          <p className="text-sm text-gray-500 dark:text-[#8B949E]">
+                            기존 채널이 없습니다
+                          </p>
+                          <p className="text-xs text-gray-400 dark:text-[#6E7681] mt-1">
+                            "새 채널 생성"을 선택하여 채널을 생성하세요
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 새 채널 생성 모드 */}
+                  {receiverChannelMode === "create" && (
+                    <>
+                      {/* 주소 */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
+                          주소 <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={receiver.address}
+                          onChange={(e) =>
+                            setReceiver({
+                              ...receiver,
+                              address: e.target.value,
+                            })
+                          }
+                          placeholder="예: /chat/{roomId}"
+                          disabled={isReadOnly}
+                          className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
+                            isReadOnly ? "opacity-60 cursor-not-allowed" : ""
+                          }`}
+                        />
+                      </div>
+
+                      {/* Messages */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E]">
+                            📨 Messages{" "}
+                            {messages.length > 0 && `(${messages.length})`}
+                          </label>
+                          {!isReadOnly && (
+                            <button
+                              onClick={loadMessages}
+                              className="text-[#2563EB] hover:text-[#1E40AF] text-xs"
+                              title="새로고침"
+                            >
+                              ↻
+                            </button>
+                          )}
+                        </div>
+                        <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-200 dark:border-[#2D333B] rounded-md p-3 bg-gray-50 dark:bg-[#0D1117]">
+                          {messages.length > 0 ? (
+                            messages.map((msg, idx) => {
+                              const messageName =
+                                msg.messageName || msg.name || "Unnamed";
+                              const isSelected =
+                                receiver.messages?.length === 1 &&
+                                receiver.messages[0] === messageName;
+
+                              return (
+                                <label
+                                  key={`${messageName}-${idx}`}
+                                  className={`flex items-center gap-2 p-2.5 rounded-md cursor-pointer transition-colors ${
+                                    isSelected
+                                      ? "bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700"
+                                      : "bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#2D333B] hover:bg-gray-100 dark:hover:bg-[#21262D]"
+                                  } ${
+                                    isReadOnly
+                                      ? "opacity-60 cursor-not-allowed"
+                                      : ""
+                                  }`}
+                                >
+                                  <input
+                                    type="radio"
+                                    name="receiver-message"
+                                    checked={isSelected}
+                                    onChange={() => {
+                                      if (isReadOnly) return;
+                                      setReceiver({
+                                        ...receiver,
+                                        messages: [messageName],
+                                      });
+                                    }}
+                                    disabled={isReadOnly}
+                                    className="w-4 h-4 text-blue-600 focus:ring-blue-500 flex-shrink-0"
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-sm text-gray-900 dark:text-[#E6EDF3] font-medium truncate">
+                                      {messageName}
+                                    </div>
+                                    {msg.description && (
+                                      <div className="text-xs text-gray-500 dark:text-[#8B949E] truncate mt-0.5">
+                                        {msg.description}
+                                      </div>
+                                    )}
+                                  </div>
+                                </label>
+                              );
+                            })
+                          ) : (
+                            <div className="text-center py-6">
+                              <p className="text-sm text-gray-500 dark:text-[#8B949E] mb-2">
+                                사용 가능한 메시지가 없습니다
+                              </p>
+                              <p className="text-xs text-gray-400 dark:text-[#6E7681]">
+                                Message 탭에서 먼저 메시지를 생성해주세요
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </>
                   )}
                 </div>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
-              <p>Receiver가 없습니다. "추가" 버튼을 클릭하여 추가하세요.</p>
-            </div>
-          )}
+              ) : (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
+                  <p>Receiver가 없습니다. "추가" 버튼을 클릭하여 추가하세요.</p>
+                </div>
+              )}
             </div>
           )}
 
           {wsTab === "reply" && (
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
-                  Reply
-                </h3>
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
+                    Reply
+                  </h3>
+                  <p className="text-xs text-gray-600 dark:text-[#8B949E] mt-1">
+                    메시지와 주소를 입력하면 채널을 생성하거나 기존 채널을
+                    선택할 수 있습니다.
+                  </p>
+                </div>
                 {!isReadOnly && (
                   <div className="flex gap-2">
                     {reply ? (
@@ -1074,18 +1483,252 @@ export function WsEditorForm({
                 )}
               </div>
 
-          {reply ? (
+              {reply ? (
+                <div className="space-y-4">
+                  {/* 채널 선택 모드 선택 */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
+                      채널 선택 방식
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setReplyChannelMode("select");
+                          if (reply) {
+                            setReply({ ...reply, address: "", messages: [] });
+                          }
+                        }}
+                        disabled={isReadOnly}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                          replyChannelMode === "select"
+                            ? "bg-[#2563EB] text-white"
+                            : "bg-gray-100 dark:bg-[#21262D] text-gray-700 dark:text-[#C9D1D9] hover:bg-gray-200 dark:hover:bg-[#30363D]"
+                        } ${isReadOnly ? "opacity-60 cursor-not-allowed" : ""}`}
+                      >
+                        기존 채널 선택
+                      </button>
+                      <button
+                        onClick={() => {
+                          setReplyChannelMode("create");
+                          if (reply) {
+                            setReply({ ...reply, address: "", messages: [] });
+                          }
+                        }}
+                        disabled={isReadOnly}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                          replyChannelMode === "create"
+                            ? "bg-[#2563EB] text-white"
+                            : "bg-gray-100 dark:bg-[#21262D] text-gray-700 dark:text-[#C9D1D9] hover:bg-gray-200 dark:hover:bg-[#30363D]"
+                        } ${isReadOnly ? "opacity-60 cursor-not-allowed" : ""}`}
+                      >
+                        새 채널 생성
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 기존 채널 선택 모드 */}
+                  {replyChannelMode === "select" && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
+                        기존 채널 선택
+                      </label>
+                      {channels.length > 0 ? (
+                        <div className="max-h-64 overflow-y-auto space-y-2 border border-gray-200 dark:border-[#2D333B] rounded-md p-3 bg-gray-50 dark:bg-[#0D1117]">
+                          {channels.map((ch) => {
+                            const channelMessageNames = Object.keys(
+                              ch.channel.messages || {}
+                            );
+                            const isSelected =
+                              reply &&
+                              reply.address === ch.channel.address &&
+                              reply.messages?.length ===
+                                channelMessageNames.length &&
+                              reply.messages.every((msg) =>
+                                channelMessageNames.includes(msg)
+                              );
+
+                            return (
+                              <div
+                                key={ch.channelName}
+                                onClick={() =>
+                                  !isReadOnly &&
+                                  handleSelectExistingChannel(ch, "reply")
+                                }
+                                className={`text-sm p-3 border rounded cursor-pointer transition-colors ${
+                                  isSelected
+                                    ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-700"
+                                    : "bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] hover:bg-gray-100 dark:hover:bg-[#21262D]"
+                                } ${
+                                  isReadOnly
+                                    ? "cursor-not-allowed opacity-60"
+                                    : ""
+                                }`}
+                              >
+                                <div className="font-mono text-gray-800 dark:text-[#E6EDF3] font-medium">
+                                  {ch.channelName}
+                                </div>
+                                <div className="text-xs text-gray-600 dark:text-[#8B949E] mt-1">
+                                  주소: {ch.channel.address}
+                                </div>
+                                <div className="text-xs text-gray-600 dark:text-[#8B949E] mt-1">
+                                  메시지:{" "}
+                                  {channelMessageNames.join(", ") || "없음"}
+                                </div>
+                                {isSelected && (
+                                  <div className="text-xs text-emerald-600 dark:text-emerald-400 mt-2 font-medium">
+                                    ✓ 선택됨
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="text-center py-6 border border-gray-200 dark:border-[#2D333B] rounded-md bg-gray-50 dark:bg-[#0D1117]">
+                          <p className="text-sm text-gray-500 dark:text-[#8B949E]">
+                            기존 채널이 없습니다
+                          </p>
+                          <p className="text-xs text-gray-400 dark:text-[#6E7681] mt-1">
+                            "새 채널 생성"을 선택하여 채널을 생성하세요
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 새 채널 생성 모드 */}
+                  {replyChannelMode === "create" && (
+                    <>
+                      {/* 주소 */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
+                          주소 <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={reply.address}
+                          onChange={(e) =>
+                            setReply({ ...reply, address: e.target.value })
+                          }
+                          placeholder="예: /chat/{roomId}"
+                          disabled={isReadOnly}
+                          className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
+                            isReadOnly ? "opacity-60 cursor-not-allowed" : ""
+                          }`}
+                        />
+                      </div>
+
+                      {/* Messages */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E]">
+                            📨 Messages{" "}
+                            {messages.length > 0 && `(${messages.length})`}
+                          </label>
+                          {!isReadOnly && (
+                            <button
+                              onClick={loadMessages}
+                              className="text-[#2563EB] hover:text-[#1E40AF] text-xs"
+                              title="새로고침"
+                            >
+                              ↻
+                            </button>
+                          )}
+                        </div>
+                        <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-200 dark:border-[#2D333B] rounded-md p-3 bg-gray-50 dark:bg-[#0D1117]">
+                          {messages.length > 0 ? (
+                            messages.map((msg, idx) => {
+                              const messageName =
+                                msg.messageName || msg.name || "Unnamed";
+                              const isSelected =
+                                reply.messages?.length === 1 &&
+                                reply.messages[0] === messageName;
+
+                              return (
+                                <label
+                                  key={`${messageName}-${idx}`}
+                                  className={`flex items-center gap-2 p-2.5 rounded-md cursor-pointer transition-colors ${
+                                    isSelected
+                                      ? "bg-emerald-100 dark:bg-emerald-900/30 border border-emerald-300 dark:border-emerald-700"
+                                      : "bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#2D333B] hover:bg-gray-100 dark:hover:bg-[#21262D]"
+                                  } ${
+                                    isReadOnly
+                                      ? "opacity-60 cursor-not-allowed"
+                                      : ""
+                                  }`}
+                                >
+                                  <input
+                                    type="radio"
+                                    name="reply-message"
+                                    checked={isSelected}
+                                    onChange={() => {
+                                      if (isReadOnly) return;
+                                      setReply({
+                                        ...reply,
+                                        messages: [messageName],
+                                      });
+                                    }}
+                                    disabled={isReadOnly}
+                                    className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 flex-shrink-0"
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-sm text-gray-900 dark:text-[#E6EDF3] font-medium truncate">
+                                      {messageName}
+                                    </div>
+                                    {msg.description && (
+                                      <div className="text-xs text-gray-500 dark:text-[#8B949E] truncate mt-0.5">
+                                        {msg.description}
+                                      </div>
+                                    )}
+                                  </div>
+                                </label>
+                              );
+                            })
+                          ) : (
+                            <div className="text-center py-6">
+                              <p className="text-sm text-gray-500 dark:text-[#8B949E] mb-2">
+                                사용 가능한 메시지가 없습니다
+                              </p>
+                              <p className="text-xs text-gray-400 dark:text-[#6E7681]">
+                                Message 탭에서 먼저 메시지를 생성해주세요
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
+                  <p>Reply가 없습니다. "추가" 버튼을 클릭하여 추가하세요.</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {wsTab === "schema" && (
+            <SchemaCard isReadOnly={isReadOnly} protocol="WebSocket" />
+          )}
+
+          {wsTab === "message" && (
             <div className="space-y-4">
-              {/* 주소 */}
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
+                  메시지 작성
+                </h3>
+              </div>
+
+              {/* 메시지 이름 */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                  주소
+                  메시지 이름 <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
-                  value={reply.address}
-                  onChange={(e) => setReply({ ...reply, address: e.target.value })}
-                  placeholder="예: /chat/message"
+                  value={messageName}
+                  onChange={(e) => setMessageName(e.target.value)}
+                  placeholder="예: ChatMessage, NotificationMessage"
                   disabled={isReadOnly}
                   className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
                     isReadOnly ? "opacity-60 cursor-not-allowed" : ""
@@ -1093,165 +1736,255 @@ export function WsEditorForm({
                 />
               </div>
 
-              {/* Messages */}
+              {/* 메시지 설명 */}
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E]">
-                    📨 Messages {messages.length > 0 && `(${messages.length})`}
-                  </label>
-                  {!isReadOnly && (
-                    <button
-                      onClick={loadMessages}
-                      className="text-[#2563EB] hover:text-[#1E40AF] text-xs"
-                      title="새로고침"
-                    >
-                      ↻
-                    </button>
+                <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
+                  설명
+                </label>
+                <input
+                  type="text"
+                  value={messageDescription}
+                  onChange={(e) => setMessageDescription(e.target.value)}
+                  placeholder="메시지에 대한 설명을 입력하세요"
+                  disabled={isReadOnly}
+                  className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
+                    isReadOnly ? "opacity-60 cursor-not-allowed" : ""
+                  }`}
+                />
+              </div>
+
+              {/* 메시지 타입 선택 */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
+                  메시지 타입 선택
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setMessageType("name")}
+                    disabled={isReadOnly}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                      messageType === "name"
+                        ? "bg-[#2563EB] text-white"
+                        : "bg-gray-100 dark:bg-[#21262D] text-gray-700 dark:text-[#C9D1D9] hover:bg-gray-200 dark:hover:bg-[#30363D]"
+                    } ${isReadOnly ? "opacity-60 cursor-not-allowed" : ""}`}
+                  >
+                    Name
+                  </button>
+                  <button
+                    onClick={() => setMessageType("header")}
+                    disabled={isReadOnly}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                      messageType === "header"
+                        ? "bg-[#2563EB] text-white"
+                        : "bg-gray-100 dark:bg-[#21262D] text-gray-700 dark:text-[#C9D1D9] hover:bg-gray-200 dark:hover:bg-[#30363D]"
+                    } ${isReadOnly ? "opacity-60 cursor-not-allowed" : ""}`}
+                  >
+                    Header
+                  </button>
+                  <button
+                    onClick={() => setMessageType("schema")}
+                    disabled={isReadOnly}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                      messageType === "schema"
+                        ? "bg-[#2563EB] text-white"
+                        : "bg-gray-100 dark:bg-[#21262D] text-gray-700 dark:text-[#C9D1D9] hover:bg-gray-200 dark:hover:bg-[#30363D]"
+                    } ${isReadOnly ? "opacity-60 cursor-not-allowed" : ""}`}
+                  >
+                    Payload
+                  </button>
+                </div>
+              </div>
+
+              {/* Header 타입 선택 시 */}
+              {messageType === "header" && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E]">
+                      Headers
+                    </label>
+                    {!isReadOnly && (
+                      <button
+                        onClick={addMessageHeader}
+                        className="text-[#2563EB] hover:text-[#1E40AF] text-xs font-medium"
+                      >
+                        + Add Header
+                      </button>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    {messageHeaders.map((header, index) => (
+                      <div key={index} className="flex gap-2">
+                        <input
+                          type="text"
+                          value={header.key}
+                          onChange={(e) =>
+                            updateMessageHeader(index, "key", e.target.value)
+                          }
+                          placeholder="Header 이름"
+                          disabled={isReadOnly}
+                          className={`flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
+                            isReadOnly ? "opacity-60 cursor-not-allowed" : ""
+                          }`}
+                        />
+                        <input
+                          type="text"
+                          value={header.value}
+                          onChange={(e) =>
+                            updateMessageHeader(index, "value", e.target.value)
+                          }
+                          placeholder="Header 값"
+                          disabled={isReadOnly}
+                          className={`flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
+                            isReadOnly ? "opacity-60 cursor-not-allowed" : ""
+                          }`}
+                        />
+                        {!isReadOnly && (
+                          <button
+                            onClick={() => removeMessageHeader(index)}
+                            className="px-2 py-2 text-red-500 hover:text-red-700"
+                          >
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M6 18L18 6M6 6l12 12"
+                              />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Schema 타입 선택 시 */}
+              {messageType === "schema" && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E]">
+                      Payload Schema
+                    </label>
+                    <div className="flex gap-2">
+                      {!isReadOnly && (
+                        <>
+                          <button
+                            onClick={() => setIsMessageSchemaModalOpen(true)}
+                            className="text-[#2563EB] hover:text-[#1E40AF] text-xs font-medium"
+                          >
+                            Schema 선택
+                          </button>
+                          <button
+                            onClick={addMessagePayloadField}
+                            className="text-[#2563EB] hover:text-[#1E40AF] text-xs font-medium"
+                          >
+                            + Add Field
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {selectedMessageSchema && (
+                    <div className="mb-2 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-blue-700 dark:text-blue-300 font-medium">
+                          Schema: {getShortSchemaName(selectedMessageSchema)}
+                        </span>
+                        {!isReadOnly && (
+                          <button
+                            onClick={() => setSelectedMessageSchema(null)}
+                            className="text-blue-500 hover:text-blue-700 text-xs"
+                          >
+                            제거
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {!selectedMessageSchema && (
+                    <div className="space-y-2">
+                      {messagePayloadSchema.fields &&
+                      messagePayloadSchema.fields.length > 0 ? (
+                        messagePayloadSchema.fields.map((field, index) => (
+                          <SchemaFieldEditor
+                            key={index}
+                            field={field}
+                            onChange={(newField) =>
+                              updateMessagePayloadField(index, newField)
+                            }
+                            onRemove={() => removeMessagePayloadField(index)}
+                            isReadOnly={isReadOnly}
+                            allowFileType={false}
+                            allowMockExpression={true}
+                          />
+                        ))
+                      ) : (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 text-center py-2">
+                          Schema 필드가 없습니다. "+ Add Field"를 클릭하여
+                          추가하거나 Schema를 선택하세요.
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
+              )}
+
+              {/* 메시지 생성 버튼 */}
+              {!isReadOnly && (
+                <div className="pt-4">
+                  <button
+                    onClick={handleCreateMessage}
+                    className="w-full px-4 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md text-sm font-medium transition-colors"
+                  >
+                    메시지 생성
+                  </button>
+                </div>
+              )}
+
+              {/* 생성된 메시지 목록 */}
+              <div className="mt-6">
+                <h4 className="text-xs font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">
+                  생성된 메시지 목록 ({messages.length})
+                </h4>
                 <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-200 dark:border-[#2D333B] rounded-md p-3 bg-gray-50 dark:bg-[#0D1117]">
                   {messages.length > 0 ? (
                     messages.map((msg, idx) => {
-                      const messageName = msg.messageName || msg.name || "Unnamed";
-                      const isSelected = reply.messages?.includes(messageName) || false;
-                      
+                      const messageName =
+                        msg.messageName || msg.name || "Unnamed";
                       return (
-                        <label
+                        <div
                           key={`${messageName}-${idx}`}
-                          className={`flex items-center gap-2 p-2.5 rounded-md cursor-pointer transition-colors ${
-                            isSelected
-                              ? "bg-emerald-100 dark:bg-emerald-900/30 border border-emerald-300 dark:border-emerald-700"
-                              : "bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#2D333B] hover:bg-gray-100 dark:hover:bg-[#21262D]"
-                          } ${isReadOnly ? "opacity-60 cursor-not-allowed" : ""}`}
+                          className="p-2.5 rounded-md bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#2D333B]"
                         >
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={(e) => {
-                              if (isReadOnly) return;
-                              const currentMessages = reply.messages || [];
-                              const newMessages = e.target.checked
-                                ? [...currentMessages, messageName]
-                                : currentMessages.filter((m) => m !== messageName);
-                              setReply({ ...reply, messages: newMessages });
-                            }}
-                            disabled={isReadOnly}
-                            className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 flex-shrink-0"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm text-gray-900 dark:text-[#E6EDF3] font-medium truncate">
-                              {messageName}
-                            </div>
-                            {msg.description && (
-                              <div className="text-xs text-gray-500 dark:text-[#8B949E] truncate mt-0.5">
-                                {msg.description}
-                              </div>
-                            )}
+                          <div className="text-sm text-gray-900 dark:text-[#E6EDF3] font-medium">
+                            {messageName}
                           </div>
-                        </label>
+                          {msg.description && (
+                            <div className="text-xs text-gray-500 dark:text-[#8B949E] mt-0.5">
+                              {msg.description}
+                            </div>
+                          )}
+                        </div>
                       );
                     })
                   ) : (
                     <div className="text-center py-6">
-                      <p className="text-sm text-gray-500 dark:text-[#8B949E] mb-2">
-                        사용 가능한 메시지가 없습니다
-                      </p>
-                      <p className="text-xs text-gray-400 dark:text-[#6E7681]">
-                        Message를 먼저 생성해주세요
+                      <p className="text-sm text-gray-500 dark:text-[#8B949E]">
+                        생성된 메시지가 없습니다
                       </p>
                     </div>
                   )}
                 </div>
               </div>
-
-              {/* Schema */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E]">
-                    Schema
-                  </label>
-                  <div className="flex gap-2">
-                    {!isReadOnly && (
-                      <>
-                        <button
-                          onClick={() => setIsReplySchemaModalOpen(true)}
-                          className="text-[#2563EB] hover:text-[#1E40AF] text-xs font-medium"
-                        >
-                          Schema 선택
-                        </button>
-                        <button
-                          onClick={addReplySchemaField}
-                          className="text-[#2563EB] hover:text-[#1E40AF] text-xs font-medium"
-                        >
-                          + Add Field
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* Schema Reference 표시 */}
-                {reply.schema.schemaRef && (
-                  <div className="mb-2 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
-                    <div className="flex items-center justify-between">
-                      <span 
-                        className="text-xs text-blue-700 dark:text-blue-300 font-medium"
-                        title={reply.schema.schemaRef}
-                      >
-                        Schema: {getShortSchemaName(reply.schema.schemaRef)}
-                      </span>
-                      {!isReadOnly && (
-                        <button
-                          onClick={() => {
-                            setReply({
-                              ...reply,
-                              schema: { ...reply.schema, schemaRef: undefined },
-                            });
-                          }}
-                          className="text-blue-500 hover:text-blue-700 text-xs"
-                        >
-                          제거
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Schema Fields */}
-                <div className="space-y-2">
-                  {reply.schema.fields && reply.schema.fields.length > 0 ? (
-                    reply.schema.fields.map((field, index) => (
-                      <SchemaFieldEditor
-                        key={index}
-                        field={field}
-                        onChange={(newField) => updateReplySchemaField(index, newField)}
-                        onRemove={() => removeReplySchemaField(index)}
-                        isReadOnly={isReadOnly}
-                        allowFileType={false}
-                        allowMockExpression={true}
-                      />
-                    ))
-                  ) : (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 text-center py-2">
-                      Schema 필드가 없습니다. "+ Add Field"를 클릭하여 추가하거나 Schema를 선택하세요.
-                    </p>
-                  )}
-                </div>
-              </div>
             </div>
-          ) : (
-            <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
-              <p>Reply가 없습니다. "추가" 버튼을 클릭하여 추가하세요.</p>
-            </div>
-          )}
-            </div>
-          )}
-
-          {wsTab === "schema" && (
-            <SchemaCard
-              isReadOnly={isReadOnly}
-              protocol="WebSocket"
-            />
           )}
         </div>
       </div>
@@ -1271,6 +2004,16 @@ export function WsEditorForm({
         onSelect={handleReplySchemaSelect}
         schemas={schemas}
         setSchemas={setSchemas}
+      />
+
+      {/* 메시지 작성용 Schema 선택 모달 */}
+      <SchemaModal
+        isOpen={isMessageSchemaModalOpen}
+        onClose={() => setIsMessageSchemaModalOpen(false)}
+        onSelect={handleMessageSchemaSelect}
+        schemas={schemas}
+        setSchemas={setSchemas}
+        protocol="WebSocket"
       />
     </div>
   );

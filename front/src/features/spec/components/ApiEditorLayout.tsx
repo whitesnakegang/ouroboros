@@ -22,7 +22,6 @@ import {
 } from "../services/api";
 import { MarkdownPreviewModal } from "./MarkdownPreviewModal";
 // FilenameOptions removed
-import { WsChannelMessageTree } from "./WsChannelMessageTree";
 import {
   createRestApiSpec,
   updateRestApiSpec,
@@ -31,10 +30,12 @@ import {
   syncRestApiSpec,
   getSchema,
   getWebSocketOperation,
+  createWebSocketOperation,
   updateWebSocketOperation,
   syncWebSocketOperation,
   getWebSocketChannel,
   type RestApiSpecResponse,
+  type CreateOperationRequest,
 } from "../services/api";
 import {
   convertRequestBodyToOpenAPI,
@@ -283,6 +284,7 @@ export function ApiEditorLayout() {
       setSummary("");
       setQueryParams([]);
       setRequestHeaders([]);
+      setPathParams([]);
       setRequestBody({
         type: "none",
         fields: [],
@@ -360,10 +362,11 @@ export function ApiEditorLayout() {
       // Parameters를 폼 state와 테스트 스토어로 분리
       const formHeaders: KeyValuePair[] = [];
       const formQueryParams: KeyValuePair[] = [];
+      const formPathParams: KeyValuePair[] = [];
       const testHeaders: Array<{ key: string; value: string }> = [];
       const testQueryParams: Array<{ key: string; value: string }> = [];
 
-      // Parameters를 헤더와 쿼리 파라미터로 분리
+      // Parameters를 헤더, 쿼리 파라미터, path 파라미터로 분리
       if (spec.parameters && Array.isArray(spec.parameters)) {
         spec.parameters.forEach((param: any) => {
           if (param.in === "header") {
@@ -394,6 +397,19 @@ export function ApiEditorLayout() {
               key: param.name || "",
               value: param.example || param.schema?.default || "",
             });
+          } else if (param.in === "path") {
+            // 폼 state (편집용)
+            // schema 타입 추출: query parameter와 동일한 방식으로 처리
+            const schema = param.schema as any;
+            const paramType = schema?.type || "string";
+
+            formPathParams.push({
+              key: param.name || "",
+              value: schema?.default || param.example || "",
+              required: param.required !== false, // path parameter는 기본적으로 required
+              description: param.description || "",
+              type: paramType,
+            });
           }
         });
       }
@@ -401,6 +417,7 @@ export function ApiEditorLayout() {
       // 폼 state 업데이트
       setQueryParams(formQueryParams);
       setRequestHeaders(formHeaders);
+      setPathParams(formPathParams);
 
       // RequestBody 처리 (새로운 schemaConverter 사용)
       let loadedRequestBody: RequestBody = { type: "none", fields: [] };
@@ -427,6 +444,43 @@ export function ApiEditorLayout() {
       ) {
         try {
           const schemaResponse = await getSchema(loadedRequestBody.schemaRef);
+          const schemaData = schemaResponse.data;
+
+          if (schemaData.properties) {
+            const fields = Object.entries(schemaData.properties).map(
+              ([key, propSchema]: [string, any]) => {
+                return parseOpenAPISchemaToSchemaField(key, propSchema);
+              }
+            );
+
+            // required 필드 설정
+            if (schemaData.required && Array.isArray(schemaData.required)) {
+              fields.forEach((field) => {
+                if (schemaData.required!.includes(field.key)) {
+                  field.required = true;
+                }
+              });
+            }
+
+            loadedRequestBody.fields = fields;
+          }
+        } catch {
+          // 스키마 조회 실패 시 무시
+        }
+      }
+
+      // rootSchemaType이 ref인 경우 스키마를 조회해서 fields 채우기 (json/xml 타입)
+      if (
+        loadedRequestBody.rootSchemaType &&
+        isRefSchema(loadedRequestBody.rootSchemaType) &&
+        (loadedRequestBody.type === "json" ||
+          loadedRequestBody.type === "xml") &&
+        (!loadedRequestBody.fields || loadedRequestBody.fields.length === 0)
+      ) {
+        try {
+          const schemaResponse = await getSchema(
+            loadedRequestBody.rootSchemaType.schemaName
+          );
           const schemaData = schemaResponse.data;
 
           if (schemaData.properties) {
@@ -756,7 +810,15 @@ export function ApiEditorLayout() {
       setWsEntryPoint(operationData.operation.entrypoint || "/ws");
       setWsSummary(""); // Operation에는 summary가 없음
       setWsDescription(operationData.operationName || ""); // operationName을 description으로
-      setWsTags(""); // 필요시 추가
+      // 백엔드에서 관리하는 tags 사용 (REST API와 동일하게)
+      const operationTags = (operationData.operation as any).tags;
+      setWsTags(
+        operationTags &&
+          Array.isArray(operationTags) &&
+          operationTags.length > 0
+          ? operationTags.join(", ") // REST와 동일하게 쉼표로 구분된 문자열로 변환
+          : ""
+      );
 
       // Receiver 설정
       if (
@@ -881,6 +943,7 @@ export function ApiEditorLayout() {
 
   // Request state
   const [queryParams, setQueryParams] = useState<KeyValuePair[]>([]);
+  const [pathParams, setPathParams] = useState<KeyValuePair[]>([]);
   const [requestHeaders, setRequestHeaders] = useState<KeyValuePair[]>([]);
   const [requestBody, setRequestBody] = useState<RequestBody>({
     type: "none",
@@ -892,6 +955,7 @@ export function ApiEditorLayout() {
 
   // WebSocket state
   const [wsEntryPoint, setWsEntryPoint] = useState("");
+  const [wsProtocol, setWsProtocol] = useState<"ws" | "wss">("ws");
   const [wsSummary, setWsSummary] = useState("");
   const [wsDescription, setWsDescription] = useState("");
   const [wsTags, setWsTags] = useState("");
@@ -899,10 +963,12 @@ export function ApiEditorLayout() {
     address: string;
     headers: KeyValuePair[];
     schema: RequestBody;
+    messages?: string[];
   } | null>(null);
   const [wsReply, setWsReply] = useState<{
     address: string;
     schema: RequestBody;
+    messages?: string[];
   } | null>(null);
 
   const methods = ["GET", "POST", "PUT", "PATCH", "DELETE"];
@@ -1098,11 +1164,198 @@ export function ApiEditorLayout() {
         alert("Entry Point를 입력해주세요.");
         return;
       }
-      alert("WebSocket Operation 저장 기능은 준비 중입니다.");
-      // TODO: Implement WebSocket Operation save logic
-      // - createWebSocketOperation or updateWebSocketOperation 호출
-      // - receiver/reply messages 변환
-      // - protocol + pathname 변환
+
+      try {
+        // receiver와 reply를 ChannelMessageInfo 형식으로 변환
+        const receives =
+          wsReceiver && wsReceiver.address
+            ? [
+                {
+                  address: wsReceiver.address,
+                  messages: wsReceiver.messages || [],
+                },
+              ]
+            : null;
+
+        const replies =
+          wsReply && wsReply.address
+            ? [
+                {
+                  address: wsReply.address,
+                  messages: wsReply.messages || [],
+                },
+              ]
+            : null;
+
+        const request: CreateOperationRequest = {
+          protocol: wsProtocol,
+          pathname: wsEntryPoint,
+          receives: receives,
+          replies: replies,
+          tags:
+            wsTags && wsTags.trim()
+              ? wsTags
+                  .split(",")
+                  .map((t) => t.trim())
+                  .filter((t) => t.length > 0)
+              : undefined, // 백엔드로 tags 전달
+        };
+
+        if (selectedEndpoint && isEditMode) {
+          // 수정 로직
+          await updateWebSocketOperation(selectedEndpoint.id, {
+            protocol: wsProtocol,
+            pathname: wsEntryPoint,
+            receive: receives && receives.length > 0 ? receives[0] : undefined,
+            reply: replies && replies.length > 0 ? replies[0] : undefined,
+            tags:
+              wsTags && wsTags.trim()
+                ? wsTags
+                    .split(",")
+                    .map((t) => t.trim())
+                    .filter((t) => t.length > 0)
+                : undefined, // 백엔드로 tags 전달
+          });
+          alert("WebSocket Operation이 수정되었습니다.");
+
+          // 사이드바 목록 다시 로드
+          await loadEndpoints();
+
+          // 저장 후 다시 로드하여 백엔드에서 최신 데이터 가져오기
+          await loadEndpointData(selectedEndpoint.id);
+        } else {
+          // 생성 로직
+          const response = await createWebSocketOperation(request);
+          const createdOperation =
+            response.data && response.data.length > 0 ? response.data[0] : null;
+
+          if (createdOperation) {
+            // 생성된 operation을 endpoint 형태로 변환
+            const operation = createdOperation.operation;
+            const operationId = operation.id || createdOperation.operationName;
+
+            // receiver address 추출
+            const receiverAddress =
+              receives && receives.length > 0 ? receives[0].address : "";
+
+            // extractDomainFromAddress 함수와 동일한 로직 사용
+            const extractDomain = (address: string): string => {
+              if (!address || address === "/unknown") {
+                return "OTHERS";
+              }
+              const parts = address
+                .split("/")
+                .filter((part) => part.length > 0);
+              if (parts.length === 0) {
+                return "OTHERS";
+              }
+              const domain = parts[0];
+              return (
+                domain.charAt(0).toUpperCase() + domain.slice(1).toLowerCase()
+              );
+            };
+            // 그룹 결정: 백엔드에서 받은 tags 사용 (REST와 동일하게)
+            // 백엔드에서 tags를 반환하므로 operation.tags 사용
+            const operationTags = (operation as any).tags;
+            const group =
+              operationTags &&
+              Array.isArray(operationTags) &&
+              operationTags.length > 0
+                ? operationTags[0] // REST와 동일하게 첫 번째 tag 사용
+                : extractDomain(receiverAddress);
+
+            // tag에 따라 method 결정
+            const tag = createdOperation.tag || operation.action || "receive";
+            let method = "RECEIVE";
+            if (tag === "duplicate") {
+              method = "DUPLEX";
+            } else if (tag === "receive") {
+              method = "RECEIVE";
+            } else if (tag === "sendto") {
+              method = "SEND";
+            }
+
+            // Path 생성
+            let path = receiverAddress;
+            if (replies && replies.length > 0 && replies[0].address) {
+              path = `${receiverAddress} - ${replies[0].address}`;
+            }
+
+            // Summary 생성
+            const summary = createdOperation.operationName
+              .replace(/^_/, "")
+              .replace(/_to_/g, " → ")
+              .replace(/_/g, " ")
+              .replace(/\./g, ".");
+
+            const newEndpoint = {
+              id: operationId,
+              method: method,
+              path: path,
+              description: summary,
+              implementationStatus: (() => {
+                if (operation.progress?.toLowerCase() === "completed")
+                  return undefined;
+                if (operation.progress?.toLowerCase() === "mock")
+                  return "in-progress" as const;
+                return "not-implemented" as const;
+              })(),
+              hasSpecError:
+                operation.diff && operation.diff !== "none" ? true : undefined,
+              tags: (operation as any).tags || [], // 백엔드에서 받은 tags 사용
+              progress: operation.progress || "none",
+              tag: tag,
+              diff: operation.diff || "none",
+              protocol: "WebSocket" as const,
+              operationName: createdOperation.operationName,
+            };
+
+            // 사이드바에 추가
+            const { addEndpoint } = useSidebarStore.getState();
+            addEndpoint(newEndpoint, group);
+
+            alert(`WebSocket Operation이 생성되었습니다.`);
+
+            // 사이드바 목록 다시 로드
+            await loadEndpoints();
+
+            // 생성된 엔드포인트를 선택 (wsTags 정보 유지)
+            setSelectedEndpoint(newEndpoint);
+            setIsNewFormMode(false); // 저장 후 새 폼 모드 해제
+
+            // 생성 후 다시 로드하여 백엔드에서 최신 데이터 가져오기 (progress 등 최신 정보 반영)
+            await loadWebSocketOperationData(operationId);
+
+            // loadWebSocketOperationData 후 최신 operation 정보로 selectedEndpoint 업데이트
+            // 백엔드에서 tags를 관리하므로 백엔드에서 받은 tags 사용
+            try {
+              const latestResponse = await getWebSocketOperation(operationId);
+              const latestOperation = latestResponse.data.operation;
+              const latestOperationData = latestResponse.data;
+
+              // 최신 progress, diff, tags 정보로 업데이트
+              setSelectedEndpoint({
+                ...newEndpoint,
+                progress: latestOperation.progress || newEndpoint.progress,
+                diff: latestOperation.diff || newEndpoint.diff,
+                tag: latestOperationData.tag || newEndpoint.tag,
+                tags: (latestOperation as any).tags || newEndpoint.tags, // 백엔드에서 받은 tags 사용
+              });
+            } catch (error) {
+              console.warn("최신 operation 정보 로드 실패:", error);
+            }
+          } else {
+            alert("WebSocket Operation이 생성되었습니다.");
+            // 사이드바 목록 다시 로드
+            await loadEndpoints();
+            // 폼 초기화
+            handleReset();
+          }
+        }
+      } catch (error: any) {
+        console.error("WebSocket Operation 저장 실패:", error);
+        alert(error.message || "WebSocket Operation 저장에 실패했습니다.");
+      }
       return;
     }
 
@@ -1276,6 +1529,7 @@ export function ApiEditorLayout() {
       setSummary("");
       setQueryParams([]);
       setRequestHeaders([]);
+      setPathParams([]);
       setAuth({ type: "none" });
       setRequestBody({
         type: "json",
@@ -1311,6 +1565,7 @@ export function ApiEditorLayout() {
     // 프로토콜에 따른 추가 초기화
     if (protocol === "WebSocket") {
       setWsEntryPoint("");
+      setWsProtocol("ws");
       setWsSummary("");
       setWsDescription("");
       setWsTags("");
@@ -2119,6 +2374,8 @@ export function ApiEditorLayout() {
                 <WsEditorForm
                   entryPoint={wsEntryPoint}
                   setEntryPoint={setWsEntryPoint}
+                  protocol={wsProtocol}
+                  setProtocol={setWsProtocol}
                   summary={wsSummary}
                   setSummary={setWsSummary}
                   description={wsDescription}
@@ -2291,7 +2548,7 @@ export function ApiEditorLayout() {
                       {summary && (
                         <div>
                           <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-1">
-                            Summary
+                            Owner
                           </h3>
                           <p className="text-sm text-gray-900 dark:text-[#E6EDF3]">
                             {summary}
@@ -2451,13 +2708,13 @@ export function ApiEditorLayout() {
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                              Summary
+                              Owner
                             </label>
                             <input
                               type="text"
                               value={summary}
                               onChange={(e) => setSummary(e.target.value)}
-                              placeholder="예: 사용자 로그인 생성"
+                              placeholder="예: 심연수"
                               disabled={!!(selectedEndpoint && !isEditMode)}
                               className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
                                 selectedEndpoint && !isEditMode
@@ -2540,6 +2797,8 @@ export function ApiEditorLayout() {
                       <ApiRequestCard
                         queryParams={queryParams}
                         setQueryParams={setQueryParams}
+                        pathParams={pathParams}
+                        setPathParams={setPathParams}
                         requestHeaders={requestHeaders}
                         setRequestHeaders={setRequestHeaders}
                         requestBody={requestBody}
@@ -2658,13 +2917,6 @@ export function ApiEditorLayout() {
         onClose={() => setIsCodeSnippetOpen(false)}
         spec={currentSpec}
       />
-
-      {/* WebSocket Channels/Messages Tree */}
-      {protocol === "WebSocket" && activeTab === "form" && (
-        <div className="px-6 py-4">
-          <WsChannelMessageTree />
-        </div>
-      )}
 
       {/* Import Result Modal */}
       {importResult && (

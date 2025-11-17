@@ -288,8 +288,17 @@ export async function getRestApiSpec(id: string): Promise<GetSpecResponse & { re
   const data = await response.json();
   
   // 응답 헤더에서 diff 로그 정보 추출
-  const reqLog = response.headers.get("x-ouroboros-req-log") || response.headers.get("X-Ouroboros-Req-Log");
-  const resLog = response.headers.get("x-ouroboros-res-log") || response.headers.get("X-Ouroboros-Res-Log");
+  const headerReqLog = response.headers.get("x-ouroboros-req-log") || response.headers.get("X-Ouroboros-Req-Log");
+  const headerResLog = response.headers.get("x-ouroboros-res-log") || response.headers.get("X-Ouroboros-Res-Log");
+  
+  // 응답 body에서도 diff 로그 정보 추출
+  // data.reqLog/resLog (최상위 레벨) 또는 data.data.reqLog/resLog (data 객체 내부) 확인
+  const bodyReqLog = data.reqLog || (data.data && data.data.reqLog);
+  const bodyResLog = data.resLog || (data.data && data.data.resLog);
+  
+  // 헤더 우선, 없으면 body에서 가져옴
+  const reqLog = headerReqLog || bodyReqLog;
+  const resLog = headerResLog || bodyResLog;
   
   return {
     ...data,
@@ -875,6 +884,7 @@ export interface CreateOperationRequest {
   pathname: string;
   receives?: ChannelMessageInfo[] | null;
   replies?: ChannelMessageInfo[] | null;
+  tags?: string[]; // 백엔드에서 관리할 tags 필드 추가
 }
 
 export interface UpdateOperationRequest {
@@ -882,6 +892,7 @@ export interface UpdateOperationRequest {
   pathname?: string;
   receive?: ChannelMessageInfo;
   reply?: ChannelMessageInfo;
+  tags?: string[]; // 백엔드에서 관리할 tags 필드 추가
 }
 
 export interface GetAllOperationsResponse {
