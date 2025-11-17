@@ -1,5 +1,6 @@
 package kr.co.ouroboros.core.rest.spec.validator;
 
+import kr.co.ouroboros.core.rest.handler.helper.RequestDiffHelper;
 import kr.co.ouroboros.core.rest.spec.model.Property;
 import kr.co.ouroboros.core.rest.spec.model.Schema;
 import lombok.extern.slf4j.Slf4j;
@@ -289,7 +290,7 @@ public class RestSchemaValidator {
 
             if (!schemaExists) {
                 // Try normalized name (simple class name)
-                String normalizedName = extractSimpleClassName(schemaName);
+                String normalizedName = RequestDiffHelper.extractClassNameFromFullName(schemaName);
                 schemaExists = schemas.containsKey(normalizedName);
             }
 
@@ -358,24 +359,4 @@ public class RestSchemaValidator {
         return schema;
     }
 
-    /**
-     * Extracts the simple class name from a fully qualified class name (FQCN).
-     * <p>
-     * Example: "com.c102.ourotest.dto.MemberResponse" -> "MemberResponse"
-     *
-     * @param fullName the fully qualified class name or simple class name
-     * @return the simple class name; if no '.' is present, returns the original string
-     */
-    private String extractSimpleClassName(String fullName) {
-        if (fullName == null || fullName.isEmpty()) {
-            return fullName;
-        }
-
-        int lastDotIndex = fullName.lastIndexOf('.');
-        if (lastDotIndex == -1) {
-            return fullName;
-        }
-
-        return fullName.substring(lastDotIndex + 1);
-    }
 }

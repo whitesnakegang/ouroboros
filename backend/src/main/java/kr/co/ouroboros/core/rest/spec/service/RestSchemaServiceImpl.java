@@ -3,6 +3,7 @@ package kr.co.ouroboros.core.rest.spec.service;
 import kr.co.ouroboros.core.global.Protocol;
 import kr.co.ouroboros.core.global.manager.OuroApiSpecManager;
 import kr.co.ouroboros.core.rest.common.yaml.RestApiYamlParser;
+import kr.co.ouroboros.core.rest.handler.helper.RequestDiffHelper;
 import kr.co.ouroboros.core.rest.mock.registry.RestMockRegistry;
 import kr.co.ouroboros.core.rest.mock.service.RestMockLoaderService;
 import kr.co.ouroboros.ui.rest.spec.dto.CreateSchemaRequest;
@@ -123,7 +124,7 @@ public class RestSchemaServiceImpl implements RestSchemaService {
             // If not found, try with normalized name (simple class name)
             String actualSchemaName = schemaName;
             if (schemaDefinition == null) {
-                String normalizedName = extractClassNameFromFullName(schemaName);
+                String normalizedName = RequestDiffHelper.extractClassNameFromFullName(schemaName);
                 schemaDefinition = yamlParser.getSchema(openApiDoc, normalizedName);
                 if (schemaDefinition != null) {
                     actualSchemaName = normalizedName;
@@ -169,7 +170,7 @@ public class RestSchemaServiceImpl implements RestSchemaService {
 
             // If not found, try with normalized name (simple class name)
             if (existingSchema == null) {
-                String normalizedName = extractClassNameFromFullName(schemaName);
+                String normalizedName = RequestDiffHelper.extractClassNameFromFullName(schemaName);
                 existingSchema = yamlParser.getSchema(openApiDoc, normalizedName);
                 if (existingSchema != null) {
                     actualSchemaName = normalizedName;
@@ -258,7 +259,7 @@ public class RestSchemaServiceImpl implements RestSchemaService {
 
             // If not found, try with normalized name (simple class name)
             if (!removed) {
-                String normalizedName = extractClassNameFromFullName(schemaName);
+                String normalizedName = RequestDiffHelper.extractClassNameFromFullName(schemaName);
                 removed = yamlParser.removeSchema(openApiDoc, normalizedName);
                 if (removed) {
                     actualSchemaName = normalizedName;
@@ -596,27 +597,6 @@ public class RestSchemaServiceImpl implements RestSchemaService {
         Map<String, kr.co.ouroboros.core.rest.mock.model.EndpointMeta> endpoints = mockLoaderService.loadFromYaml();
         endpoints.values().forEach(mockRegistry::register);
         log.info("Reloaded {} mock endpoints into registry", endpoints.size());
-    }
-
-    /**
-     * Extracts the simple class name from a fully qualified class name (FQCN).
-     * <p>
-     * Example: "com.c102.ourotest.dto.MemberResponse" -> "MemberResponse"
-     *
-     * @param fullName the fully qualified class name or simple class name
-     * @return the simple class name; if no '.' is present, returns the original string
-     */
-    private String extractClassNameFromFullName(String fullName) {
-        if (fullName == null || fullName.isEmpty()) {
-            return fullName;
-        }
-
-        int lastDotIndex = fullName.lastIndexOf('.');
-        if (lastDotIndex == -1) {
-            return fullName;
-        }
-
-        return fullName.substring(lastDotIndex + 1);
     }
 
 }
