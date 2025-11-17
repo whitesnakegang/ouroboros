@@ -275,22 +275,33 @@ public class SchemaComparator {
             Map<String, TypeCnts> baseSchemas,
             Map<String, TypeCnts> targetSchemas) {
         Map<String, Boolean> results = new HashMap<>();
-        
+
         if (baseSchemas == null || baseSchemas.isEmpty()) {
             return results;
         }
-        
+
         for (Map.Entry<String, TypeCnts> entry : baseSchemas.entrySet()) {
             String schemaName = entry.getKey();
             TypeCnts baseTypeCnts = entry.getValue();
-            
-            // targetSchemas에 해당 스키마가 없으면 false
-            if (targetSchemas == null || !targetSchemas.containsKey(schemaName)) {
+
+            // Normalize schema name to simple class name for comparison
+            String normalizedSchemaName = kr.co.ouroboros.core.rest.handler.helper.RequestDiffHelper.extractClassNameFromFullName(schemaName);
+
+            // targetSchemas에 해당 스키마가 없으면 false (정규화된 이름으로 검색)
+            TypeCnts targetTypeCnts = null;
+            if (targetSchemas != null) {
+                // Try exact match first
+                targetTypeCnts = targetSchemas.get(schemaName);
+                // If not found, try normalized name
+                if (targetTypeCnts == null) {
+                    targetTypeCnts = targetSchemas.get(normalizedSchemaName);
+                }
+            }
+
+            if (targetTypeCnts == null) {
                 results.put(schemaName, false);
                 continue;
             }
-            
-            TypeCnts targetTypeCnts = targetSchemas.get(schemaName);
             
             // 두 TypeCnts의 typeCounts를 비교
             Map<String, Integer> baseTypeCounts = baseTypeCnts != null ? baseTypeCnts.getTypeCounts() : new HashMap<>();
