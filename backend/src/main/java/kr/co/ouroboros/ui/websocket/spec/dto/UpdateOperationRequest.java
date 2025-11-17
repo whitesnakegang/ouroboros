@@ -66,5 +66,14 @@ public class UpdateOperationRequest {
      * Example: ["user", "chat"] will be stored as ["USER", "CHAT"]
      */
     private List<String> tags;
+
+    /**
+     * Development progress status.
+     * <p>
+     * Allowed values: "completed", "none"
+     * Updates the x-ouroboros-progress field in the AsyncAPI specification.
+     * Example: "completed", "none"
+     */
+    private String progress;
 }
 

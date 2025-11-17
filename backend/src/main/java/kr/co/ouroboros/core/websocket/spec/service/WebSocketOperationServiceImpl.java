@@ -258,14 +258,7 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
 
                 Operation operation = convertMapToOperation(operationDefinition);
 
-                // Calculate tag based on operation type
-                String tag = calculateOperationTag(operation);
-
-                responses.add(OperationResponse.builder()
-                        .operationName(operationName)
-                        .operation(operation)
-                        .tag(tag)
-                        .build());
+                responses.add(buildOperationResponse(operationName, operation, asyncApiDoc));
             }
 
             return responses;
@@ -295,10 +288,7 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
 
             Operation operation = convertMapToOperation(operationDefinition);
 
-            return OperationResponse.builder()
-                    .operationName(operationName)
-                    .operation(operation)
-                    .build();
+            return buildOperationResponse(operationName, operation, asyncApiDoc);
         } finally {
             lock.readLock().unlock();
         }
@@ -377,6 +367,15 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                 } else {
                     updatedOperation.remove("tags");
                 }
+            }
+
+            // Update x-ouroboros-progress if provided
+            if (request.getProgress() != null) {
+                String progress = request.getProgress().trim().toLowerCase();
+                if (!progress.equals("completed") && !progress.equals("none")) {
+                    throw new IllegalArgumentException("Progress must be either 'completed' or 'none'");
+                }
+                updatedOperation.put("x-ouroboros-progress", progress);
             }
 
             // Determine action automatically based on provided fields
@@ -507,10 +506,7 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
 
             Operation operation = convertMapToOperation(existingOperation);
 
-            return OperationResponse.builder()
-                    .operationName(operationName)
-                    .operation(operation)
-                    .build();
+            return buildOperationResponse(operationName, operation, asyncApiDoc);
         } finally {
             lock.writeLock().unlock();
         }
@@ -1082,20 +1078,17 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                 // Already exists in file, just return it
                 log.info("Operation '{}' already exists in file (ID: {}), no sync needed", operationName, id);
                 Operation operation = convertMapToOperation(fileOperationEntry.getValue());
-                return OperationResponse.builder()
-                        .operationName(fileOperationEntry.getKey())
-                        .operation(operation)
-                        .build();
+                return buildOperationResponse(fileOperationEntry.getKey(), operation, fileDoc);
             }
 
-            // Step 4: Sync servers from cache to file if file has no servers
-            syncServersFromCache(cacheDoc, fileDoc);
-
-            // Step 5: Sync missing schemas and messages from cache to file
-            syncMissingSchemasAndMessagesFromCache(cacheDoc, fileDoc);
-
-            // Step 6: Deep copy operation from cache
+            // Step 4: Deep copy operation from cache (moved earlier to extract entrypoint)
             Map<String, Object> operationToAdd = deepCopyOperation(cacheOperation);
+
+            // Step 5: Sync servers from cache to file if file has no servers
+            syncServersFromCache(cacheDoc, fileDoc, operationToAdd);
+
+            // Step 6: Sync missing schemas and messages from cache to file
+            syncMissingSchemasAndMessagesFromCache(cacheDoc, fileDoc);
 
             // Step 7: Reset Ouroboros custom fields to default values when syncing to file
             // WebSocket operations use: x-ouroboros-progress, x-ouroboros-diff (no x-ouroboros-tag)
@@ -1209,10 +1202,7 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
             log.info("Synced cache-only operation '{}' to file (ID: {})", operationName, id);
 
             Operation operation = convertMapToOperation(operationToAdd);
-            return OperationResponse.builder()
-                    .operationName(operationName)
-                    .operation(operation)
-                    .build();
+            return buildOperationResponse(operationName, operation, fileDoc);
         } finally {
             lock.writeLock().unlock();
         }
@@ -1221,39 +1211,36 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
     /**
      * Syncs servers from cache to file document if file has no servers.
      * <p>
-     * Copies all servers from cache to file to ensure entrypoint can be extracted.
-     * If cache also has no servers, creates a default server with protocol "ws" and pathname "/ws".
+     * Extracts entrypoint from operation and creates a proper server using ensureServerExists
+     * to ensure pathname field is included. Falls back to default server if no entrypoint found.
      *
      * @param cacheDoc the cached document containing servers
      * @param fileDoc the file document to sync into
+     * @param operationToSync the operation being synced (used to extract entrypoint)
      */
     @SuppressWarnings("unchecked")
-    private void syncServersFromCache(Map<String, Object> cacheDoc, Map<String, Object> fileDoc) {
+    private void syncServersFromCache(Map<String, Object> cacheDoc, Map<String, Object> fileDoc, Map<String, Object> operationToSync) {
         Map<String, Object> fileServers = yamlParser.getServers(fileDoc);
         if (fileServers != null && !fileServers.isEmpty()) {
             // File already has servers, no need to sync
             return;
         }
 
-        Map<String, Object> cacheServers = yamlParser.getServers(cacheDoc);
-        if (cacheServers != null && !cacheServers.isEmpty()) {
-            // Deep copy servers from cache to file
-            try {
-                byte[] bytes = objectMapper.writeValueAsBytes(cacheServers);
-                Map<String, Object> serversCopy = objectMapper.readValue(bytes, new TypeReference<Map<String, Object>>() {});
-
-                // Set servers in fileDoc
-                fileDoc.put("servers", serversCopy);
-                log.info("Synced {} server(s) from cache to file", serversCopy.size());
-            } catch (Exception e) {
-                log.error("Failed to sync servers from cache to file", e);
-            }
-        } else {
-            // Cache has no servers either, create default server
-            log.debug("No servers found in cache, creating default server");
-            serverManager.ensureServerExists(fileDoc, "ws", "/ws");
-            log.info("Created default server (ws:///ws) in file");
+        // Extract entrypoint from operation, default to "/ws"
+        String entrypoint = (String) operationToSync.get("x-ouroboros-entrypoint");
+        if (entrypoint == null || entrypoint.isEmpty()) {
+            entrypoint = "/ws";
         }
+
+        // Extract protocol from cache servers or default to "ws"
+        String protocol = serverManager.extractProtocol(cacheDoc);
+        if (protocol == null) {
+            protocol = "ws";
+        }
+
+        // Create proper server with pathname using ensureServerExists
+        serverManager.ensureServerExists(fileDoc, protocol, entrypoint);
+        log.info("Created server ({}://{}) in file", protocol, entrypoint);
     }
 
     /**
@@ -1661,6 +1648,33 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
             log.error("Failed to deep copy channel", e);
             throw new RuntimeException("Channel deep copy failed, cannot proceed safely", e);
         }
+    }
+
+    /**
+     * Builds an OperationResponse with protocol and tag automatically calculated.
+     * <p>
+     * Extracts the protocol from the server matching the operation's x-ouroboros-entrypoint
+     * and calculates the tag based on the operation's action and reply.
+     *
+     * @param operationName the operation name (identifier)
+     * @param operation the operation definition
+     * @param asyncApiDoc the AsyncAPI document containing servers
+     * @return OperationResponse with protocol and tag fields populated
+     */
+    private OperationResponse buildOperationResponse(String operationName, Operation operation, Map<String, Object> asyncApiDoc) {
+        String protocol = null;
+        if (operation.getXOuroborosEntrypoint() != null && asyncApiDoc != null) {
+            protocol = serverManager.extractProtocolByPathname(asyncApiDoc, operation.getXOuroborosEntrypoint());
+        }
+
+        String tag = calculateOperationTag(operation);
+
+        return OperationResponse.builder()
+                .operationName(operationName)
+                .operation(operation)
+                .protocol(protocol)
+                .tag(tag)
+                .build();
     }
 }
 
