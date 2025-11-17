@@ -33,6 +33,9 @@ import org.springframework.context.annotation.Primary;
  *   <li>{@link Sampler} - TryOnlySampler to sample only Try requests</li>
  *   <li>{@link SpanProcessor} - TempoTrySpanProcessor or InMemoryTrySpanProcessor based on Tempo enabled status</li>
  * </ul>
+ * <p>
+ * <b>Activation:</b>
+ * This configuration is enabled by default. To disable, set {@code ouroboros.enabled=false}.
  *
  * @author Ouroboros Team
  * @since 0.0.1
@@ -40,6 +43,7 @@ import org.springframework.context.annotation.Primary;
 @Slf4j
 @AutoConfiguration
 @AutoConfigureBefore(OpenTelemetryTracingAutoConfiguration.class)
+@ConditionalOnProperty(prefix = "ouroboros", name = "enabled", havingValue = "true", matchIfMissing = true)
 @EnableConfigurationProperties(TempoProperties.class)
 public class TraceStorageConfig {
     
