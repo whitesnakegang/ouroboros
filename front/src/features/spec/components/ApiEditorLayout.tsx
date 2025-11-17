@@ -30,10 +30,12 @@ import {
   syncRestApiSpec,
   getSchema,
   getWebSocketOperation,
+  createWebSocketOperation,
   updateWebSocketOperation,
   syncWebSocketOperation,
   getWebSocketChannel,
   type RestApiSpecResponse,
+  type CreateOperationRequest,
 } from "../services/api";
 import {
   convertRequestBodyToOpenAPI,
@@ -945,6 +947,7 @@ export function ApiEditorLayout() {
 
   // WebSocket state
   const [wsEntryPoint, setWsEntryPoint] = useState("");
+  const [wsProtocol, setWsProtocol] = useState<"ws" | "wss">("ws");
   const [wsSummary, setWsSummary] = useState("");
   const [wsDescription, setWsDescription] = useState("");
   const [wsTags, setWsTags] = useState("");
@@ -952,10 +955,12 @@ export function ApiEditorLayout() {
     address: string;
     headers: KeyValuePair[];
     schema: RequestBody;
+    messages?: string[];
   } | null>(null);
   const [wsReply, setWsReply] = useState<{
     address: string;
     schema: RequestBody;
+    messages?: string[];
   } | null>(null);
 
   const methods = ["GET", "POST", "PUT", "PATCH", "DELETE"];
@@ -1151,11 +1156,65 @@ export function ApiEditorLayout() {
         alert("Entry Point를 입력해주세요.");
         return;
       }
-      alert("WebSocket Operation 저장 기능은 준비 중입니다.");
-      // TODO: Implement WebSocket Operation save logic
-      // - createWebSocketOperation or updateWebSocketOperation 호출
-      // - receiver/reply messages 변환
-      // - protocol + pathname 변환
+
+      try {
+        // receiver와 reply를 ChannelMessageInfo 형식으로 변환
+        const receives =
+          wsReceiver && wsReceiver.address
+            ? [
+                {
+                  address: wsReceiver.address,
+                  messages: wsReceiver.messages || [],
+                },
+              ]
+            : null;
+
+        const replies =
+          wsReply && wsReply.address
+            ? [
+                {
+                  address: wsReply.address,
+                  messages: wsReply.messages || [],
+                },
+              ]
+            : null;
+
+        const request: CreateOperationRequest = {
+          protocol: wsProtocol,
+          pathname: wsEntryPoint,
+          receives: receives,
+          replies: replies,
+        };
+
+        if (selectedEndpoint && isEditMode) {
+          // 수정 로직
+          await updateWebSocketOperation(selectedEndpoint.id, {
+            protocol: wsProtocol,
+            pathname: wsEntryPoint,
+            receive: receives && receives.length > 0 ? receives[0] : undefined,
+            reply: replies && replies.length > 0 ? replies[0] : undefined,
+          });
+          alert("WebSocket Operation이 수정되었습니다.");
+        } else {
+          // 생성 로직
+          await createWebSocketOperation(request);
+          alert("WebSocket Operation이 생성되었습니다.");
+        }
+
+        // 사이드바 목록 다시 로드
+        await loadEndpoints();
+
+        // 수정 모드인 경우 다시 로드
+        if (selectedEndpoint && isEditMode) {
+          await loadEndpointData(selectedEndpoint.id);
+        } else {
+          // 새로 생성한 경우 폼 초기화
+          handleReset();
+        }
+      } catch (error: any) {
+        console.error("WebSocket Operation 저장 실패:", error);
+        alert(error.message || "WebSocket Operation 저장에 실패했습니다.");
+      }
       return;
     }
 
@@ -1365,6 +1424,7 @@ export function ApiEditorLayout() {
     // 프로토콜에 따른 추가 초기화
     if (protocol === "WebSocket") {
       setWsEntryPoint("");
+      setWsProtocol("ws");
       setWsSummary("");
       setWsDescription("");
       setWsTags("");
@@ -2173,6 +2233,8 @@ export function ApiEditorLayout() {
                 <WsEditorForm
                   entryPoint={wsEntryPoint}
                   setEntryPoint={setWsEntryPoint}
+                  protocol={wsProtocol}
+                  setProtocol={setWsProtocol}
                   summary={wsSummary}
                   setSummary={setWsSummary}
                   description={wsDescription}
@@ -2345,7 +2407,7 @@ export function ApiEditorLayout() {
                       {summary && (
                         <div>
                           <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-1">
-                            Summary
+                            Owner
                           </h3>
                           <p className="text-sm text-gray-900 dark:text-[#E6EDF3]">
                             {summary}
@@ -2505,13 +2567,13 @@ export function ApiEditorLayout() {
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                              Summary
+                              Owner
                             </label>
                             <input
                               type="text"
                               value={summary}
                               onChange={(e) => setSummary(e.target.value)}
-                              placeholder="예: 사용자 로그인 생성"
+                              placeholder="예: 심연수"
                               disabled={!!(selectedEndpoint && !isEditMode)}
                               className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
                                 selectedEndpoint && !isEditMode

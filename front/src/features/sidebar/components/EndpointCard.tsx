@@ -152,10 +152,7 @@ export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
             ) : null}
           </div>
 
-          {/* Summary (두 번째 줄) */}
-          <p className="text-xs text-gray-600 dark:text-[#8B949E] line-clamp-1">
-            {endpoint.description}
-          </p>
+          {/* Owner (두 번째 줄) */}
         </div>
       </div>
     </div>

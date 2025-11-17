@@ -44,6 +44,8 @@ interface Reply {
 interface WsEditorFormProps {
   entryPoint: string;
   setEntryPoint: (entryPoint: string) => void;
+  protocol?: "ws" | "wss";
+  setProtocol?: (protocol: "ws" | "wss") => void;
   summary: string;
   setSummary: (summary: string) => void;
   description: string;
@@ -68,6 +70,8 @@ interface WsEditorFormProps {
 export function WsEditorForm({
   entryPoint,
   setEntryPoint,
+  protocol: externalProtocol,
+  setProtocol: setExternalProtocol,
   summary,
   setSummary,
   description,
@@ -123,7 +127,9 @@ export function WsEditorForm({
   >(null);
 
   // Protocol state (entryPoint에서 분리)
-  const [protocol, setProtocol] = useState<"ws" | "wss">("ws");
+  const [internalProtocol, setInternalProtocol] = useState<"ws" | "wss">("ws");
+  const protocol = externalProtocol ?? internalProtocol;
+  const setProtocol = setExternalProtocol ?? setInternalProtocol;
   const [pathname, setPathname] = useState("/ws");
 
   // Schema 이름에서 마지막 부분만 추출 (예: com.example.dto.UserDTO -> UserDTO)
@@ -389,7 +395,7 @@ export function WsEditorForm({
     }
   };
 
-  // 기존 채널 선택 핸들러 (토글 방식)
+  // 기존 채널 선택 핸들러 (토글 방식 - 선택/선택해제)
   const handleSelectExistingChannel = (
     channel: ChannelResponse,
     type: "receiver" | "reply"
@@ -1369,8 +1375,8 @@ export function WsEditorForm({
                               const messageName =
                                 msg.messageName || msg.name || "Unnamed";
                               const isSelected =
-                                receiver.messages?.includes(messageName) ||
-                                false;
+                                receiver.messages?.length === 1 &&
+                                receiver.messages[0] === messageName;
 
                               return (
                                 <label
@@ -1386,24 +1392,18 @@ export function WsEditorForm({
                                   }`}
                                 >
                                   <input
-                                    type="checkbox"
+                                    type="radio"
+                                    name="receiver-message"
                                     checked={isSelected}
-                                    onChange={(e) => {
+                                    onChange={() => {
                                       if (isReadOnly) return;
-                                      const currentMessages =
-                                        receiver.messages || [];
-                                      const newMessages = e.target.checked
-                                        ? [...currentMessages, messageName]
-                                        : currentMessages.filter(
-                                            (m) => m !== messageName
-                                          );
                                       setReceiver({
                                         ...receiver,
-                                        messages: newMessages,
+                                        messages: [messageName],
                                       });
                                     }}
                                     disabled={isReadOnly}
-                                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 flex-shrink-0"
+                                    className="w-4 h-4 text-blue-600 focus:ring-blue-500 flex-shrink-0"
                                   />
                                   <div className="flex-1 min-w-0">
                                     <div className="text-sm text-gray-900 dark:text-[#E6EDF3] font-medium truncate">
@@ -1645,7 +1645,8 @@ export function WsEditorForm({
                               const messageName =
                                 msg.messageName || msg.name || "Unnamed";
                               const isSelected =
-                                reply.messages?.includes(messageName) || false;
+                                reply.messages?.length === 1 &&
+                                reply.messages[0] === messageName;
 
                               return (
                                 <label
@@ -1661,24 +1662,18 @@ export function WsEditorForm({
                                   }`}
                                 >
                                   <input
-                                    type="checkbox"
+                                    type="radio"
+                                    name="reply-message"
                                     checked={isSelected}
-                                    onChange={(e) => {
+                                    onChange={() => {
                                       if (isReadOnly) return;
-                                      const currentMessages =
-                                        reply.messages || [];
-                                      const newMessages = e.target.checked
-                                        ? [...currentMessages, messageName]
-                                        : currentMessages.filter(
-                                            (m) => m !== messageName
-                                          );
                                       setReply({
                                         ...reply,
-                                        messages: newMessages,
+                                        messages: [messageName],
                                       });
                                     }}
                                     disabled={isReadOnly}
-                                    className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 flex-shrink-0"
+                                    className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 flex-shrink-0"
                                   />
                                   <div className="flex-1 min-w-0">
                                     <div className="text-sm text-gray-900 dark:text-[#E6EDF3] font-medium truncate">
