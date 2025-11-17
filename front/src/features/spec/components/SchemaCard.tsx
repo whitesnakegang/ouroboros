@@ -573,7 +573,7 @@ export function SchemaCard({
                     }}
                     isReadOnly={isReadOnly}
                     allowFileType={false}
-                    allowMockExpression={true}
+                    allowMockExpression={protocol !== "WebSocket"}
                   />
                 ))}
                 {schemaFields.length === 0 && (
