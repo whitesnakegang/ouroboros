@@ -14,6 +14,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 
@@ -43,13 +44,16 @@ import java.util.Set;
  *   <li>Always excludes kr.co.ouroboros.* SDK classes</li>
  * </ul>
  * <p>
- * Method tracing is disabled by default. To enable it, set {@code ouroboros.method-tracing.enabled=true}
+ * <b>Activation:</b>
+ * This configuration is enabled by default. To disable, set {@code ouroboros.enabled=false}.
+ * Method tracing is disabled by default within this configuration. To enable it, set {@code ouroboros.method-tracing.enabled=true}
  * and configure at least one allowed package. If no allowed packages are configured, method tracing is disabled.
  *
  * @author Ouroboros Team
  * @since 0.0.1
  */
 @AutoConfiguration
+@ConditionalOnProperty(prefix = "ouroboros", name = "enabled", havingValue = "true", matchIfMissing = true)
 @EnableConfigurationProperties(MethodTracingProperties.class)
 @ConditionalOnClass(Advisor.class)
 public class MethodTracingConfig {
