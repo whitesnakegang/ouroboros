@@ -19,6 +19,7 @@ import type {
   PrimitiveSchema,
 } from "../types/schema.types";
 import { createDefaultField } from "../types/schema.types";
+import { parseOpenAPISchemaToSchemaType } from "../utils/schemaConverter";
 
 interface KeyValuePair {
   key: string;
@@ -58,6 +59,8 @@ interface WsEditorFormProps {
   setReply: (reply: Reply | null) => void;
   isReadOnly?: boolean;
   isDocumentView?: boolean;
+  wsSpecTab?: "receiver" | "reply";
+  setWsSpecTab?: (tab: "receiver" | "reply") => void;
   diff?: string; // 명세 불일치 정보
   operationInfo?: {
     operationName?: string;
@@ -84,6 +87,8 @@ export function WsEditorForm({
   setReply,
   isReadOnly = false,
   isDocumentView = false,
+  wsSpecTab: externalWsSpecTab,
+  setWsSpecTab: setExternalWsSpecTab,
   diff,
   operationInfo,
   onSyncToActual,
@@ -96,7 +101,17 @@ export function WsEditorForm({
   const [isReplySchemaModalOpen, setIsReplySchemaModalOpen] = useState(false);
   const [isMessageSchemaModalOpen, setIsMessageSchemaModalOpen] =
     useState(false);
-  // 통합 탭
+
+  // 내부 wsSpecTab state (외부에서 제공되지 않으면 내부에서 관리)
+  const [internalWsSpecTab, setInternalWsSpecTab] = useState<
+    "receiver" | "reply"
+  >("receiver");
+  const wsSpecTab = externalWsSpecTab ?? internalWsSpecTab;
+  // setWsSpecTab는 외부(ApiEditorLayout)에서 탭 전환 시 사용되므로 유지
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const setWsSpecTab = setExternalWsSpecTab ?? setInternalWsSpecTab;
+
+  // 통합 탭 (편집 모드용)
   const [wsTab, setWsTab] = useState<
     "receiver" | "reply" | "schema" | "message"
   >("receiver");
@@ -159,8 +174,8 @@ export function WsEditorForm({
     try {
       const response = await getAllWebSocketMessages();
       setMessages(response.data);
-    } catch (err) {
-      console.error("메시지 로드 실패:", err);
+    } catch {
+      // 메시지 로드 실패 시 무시
     }
   };
 
@@ -169,8 +184,8 @@ export function WsEditorForm({
     try {
       const response = await getAllWebSocketChannels();
       setChannels(response.data);
-    } catch (err) {
-      console.error("채널 로드 실패:", err);
+    } catch {
+      // 채널 로드 실패 시 무시
     }
   };
 
@@ -184,8 +199,8 @@ export function WsEditorForm({
     try {
       const response = await getAllWebSocketSchemas();
       setSchemas(response.data);
-    } catch (err) {
-      console.error("WebSocket 스키마 로드 실패:", err);
+    } catch {
+      // WebSocket 스키마 로드 실패 시 무시
     }
   };
 
@@ -383,7 +398,6 @@ export function WsEditorForm({
       // 메시지 목록 새로고침
       await loadMessages();
     } catch (error) {
-      console.error("메시지 생성 실패:", error);
       alert(
         `메시지 생성 실패: ${
           error instanceof Error ? error.message : "알 수 없는 오류"
@@ -749,185 +763,249 @@ export function WsEditorForm({
     );
   };
 
-  // 문서 형식 뷰
-  if (isDocumentView) {
+  // MessagePayloadSchemaViewer 컴포넌트: payload의 schema를 표시 (Schema Reference만 표시)
+  const MessagePayloadSchemaViewer = ({ schemaRef }: { schemaRef: string }) => {
+    const [schemaName, setSchemaName] = useState<string | null>(null);
+
+    useEffect(() => {
+      // $ref에서 schema 이름 추출
+      // 예: "#/components/schemas/ChatMessage" -> "ChatMessage"
+      // 예: "ChatMessage" -> "ChatMessage"
+      if (schemaRef) {
+        const extractedName = schemaRef.includes("#/components/schemas/")
+          ? schemaRef.replace("#/components/schemas/", "")
+          : schemaRef.includes("/")
+          ? schemaRef.split("/").pop() || schemaRef
+          : schemaRef;
+        setSchemaName(extractedName);
+      }
+    }, [schemaRef]);
+
+    if (!schemaName) {
+      return (
+        <span className="text-sm text-gray-500 dark:text-[#8B949E] italic">
+          (schema 정보 없음)
+        </span>
+      );
+    }
+
+    // Schema Reference만 표시 (상세 필드 목록은 표시하지 않음)
     return (
-      <div className="space-y-6">
-        {/* Diff 알림 */}
-        {renderDiffNotification()}
-        {/* Entry Point */}
-        <div>
-          <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">
-            Entry Point
-          </h3>
-          <div className="flex items-start gap-3 text-sm">
-            <span className="font-mono text-gray-900 dark:text-[#E6EDF3]">
-              {entryPoint || (
-                <span className="text-gray-400 italic">(empty)</span>
-              )}
-            </span>
-          </div>
+      <div className="p-3 bg-gray-50 dark:bg-[#0D1117] border border-gray-200 dark:border-[#2D333B] rounded-md">
+        <div className="text-sm text-gray-600 dark:text-[#8B949E]">
+          <span className="font-medium">Schema Reference:</span>{" "}
+          <span className="font-mono text-gray-900 dark:text-[#E6EDF3]">
+            {schemaName}
+          </span>
         </div>
+      </div>
+    );
+  };
 
-        {/* Summary */}
-        {summary && (
-          <div>
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">
-              Summary
-            </h3>
-            <div className="text-sm text-gray-900 dark:text-[#E6EDF3]">
-              {summary}
-            </div>
-          </div>
-        )}
+  // 문서 형식 뷰 - REST 스타일로 재구성
+  if (isDocumentView) {
+    // 현재 선택된 탭에 따라 표시할 내용 결정
+    const currentChannel = wsSpecTab === "receiver" ? receiver : reply;
+    const channelType = wsSpecTab === "receiver" ? "Receiver" : "Reply";
 
-        {/* Description */}
-        {description && (
-          <div>
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">
-              Description
-            </h3>
-            <div className="text-sm text-gray-900 dark:text-[#E6EDF3]">
-              {description}
-            </div>
-          </div>
-        )}
-
-        {/* Tags */}
-        {tags && (
-          <div>
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">
-              Tags
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              {tags.split(",").map((tag, index) => (
-                <span
-                  key={index}
-                  className="px-2 py-1 bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs rounded"
-                >
-                  {tag.trim()}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Receiver */}
-        {receiver && (
-          <div>
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-3">
-              Receiver
-            </h3>
-            <div className="space-y-4 ml-4">
+    return (
+      <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] shadow-sm overflow-hidden">
+        {/* 탭 내용 */}
+        <div className="p-4 bg-white dark:bg-[#161B22]">
+          {currentChannel ? (
+            <div className="space-y-4">
+              {/* Address */}
               <div>
-                <h4 className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] mb-2">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">
                   Address
-                </h4>
+                </h3>
                 <div className="flex items-start gap-3 text-sm">
                   <span className="font-mono text-gray-900 dark:text-[#E6EDF3]">
-                    {receiver.address || (
+                    {currentChannel.address || (
                       <span className="text-gray-400 italic">(empty)</span>
                     )}
                   </span>
                 </div>
               </div>
 
-              {receiver.headers && receiver.headers.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] mb-2">
-                    Headers
-                  </h4>
-                  <div className="space-y-2">
-                    {receiver.headers.map((header, index) => (
-                      <div
-                        key={index}
-                        className="flex items-start gap-3 text-sm"
-                      >
-                        <span className="font-mono text-gray-900 dark:text-[#E6EDF3] min-w-[120px]">
-                          {header.key}
-                        </span>
-                        <span className="text-gray-600 dark:text-[#8B949E]">
-                          :
-                        </span>
-                        <span className="text-gray-900 dark:text-[#E6EDF3] flex-1">
-                          {header.value || (
-                            <span className="text-gray-400 italic">
-                              (empty)
-                            </span>
-                          )}
-                        </span>
-                        {header.required && (
-                          <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-xs rounded">
-                            Required
-                          </span>
-                        )}
-                      </div>
-                    ))}
+              {/* Messages */}
+              {currentChannel.messages &&
+                currentChannel.messages.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">
+                      Messages
+                    </h3>
+                    <div className="space-y-4">
+                      {currentChannel.messages.map((messageName, idx) => {
+                        // 메시지 정보 찾기
+                        const messageInfo = messages.find(
+                          (msg) =>
+                            msg.messageName === messageName ||
+                            msg.name === messageName
+                        );
+
+                        return (
+                          <div
+                            key={`${messageName}-${idx}`}
+                            className="border border-gray-200 dark:border-[#2D333B] rounded-md p-3 bg-gray-50 dark:bg-[#0D1117]"
+                          >
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="font-mono text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
+                                {messageName}
+                              </span>
+                              {messageInfo?.description && (
+                                <span className="text-xs text-gray-500 dark:text-[#8B949E]">
+                                  - {messageInfo.description}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* 메시지 구조 표시: name/header/payload 중 실제로 있는 것만 */}
+                            <div className="space-y-2 ml-4">
+                              {/* Name */}
+                              {messageInfo?.name && (
+                                <div>
+                                  <span className="text-xs font-semibold text-gray-600 dark:text-[#8B949E]">
+                                    Name:
+                                  </span>
+                                  <span className="ml-2 text-sm text-gray-900 dark:text-[#E6EDF3]">
+                                    {messageInfo.name}
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* Headers */}
+                              {messageInfo?.headers &&
+                                Object.keys(messageInfo.headers).length > 0 && (
+                                  <div>
+                                    <span className="text-xs font-semibold text-gray-600 dark:text-[#8B949E]">
+                                      Headers:
+                                    </span>
+                                    <div className="mt-1 space-y-1">
+                                      {Object.entries(messageInfo.headers).map(
+                                        ([key, value]) => (
+                                          <div
+                                            key={key}
+                                            className="flex items-start gap-2 text-sm"
+                                          >
+                                            <span className="font-mono text-gray-900 dark:text-[#E6EDF3] min-w-[100px]">
+                                              {key}
+                                            </span>
+                                            <span className="text-gray-600 dark:text-[#8B949E]">
+                                              :
+                                            </span>
+                                            <span className="text-gray-900 dark:text-[#E6EDF3]">
+                                              {String(value)}
+                                            </span>
+                                          </div>
+                                        )
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+
+                              {/* Payload */}
+                              {messageInfo?.payload && (
+                                <div>
+                                  <span className="text-xs font-semibold text-gray-600 dark:text-[#8B949E]">
+                                    Payload:
+                                  </span>
+                                  <div className="mt-2">
+                                    {messageInfo.payload.schema?.$ref ? (
+                                      <MessagePayloadSchemaViewer
+                                        schemaRef={
+                                          messageInfo.payload.schema.$ref
+                                        }
+                                      />
+                                    ) : messageInfo.payload.schema?.ref ? (
+                                      <MessagePayloadSchemaViewer
+                                        schemaRef={
+                                          messageInfo.payload.schema.ref
+                                        }
+                                      />
+                                    ) : messageInfo.payload.schema?.type ? (
+                                      <div>
+                                        <span className="text-sm text-gray-900 dark:text-[#E6EDF3]">
+                                          type:{" "}
+                                          {messageInfo.payload.schema.type}
+                                        </span>
+                                        {messageInfo.payload.schema
+                                          .properties && (
+                                          <div className="mt-2">
+                                            <SchemaViewer
+                                              schemaType={{
+                                                kind: "object",
+                                                properties: Object.entries(
+                                                  messageInfo.payload.schema
+                                                    .properties
+                                                ).map(
+                                                  ([key, prop]: [
+                                                    string,
+                                                    unknown
+                                                  ]) => {
+                                                    const propObj = prop as {
+                                                      description?: string;
+                                                      type?: string;
+                                                      [key: string]: unknown;
+                                                    };
+                                                    return {
+                                                      key,
+                                                      description:
+                                                        propObj.description,
+                                                      required:
+                                                        messageInfo.payload.schema.required?.includes(
+                                                          key
+                                                        ) || false,
+                                                      schemaType:
+                                                        parseOpenAPISchemaToSchemaType(
+                                                          propObj
+                                                        ),
+                                                    };
+                                                  }
+                                                ),
+                                              }}
+                                              contentType="application/json"
+                                            />
+                                          </div>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <span className="text-sm text-gray-500 dark:text-[#8B949E] italic">
+                                        (schema 정보 없음)
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* 메시지 정보가 없는 경우 */}
+                              {!messageInfo && (
+                                <div className="text-xs text-gray-500 dark:text-[#8B949E] italic">
+                                  메시지 정보를 불러올 수 없습니다.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {receiver.schema && (
-                <div>
-                  <h4 className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] mb-2">
-                    Schema
-                  </h4>
-                  <SchemaViewer
-                    schemaType={receiver.schema.rootSchemaType}
-                    fields={receiver.schema.fields}
-                    schemaRef={receiver.schema.schemaRef}
-                    description={receiver.schema.description}
-                    contentType="application/json"
-                  />
+              {/* Messages가 없는 경우 */}
+              {(!currentChannel.messages ||
+                currentChannel.messages.length === 0) && (
+                <div className="text-sm text-gray-500 dark:text-[#8B949E] italic">
+                  No messages configured.
                 </div>
               )}
             </div>
-          </div>
-        )}
-
-        {/* Reply */}
-        {reply && (
-          <div>
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-3">
-              Reply
-            </h3>
-            <div className="space-y-4 ml-4">
-              <div>
-                <h4 className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] mb-2">
-                  Address
-                </h4>
-                <div className="flex items-start gap-3 text-sm">
-                  <span className="font-mono text-gray-900 dark:text-[#E6EDF3]">
-                    {reply.address || (
-                      <span className="text-gray-400 italic">(empty)</span>
-                    )}
-                  </span>
-                </div>
-              </div>
-
-              {reply.schema && (
-                <div>
-                  <h4 className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] mb-2">
-                    Schema
-                  </h4>
-                  <SchemaViewer
-                    schemaType={reply.schema.rootSchemaType}
-                    fields={reply.schema.fields}
-                    schemaRef={reply.schema.schemaRef}
-                    description={reply.schema.description}
-                    contentType="application/json"
-                  />
-                </div>
-              )}
+          ) : (
+            <div className="text-sm text-gray-500 dark:text-[#8B949E] italic">
+              No {channelType.toLowerCase()} configuration.
             </div>
-          </div>
-        )}
-
-        {!receiver && !reply && (
-          <div className="text-sm text-gray-500 dark:text-[#8B949E] italic">
-            No WebSocket configuration.
-          </div>
-        )}
+          )}
+        </div>
       </div>
     );
   }

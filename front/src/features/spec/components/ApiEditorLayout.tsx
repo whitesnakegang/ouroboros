@@ -99,6 +99,7 @@ export function ApiEditorLayout() {
   const [specTab, setSpecTab] = useState<"request" | "response" | "schema">(
     "request"
   );
+  const [wsSpecTab, setWsSpecTab] = useState<"receiver" | "reply">("receiver");
   const [isCodeSnippetOpen, setIsCodeSnippetOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isNewFormMode, setIsNewFormMode] = useState(false);
@@ -804,8 +805,6 @@ export function ApiEditorLayout() {
       const response = await getWebSocketOperation(operationId);
       const operationData = response.data;
 
-      console.log("✅ Loaded WebSocket operation:", operationData);
-
       // WebSocket form state 설정
       setWsEntryPoint(operationData.operation.entrypoint || "/ws");
       setWsSummary(""); // Operation에는 summary가 없음
@@ -834,20 +833,49 @@ export function ApiEditorLayout() {
           const channelResponse = await getWebSocketChannel(channelName);
           actualAddress = channelResponse.data.channel?.address || channelName;
         } catch {
-          console.warn("Channel 조회 실패, channel name 사용:", channelName);
+          // Channel 조회 실패 시 channel name 사용
+        }
+
+        // operation.messages에서 메시지 이름 추출
+        const messageNames: string[] = [];
+        if (
+          operationData.operation.messages &&
+          Array.isArray(operationData.operation.messages)
+        ) {
+          operationData.operation.messages.forEach((msg: any) => {
+            if (typeof msg === "string") {
+              // 문자열인 경우 그대로 사용
+              messageNames.push(msg);
+            } else if (msg.$ref) {
+              // $ref 형태: "#/channels/_chat_{roomId}/messages/ChatMessage" -> "ChatMessage"
+              const refPath = msg.$ref;
+              if (refPath.includes("/messages/")) {
+                const messageName = refPath.split("/messages/")[1];
+                if (messageName) {
+                  messageNames.push(messageName);
+                }
+              }
+            } else if (msg.ref) {
+              // ref 형태 (간단한 참조)
+              const refPath = msg.ref;
+              if (refPath.includes("/messages/")) {
+                const messageName = refPath.split("/messages/")[1];
+                if (messageName) {
+                  messageNames.push(messageName);
+                }
+              } else {
+                // 직접 메시지 이름인 경우
+                messageNames.push(refPath);
+              }
+            }
+          });
         }
 
         setWsReceiver({
           address: actualAddress,
-          headers: [
-            {
-              key: "accept-version",
-              value: "1.1",
-              required: true,
-              description: "STOMP 프로토콜 버전 (필수)",
-            },
-          ],
+          headers: [], // accept-version 하드코딩 제거, 실제 메시지에서 가져온 정보만 사용
           schema: { type: "json", fields: [] },
+          messages: messageNames.length > 0 ? messageNames : undefined,
         });
       } else if (
         operationData.operation.action === "send" &&
@@ -862,13 +890,45 @@ export function ApiEditorLayout() {
           const channelResponse = await getWebSocketChannel(channelName);
           actualAddress = channelResponse.data.channel?.address || channelName;
         } catch {
-          console.warn("Channel 조회 실패, channel name 사용:", channelName);
+          // Channel 조회 실패 시 channel name 사용
+        }
+
+        // operation.messages에서 메시지 이름 추출
+        const messageNames: string[] = [];
+        if (
+          operationData.operation.messages &&
+          Array.isArray(operationData.operation.messages)
+        ) {
+          operationData.operation.messages.forEach((msg: any) => {
+            if (typeof msg === "string") {
+              messageNames.push(msg);
+            } else if (msg.$ref) {
+              const refPath = msg.$ref;
+              if (refPath.includes("/messages/")) {
+                const messageName = refPath.split("/messages/")[1];
+                if (messageName) {
+                  messageNames.push(messageName);
+                }
+              }
+            } else if (msg.ref) {
+              const refPath = msg.ref;
+              if (refPath.includes("/messages/")) {
+                const messageName = refPath.split("/messages/")[1];
+                if (messageName) {
+                  messageNames.push(messageName);
+                }
+              } else {
+                messageNames.push(refPath);
+              }
+            }
+          });
         }
 
         setWsReceiver({
           address: actualAddress,
           headers: [],
           schema: { type: "json", fields: [] },
+          messages: messageNames.length > 0 ? messageNames : undefined,
         });
       } else {
         setWsReceiver(null);
@@ -889,21 +949,49 @@ export function ApiEditorLayout() {
           actualReplyAddress =
             channelResponse.data.channel?.address || replyChannelName;
         } catch {
-          console.warn(
-            "Reply channel 조회 실패, channel name 사용:",
-            replyChannelName
-          );
+          // Reply channel 조회 실패 시 channel name 사용
+        }
+
+        // reply.messages에서 메시지 이름 추출
+        const replyMessageNames: string[] = [];
+        if (
+          operationData.operation.reply.messages &&
+          Array.isArray(operationData.operation.reply.messages)
+        ) {
+          operationData.operation.reply.messages.forEach((msg: any) => {
+            if (typeof msg === "string") {
+              replyMessageNames.push(msg);
+            } else if (msg.$ref) {
+              const refPath = msg.$ref;
+              if (refPath.includes("/messages/")) {
+                const messageName = refPath.split("/messages/")[1];
+                if (messageName) {
+                  replyMessageNames.push(messageName);
+                }
+              }
+            } else if (msg.ref) {
+              const refPath = msg.ref;
+              if (refPath.includes("/messages/")) {
+                const messageName = refPath.split("/messages/")[1];
+                if (messageName) {
+                  replyMessageNames.push(messageName);
+                }
+              } else {
+                replyMessageNames.push(refPath);
+              }
+            }
+          });
         }
 
         setWsReply({
           address: actualReplyAddress,
           schema: { type: "json", fields: [] },
+          messages:
+            replyMessageNames.length > 0 ? replyMessageNames : undefined,
         });
       } else {
         setWsReply(null);
       }
-
-      console.log("✅ WebSocket form state 설정 완료");
     } catch (error) {
       console.error("WebSocket Operation 로드 실패:", error);
       alert(
@@ -970,6 +1058,18 @@ export function ApiEditorLayout() {
     schema: RequestBody;
     messages?: string[];
   } | null>(null);
+
+  // wsReceiver나 wsReply가 하나만 있을 때 기본 탭 설정
+  useEffect(() => {
+    if (selectedEndpoint && !isEditMode && !isNewFormMode) {
+      // receive만 있으면 receiver 탭으로, reply만 있으면 reply 탭으로 설정
+      if (wsReceiver && !wsReply) {
+        setWsSpecTab("receiver");
+      } else if (wsReply && !wsReceiver) {
+        setWsSpecTab("reply");
+      }
+    }
+  }, [wsReceiver, wsReply, selectedEndpoint, isEditMode, isNewFormMode]);
 
   const methods = ["GET", "POST", "PUT", "PATCH", "DELETE"];
 
@@ -1339,8 +1439,8 @@ export function ApiEditorLayout() {
                 tag: latestOperationData.tag || newEndpoint.tag,
                 tags: (latestOperation as any).tags || newEndpoint.tags, // 백엔드에서 받은 tags 사용
               });
-            } catch (error) {
-              console.warn("최신 operation 정보 로드 실패:", error);
+            } catch {
+              // 최신 operation 정보 로드 실패 시 무시
             }
           } else {
             alert("WebSocket Operation이 생성되었습니다.");
@@ -2369,44 +2469,246 @@ export function ApiEditorLayout() {
             )}
             {protocol === "WebSocket" &&
               (selectedEndpoint !== null || isNewFormMode) && (
-                <WsEditorForm
-                  entryPoint={wsEntryPoint}
-                  setEntryPoint={setWsEntryPoint}
-                  protocol={wsProtocol}
-                  setProtocol={setWsProtocol}
-                  summary={wsSummary}
-                  setSummary={setWsSummary}
-                  description={wsDescription}
-                  setDescription={setWsDescription}
-                  tags={wsTags}
-                  setTags={setWsTags}
-                  receiver={wsReceiver}
-                  setReceiver={setWsReceiver}
-                  reply={wsReply}
-                  setReply={setWsReply}
-                  isReadOnly={!!(selectedEndpoint && !isEditMode)}
-                  isDocumentView={
-                    !isEditMode && !isNewFormMode && selectedEndpoint !== null
-                  }
-                  diff={selectedEndpoint?.diff}
-                  operationInfo={
-                    selectedEndpoint
-                      ? {
-                          operationName: (selectedEndpoint as any)
-                            .operationName,
-                          tag: selectedEndpoint.method?.toLowerCase(),
-                          progress: selectedEndpoint.progress,
-                        }
-                      : undefined
-                  }
-                  onSyncToActual={
-                    selectedEndpoint &&
-                    selectedEndpoint.diff &&
-                    selectedEndpoint.diff !== "none"
-                      ? handleSyncWebSocketToActual
-                      : undefined
-                  }
-                />
+                <>
+                  {/* Protocol & Pathname Card - REST의 Method & URL 카드와 유사 */}
+                  <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm mb-6">
+                    <div className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3] mb-2 flex items-center gap-2">
+                      <svg
+                        className="h-4 w-4 text-gray-500 dark:text-[#8B949E]"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                        />
+                      </svg>
+                      <span>Protocol & Pathname</span>
+                    </div>
+
+                    {/* 작성된 명세서: 문서 형식 표시 */}
+                    {selectedEndpoint && !isEditMode && !isNewFormMode ? (
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-3">
+                          <span className="inline-flex items-center rounded-[4px] border border-gray-300 dark:border-[#2D333B] bg-white dark:bg-[#0D1117] px-2.5 py-1 text-xs font-mono font-semibold text-[#2563EB]">
+                            {wsProtocol.toUpperCase()}
+                          </span>
+                          <span className="text-base font-mono text-gray-900 dark:text-[#E6EDF3]">
+                            {wsEntryPoint || "/ws"}
+                          </span>
+                          {selectedEndpoint.diff &&
+                            selectedEndpoint.diff !== "none" && (
+                              <div
+                                className="flex items-center gap-1 text-amber-500"
+                                title="명세와 실제 구현이 일치하지 않습니다"
+                              >
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                                  />
+                                </svg>
+                              </div>
+                            )}
+                        </div>
+
+                        {wsTags && (
+                          <div>
+                            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-1">
+                              Tags
+                            </h3>
+                            <div className="flex flex-wrap gap-2">
+                              {wsTags.split(",").map((tag, idx) => (
+                                <span
+                                  key={idx}
+                                  className="px-2 py-1 bg-gray-100 dark:bg-[#21262D] text-gray-700 dark:text-[#C9D1D9] rounded text-xs"
+                                >
+                                  {tag.trim()}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      /* 편집 모드: 입력 필드 표시 */
+                      <div className="space-y-4">
+                        <p className="text-xs text-gray-600 dark:text-[#8B949E] mb-4">
+                          WebSocket 프로토콜과 엔드포인트 경로를 입력하세요
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-4">
+                          <div className="relative sm:w-auto w-full">
+                            <select
+                              value={wsProtocol}
+                              onChange={(e) =>
+                                setWsProtocol(e.target.value as "ws" | "wss")
+                              }
+                              disabled={!!(selectedEndpoint && !isEditMode)}
+                              className={`appearance-none w-full sm:w-auto px-3 py-2 pr-10 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm font-medium min-w-[120px] ${
+                                selectedEndpoint && !isEditMode
+                                  ? "opacity-60 cursor-not-allowed"
+                                  : ""
+                              }`}
+                            >
+                              <option value="ws">ws</option>
+                              <option value="wss">wss</option>
+                            </select>
+                            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                              <svg
+                                className="w-4 h-4 text-gray-500 dark:text-[#8B949E]"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M19 9l-7 7-7-7"
+                                />
+                              </svg>
+                            </div>
+                          </div>
+                          <div className="relative flex-1">
+                            <input
+                              type="text"
+                              value={wsEntryPoint}
+                              onChange={(e) => {
+                                // 한글 입력 방지: 영문, 숫자, 특수문자(/ - _ . { } [ ])만 허용
+                                const value = e.target.value;
+                                const filtered = value.replace(
+                                  /[^a-zA-Z0-9/\-_.{}[\]]/g,
+                                  ""
+                                );
+                                setWsEntryPoint(filtered);
+                              }}
+                              onKeyPress={(e) => {
+                                // 한글 입력 방지 (IME 입력 차단)
+                                const char = e.key;
+                                if (/[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(char)) {
+                                  e.preventDefault();
+                                }
+                              }}
+                              placeholder="예: /ws, /websocket, /chat"
+                              disabled={!!(selectedEndpoint && !isEditMode)}
+                              className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm font-mono ${
+                                selectedEndpoint && !isEditMode
+                                  ? "opacity-60 cursor-not-allowed"
+                                  : ""
+                              }`}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
+                            Tags
+                          </label>
+                          <input
+                            type="text"
+                            value={wsTags}
+                            onChange={(e) => setWsTags(e.target.value)}
+                            placeholder="예: CHAT, NOTIFICATION (쉼표로 구분)"
+                            disabled={!!(selectedEndpoint && !isEditMode)}
+                            className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
+                              selectedEndpoint && !isEditMode
+                                ? "opacity-60 cursor-not-allowed"
+                                : ""
+                            }`}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Receiver/Reply 탭 - REST의 Request/Response 탭과 유사 */}
+                  {selectedEndpoint &&
+                    !isEditMode &&
+                    !isNewFormMode &&
+                    (wsReceiver || wsReply) && (
+                      <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] shadow-sm mb-6 overflow-hidden">
+                        {/* 탭 헤더 */}
+                        <div className="bg-gray-50 dark:bg-[#0D1117] border-b border-gray-200 dark:border-[#2D333B] px-4 pt-2">
+                          <div className="flex gap-0.5 -mb-px">
+                            {wsReceiver && (
+                              <button
+                                onClick={() => setWsSpecTab("receiver")}
+                                className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ${
+                                  wsSpecTab === "receiver"
+                                    ? "text-gray-900 dark:text-[#E6EDF3] bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] border-b-white dark:border-b-[#161B22] relative z-10"
+                                    : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
+                                }`}
+                              >
+                                Receiver
+                              </button>
+                            )}
+                            {wsReply && (
+                              <button
+                                onClick={() => setWsSpecTab("reply")}
+                                className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ${
+                                  wsSpecTab === "reply"
+                                    ? "text-gray-900 dark:text-[#E6EDF3] bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] border-b-white dark:border-b-[#161B22] relative z-10"
+                                    : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
+                                }`}
+                              >
+                                Reply
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                  <WsEditorForm
+                    entryPoint={wsEntryPoint}
+                    setEntryPoint={setWsEntryPoint}
+                    protocol={wsProtocol}
+                    setProtocol={setWsProtocol}
+                    summary={wsSummary}
+                    setSummary={setWsSummary}
+                    description={wsDescription}
+                    setDescription={setWsDescription}
+                    tags={wsTags}
+                    setTags={setWsTags}
+                    receiver={wsReceiver}
+                    setReceiver={setWsReceiver}
+                    reply={wsReply}
+                    setReply={setWsReply}
+                    isReadOnly={!!(selectedEndpoint && !isEditMode)}
+                    isDocumentView={
+                      !isEditMode && !isNewFormMode && selectedEndpoint !== null
+                    }
+                    wsSpecTab={wsSpecTab}
+                    setWsSpecTab={setWsSpecTab}
+                    diff={selectedEndpoint?.diff}
+                    operationInfo={
+                      selectedEndpoint
+                        ? {
+                            operationName: (selectedEndpoint as any)
+                              .operationName,
+                            tag: selectedEndpoint.method?.toLowerCase(),
+                            progress: selectedEndpoint.progress,
+                          }
+                        : undefined
+                    }
+                    onSyncToActual={
+                      selectedEndpoint &&
+                      selectedEndpoint.diff &&
+                      selectedEndpoint.diff !== "none"
+                        ? handleSyncWebSocketToActual
+                        : undefined
+                    }
+                  />
+                </>
               )}
             {protocol !== null &&
               protocol !== "REST" &&
@@ -2712,7 +3014,7 @@ export function ApiEditorLayout() {
                               type="text"
                               value={summary}
                               onChange={(e) => setSummary(e.target.value)}
-                              placeholder="예: 심연수"
+                              placeholder="예: 홍길동"
                               disabled={!!(selectedEndpoint && !isEditMode)}
                               className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
                                 selectedEndpoint && !isEditMode

@@ -261,9 +261,8 @@ export const useSidebarStore = create<SidebarState>()(
                   channelMap.set(channelName, address);
                 }
               });
-              console.log("✅ Loaded channel mappings:", channelMap);
-            } catch (channelError) {
-              console.warn("Channel 로드 실패, 추정 값 사용:", channelError);
+            } catch {
+              // Channel 로드 실패 시 추정 값 사용
             }
 
             // 2. Operations 로드
@@ -290,16 +289,13 @@ export const useSidebarStore = create<SidebarState>()(
               }
               grouped[group].push(endpoint);
             });
-            
-            console.log("✅ WebSocket operations loaded successfully");
-          } catch (wsError) {
-            console.warn("WebSocket Operations 로드 실패:", wsError);
-            // WebSocket 로드 실패 시 에러만 로그
+          } catch {
+            // WebSocket Operations 로드 실패 시 무시
           }
 
           set({ endpoints: grouped, isLoading: false });
-        } catch (error) {
-          console.error("API 목록 로드 실패:", error);
+        } catch {
+          // API 목록 로드 실패
           set({ isLoading: false });
           // 에러 발생 시 빈 객체로 설정
           set({ endpoints: {} });
