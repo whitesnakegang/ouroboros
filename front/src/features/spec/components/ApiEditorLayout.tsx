@@ -2270,65 +2270,84 @@ export function ApiEditorLayout() {
 
     const diffType = selectedEndpoint.diff?.toLowerCase() || "";
 
-    if (
-      confirm(
-        "Do you want to automatically reflect the actual implementation into the spec?\n\nThis operation cannot be undone."
-      )
-    ) {
-      try {
-        // diff가 "endpoint"인 경우 sync API 호출 (캐시 -> 파일 동기화)
-        if (diffType === "endpoint") {
-          const syncResponse = await syncRestApiSpec(selectedEndpoint.id);
+    setConfirmModal({
+      isOpen: true,
+      title: "Reflect Implementation to Spec",
+      message:
+        "Do you want to automatically reflect the actual implementation into the spec?\n\nThis operation cannot be undone.",
+      variant: "warning",
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          // diff가 "endpoint"인 경우 sync API 호출 (캐시 -> 파일 동기화)
+          if (diffType === "endpoint") {
+            const syncResponse = await syncRestApiSpec(selectedEndpoint.id);
 
-          // 엔드포인트 데이터 다시 로드하여 최신 상태 반영
-          await loadEndpointData(selectedEndpoint.id);
+            // 엔드포인트 데이터 다시 로드하여 최신 상태 반영
+            await loadEndpointData(selectedEndpoint.id);
 
-          // 사이드바 목록도 다시 로드하여 diff 상태 업데이트
-          await loadEndpoints();
+            // 사이드바 목록도 다시 로드하여 diff 상태 업데이트
+            await loadEndpoints();
 
-          // selectedEndpoint 업데이트
-          const updatedSpec = syncResponse.data;
-          if (updatedSpec) {
-            setSelectedEndpoint({
-              ...selectedEndpoint,
-              diff: updatedSpec.diff || "none",
-              progress: updatedSpec.progress || selectedEndpoint.progress,
+            // selectedEndpoint 업데이트
+            const updatedSpec = syncResponse.data;
+            if (updatedSpec) {
+              setSelectedEndpoint({
+                ...selectedEndpoint,
+                diff: updatedSpec.diff || "none",
+                progress: updatedSpec.progress || selectedEndpoint.progress,
+              });
+            }
+
+            setAlertModal({
+              isOpen: true,
+              title: "Success",
+              message: "The actual implementation has been successfully reflected in the spec.",
+              variant: "success",
+            });
+          } else {
+            // 다른 diff 타입 (request, response, both)은 기존 로직 유지
+            const response = await getRestApiSpec(selectedEndpoint.id);
+            const spec = response.data;
+
+            const updateRequest = {
+              path: spec.path,
+              method: spec.method,
+              summary: spec.summary,
+              description: spec.description,
+              tags: spec.tags || [],
+              parameters: spec.parameters || [],
+              requestBody: spec.requestBody || undefined,
+              responses: spec.responses || {},
+              security: spec.security || [],
+            };
+
+            await updateRestApiSpec(selectedEndpoint.id, updateRequest);
+
+            // 엔드포인트 데이터 다시 로드하여 최신 상태 반영
+            await loadEndpointData(selectedEndpoint.id);
+
+            // 사이드바 목록도 다시 로드하여 diff 상태 업데이트
+            await loadEndpoints();
+
+            setAlertModal({
+              isOpen: true,
+              title: "Success",
+              message: "The actual implementation has been successfully reflected in the spec.",
+              variant: "success",
             });
           }
-
-          alert("실제 구현이 명세에 성공적으로 반영되었습니다!");
-        } else {
-          // 다른 diff 타입 (request, response, both)은 기존 로직 유지
-          const response = await getRestApiSpec(selectedEndpoint.id);
-          const spec = response.data;
-
-          const updateRequest = {
-            path: spec.path,
-            method: spec.method,
-            summary: spec.summary,
-            description: spec.description,
-            tags: spec.tags || [],
-            parameters: spec.parameters || [],
-            requestBody: spec.requestBody || undefined,
-            responses: spec.responses || {},
-            security: spec.security || [],
-          };
-
-          await updateRestApiSpec(selectedEndpoint.id, updateRequest);
-
-          // 엔드포인트 데이터 다시 로드하여 최신 상태 반영
-          await loadEndpointData(selectedEndpoint.id);
-
-          // 사이드바 목록도 다시 로드하여 diff 상태 업데이트
-          await loadEndpoints();
-
-          alert("실제 구현이 명세에 성공적으로 반영되었습니다!");
+        } catch (error: unknown) {
+          const errorMessage = getErrorMessage(error);
+          setAlertModal({
+            isOpen: true,
+            title: "Sync Failed",
+            message: `Failed to sync spec: ${errorMessage}`,
+            variant: "error",
+          });
         }
-      } catch (error: unknown) {
-        const errorMessage = getErrorMessage(error);
-        alert(`명세 동기화에 실패했습니다: ${errorMessage}`);
-      }
-    }
+      },
+    });
   };
 
   // WebSocket Operation 동기화 (channel diff 해결)
@@ -2338,136 +2357,162 @@ export function ApiEditorLayout() {
     // UUID(id)를 사용 (operationName이 아님)
     const operationId = selectedEndpoint.id;
     if (!operationId) {
-      alert("Operation ID를 찾을 수 없습니다.");
+      setAlertModal({
+        isOpen: true,
+        title: "Error",
+        message: "Operation ID not found.",
+        variant: "error",
+      });
       return;
     }
 
     const diffType = selectedEndpoint.diff?.toLowerCase() || "";
 
-    if (
-      confirm(
-        "실제 구현의 Channel 정보를 명세에 자동으로 반영하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다."
-      )
-    ) {
-      try {
-        // diff가 "channel"인 경우 sync API 호출 (캐시 -> 파일 동기화)
-        if (diffType === "channel") {
-          const syncResponse = await syncWebSocketOperation(operationId);
+    setConfirmModal({
+      isOpen: true,
+      title: "Reflect Channel to Spec",
+      message:
+        "Do you want to automatically reflect the actual implementation's Channel information into the spec?\n\nThis operation cannot be undone.",
+      variant: "warning",
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          // diff가 "channel"인 경우 sync API 호출 (캐시 -> 파일 동기화)
+          if (diffType === "channel") {
+            const syncResponse = await syncWebSocketOperation(operationId);
 
-          // sync 후 도메인 이름을 tags.name으로 설정
-          const updatedOperation = syncResponse.data?.operation;
-          if (updatedOperation) {
-            // 도메인 추출 함수
-            const extractDomain = (address: string): string => {
-              if (!address || address === "/unknown") {
-                return "OTHERS";
-              }
-              const parts = address
-                .split("/")
-                .filter((part) => part.length > 0);
-              if (parts.length === 0) {
-                return "OTHERS";
-              }
-              const domain = parts[0];
-              return (
-                domain.charAt(0).toUpperCase() + domain.slice(1).toLowerCase()
-              );
-            };
+            // sync 후 도메인 이름을 tags.name으로 설정
+            const updatedOperation = syncResponse.data?.operation;
+            if (updatedOperation) {
+              // 도메인 추출 함수
+              const extractDomain = (address: string): string => {
+                if (!address || address === "/unknown") {
+                  return "OTHERS";
+                }
+                const parts = address
+                  .split("/")
+                  .filter((part) => part.length > 0);
+                if (parts.length === 0) {
+                  return "OTHERS";
+                }
+                const domain = parts[0];
+                return (
+                  domain.charAt(0).toUpperCase() + domain.slice(1).toLowerCase()
+                );
+              };
 
-            // receiver address에서 도메인 추출
-            let domainName = "OTHERS";
-            if (updatedOperation.channel) {
-              const channelRef = updatedOperation.channel.ref || "";
-              const channelName = channelRef.replace("#/channels/", "");
-              try {
-                const channelResponse = await getWebSocketChannel(channelName);
-                const actualAddress =
-                  channelResponse.data.channel?.address || channelName;
-                domainName = extractDomain(actualAddress);
-              } catch {
-                // Channel 조회 실패 시 channel name에서 도메인 추출
-                domainName = extractDomain(channelName);
+              // receiver address에서 도메인 추출
+              let domainName = "OTHERS";
+              if (updatedOperation.channel) {
+                const channelRef = updatedOperation.channel.ref || "";
+                const channelName = channelRef.replace("#/channels/", "");
+                try {
+                  const channelResponse = await getWebSocketChannel(channelName);
+                  const actualAddress =
+                    channelResponse.data.channel?.address || channelName;
+                  domainName = extractDomain(actualAddress);
+                } catch {
+                  // Channel 조회 실패 시 channel name에서 도메인 추출
+                  domainName = extractDomain(channelName);
+                }
               }
+
+              // 도메인 이름을 tags로 업데이트
+              // 백엔드에서 tags는 string[] 형태로 받지만, 실제 저장 시 [{name: "TAG_NAME"}] 형태로 변환됨
+              await updateWebSocketOperation(operationId, {
+                tags: [domainName], // 도메인 이름을 tags로 설정 (백엔드에서 {name: domainName} 형태로 변환)
+              });
             }
 
-            // 도메인 이름을 tags로 업데이트
-            // 백엔드에서 tags는 string[] 형태로 받지만, 실제 저장 시 [{name: "TAG_NAME"}] 형태로 변환됨
-            await updateWebSocketOperation(operationId, {
-              tags: [domainName], // 도메인 이름을 tags로 설정 (백엔드에서 {name: domainName} 형태로 변환)
+            // Operation 데이터 다시 로드하여 최신 상태 반영
+            await loadWebSocketOperationData(operationId);
+
+            // 사이드바 목록도 다시 로드하여 diff 상태 업데이트
+            await loadEndpoints();
+
+            // selectedEndpoint 업데이트
+            if (updatedOperation) {
+              setSelectedEndpoint({
+                ...selectedEndpoint,
+                diff: updatedOperation.diff || "none",
+                progress: updatedOperation.progress || selectedEndpoint.progress,
+              });
+            }
+
+            setAlertModal({
+              isOpen: true,
+              title: "Success",
+              message:
+                "The actual implementation's Channel has been successfully reflected in the spec.",
+              variant: "success",
             });
+            return;
           }
 
-          // Operation 데이터 다시 로드하여 최신 상태 반영
+          // payload diff는 기존 로직 유지 (update API 사용)
+          // UUID로 operation 정보 조회
+          const response = await getWebSocketOperation(operationId);
+          const operation = response.data.operation;
+
+          // 백엔드가 기대하는 UpdateOperationRequest 형식으로 변환
+          const updateRequest: any = {};
+
+          // Receive 변환 (channel + messages)
+          if (operation.channel) {
+            updateRequest.receive = {
+              channelRef:
+                operation.channel.ref?.replace("#/channels/", "") || null,
+              messages:
+                operation.messages
+                  ?.map((m) =>
+                    typeof m === "string" ? m : m.ref?.replace("#/messages/", "")
+                  )
+                  .filter(Boolean) || [],
+            };
+          }
+
+          // Reply 변환
+          if (operation.reply?.channel) {
+            updateRequest.reply = {
+              channelRef:
+                operation.reply.channel.ref?.replace("#/channels/", "") || null,
+              messages:
+                operation.reply.messages
+                  ?.map((m) =>
+                    typeof m === "string" ? m : m.ref?.replace("#/messages/", "")
+                  )
+                  .filter(Boolean) || [],
+            };
+          }
+
+          // UUID로 업데이트
+          await updateWebSocketOperation(operationId, updateRequest);
+
+          // UUID로 다시 로드
           await loadWebSocketOperationData(operationId);
 
           // 사이드바 목록도 다시 로드하여 diff 상태 업데이트
           await loadEndpoints();
 
-          // selectedEndpoint 업데이트
-          if (updatedOperation) {
-            setSelectedEndpoint({
-              ...selectedEndpoint,
-              diff: updatedOperation.diff || "none",
-              progress: updatedOperation.progress || selectedEndpoint.progress,
-            });
-          }
-
-          alert("실제 구현의 Channel이 명세에 성공적으로 반영되었습니다!");
-          return;
+          setAlertModal({
+            isOpen: true,
+            title: "Success",
+            message:
+              "The actual implementation has been successfully reflected in the spec.",
+            variant: "success",
+          });
+        } catch (error: unknown) {
+          console.error("명세 동기화 실패:", error);
+          const errorMessage = getErrorMessage(error);
+          setAlertModal({
+            isOpen: true,
+            title: "Sync Failed",
+            message: `Failed to sync spec: ${errorMessage}`,
+            variant: "error",
+          });
         }
-
-        // payload diff는 기존 로직 유지 (update API 사용)
-        // UUID로 operation 정보 조회
-        const response = await getWebSocketOperation(operationId);
-        const operation = response.data.operation;
-
-        // 백엔드가 기대하는 UpdateOperationRequest 형식으로 변환
-        const updateRequest: any = {};
-
-        // Receive 변환 (channel + messages)
-        if (operation.channel) {
-          updateRequest.receive = {
-            channelRef:
-              operation.channel.ref?.replace("#/channels/", "") || null,
-            messages:
-              operation.messages
-                ?.map((m) =>
-                  typeof m === "string" ? m : m.ref?.replace("#/messages/", "")
-                )
-                .filter(Boolean) || [],
-          };
-        }
-
-        // Reply 변환
-        if (operation.reply?.channel) {
-          updateRequest.reply = {
-            channelRef:
-              operation.reply.channel.ref?.replace("#/channels/", "") || null,
-            messages:
-              operation.reply.messages
-                ?.map((m) =>
-                  typeof m === "string" ? m : m.ref?.replace("#/messages/", "")
-                )
-                .filter(Boolean) || [],
-          };
-        }
-
-        // UUID로 업데이트
-        await updateWebSocketOperation(operationId, updateRequest);
-
-        // UUID로 다시 로드
-        await loadWebSocketOperationData(operationId);
-
-        // 사이드바 목록도 다시 로드하여 diff 상태 업데이트
-        await loadEndpoints();
-
-        alert("실제 구현이 명세에 성공적으로 반영되었습니다!");
-      } catch (error: unknown) {
-        console.error("명세 동기화 실패:", error);
-        const errorMessage = getErrorMessage(error);
-        alert(`명세 동기화에 실패했습니다: ${errorMessage}`);
-      }
-    }
+      },
+    });
   };
 
   const handleRun = async () => {
