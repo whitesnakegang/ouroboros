@@ -372,8 +372,8 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
             // Update x-ouroboros-progress if provided
             if (request.getProgress() != null) {
                 String progress = request.getProgress().trim().toLowerCase();
-                if (!progress.equals("completed") && !progress.equals("none")) {
-                    throw new IllegalArgumentException("Progress must be either 'completed' or 'none'");
+                if (!progress.equals("completed") && !progress.equals("receive") && !progress.equals("none")) {
+                    throw new IllegalArgumentException("Progress must be one of: 'completed', 'receive', 'none'");
                 }
                 updatedOperation.put("x-ouroboros-progress", progress);
             }
@@ -1184,6 +1184,81 @@ public class WebSocketOperationServiceImpl implements WebSocketOperationService 
                                 
                                 fileChannels.put(channelName, channelToAdd);
                                 log.debug("Synced channel '{}' from cache to file", channelName);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Step 10.5: Ensure referenced reply channel exists in file
+            @SuppressWarnings("unchecked")
+            Map<String, Object> reply = (Map<String, Object>) operationToAdd.get("reply");
+            if (reply != null) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> replyChannelRef = (Map<String, Object>) reply.get("channel");
+                if (replyChannelRef != null) {
+                    String replyChannelRefStr = (String) replyChannelRef.get("$ref");
+                    if (replyChannelRefStr != null && replyChannelRefStr.startsWith("#/channels/")) {
+                        String replyChannelName = replyChannelRefStr.substring("#/channels/".length());
+                        // Extract class name if channel name has package prefix
+                        String replyClassName = RefCleanupUtil.extractClassNameFromFullName(replyChannelName);
+                        if (replyClassName != null && !replyClassName.equals(replyChannelName)) {
+                            // Update channel reference to use class name
+                            replyChannelRef.put("$ref", "#/channels/" + replyClassName);
+                            replyChannelName = replyClassName;
+                        }
+
+                        // Ensure reply channel exists in file (will be created if missing)
+                        Map<String, Object> cacheChannels = yamlParser.getChannels(cacheDoc);
+                        if (cacheChannels != null) {
+                            // Check both full name and class name in cache channels
+                            @SuppressWarnings("unchecked")
+                            Map<String, Object> cacheReplyChannel = (Map<String, Object>) cacheChannels.get(replyChannelName);
+                            if (cacheReplyChannel == null && !replyChannelName.equals(RefCleanupUtil.extractClassNameFromFullName(replyChannelName))) {
+                                // Try to find by full package name
+                                for (String key : cacheChannels.keySet()) {
+                                    if (RefCleanupUtil.extractClassNameFromFullName(key).equals(replyChannelName)) {
+                                        @SuppressWarnings("unchecked")
+                                        Map<String, Object> foundChannel = (Map<String, Object>) cacheChannels.get(key);
+                                        cacheReplyChannel = foundChannel;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (cacheReplyChannel != null) {
+                                Map<String, Object> fileChannels = yamlParser.getOrCreateChannels(fileDoc);
+                                if (!fileChannels.containsKey(replyChannelName)) {
+                                    Map<String, Object> replyChannelToAdd = deepCopyChannel(cacheReplyChannel);
+
+                                    // Update messages map keys to use class names instead of full package names
+                                    @SuppressWarnings("unchecked")
+                                    Map<String, Object> messagesMap = (Map<String, Object>) replyChannelToAdd.get("messages");
+                                    if (messagesMap != null && !messagesMap.isEmpty()) {
+                                        Map<String, Object> updatedMessagesMap = new LinkedHashMap<>();
+                                        for (Map.Entry<String, Object> messageEntry : messagesMap.entrySet()) {
+                                            String fullMessageKey = messageEntry.getKey();
+                                            String messageClassName = RefCleanupUtil.extractClassNameFromFullName(fullMessageKey);
+                                            Object messageValue = messageEntry.getValue();
+
+                                            // Update $ref in message value if it exists
+                                            if (messageValue instanceof Map) {
+                                                @SuppressWarnings("unchecked")
+                                                Map<String, Object> messageMap = (Map<String, Object>) messageValue;
+                                                updateSchemaAndMessageReferences(messageMap, packageToClassNameMap);
+                                            }
+
+                                            updatedMessagesMap.put(messageClassName, messageValue);
+                                        }
+                                        replyChannelToAdd.put("messages", updatedMessagesMap);
+                                    }
+
+                                    // Update other $ref references in channel
+                                    updateSchemaAndMessageReferences(replyChannelToAdd, packageToClassNameMap);
+
+                                    fileChannels.put(replyChannelName, replyChannelToAdd);
+                                    log.debug("Synced reply channel '{}' from cache to file", replyChannelName);
+                                }
                             }
                         }
                     }

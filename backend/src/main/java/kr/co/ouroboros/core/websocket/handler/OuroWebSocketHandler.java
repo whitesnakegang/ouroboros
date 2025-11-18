@@ -11,6 +11,8 @@ import kr.co.ouroboros.core.global.Protocol;
 import kr.co.ouroboros.core.global.handler.OuroProtocolHandler;
 import kr.co.ouroboros.core.global.spec.OuroApiSpec;
 import kr.co.ouroboros.core.websocket.common.dto.OuroWebSocketApiSpec;
+import kr.co.ouroboros.core.websocket.config.WebSocketPrefixProperties;
+import kr.co.ouroboros.core.websocket.handler.helper.ChannelAddressNormalizer;
 import kr.co.ouroboros.core.websocket.handler.pipeline.WebSocketSpecSyncPipeline;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -44,6 +46,7 @@ public class OuroWebSocketHandler implements OuroProtocolHandler {
 
     private final AsyncApiService asyncApiService;
     private final WebSocketSpecSyncPipeline pipeline;
+    private final WebSocketPrefixProperties prefixProperties;
     private static final ObjectMapper mapper = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
 
@@ -69,16 +72,27 @@ public class OuroWebSocketHandler implements OuroProtocolHandler {
     
     /**
      * Creates an OuroApiSpec that represents the current AsyncAPI state.
+     * <p>
+     * This method scans the current application code using Springwolf and normalizes
+     * channel addresses by adding appropriate STOMP destination prefixes. Springwolf
+     * captures only the {@code @MessageMapping} path (e.g., "/chat/send") without the
+     * application destination prefix, so this method adds the configured prefix
+     * (e.g., "/app") to produce the full STOMP destination (e.g., "/app/chat/send").
      *
-     * @return an OuroApiSpec representing the current AsyncAPI state
+     * @return an OuroApiSpec representing the current AsyncAPI state with normalized channel addresses
      * @throws RuntimeException if the AsyncAPI cannot be serialized or converted to the websocket spec
      */
     @Override
     public OuroApiSpec scanCurrentState() {
         try {
-        AsyncAPI asyncAPI = asyncApiService.getAsyncAPI();
+            AsyncAPI asyncAPI = asyncApiService.getAsyncAPI();
             String json = Json31.mapper().writeValueAsString(asyncAPI);
-            return mapper.readValue(json, OuroWebSocketApiSpec.class);
+            OuroWebSocketApiSpec spec = mapper.readValue(json, OuroWebSocketApiSpec.class);
+
+            // Normalize channel addresses by adding appropriate prefixes
+            ChannelAddressNormalizer.normalizeChannelAddresses(spec, prefixProperties);
+
+            return spec;
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }

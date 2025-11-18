@@ -108,10 +108,16 @@ public class WebSocketSpecSyncPipeline implements SpecSyncPipeline {
                 fileOpMap.put(operationKey, scanOp);
                 // Operation이 참조하는 Channel 추가
                 WebSocketSpecSyncHelper.addReferencedChannel(wsFileSpec, wsScannedSpec, channelRef);
-                
+
+                // Reply channel도 추가
+                if (scanOp.getReply() != null && scanOp.getReply().getChannel() != null) {
+                    String replyChannelRef = scanOp.getReply().getChannel().getRef();
+                    WebSocketSpecSyncHelper.addReferencedChannel(wsFileSpec, wsScannedSpec, replyChannelRef);
+                }
+
                 // Operation이 참조하는 Message와 Schema 추가
                 WebSocketSpecSyncHelper.addReferencedMessagesAndSchemas(wsFileSpec, wsScannedSpec, scanOp);
-                
+
                 continue;
             }
             
