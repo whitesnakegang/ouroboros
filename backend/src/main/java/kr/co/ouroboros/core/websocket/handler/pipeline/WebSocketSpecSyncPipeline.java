@@ -102,7 +102,9 @@ public class WebSocketSpecSyncPipeline implements SpecSyncPipeline {
                 if (scanOp.getTags() != null) {
                     scanOp.setTags(SpecValidationUtil.normalizeWebSocketTags(scanOp.getTags()));
                 }
-
+                if(scanOp.getReply() == null){
+                    scanOp.setXOuroborosProgress("receive");
+                }
                 scanOp.setXOuroborosDiff("channel");
                 scanOp.setXOuroborosId(UUID.randomUUID().toString());
                 fileOpMap.put(operationKey, scanOp);
