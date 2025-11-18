@@ -28,18 +28,51 @@ const mockStatusColors = {
 // Completed 상태 표시 색상 (육안으로 확실히 구분 가능한 색상)
 const completedStatusColor = "bg-[#10B981]"; // 초록색
 
-// WebSocket Progress 상태 표시 색상 (점 스타일)
-const wsProgressColors = {
-  none: "bg-gray-400 dark:bg-gray-600",
-  mock: "bg-yellow-500 dark:bg-yellow-400",
-  completed: "bg-green-500 dark:bg-green-400",
-};
+// WebSocket 상태별 색상 및 라벨 결정 함수
+const getWebSocketStatus = (tag?: string, progress?: string) => {
+  const normalizedProgress = progress?.toLowerCase();
+  const normalizedTag = tag?.toLowerCase();
 
-// Progress 상태별 툴팁 텍스트
-const wsProgressLabels = {
-  none: "미구현",
-  mock: "Mock",
-  completed: "완료",
+  // tag: receive인 경우
+  if (normalizedTag === "receive") {
+    if (normalizedProgress === "none" || !normalizedProgress) {
+      return {
+        color: "bg-[#8B949E]", // 회색
+        label: "미구현",
+      };
+    } else if (normalizedProgress === "receive") {
+      return {
+        color: "bg-[#10B981]", // 초록색
+        label: "완료",
+      };
+    }
+  }
+
+  // tag: duplicate인 경우
+  if (normalizedTag === "duplicate") {
+    if (normalizedProgress === "none" || !normalizedProgress) {
+      return {
+        color: "bg-[#8B949E]", // 회색
+        label: "미구현",
+      };
+    } else if (normalizedProgress === "receive") {
+      return {
+        color: "bg-[#F97316]", // 주황색
+        label: "receive만 검증 완료",
+      };
+    } else if (normalizedProgress === "complete" || normalizedProgress === "completed") {
+      return {
+        color: "bg-[#10B981]", // 초록색
+        label: "완료",
+      };
+    }
+  }
+
+  // 기본값 (기타 경우)
+  return {
+    color: "bg-[#8B949E]", // 회색
+    label: "미구현",
+  };
 };
 
 export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
@@ -110,14 +143,17 @@ export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
           </>
         )}
 
-        {/* WebSocket: Progress 상태 표시 점 */}
-        {isWebSocket && endpoint.progress && wsProgressColors[endpoint.progress as keyof typeof wsProgressColors] && (
-          <div
-            className={`w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0 ${
-              wsProgressColors[endpoint.progress as keyof typeof wsProgressColors]
-            }`}
-            title={wsProgressLabels[endpoint.progress as keyof typeof wsProgressLabels]}
-          />
+        {/* WebSocket: tag와 progress 조합에 따른 상태 표시 점 */}
+        {isWebSocket && (
+          (() => {
+            const wsStatus = getWebSocketStatus(endpoint.tag, endpoint.progress);
+            return (
+              <div
+                className={`w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0 ${wsStatus.color}`}
+                title={wsStatus.label}
+              />
+            );
+          })()
         )}
 
         <div className="flex-1 min-w-0">
