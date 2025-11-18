@@ -340,9 +340,6 @@ export function ApiRequestCard({
         </svg>
         <span>Request</span>
       </div>
-      <p className="text-xs text-gray-600 dark:text-[#8B949E] mb-4">
-        요청 파라미터 및 헤더 설정
-      </p>
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-gray-200 dark:border-[#2D333B] mb-4">
@@ -350,9 +347,9 @@ export function ApiRequestCard({
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 text-sm font-medium transition-colors capitalize border-b-2 ${
+            className={`px-4 py-2 text-sm font-medium transition-colors capitalize border-b-2 focus:outline-none focus:ring-0 ${
               activeTab === tab
-                ? "text-gray-900 dark:text-[#E6EDF3] border-[#2563EB]"
+                ? "text-gray-900 dark:text-[#E6EDF3] border-gray-900 dark:border-[#E6EDF3]"
                 : "text-gray-500 dark:text-[#8B949E] border-transparent hover:text-gray-900 dark:hover:text-[#E6EDF3]"
             }`}
           >
@@ -369,9 +366,6 @@ export function ApiRequestCard({
         {activeTab === "headers" && (
           <div>
             <div className="flex items-center justify-between mb-3">
-              <p className="text-xs text-gray-600 dark:text-[#8B949E]">
-                요청 헤더 설정
-              </p>
               <button
                 onClick={addHeader}
                 disabled={isReadOnly}
@@ -381,7 +375,7 @@ export function ApiRequestCard({
                     : "text-[#2563EB] hover:text-[#1E40AF]"
                 }`}
               >
-                + Add
+                + Add Header
               </button>
             </div>
             <div className="space-y-2">
@@ -405,7 +399,7 @@ export function ApiRequestCard({
                     onChange={(e) => updateHeader(index, "key", e.target.value)}
                     placeholder="Header Name (e.g., X-API-Key)"
                     disabled={isReadOnly}
-                    className="flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm"
+                    className="flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
                   />
                   <input
                     type="text"
@@ -415,7 +409,7 @@ export function ApiRequestCard({
                     }
                     placeholder="Header Value (e.g., abc123)"
                     disabled={isReadOnly}
-                    className="flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm"
+                    className="flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
                   />
                   <button
                     onClick={() => removeHeader(index)}
@@ -444,7 +438,7 @@ export function ApiRequestCard({
 
         {activeTab === "body" && (
           <div>
-            <div className="flex gap-1 mb-3 border-b border-gray-200 dark:border-[#2D333B]">
+            <div className="flex gap-1 mb-3 mt-4 border-b border-gray-200 dark:border-[#2D333B]">
               {bodyTypes.map((type) => (
                 <button
                   key={type}
@@ -466,9 +460,9 @@ export function ApiRequestCard({
                     setRequestBody(newBody);
                   }}
                   disabled={isReadOnly}
-                  className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+                  className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 focus:outline-none focus:ring-0 ${
                     requestBody.type === type
-                      ? "text-gray-900 dark:text-[#E6EDF3] border-[#2563EB]"
+                      ? "text-gray-900 dark:text-[#E6EDF3] border-gray-900 dark:border-[#E6EDF3]"
                       : "text-gray-500 dark:text-[#8B949E] border-transparent hover:text-gray-900 dark:hover:text-[#E6EDF3]"
                   } disabled:opacity-50`}
                 >
@@ -526,7 +520,7 @@ export function ApiRequestCard({
                         });
                       }}
                       disabled={isReadOnly}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
                     >
                       <option value="object">Object</option>
                       <option value="array">Array</option>
@@ -862,7 +856,7 @@ export function ApiRequestCard({
                               });
                             }}
                             disabled={isReadOnly}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
                           >
                             <option value="string">string</option>
                             <option value="integer">integer</option>
@@ -944,131 +938,9 @@ export function ApiRequestCard({
 
         {activeTab === "params" && (
           <div className="space-y-6">
-            {/* Path Parameters */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-xs text-gray-600 dark:text-[#8B949E]">
-                  Path Parameters (URL 경로의 {`{param}`} 형태)
-                </p>
-                {setPathParams && (
-                  <button
-                    onClick={() =>
-                      setPathParams([
-                        ...pathParams,
-                        { key: "", value: "", type: "string", required: true },
-                      ])
-                    }
-                    disabled={isReadOnly}
-                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                      isReadOnly
-                        ? "text-gray-400 dark:text-[#8B949E] cursor-not-allowed"
-                        : "text-[#2563EB] hover:text-[#1E40AF]"
-                    }`}
-                  >
-                    + Add Param
-                  </button>
-                )}
-              </div>
-              <div className="space-y-2">
-                {pathParams.length === 0 ? (
-                  <div className="text-center py-4 text-gray-500 dark:text-gray-400">
-                    <p className="text-sm">Path 파라미터가 없습니다.</p>
-                  </div>
-                ) : (
-                  pathParams.map((param, index) => (
-                    <div key={index} className="flex gap-2 items-center">
-                      <input
-                        type="checkbox"
-                        checked={param.required !== false}
-                        onChange={(e) => {
-                          if (!setPathParams) return;
-                          const updated = [...pathParams];
-                          updated[index].required = e.target.checked;
-                          setPathParams(updated);
-                        }}
-                        disabled={isReadOnly}
-                        className="w-4 h-4"
-                        title="Required"
-                      />
-                      <input
-                        type="text"
-                        value={param.key}
-                        onChange={(e) => {
-                          if (!setPathParams) return;
-                          const updated = [...pathParams];
-                          updated[index].key = e.target.value;
-                          setPathParams(updated);
-                        }}
-                        placeholder="Key (예: id, userId)"
-                        disabled={isReadOnly}
-                        className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
-                      />
-                      <select
-                        value={param.type || "string"}
-                        onChange={(e) => {
-                          if (!setPathParams) return;
-                          const updated = [...pathParams];
-                          updated[index].type = e.target.value;
-                          setPathParams(updated);
-                        }}
-                        disabled={isReadOnly}
-                        className="px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
-                      >
-                        <option value="string">string</option>
-                        <option value="number">number</option>
-                        <option value="integer">integer</option>
-                        <option value="boolean">boolean</option>
-                      </select>
-                      <input
-                        type="text"
-                        value={param.value}
-                        onChange={(e) => {
-                          if (!setPathParams) return;
-                          const updated = [...pathParams];
-                          updated[index].value = e.target.value;
-                          setPathParams(updated);
-                        }}
-                        placeholder="Value (예: 1, user123)"
-                        disabled={isReadOnly}
-                        className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
-                      />
-                      {setPathParams && (
-                        <button
-                          onClick={() => {
-                            setPathParams(
-                              pathParams.filter((_, i) => i !== index)
-                            );
-                          }}
-                          disabled={isReadOnly}
-                          className="p-1.5 text-red-500 hover:text-red-600 disabled:opacity-50"
-                        >
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                            />
-                          </svg>
-                        </button>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
             {/* Query Parameters */}
             <div>
               <div className="flex items-center justify-between mb-3">
-                <p className="text-xs text-gray-600 dark:text-[#8B949E]">
-                  쿼리 파라미터 설정 (URL 뒤에 ?key=value 형태)
-                </p>
                 <button
                   onClick={() =>
                     setQueryParams([
@@ -1087,11 +959,7 @@ export function ApiRequestCard({
                 </button>
               </div>
               <div className="space-y-2">
-                {queryParams.length === 0 ? (
-                  <div className="text-center py-4 text-gray-500 dark:text-gray-400">
-                    <p className="text-sm">쿼리 파라미터가 없습니다.</p>
-                  </div>
-                ) : (
+                {queryParams.length > 0 && (
                   queryParams.map((param, index) => (
                     <div key={index} className="flex gap-2 items-center">
                       <input
@@ -1114,9 +982,9 @@ export function ApiRequestCard({
                           updated[index].key = e.target.value;
                           setQueryParams(updated);
                         }}
-                        placeholder="Key (예: page, limit)"
+                        placeholder="Key"
                         disabled={isReadOnly}
-                        className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
+                        className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500"
                       />
                       <select
                         value={param.type || "string"}
@@ -1126,7 +994,7 @@ export function ApiRequestCard({
                           setQueryParams(updated);
                         }}
                         disabled={isReadOnly}
-                        className="px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
+                        className="px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500"
                       >
                         <option value="string">string</option>
                         <option value="number">number</option>
@@ -1141,9 +1009,9 @@ export function ApiRequestCard({
                           updated[index].value = e.target.value;
                           setQueryParams(updated);
                         }}
-                        placeholder="Value (예: 1, true)"
+                        placeholder="Value"
                         disabled={isReadOnly}
-                        className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
+                        className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500"
                       />
                       <button
                         onClick={() =>
@@ -1228,14 +1096,14 @@ export function ApiRequestCard({
                         bearer: { token: e.target.value },
                       })
                     }
-                    placeholder="Bearer token (예: 123)"
+                    placeholder="Bearer token"
                     disabled={isReadOnly}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-[#30363D] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div className="p-3 bg-gray-50 dark:bg-[#0D1117] border border-gray-200 dark:border-[#2D333B] rounded-md">
                   <p className="text-xs text-gray-600 dark:text-[#8B949E] mb-1">
-                    <strong>헤더 형식:</strong>
+                    <strong>Header format:</strong>
                   </p>
                   <code className="text-xs text-gray-900 dark:text-[#E6EDF3] font-mono">
                     Authorization: Bearer{" "}
@@ -1288,14 +1156,14 @@ export function ApiRequestCard({
                         },
                       })
                     }
-                    placeholder="API Key 값 (예: abc123xyz456)"
+                    placeholder="API Key value"
                     disabled={isReadOnly}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-[#30363D] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div className="p-3 bg-gray-50 dark:bg-[#0D1117] border border-gray-200 dark:border-[#2D333B] rounded-md">
                   <p className="text-xs text-gray-600 dark:text-[#8B949E] mb-1">
-                    <strong>헤더 형식:</strong>
+                    <strong>Header format:</strong>
                   </p>
                   <code className="text-xs text-gray-900 dark:text-[#E6EDF3] font-mono">
                     {auth.apiKey?.key || "X-API-Key"}:{" "}
@@ -1351,7 +1219,7 @@ export function ApiRequestCard({
                 </div>
                 <div className="p-3 bg-gray-50 dark:bg-[#0D1117] border border-gray-200 dark:border-[#2D333B] rounded-md">
                   <p className="text-xs text-gray-600 dark:text-[#8B949E] mb-1">
-                    <strong>헤더 형식:</strong>
+                    <strong>Header format:</strong>
                   </p>
                   <code className="text-xs text-gray-900 dark:text-[#E6EDF3] font-mono break-all">
                     Authorization: Basic{" "}

@@ -41,17 +41,23 @@ export function CodeSnippetPanel({
       try {
         // 전체 OpenAPI YAML 가져오기
         const yamlContent = await exportYaml();
-        
+
         // YAML을 객체로 변환
         const openApiSpec = yaml.load(yamlContent) as any;
-        
-        if (!openApiSpec || !openApiSpec.paths || !openApiSpec.paths[spec.path]) {
-          throw new Error("OpenAPI 스펙에서 경로를 찾을 수 없습니다.");
+
+        if (
+          !openApiSpec ||
+          !openApiSpec.paths ||
+          !openApiSpec.paths[spec.path]
+        ) {
+          throw new Error(
+            "명세에 해당 경로가 없습니다. 실제 명세에 반영 후 다시 시도해주세요."
+          );
         }
 
         // openapi-snippet으로 스니펫 생성
         // getEndpointSnippets(openApi, path, method, targets, values)
-        const targets = languages.map(lang => lang.id);
+        const targets = languages.map((lang) => lang.id);
         const result = getEndpointSnippets(
           openApiSpec,
           spec.path,
@@ -63,17 +69,27 @@ export function CodeSnippetPanel({
         const selectedSnippet = result.snippets.find(
           (snippet: any) => snippet.id === selectedLanguage
         );
-        
+
         if (selectedSnippet && selectedSnippet.content) {
           setSnippet(selectedSnippet.content);
         } else {
           // fallback: 지원되지 않는 언어인 경우
-          const availableLanguages = result.snippets.map((s: any) => s.id).join(", ");
-          setSnippet(`// ${selectedLanguage} 언어는 아직 지원되지 않습니다.\n// 사용 가능한 언어: ${availableLanguages || "없음"}`);
+          const availableLanguages = result.snippets
+            .map((s: any) => s.id)
+            .join(", ");
+          setSnippet(
+            `// ${selectedLanguage} is not supported yet.\n// Available languages: ${
+              availableLanguages || "none"
+            }`
+          );
         }
       } catch (error) {
-        console.error("스니펫 생성 실패:", error);
-        setSnippet(`// 스니펫 생성 중 오류가 발생했습니다.\n// ${error instanceof Error ? error.message : String(error)}`);
+        console.error("Failed to generate snippet:", error);
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        setSnippet(
+          `// ${errorMessage}\n// try again after updating the spec to the actual implementation.`
+        );
       } finally {
         setLoading(false);
       }
@@ -168,13 +184,13 @@ export function CodeSnippetPanel({
                 disabled={loading || !snippet}
                 className="px-3 py-1 text-sm bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {copied ? "복사됨" : "복사"}
+                {copied ? "Copied" : "Copy"}
               </button>
             </div>
             <div className="bg-[#0D1117] dark:bg-[#010409] p-4 rounded-md max-h-[calc(100vh-250px)] overflow-y-auto">
               {loading ? (
                 <div className="text-sm text-[#E6EDF3] text-center py-8">
-                  스니펫 생성 중...
+                  Generating Snippet...
                 </div>
               ) : (
                 <pre className="text-sm text-[#E6EDF3] whitespace-pre-wrap overflow-x-auto font-mono">

@@ -185,7 +185,7 @@ export function SchemaModal({
                             {schema.properties
                               ? Object.keys(schema.properties).length
                               : 0}
-                            개 필드
+                            fields
                           </p>
                           {schema.schemaName.includes(".") && (
                             <span

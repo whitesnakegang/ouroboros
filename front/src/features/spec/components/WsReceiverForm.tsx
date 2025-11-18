@@ -3,9 +3,7 @@ import { SchemaFieldEditor } from "./SchemaFieldEditor";
 import { SchemaModal } from "./SchemaModal";
 import { getAllSchemas, type SchemaResponse } from "../services/api";
 import type { SchemaField, RequestBody } from "../types/schema.types";
-import {
-  createDefaultField,
-} from "../types/schema.types";
+import { createDefaultField } from "../types/schema.types";
 
 interface KeyValuePair {
   key: string;
@@ -117,7 +115,7 @@ export function WsReceiverForm({
   };
 
   return (
-    <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm mb-4">
+    <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm mb-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
           Receiver
@@ -127,7 +125,7 @@ export function WsReceiverForm({
             onClick={onRemove}
             className="text-red-500 hover:text-red-700 text-sm font-medium"
           >
-            삭제
+            Delete
           </button>
         )}
       </div>
@@ -135,15 +133,15 @@ export function WsReceiverForm({
       {/* 주소 */}
       <div className="mb-4">
         <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-          주소
+          Address
         </label>
         <input
           type="text"
           value={address}
           onChange={(e) => setAddress(e.target.value)}
-          placeholder="예: /chat/message"
+          placeholder="/chat/message"
           disabled={isReadOnly}
-          className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
+          className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
             isReadOnly ? "opacity-60 cursor-not-allowed" : ""
           }`}
         />
@@ -171,9 +169,9 @@ export function WsReceiverForm({
                 type="text"
                 value={header.key}
                 onChange={(e) => updateHeader(index, "key", e.target.value)}
-                placeholder="Header 이름"
+                placeholder="Header Name"
                 disabled={isReadOnly}
-                className={`flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
+                className={`flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                   isReadOnly ? "opacity-60 cursor-not-allowed" : ""
                 }`}
               />
@@ -181,9 +179,9 @@ export function WsReceiverForm({
                 type="text"
                 value={header.value}
                 onChange={(e) => updateHeader(index, "value", e.target.value)}
-                placeholder="Header 값"
+                placeholder="Header Value"
                 disabled={isReadOnly}
-                className={`flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
+                className={`flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                   isReadOnly ? "opacity-60 cursor-not-allowed" : ""
                 }`}
               />
@@ -211,14 +209,14 @@ export function WsReceiverForm({
           ))}
           {headers.length === 0 && (
             <p className="text-xs text-gray-500 dark:text-gray-400 text-center py-2">
-              Header가 없습니다. "+ Add Header"를 클릭하여 추가하세요.
+              No headers. Click "+ Add Header" to add one.
             </p>
           )}
         </div>
       </div>
 
       {/* Schema */}
-      <div>
+      <div className="mt-4">
         <div className="flex items-center justify-between mb-2">
           <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E]">
             Schema
@@ -280,7 +278,8 @@ export function WsReceiverForm({
             ))
           ) : (
             <p className="text-xs text-gray-500 dark:text-gray-400 text-center py-2">
-              Schema 필드가 없습니다. "+ Add Field"를 클릭하여 추가하거나 Schema를 선택하세요.
+              Schema 필드가 없습니다. "+ Add Field"를 클릭하여 추가하거나
+              Schema를 선택하세요.
             </p>
           )}
         </div>
@@ -297,4 +296,3 @@ export function WsReceiverForm({
     </div>
   );
 }
-

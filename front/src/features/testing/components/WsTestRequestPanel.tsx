@@ -589,7 +589,7 @@ export function WsTestRequestPanel() {
               onChange={(e) => setEntryPoint(e.target.value)}
               placeholder="ws://localhost:8080/ws"
               disabled={wsConnectionStatus === "connected"}
-              className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm font-mono disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm font-mono disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -603,7 +603,7 @@ export function WsTestRequestPanel() {
               onChange={(e) => setRoomId(e.target.value)}
               placeholder="room1"
               disabled={wsConnectionStatus === "connected"}
-              className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -663,8 +663,8 @@ export function WsTestRequestPanel() {
                       onChange={(e) =>
                         updateConnectHeader(index, e.target.value, header.value)
                       }
-                      placeholder="Key (예: accept-version)"
-                      className="flex-1 px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm"
+                      placeholder="Key"
+                      className="flex-1 px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
                     />
                     <input
                       type="text"
@@ -672,8 +672,8 @@ export function WsTestRequestPanel() {
                       onChange={(e) =>
                         updateConnectHeader(index, header.key, e.target.value)
                       }
-                      placeholder="Value (예: 1.1,1.2)"
-                      className="flex-1 px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm"
+                      placeholder="Value"
+                      className="flex-1 px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
                     />
                     <button
                       onClick={() => removeConnectHeader(index)}
@@ -718,7 +718,7 @@ export function WsTestRequestPanel() {
                 value={sender}
                 onChange={(e) => setSender(e.target.value)}
                 placeholder="tester"
-                className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm"
+                className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
               />
             </div>
 
@@ -730,13 +730,13 @@ export function WsTestRequestPanel() {
                 type="text"
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                placeholder="메시지 내용을 입력하세요"
+                placeholder="Message"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     handleSimpleSend();
                   }
                 }}
-                className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm"
+                className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
               />
             </div>
 
@@ -749,7 +749,7 @@ export function WsTestRequestPanel() {
                 onChange={(e) =>
                   setMessageType(e.target.value as "TALK" | "ENTER" | "LEAVE")
                 }
-                className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm"
+                className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
               >
                 <option value="TALK">TALK</option>
                 <option value="ENTER">ENTER</option>
@@ -763,7 +763,7 @@ export function WsTestRequestPanel() {
                 id="enableTryHeader"
                 checked={enableTryHeader}
                 onChange={(e) => setEnableTryHeader(e.target.checked)}
-                className="w-4 h-4 text-[#2563EB] bg-gray-100 border-gray-300 rounded focus:ring-[#2563EB]"
+                className="w-4 h-4 text-gray-600 dark:text-gray-400 bg-gray-100 border-gray-300 rounded focus:ring-gray-400 dark:focus:ring-gray-500"
               />
               <label
                 htmlFor="enableTryHeader"
@@ -825,7 +825,7 @@ export function WsTestRequestPanel() {
                           }}
                           className="sr-only peer"
                         />
-                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-gray-300 dark:peer-focus:ring-gray-600 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-gray-600"></div>
                       </label>
                     </div>
                   ))}
@@ -893,7 +893,7 @@ export function WsTestRequestPanel() {
                       }}
                       className="sr-only peer"
                     />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-gray-300 dark:peer-focus:ring-gray-600 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-gray-600"></div>
                   </label>
                 </div>
               );

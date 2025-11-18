@@ -33,28 +33,31 @@ export function DiffNotification({
       return {
         type: "both",
         description:
-          "요청(Request)과 응답(Response) 모두 명세와 실제 구현이 다릅니다.",
+          "Request and Response are different from the spec and the actual implementation.",
       };
     } else if (lowerDiff.includes("request")) {
       return {
         type: "request",
-        description: "요청(Request) 부분이 명세와 실제 구현이 다릅니다.",
+        description:
+          "Request is different from the spec and the actual implementation.",
       };
     } else if (lowerDiff.includes("response")) {
       return {
         type: "response",
-        description: "응답(Response) 부분이 명세와 실제 구현이 다릅니다.",
+        description:
+          "Response is different from the spec and the actual implementation.",
       };
     } else if (lowerDiff.includes("endpoint")) {
       return {
         type: "endpoint",
-        description: "엔드포인트(Endpoint) 정보가 명세와 실제 구현이 다릅니다.",
+        description:
+          "Endpoint information is different from the spec and the actual implementation.",
       };
     }
 
     return {
       type: "both",
-      description: "명세와 실제 구현이 일치하지 않습니다.",
+      description: "The spec and the actual implementation are different.",
     };
   };
 
@@ -67,15 +70,15 @@ export function DiffNotification({
   const getTypeLabel = () => {
     switch (diffDetails.type) {
       case "request":
-        return "요청 불일치";
+        return "Request Diff";
       case "response":
-        return "응답 불일치";
+        return "Response Diff";
       case "endpoint":
-        return "엔드포인트 불일치";
+        return "Endpoint Diff";
       case "both":
-        return "요청/응답 불일치";
+        return "Request/Response Diff";
       default:
-        return "불일치";
+        return "Diff";
     }
   };
 
@@ -100,7 +103,7 @@ export function DiffNotification({
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
               <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-                명세와 실제 구현의 불일치
+                Diff Notification
               </h3>
               <span className="px-2 py-0.5 bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200 text-xs font-medium rounded">
                 {getTypeLabel()}
@@ -111,10 +114,10 @@ export function DiffNotification({
             </p>
             <p className="text-xs text-amber-600 dark:text-amber-500 mt-2">
               {isCompleted
-                ? "이 API는 completed 상태로 실제 구현이 완료되었습니다."
-                : "이 API는 mock 상태입니다."}
+                ? "This API is completed and the actual implementation is complete."
+                : "This API is mock."}
               {diffDetails.type === "endpoint" &&
-                " 아래 버튼으로 명세를 갱신할 수 있습니다."}
+                " You can update the spec by clicking the button below."}
             </p>
           </div>
         </div>
@@ -139,7 +142,7 @@ export function DiffNotification({
                   d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                 />
               </svg>
-              요청(Request) 불일치 상세 정보
+              Request(Request) Diff Details
             </h4>
             <div className="mt-2 p-2 bg-amber-100 dark:bg-amber-900/50 rounded border border-amber-300 dark:border-amber-700">
               <pre className="text-xs text-amber-900 dark:text-amber-200 whitespace-pre-wrap break-words font-mono">
@@ -165,7 +168,7 @@ export function DiffNotification({
                   d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                 />
               </svg>
-              응답(Response) 불일치 상세 정보
+              Response(Response) Diff Details
             </h4>
             <div className="mt-2 p-2 bg-amber-100 dark:bg-amber-900/50 rounded border border-amber-300 dark:border-amber-700">
               <pre className="text-xs text-amber-900 dark:text-amber-200 whitespace-pre-wrap break-words font-mono">
@@ -193,13 +196,13 @@ export function DiffNotification({
                     d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                   />
                 </svg>
-                불일치 상세 정보
+                Diff Details
               </h4>
               <div className="space-y-3 mt-2">
                 {reqLog && (
                   <div>
                     <h5 className="text-xs font-medium text-amber-800 dark:text-amber-300 mb-1">
-                      요청(Request) 불일치:
+                      Request(Request) Diff:
                     </h5>
                     <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded border border-amber-300 dark:border-amber-700">
                       <pre className="text-xs text-amber-900 dark:text-amber-200 whitespace-pre-wrap break-words font-mono">
@@ -211,7 +214,7 @@ export function DiffNotification({
                 {resLog && (
                   <div>
                     <h5 className="text-xs font-medium text-amber-800 dark:text-amber-300 mb-1">
-                      응답(Response) 불일치:
+                      Response(Response) Diff:
                     </h5>
                     <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded border border-amber-300 dark:border-amber-700">
                       <pre className="text-xs text-amber-900 dark:text-amber-200 whitespace-pre-wrap break-words font-mono">
@@ -242,7 +245,7 @@ export function DiffNotification({
                 d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
               />
             </svg>
-            실제 구현을 명세에 반영
+            Sync to Spec
           </button>
         )}
       </div>

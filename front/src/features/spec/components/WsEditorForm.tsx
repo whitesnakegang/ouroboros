@@ -7,11 +7,9 @@ import { AlertModal } from "@/ui/AlertModal";
 import {
   getAllWebSocketSchemas,
   getAllWebSocketMessages,
-  getAllWebSocketChannels,
   createWebSocketMessage,
   type SchemaResponse,
   type MessageResponse,
-  type ChannelResponse,
   type CreateMessageRequest,
 } from "../services/api";
 import type {
@@ -98,11 +96,10 @@ export function WsEditorForm({
   diff,
   operationInfo,
   onSyncToActual,
-  onProgressUpdate,
+  onProgressUpdate: _onProgressUpdate,
 }: WsEditorFormProps) {
   const [schemas, setSchemas] = useState<SchemaResponse[]>([]);
   const [messages, setMessages] = useState<MessageResponse[]>([]);
-  const [channels, setChannels] = useState<ChannelResponse[]>([]);
   const [isReceiverSchemaModalOpen, setIsReceiverSchemaModalOpen] =
     useState(false);
   const [isReplySchemaModalOpen, setIsReplySchemaModalOpen] = useState(false);
@@ -132,7 +129,7 @@ export function WsEditorForm({
   const [internalWsSpecTab, setInternalWsSpecTab] = useState<
     "receiver" | "reply"
   >(getDefaultTab());
-  
+
   // operationInfo.tag가 변경될 때 기본 탭 업데이트 (초기 로드 및 변경 시)
   useEffect(() => {
     if (!externalWsSpecTab && operationInfo?.tag) {
@@ -141,7 +138,7 @@ export function WsEditorForm({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [operationInfo?.tag, externalWsSpecTab]);
-  
+
   const wsSpecTab = externalWsSpecTab ?? internalWsSpecTab;
   // setWsSpecTab는 외부(ApiEditorLayout)에서 탭 전환 시 사용되므로 유지
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -152,13 +149,9 @@ export function WsEditorForm({
     "receiver" | "reply" | "schema" | "message"
   >("receiver");
 
-  // 채널 선택 모드 (기존 채널 선택 vs 새 채널 생성)
-  const [receiverChannelMode, setReceiverChannelMode] = useState<
-    "select" | "create"
-  >("select");
-  const [replyChannelMode, setReplyChannelMode] = useState<"select" | "create">(
-    "select"
-  );
+  // 채널 선택 모드 (새 채널 생성만 허용)
+  const receiverChannelMode: "create" = "create";
+  const replyChannelMode: "create" = "create";
 
   // 메시지 작성 상태
   const [messageName, setMessageName] = useState("");
@@ -176,9 +169,6 @@ export function WsEditorForm({
   const [selectedMessageSchema, setSelectedMessageSchema] = useState<
     string | null
   >(null);
-
-  // Progress 토글 로컬 상태 (즉시 UI 반영용)
-  const [localProgress, setLocalProgress] = useState<string | null>(null);
 
   // Protocol state (entryPoint에서 분리)
   const [internalProtocol, setInternalProtocol] = useState<"ws" | "wss">("ws");
@@ -210,14 +200,14 @@ export function WsEditorForm({
     if (externalProtocol && setExternalProtocol) {
       setExternalProtocol(externalProtocol);
     }
-    
+
     if (entryPoint && entryPoint.includes("://")) {
       // ws://localhost:8080/ws 형태 파싱 (외부 protocol이 없을 때만)
       if (!externalProtocol) {
-      const match = entryPoint.match(/^(ws|wss):\/\/[^/]+(\/.*)?$/);
-      if (match) {
-        setProtocol(match[1] as "ws" | "wss");
-        setPathname(match[2] || "/ws");
+        const match = entryPoint.match(/^(ws|wss):\/\/[^/]+(\/.*)?$/);
+        if (match) {
+          setProtocol(match[1] as "ws" | "wss");
+          setPathname(match[2] || "/ws");
         }
       } else {
         // 외부 protocol이 있으면 pathname만 추출
@@ -249,19 +239,19 @@ export function WsEditorForm({
     }
   };
 
-  // Channels 목록 로드
-  const loadChannels = async () => {
-    try {
-      const response = await getAllWebSocketChannels();
-      setChannels(response.data);
-    } catch {
-      // 채널 로드 실패 시 무시
-    }
-  };
+  // Channels 목록 로드 (현재 사용하지 않음 - 기존 채널 선택 기능 제거됨)
+  // const loadChannels = async () => {
+  //   try {
+  //     const response = await getAllWebSocketChannels();
+  //     setChannels(response.data);
+  //   } catch {
+  //     // 채널 로드 실패 시 무시
+  //   }
+  // };
 
   useEffect(() => {
     loadMessages();
-    loadChannels();
+    // loadChannels(); // 기존 채널 선택 기능 제거됨
   }, []);
 
   // 스키마 목록 로드 함수 (WebSocket 전용)
@@ -279,15 +269,6 @@ export function WsEditorForm({
     loadSchemas();
   }, []);
 
-  // operationInfo.progress 변경 시 로컬 상태 동기화
-  useEffect(() => {
-    if (operationInfo?.progress) {
-      setLocalProgress(operationInfo.progress.toLowerCase());
-    } else {
-      setLocalProgress(null);
-    }
-  }, [operationInfo?.progress]);
-
   // Receiver 초기화
   const initializeReceiver = () => {
     if (receiver) return;
@@ -300,7 +281,6 @@ export function WsEditorForm({
       },
       messages: [],
     });
-    setReceiverChannelMode("select");
   };
 
   // Reply 초기화
@@ -314,7 +294,6 @@ export function WsEditorForm({
       },
       messages: [],
     });
-    setReplyChannelMode("select");
   };
 
   // Receiver 헤더 관리 (현재 사용하지 않음 - Header 섹션 제거됨)
@@ -498,83 +477,11 @@ export function WsEditorForm({
     }
   };
 
-  // 기존 채널 선택 핸들러 (토글 방식 - 선택/선택해제)
-  const handleSelectExistingChannel = (
-    channel: ChannelResponse,
-    type: "receiver" | "reply"
-  ) => {
-    const channelMessageNames = Object.keys(channel.channel.messages || {});
-
-    if (type === "receiver") {
-      // 이미 선택된 채널인지 확인 (토글)
-      const isAlreadySelected =
-        receiver &&
-        receiver.address === channel.channel.address &&
-        receiver.messages?.length === channelMessageNames.length &&
-        receiver.messages.every((msg) => channelMessageNames.includes(msg));
-
-      if (isAlreadySelected) {
-        // 선택 해제
-        setReceiver({
-          address: "",
-          headers: [],
-          schema: {
-            type: "json",
-            fields: [],
-          },
-          messages: [],
-        });
-      } else {
-        // 선택
-        if (!receiver) {
-          initializeReceiver();
-        }
-        setReceiver({
-          address: channel.channel.address,
-          headers: [],
-          schema: {
-            type: "json",
-            fields: [],
-          },
-          messages: channelMessageNames,
-        });
-        setReceiverChannelMode("select");
-      }
-    } else if (type === "reply") {
-      // 이미 선택된 채널인지 확인 (토글)
-      const isAlreadySelected =
-        reply &&
-        reply.address === channel.channel.address &&
-        reply.messages?.length === channelMessageNames.length &&
-        reply.messages.every((msg) => channelMessageNames.includes(msg));
-
-      if (isAlreadySelected) {
-        // 선택 해제
-        setReply({
-          address: "",
-          schema: {
-            type: "json",
-            fields: [],
-          },
-          messages: [],
-        });
-      } else {
-        // 선택
-        if (!reply) {
-          initializeReply();
-        }
-        setReply({
-          address: channel.channel.address,
-          schema: {
-            type: "json",
-            fields: [],
-          },
-          messages: channelMessageNames,
-        });
-        setReplyChannelMode("select");
-      }
-    }
-  };
+  // 기존 채널 선택 핸들러 (현재 사용하지 않음 - 기존 채널 선택 기능 제거됨)
+  // const handleSelectExistingChannel = (
+  //   channel: ChannelResponse,
+  //   type: "receiver" | "reply"
+  // ) => { ... }
 
   // 채널 선택 또는 생성 (현재 사용하지 않음 - 채널 선택 모드로 대체됨)
   // const handleChannelSelect = async (
@@ -709,23 +616,25 @@ export function WsEditorForm({
     if (lowerDiff === "channel") {
       return {
         type: "channel" as const,
-        label: "Channel 불일치",
-        description: "Channel 정보가 명세와 실제 구현이 다릅니다.",
+        label: "Channel Diff",
+        description:
+          "Channel information is different from the spec and the actual implementation.",
         canSync: true,
       };
     } else if (lowerDiff === "payload") {
       return {
         type: "payload" as const,
-        label: "Payload 불일치",
-        description: "메시지 Payload 구조가 명세와 실제 구현이 다릅니다.",
+        label: "Payload Diff",
+        description:
+          "Message Payload structure is different from the spec and the actual implementation.",
         canSync: false,
       };
     }
 
     return {
       type: "other" as const,
-      label: "불일치",
-      description: "명세와 실제 구현이 일치하지 않습니다.",
+      label: "Diff",
+      description: "The spec and the actual implementation are different.",
       canSync: false,
     };
   };
@@ -761,7 +670,7 @@ export function WsEditorForm({
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
                 <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-                  명세와 실제 구현의 불일치
+                  Diff Notification
                 </h3>
                 <span className="px-2 py-0.5 bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200 text-xs font-medium rounded">
                   {details.label}
@@ -772,9 +681,10 @@ export function WsEditorForm({
               </p>
               <p className="text-xs text-amber-600 dark:text-amber-500 mt-2">
                 {isCompleted
-                  ? "이 Operation은 completed 상태로 실제 구현이 완료되었습니다."
-                  : "이 Operation은 진행 중입니다."}
-                {details.canSync && " 아래 버튼으로 명세를 갱신할 수 있습니다."}
+                  ? "This Operation is completed and the actual implementation is complete."
+                  : "This Operation is in progress."}
+                {details.canSync &&
+                  " You can update the spec by clicking the button below."}
               </p>
             </div>
           </div>
@@ -797,7 +707,7 @@ export function WsEditorForm({
                   d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
               </svg>
-              안내사항
+              Instructions
             </h4>
             <ul className="space-y-2">
               <li className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
@@ -815,11 +725,11 @@ export function WsEditorForm({
                   />
                 </svg>
                 <span>
-                  백엔드에서{" "}
+                  Backend uses{" "}
                   <code className="px-1 py-0.5 bg-amber-100 dark:bg-amber-900 border border-amber-300 dark:border-amber-700 rounded text-[10px] font-mono text-amber-900 dark:text-amber-200">
                     x-ouroboros-diff
                   </code>{" "}
-                  필드를 통해 불일치가 감지되었습니다.
+                  field to detect the difference.
                 </span>
               </li>
               {details.type === "channel" && (
@@ -838,8 +748,9 @@ export function WsEditorForm({
                     />
                   </svg>
                   <span>
-                    실제 구현에 존재하지만 명세에 없는 Channel이 있다면, 아래
-                    버튼을 클릭하여 명세에 자동으로 추가할 수 있습니다.
+                    If there is a Channel that exists in the actual
+                    implementation but not in the spec, you can click the button
+                    below to automatically add it to the spec.
                   </span>
                 </li>
               )}
@@ -864,7 +775,7 @@ export function WsEditorForm({
                   d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                 />
               </svg>
-              실제 구현을 명세에 반영
+              Sync to Spec
             </button>
           )}
         </div>
@@ -893,7 +804,7 @@ export function WsEditorForm({
     if (!schemaName) {
       return (
         <span className="text-sm text-gray-500 dark:text-[#8B949E] italic">
-          (schema 정보 없음)
+          (no schema information)
         </span>
       );
     }
@@ -914,7 +825,10 @@ export function WsEditorForm({
   // 문서 형식 뷰 - REST 스타일로 재구성
   if (isDocumentView) {
     // 메시지 표시 헬퍼 함수
-    const renderMessages = (channel: Receiver | Reply | null, channelType: string) => {
+    const renderMessages = (
+      channel: Receiver | Reply | null,
+      channelType: string
+    ) => {
       if (!channel) {
         return (
           <div className="text-sm text-gray-500 dark:text-[#8B949E] italic">
@@ -1015,72 +929,78 @@ export function WsEditorForm({
                           )}
 
                         {/* Payload */}
-                        {messageInfo?.payload && (() => {
-                          // payload가 schema로 감싸져 있으면 사용하고, 아니면 payload 자체를 schema로 사용
-                          const schema = messageInfo.payload.schema ?? messageInfo.payload;
-                          
-                          return (
-                            <div>
-                              <span className="text-xs font-semibold text-gray-600 dark:text-[#8B949E]">
-                                Payload:
-                              </span>
-                              <div className="mt-2">
-                                {schema?.$ref ? (
-                                  <MessagePayloadSchemaViewer
-                                    schemaRef={schema.$ref}
-                                  />
-                                ) : schema?.ref ? (
-                                  <MessagePayloadSchemaViewer
-                                    schemaRef={schema.ref}
-                                  />
-                                ) : schema?.type ? (
-                                  <div>
-                                    <span className="text-sm text-gray-900 dark:text-[#E6EDF3]">
-                                      type: {schema.type}
+                        {messageInfo?.payload &&
+                          (() => {
+                            // payload가 schema로 감싸져 있으면 사용하고, 아니면 payload 자체를 schema로 사용
+                            const schema =
+                              messageInfo.payload.schema ?? messageInfo.payload;
+
+                            return (
+                              <div>
+                                <span className="text-xs font-semibold text-gray-600 dark:text-[#8B949E]">
+                                  Payload:
+                                </span>
+                                <div className="mt-2">
+                                  {schema?.$ref ? (
+                                    <MessagePayloadSchemaViewer
+                                      schemaRef={schema.$ref}
+                                    />
+                                  ) : schema?.ref ? (
+                                    <MessagePayloadSchemaViewer
+                                      schemaRef={schema.ref}
+                                    />
+                                  ) : schema?.type ? (
+                                    <div>
+                                      <span className="text-sm text-gray-900 dark:text-[#E6EDF3]">
+                                        type: {schema.type}
+                                      </span>
+                                      {schema.properties && (
+                                        <div className="mt-2">
+                                          <SchemaViewer
+                                            schemaType={{
+                                              kind: "object",
+                                              properties: Object.entries(
+                                                schema.properties
+                                              ).map(
+                                                ([key, prop]: [
+                                                  string,
+                                                  unknown
+                                                ]) => {
+                                                  const propObj = prop as {
+                                                    description?: string;
+                                                    type?: string;
+                                                    [key: string]: unknown;
+                                                  };
+                                                  return {
+                                                    key,
+                                                    description:
+                                                      propObj.description,
+                                                    required:
+                                                      schema.required?.includes(
+                                                        key
+                                                      ) || false,
+                                                    schemaType:
+                                                      parseOpenAPISchemaToSchemaType(
+                                                        propObj
+                                                      ),
+                                                  };
+                                                }
+                                              ),
+                                            }}
+                                            contentType="application/json"
+                                          />
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <span className="text-sm text-gray-500 dark:text-[#8B949E] italic">
+                                      (schema 정보 없음)
                                     </span>
-                                    {schema.properties && (
-                                      <div className="mt-2">
-                                        <SchemaViewer
-                                          schemaType={{
-                                            kind: "object",
-                                            properties: Object.entries(
-                                              schema.properties
-                                            ).map(
-                                              ([key, prop]: [string, unknown]) => {
-                                                const propObj = prop as {
-                                                  description?: string;
-                                                  type?: string;
-                                                  [key: string]: unknown;
-                                                };
-                                                return {
-                                                  key,
-                                                  description: propObj.description,
-                                                  required:
-                                                    schema.required?.includes(
-                                                      key
-                                                    ) || false,
-                                                  schemaType:
-                                                    parseOpenAPISchemaToSchemaType(
-                                                      propObj
-                                                    ),
-                                                };
-                                              }
-                                            ),
-                                          }}
-                                          contentType="application/json"
-                                        />
-                                      </div>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <span className="text-sm text-gray-500 dark:text-[#8B949E] italic">
-                                    (schema 정보 없음)
-                                  </span>
-                                )}
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })()}
+                            );
+                          })()}
 
                         {/* 메시지 정보가 없는 경우 */}
                         {!messageInfo && (
@@ -1104,88 +1024,13 @@ export function WsEditorForm({
     };
 
     return (
-      <div className="w-full max-w-6xl mx-auto px-6 py-8">
+      <div className="w-full">
         {/* Diff 알림 */}
         {renderDiffNotification()}
 
-        {/* Progress 수동 관리 토글 (읽기 전용 모드에서만 표시, DUPLEX나 SEND인 경우만) */}
-        <div className="mb-4 flex items-center justify-end gap-2 h-6">
-          {isReadOnly &&
-          operationInfo &&
-          (operationInfo.tag === "duplex" || operationInfo.tag === "send") &&
-          onProgressUpdate && (
-            <>
-              <span className="text-xs text-gray-600 dark:text-[#8B949E] font-medium">
-                작업 완료:
-              </span>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={
-                    localProgress !== null
-                      ? localProgress === "completed"
-                      : operationInfo.progress?.toLowerCase() === "completed"
-                  }
-                  onChange={async (e) => {
-                    const newProgress = e.target.checked ? "completed" : "none";
-                    // 즉시 로컬 상태 업데이트
-                    setLocalProgress(newProgress);
-                    try {
-                      await onProgressUpdate(
-                        newProgress as "none" | "completed"
-                      );
-                      // 성공 시 로컬 상태 유지 (operationInfo가 업데이트되면 자동으로 동기화됨)
-                    } catch (error) {
-                      console.error("Progress 업데이트 실패:", error);
-                      // 에러 발생 시 이전 상태로 되돌리기
-                      setLocalProgress(
-                        operationInfo.progress?.toLowerCase() || "none"
-                      );
-                      setAlertModal({
-                        isOpen: true,
-                        title: "업데이트 실패",
-                        message: `Progress 업데이트에 실패했습니다: ${
-                          error instanceof Error
-                            ? error.message
-                            : "알 수 없는 오류"
-                        }`,
-                        variant: "error",
-                      });
-                    }
-                  }}
-                  className="sr-only"
-                />
-                <div
-                  className={`w-10 h-5 rounded-full transition-colors duration-200 ease-in-out ${
-                    localProgress !== null
-                      ? localProgress === "completed"
-                        ? "bg-[#2563EB]"
-                        : "bg-gray-300 dark:bg-gray-600"
-                      : operationInfo.progress?.toLowerCase() === "completed"
-                      ? "bg-[#2563EB]"
-                      : "bg-gray-300 dark:bg-gray-600"
-                  }`}
-                >
-                  <div
-                    className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform duration-200 ease-in-out ${
-                      localProgress !== null
-                        ? localProgress === "completed"
-                          ? "translate-x-5"
-                          : "translate-x-0.5"
-                        : operationInfo.progress?.toLowerCase() === "completed"
-                        ? "translate-x-5"
-                        : "translate-x-0.5"
-                    } translate-y-0.5`}
-                  ></div>
-                </div>
-              </label>
-            </>
-          )}
-        </div>
-
         {/* Protocol & Entrypoint */}
-        <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] shadow-sm overflow-hidden mb-4">
-          <div className="p-4 bg-white dark:bg-[#161B22]">
+        <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm overflow-hidden mb-6">
+          <div className="bg-white dark:bg-[#161B22]">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <svg
@@ -1210,9 +1055,7 @@ export function WsEditorForm({
             <div className="flex items-center gap-2">
               <span
                 className={`inline-flex items-center rounded-[4px] border border-gray-300 dark:border-[#2D333B] bg-white dark:bg-[#0D1117] px-2 py-[2px] text-[10px] font-mono font-semibold ${
-                  protocol === "wss"
-                    ? "text-[#10B981]"
-                    : "text-[#2563EB]"
+                  protocol === "wss" ? "text-[#10B981]" : "text-[#2563EB]"
                 }`}
               >
                 {protocol?.toUpperCase() || "WS"}
@@ -1281,9 +1124,9 @@ export function WsEditorForm({
 
         {/* Receiver & Reply 섹션 (탭 전환) */}
         {(receiver || reply) && (
-          <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] shadow-sm overflow-hidden">
+          <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm overflow-hidden">
             {/* 탭 헤더 */}
-            <div className="bg-gray-50 dark:bg-[#0D1117] border-b border-gray-200 dark:border-[#2D333B] px-4 pt-2">
+            <div className="bg-gray-50 dark:bg-[#0D1117] border-b border-gray-200 dark:border-[#2D333B] -mx-4 -mt-4 px-4 pt-2">
               <div className="flex gap-0.5 -mb-px">
                 <button
                   onClick={() => setWsSpecTab("receiver")}
@@ -1309,7 +1152,7 @@ export function WsEditorForm({
             </div>
 
             {/* 탭 내용 */}
-            <div className="p-4 bg-white dark:bg-[#161B22]">
+            <div className="bg-white dark:bg-[#161B22] -mx-4 -mb-4 px-4 pt-4 pb-4">
               {wsSpecTab === "receiver" ? (
                 receiver ? (
                   renderMessages(receiver, "Receiver")
@@ -1344,7 +1187,7 @@ export function WsEditorForm({
   }
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-6 py-8">
+    <div className="w-full">
       {/* Diff 알림 */}
       {renderDiffNotification()}
 
@@ -1366,9 +1209,6 @@ export function WsEditorForm({
           </svg>
           <span>Protocol & Pathname</span>
         </div>
-        <p className="text-xs text-gray-600 dark:text-[#8B949E] mb-4">
-          WebSocket 프로토콜과 엔드포인트 경로를 입력하세요
-        </p>
 
         {/* Operation 정보 (읽기 전용 모드) */}
         {isReadOnly && operationInfo && (
@@ -1398,7 +1238,7 @@ export function WsEditorForm({
                   setPathname(pathname);
                 }}
                 disabled={isReadOnly}
-                className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
+                className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                   isReadOnly ? "opacity-60 cursor-not-allowed" : ""
                 }`}
               >
@@ -1433,7 +1273,7 @@ export function WsEditorForm({
                     e.preventDefault();
                   }
                 }}
-                placeholder="예: /ws, /websocket, /chat"
+                placeholder="/ws"
                 disabled={isReadOnly}
                 className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border ${
                   entryPointError
@@ -1442,7 +1282,7 @@ export function WsEditorForm({
                 } text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 ${
                   entryPointError
                     ? "focus:ring-red-500 focus:border-red-500"
-                    : "focus:ring-[#2563EB] focus:border-[#2563EB]"
+                    : "focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500"
                 } text-sm font-mono ${
                   isReadOnly ? "opacity-60 cursor-not-allowed" : ""
                 }`}
@@ -1466,9 +1306,9 @@ export function WsEditorForm({
                 type="text"
                 value={tags}
                 onChange={(e) => setTags(e.target.value)}
-                placeholder="예: CHAT, NOTIFICATION, REALTIME"
+                placeholder="CHAT"
                 disabled={isReadOnly}
-                className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
+                className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                   isReadOnly ? "opacity-60 cursor-not-allowed" : ""
                 }`}
               />
@@ -1481,9 +1321,9 @@ export function WsEditorForm({
                 type="text"
                 value={summary}
                 onChange={(e) => setSummary(e.target.value)}
-                placeholder="예: 홍길동"
+                placeholder="Owner"
                 disabled={isReadOnly}
-                className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
+                className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                   isReadOnly ? "opacity-60 cursor-not-allowed" : ""
                 }`}
               />
@@ -1499,9 +1339,9 @@ export function WsEditorForm({
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="예: 실시간 메시지 송수신을 위한 WebSocket 연결 엔드포인트"
+              placeholder="Description"
               disabled={isReadOnly}
-              className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
+              className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                 isReadOnly ? "opacity-60 cursor-not-allowed" : ""
               }`}
             />
@@ -1509,82 +1349,14 @@ export function WsEditorForm({
         </div>
       </div>
 
-      {/* Progress 수동 관리 토글 (읽기 전용 모드에서만 표시, DUPLEX나 SEND인 경우만) */}
-      {isReadOnly &&
-        operationInfo &&
-        (operationInfo.tag === "duplex" || operationInfo.tag === "send") &&
-        onProgressUpdate && (
-          <div className="mb-4 flex items-center justify-end gap-2">
-            <span className="text-xs text-gray-600 dark:text-[#8B949E] font-medium">
-              작업 완료:
-              </span>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={
-                  localProgress !== null
-                    ? localProgress === "completed"
-                    : operationInfo.progress?.toLowerCase() === "completed"
-                }
-                onChange={async (e) => {
-                  const newProgress = e.target.checked ? "completed" : "none";
-                  // 즉시 로컬 상태 업데이트
-                  setLocalProgress(newProgress);
-                  try {
-                    await onProgressUpdate(newProgress as "none" | "completed");
-                    // 성공 시 로컬 상태 유지 (operationInfo가 업데이트되면 자동으로 동기화됨)
-                  } catch (error) {
-                    console.error("Progress 업데이트 실패:", error);
-                    // 에러 발생 시 이전 상태로 되돌리기
-                    setLocalProgress(
-                      operationInfo.progress?.toLowerCase() || "none"
-                    );
-                    alert(
-                      `Progress 업데이트에 실패했습니다: ${
-                        error instanceof Error
-                          ? error.message
-                          : "알 수 없는 오류"
-                      }`
-                    );
-                  }
-                }}
-                className="sr-only peer"
-              />
-              <div
-                className={`w-10 h-5 rounded-full transition-colors duration-200 ease-in-out ${
-                  localProgress !== null
-                    ? localProgress === "completed"
-                      ? "bg-[#2563EB]"
-                      : "bg-gray-300 dark:bg-gray-600"
-                    : operationInfo.progress?.toLowerCase() === "completed"
-                    ? "bg-[#2563EB]"
-                    : "bg-gray-300 dark:bg-gray-600"
-                }`}
-              >
-                <div
-                  className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform duration-200 ease-in-out ${
-                    localProgress !== null
-                      ? localProgress === "completed"
-                        ? "translate-x-5"
-                        : "translate-x-0.5"
-                      : operationInfo.progress?.toLowerCase() === "completed"
-                      ? "translate-x-5"
-                      : "translate-x-0.5"
-                  } translate-y-0.5`}
-                ></div>
-            </div>
-            </label>
-        </div>
-      )}
-
       {/* 통합 탭 박스 */}
-      <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] shadow-sm mb-6 overflow-hidden">
+      <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm mb-6 overflow-hidden">
         {/* 탭 헤더 */}
-        <div className="bg-gray-50 dark:bg-[#0D1117] border-b border-gray-200 dark:border-[#2D333B] px-4 pt-2">
+        <div className="bg-gray-50 dark:bg-[#0D1117] border-b border-gray-200 dark:border-[#2D333B] -mx-4 -mt-4 px-4 pt-2">
           <div className="flex gap-0.5 -mb-px">
             <button
               onClick={() => setWsTab("receiver")}
-              className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ${
+              className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none focus:ring-0 ${
                 wsTab === "receiver"
                   ? "text-gray-900 dark:text-[#E6EDF3] bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] border-b-white dark:border-b-[#161B22] relative z-10"
                   : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
@@ -1626,7 +1398,7 @@ export function WsEditorForm({
         </div>
 
         {/* 탭 내용 */}
-        <div className="p-4 bg-white dark:bg-[#161B22]">
+        <div className="bg-white dark:bg-[#161B22] -mx-4 -mb-4 px-4 pt-4 pb-4">
           {wsTab === "receiver" && (
             <div>
               <div className="flex items-center justify-between mb-4">
@@ -1634,10 +1406,6 @@ export function WsEditorForm({
                   <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
                     Receiver
                   </h3>
-                  <p className="text-xs text-gray-600 dark:text-[#8B949E] mt-1">
-                    메시지와 주소를 입력하면 채널을 생성하거나 기존 채널을
-                    선택할 수 있습니다.
-                  </p>
                 </div>
                 {!isReadOnly && (
                   <div className="flex gap-2">
@@ -1675,132 +1443,13 @@ export function WsEditorForm({
 
               {receiver ? (
                 <div className="space-y-4">
-                  {/* 채널 선택 모드 선택 */}
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                      채널 선택 방식
-                    </label>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          setReceiverChannelMode("select");
-                          if (receiver) {
-                            setReceiver({
-                              ...receiver,
-                              address: "",
-                              messages: [],
-                            });
-                          }
-                        }}
-                        disabled={isReadOnly}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                          receiverChannelMode === "select"
-                            ? "bg-[#2563EB] text-white"
-                            : "bg-gray-100 dark:bg-[#21262D] text-gray-700 dark:text-[#C9D1D9] hover:bg-gray-200 dark:hover:bg-[#30363D]"
-                        } ${isReadOnly ? "opacity-60 cursor-not-allowed" : ""}`}
-                      >
-                        기존 채널 선택
-                      </button>
-                      <button
-                        onClick={() => {
-                          setReceiverChannelMode("create");
-                          if (receiver) {
-                            setReceiver({
-                              ...receiver,
-                              address: "",
-                              messages: [],
-                            });
-                          }
-                        }}
-                        disabled={isReadOnly}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                          receiverChannelMode === "create"
-                            ? "bg-[#2563EB] text-white"
-                            : "bg-gray-100 dark:bg-[#21262D] text-gray-700 dark:text-[#C9D1D9] hover:bg-gray-200 dark:hover:bg-[#30363D]"
-                        } ${isReadOnly ? "opacity-60 cursor-not-allowed" : ""}`}
-                      >
-                        새 채널 생성
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* 기존 채널 선택 모드 */}
-                  {receiverChannelMode === "select" && (
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                        기존 채널 선택
-                      </label>
-                      {channels.length > 0 ? (
-                        <div className="max-h-64 overflow-y-auto space-y-2 border border-gray-200 dark:border-[#2D333B] rounded-md p-3 bg-gray-50 dark:bg-[#0D1117]">
-                          {channels.map((ch) => {
-                            const channelMessageNames = Object.keys(
-                              ch.channel.messages || {}
-                            );
-                            const isSelected =
-                              receiver &&
-                              receiver.address === ch.channel.address &&
-                              receiver.messages?.length ===
-                                channelMessageNames.length &&
-                              receiver.messages.every((msg) =>
-                                channelMessageNames.includes(msg)
-                              );
-
-                            return (
-                              <div
-                                key={ch.channelName}
-                                onClick={() =>
-                                  !isReadOnly &&
-                                  handleSelectExistingChannel(ch, "receiver")
-                                }
-                                className={`text-sm p-3 border rounded cursor-pointer transition-colors ${
-                                  isSelected
-                                    ? "bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700"
-                                    : "bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] hover:bg-gray-100 dark:hover:bg-[#21262D]"
-                                } ${
-                                  isReadOnly
-                                    ? "cursor-not-allowed opacity-60"
-                                    : ""
-                                }`}
-                              >
-                                <div className="font-mono text-gray-800 dark:text-[#E6EDF3] font-medium">
-                                  {ch.channelName}
-                                </div>
-                                <div className="text-xs text-gray-600 dark:text-[#8B949E] mt-1">
-                                  주소: {ch.channel.address}
-                                </div>
-                                <div className="text-xs text-gray-600 dark:text-[#8B949E] mt-1">
-                                  메시지:{" "}
-                                  {channelMessageNames.join(", ") || "없음"}
-                                </div>
-                                {isSelected && (
-                                  <div className="text-xs text-blue-600 dark:text-blue-400 mt-2 font-medium">
-                                    ✓ 선택됨
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="text-center py-6 border border-gray-200 dark:border-[#2D333B] rounded-md bg-gray-50 dark:bg-[#0D1117]">
-                          <p className="text-sm text-gray-500 dark:text-[#8B949E]">
-                            기존 채널이 없습니다
-                          </p>
-                          <p className="text-xs text-gray-400 dark:text-[#6E7681] mt-1">
-                            "새 채널 생성"을 선택하여 채널을 생성하세요
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
                   {/* 새 채널 생성 모드 */}
                   {receiverChannelMode === "create" && (
                     <>
                       {/* 주소 */}
                       <div>
                         <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                          주소 <span className="text-red-500">*</span>
+                          Address <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="text"
@@ -1811,16 +1460,16 @@ export function WsEditorForm({
                               address: e.target.value,
                             })
                           }
-                          placeholder="예: /chat/{roomId}"
+                          placeholder="/app/chat/{roomId}"
                           disabled={isReadOnly}
-                          className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
+                          className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                             isReadOnly ? "opacity-60 cursor-not-allowed" : ""
                           }`}
                         />
                       </div>
 
                       {/* Messages */}
-                      <div>
+                      <div className="mt-4">
                         <div className="flex items-center justify-between mb-2">
                           <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E]">
                             📨 Messages{" "}
@@ -1902,7 +1551,7 @@ export function WsEditorForm({
                 </div>
               ) : (
                 <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
-                  <p>Receiver가 없습니다. "추가" 버튼을 클릭하여 추가하세요.</p>
+                  <p>No Receiver. Click the "Add" button to add.</p>
                 </div>
               )}
             </div>
@@ -1915,10 +1564,6 @@ export function WsEditorForm({
                   <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
                     Reply
                   </h3>
-                  <p className="text-xs text-gray-600 dark:text-[#8B949E] mt-1">
-                    메시지와 주소를 입력하면 채널을 생성하거나 기존 채널을
-                    선택할 수 있습니다.
-                  </p>
                 </div>
                 {!isReadOnly && (
                   <div className="flex gap-2">
@@ -1927,7 +1572,7 @@ export function WsEditorForm({
                         onClick={() => setReply(null)}
                         className="text-red-500 hover:text-red-700 text-sm font-medium"
                       >
-                        제거
+                        Remove
                       </button>
                     ) : (
                       <button
@@ -1947,7 +1592,7 @@ export function WsEditorForm({
                             d="M12 4v16m8-8H4"
                           />
                         </svg>
-                        추가
+                        Add
                       </button>
                     )}
                   </div>
@@ -1956,124 +1601,13 @@ export function WsEditorForm({
 
               {reply ? (
                 <div className="space-y-4">
-                  {/* 채널 선택 모드 선택 */}
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                      채널 선택 방식
-                    </label>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          setReplyChannelMode("select");
-                          if (reply) {
-                            setReply({ ...reply, address: "", messages: [] });
-                          }
-                        }}
-                        disabled={isReadOnly}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                          replyChannelMode === "select"
-                            ? "bg-[#2563EB] text-white"
-                            : "bg-gray-100 dark:bg-[#21262D] text-gray-700 dark:text-[#C9D1D9] hover:bg-gray-200 dark:hover:bg-[#30363D]"
-                        } ${isReadOnly ? "opacity-60 cursor-not-allowed" : ""}`}
-                      >
-                        기존 채널 선택
-                      </button>
-                      <button
-                        onClick={() => {
-                          setReplyChannelMode("create");
-                          if (reply) {
-                            setReply({ ...reply, address: "", messages: [] });
-                          }
-                        }}
-                        disabled={isReadOnly}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                          replyChannelMode === "create"
-                            ? "bg-[#2563EB] text-white"
-                            : "bg-gray-100 dark:bg-[#21262D] text-gray-700 dark:text-[#C9D1D9] hover:bg-gray-200 dark:hover:bg-[#30363D]"
-                        } ${isReadOnly ? "opacity-60 cursor-not-allowed" : ""}`}
-                      >
-                        새 채널 생성
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* 기존 채널 선택 모드 */}
-                  {replyChannelMode === "select" && (
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                        기존 채널 선택
-                      </label>
-                      {channels.length > 0 ? (
-                        <div className="max-h-64 overflow-y-auto space-y-2 border border-gray-200 dark:border-[#2D333B] rounded-md p-3 bg-gray-50 dark:bg-[#0D1117]">
-                          {channels.map((ch) => {
-                            const channelMessageNames = Object.keys(
-                              ch.channel.messages || {}
-                            );
-                            const isSelected =
-                              reply &&
-                              reply.address === ch.channel.address &&
-                              reply.messages?.length ===
-                                channelMessageNames.length &&
-                              reply.messages.every((msg) =>
-                                channelMessageNames.includes(msg)
-                              );
-
-                            return (
-                              <div
-                                key={ch.channelName}
-                                onClick={() =>
-                                  !isReadOnly &&
-                                  handleSelectExistingChannel(ch, "reply")
-                                }
-                                className={`text-sm p-3 border rounded cursor-pointer transition-colors ${
-                                  isSelected
-                                    ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-700"
-                                    : "bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] hover:bg-gray-100 dark:hover:bg-[#21262D]"
-                                } ${
-                                  isReadOnly
-                                    ? "cursor-not-allowed opacity-60"
-                                    : ""
-                                }`}
-                              >
-                                <div className="font-mono text-gray-800 dark:text-[#E6EDF3] font-medium">
-                                  {ch.channelName}
-                                </div>
-                                <div className="text-xs text-gray-600 dark:text-[#8B949E] mt-1">
-                                  주소: {ch.channel.address}
-                                </div>
-                                <div className="text-xs text-gray-600 dark:text-[#8B949E] mt-1">
-                                  메시지:{" "}
-                                  {channelMessageNames.join(", ") || "없음"}
-                                </div>
-                                {isSelected && (
-                                  <div className="text-xs text-emerald-600 dark:text-emerald-400 mt-2 font-medium">
-                                    ✓ 선택됨
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="text-center py-6 border border-gray-200 dark:border-[#2D333B] rounded-md bg-gray-50 dark:bg-[#0D1117]">
-                          <p className="text-sm text-gray-500 dark:text-[#8B949E]">
-                            기존 채널이 없습니다
-                          </p>
-                          <p className="text-xs text-gray-400 dark:text-[#6E7681] mt-1">
-                            "새 채널 생성"을 선택하여 채널을 생성하세요
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
                   {/* 새 채널 생성 모드 */}
                   {replyChannelMode === "create" && (
                     <>
                       {/* 주소 */}
                       <div>
                         <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                          주소 <span className="text-red-500">*</span>
+                          Address <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="text"
@@ -2081,16 +1615,16 @@ export function WsEditorForm({
                           onChange={(e) =>
                             setReply({ ...reply, address: e.target.value })
                           }
-                          placeholder="예: /chat/{roomId}"
+                          placeholder="/app/chat/{roomId}"
                           disabled={isReadOnly}
-                          className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
+                          className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                             isReadOnly ? "opacity-60 cursor-not-allowed" : ""
                           }`}
                         />
                       </div>
 
                       {/* Messages */}
-                      <div>
+                      <div className="mt-4">
                         <div className="flex items-center justify-between mb-2">
                           <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E]">
                             📨 Messages{" "}
@@ -2158,10 +1692,10 @@ export function WsEditorForm({
                           ) : (
                             <div className="text-center py-6">
                               <p className="text-sm text-gray-500 dark:text-[#8B949E] mb-2">
-                                사용 가능한 메시지가 없습니다
+                                No available messages.
                               </p>
                               <p className="text-xs text-gray-400 dark:text-[#6E7681]">
-                                Message 탭에서 먼저 메시지를 생성해주세요
+                                Create messages in the Message tab first.
                               </p>
                             </div>
                           )}
@@ -2172,7 +1706,7 @@ export function WsEditorForm({
                 </div>
               ) : (
                 <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
-                  <p>Reply가 없습니다. "추가" 버튼을 클릭하여 추가하세요.</p>
+                  <p>No Reply. Click the "Add" button to add.</p>
                 </div>
               )}
             </div>
@@ -2186,22 +1720,22 @@ export function WsEditorForm({
             <div className="space-y-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
-                  메시지 작성
+                  Message
                 </h3>
               </div>
 
               {/* 메시지 이름 */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                  메시지 이름 <span className="text-red-500">*</span>
+                  Message Name <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={messageName}
                   onChange={(e) => setMessageName(e.target.value)}
-                  placeholder="예: ChatMessage, NotificationMessage"
+                  placeholder="ChatMessage"
                   disabled={isReadOnly}
-                  className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
+                  className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                     isReadOnly ? "opacity-60 cursor-not-allowed" : ""
                   }`}
                 />
@@ -2210,15 +1744,15 @@ export function WsEditorForm({
               {/* 메시지 설명 */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                  설명
+                  Description
                 </label>
                 <input
                   type="text"
                   value={messageDescription}
                   onChange={(e) => setMessageDescription(e.target.value)}
-                  placeholder="메시지에 대한 설명을 입력하세요"
+                  placeholder="Description"
                   disabled={isReadOnly}
-                  className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
+                  className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                     isReadOnly ? "opacity-60 cursor-not-allowed" : ""
                   }`}
                 />
@@ -2227,7 +1761,7 @@ export function WsEditorForm({
               {/* 메시지 타입 선택 */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                  메시지 타입 선택
+                  Message Type
                 </label>
                 <div className="flex gap-2">
                   <button
@@ -2291,9 +1825,9 @@ export function WsEditorForm({
                           onChange={(e) =>
                             updateMessageHeader(index, "key", e.target.value)
                           }
-                          placeholder="Header 이름"
+                          placeholder="Header Name"
                           disabled={isReadOnly}
-                          className={`flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
+                          className={`flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                             isReadOnly ? "opacity-60 cursor-not-allowed" : ""
                           }`}
                         />
@@ -2303,9 +1837,9 @@ export function WsEditorForm({
                           onChange={(e) =>
                             updateMessageHeader(index, "value", e.target.value)
                           }
-                          placeholder="Header 값"
+                          placeholder="Header Value"
                           disabled={isReadOnly}
-                          className={`flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
+                          className={`flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                             isReadOnly ? "opacity-60 cursor-not-allowed" : ""
                           }`}
                         />
@@ -2415,7 +1949,7 @@ export function WsEditorForm({
                     onClick={handleCreateMessage}
                     className="w-full px-4 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md text-sm font-medium transition-colors"
                   >
-                    메시지 생성
+                    Create Message
                   </button>
                 </div>
               )}
@@ -2423,7 +1957,7 @@ export function WsEditorForm({
               {/* 생성된 메시지 목록 */}
               <div className="mt-6">
                 <h4 className="text-xs font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">
-                  생성된 메시지 목록 ({messages.length})
+                  Messages ({messages.length})
                 </h4>
                 <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-200 dark:border-[#2D333B] rounded-md p-3 bg-gray-50 dark:bg-[#0D1117]">
                   {messages.length > 0 ? (

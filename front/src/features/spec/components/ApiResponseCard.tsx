@@ -269,16 +269,13 @@ export function ApiResponseCard({
         </svg>
         <span>Response</span>
       </div>
-      <p className="text-xs text-gray-600 dark:text-[#8B949E] mb-4">
-        응답 바디, 헤더 및 상태 코드 설정
-      </p>
 
       {/* Content */}
       <div className="space-y-4">
         <div>
           <div className="flex items-center justify-between mb-4">
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              HTTP 상태 코드 관리
+              HTTP Status Code Management
             </p>
             {!isReadOnly && (
               <div className="flex gap-2">
@@ -295,9 +292,9 @@ export function ApiResponseCard({
                       }
                     }
                   }}
-                  className="px-3 py-1 text-sm border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
+                  className="px-3 py-1 text-sm border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500"
                 >
-                  <option value="">템플릿 선택...</option>
+                  <option value="">Select Template</option>
                   <optgroup label="Success">
                     {statusCodeTemplates
                       .filter((t) => t.type === "Success")
@@ -362,7 +359,7 @@ export function ApiResponseCard({
                           }
                           placeholder="200"
                           disabled={isReadOnly}
-                          className={`w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] ${
+                          className={`w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 ${
                             isReadOnly ? "opacity-60 cursor-not-allowed" : ""
                           }`}
                         />
@@ -374,7 +371,7 @@ export function ApiResponseCard({
                             updateStatusCode(index, "type", e.target.value)
                           }
                           disabled={isReadOnly}
-                          className={`px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] ${
+                          className={`px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 ${
                             isReadOnly ? "opacity-60 cursor-not-allowed" : ""
                           }`}
                         >
@@ -391,7 +388,7 @@ export function ApiResponseCard({
                           }
                           placeholder="예: 요청이 성공적으로 처리됨"
                           disabled={isReadOnly}
-                          className={`w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] ${
+                          className={`w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 ${
                             isReadOnly ? "opacity-60 cursor-not-allowed" : ""
                           }`}
                         />
@@ -439,7 +436,7 @@ export function ApiResponseCard({
                                 setStatusCodes(updated);
                               }}
                               disabled={isReadOnly}
-                              className={`px-3 py-1.5 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] ${
+                              className={`px-3 py-1.5 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 ${
                                 isReadOnly
                                   ? "opacity-60 cursor-not-allowed"
                                   : ""
@@ -491,7 +488,7 @@ export function ApiResponseCard({
                                     setStatusCodes(updated);
                                   }}
                                   disabled={isReadOnly}
-                                  className={`px-3 py-1.5 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] ${
+                                  className={`px-3 py-1.5 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 ${
                                     isReadOnly
                                       ? "opacity-60 cursor-not-allowed"
                                       : ""

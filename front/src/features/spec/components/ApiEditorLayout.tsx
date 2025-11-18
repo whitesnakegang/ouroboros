@@ -119,10 +119,24 @@ export function ApiEditorLayout() {
       const defaultTab = getDefaultWsSpecTab(selectedEndpoint);
       setWsSpecTab(defaultTab);
     }
-  }, [selectedEndpoint?.id, selectedEndpoint?.method, selectedEndpoint?.tag]);
+  }, [selectedEndpoint]);
   const [isCodeSnippetOpen, setIsCodeSnippetOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isNewFormMode, setIsNewFormMode] = useState(false);
+  // Progress 토글 로컬 상태 (즉시 UI 반영용)
+  const [localProgress, setLocalProgress] = useState<string | null>(null);
+  // Progress 업데이트 중인지 추적하는 플래그
+  const isUpdatingProgressRef = useRef(false);
+
+  // selectedEndpoint.progress 변경 시 로컬 상태 동기화 (업데이트 중이 아닐 때만)
+  useEffect(() => {
+    if (!isUpdatingProgressRef.current && selectedEndpoint?.progress) {
+      setLocalProgress(selectedEndpoint.progress.toLowerCase());
+    } else if (!isUpdatingProgressRef.current) {
+      setLocalProgress(null);
+    }
+  }, [selectedEndpoint]);
+
   const [importResult, setImportResult] = useState<ImportYamlResponse | null>(
     null
   );
@@ -2651,7 +2665,7 @@ export function ApiEditorLayout() {
     <div className="h-full flex flex-col bg-white dark:bg-[#0D1117] min-h-0">
       {/* Header Tabs */}
       <div className="border-b border-gray-200 dark:border-[#2D333B] px-6 py-4 bg-white dark:bg-[#0D1117]">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
           {/* Left: Tabs */}
           <div className="flex gap-0 border-b border-gray-200 dark:border-[#2D333B]">
             <button
@@ -2662,7 +2676,7 @@ export function ApiEditorLayout() {
                   : "text-gray-500 dark:text-[#8B949E] hover:text-gray-900 dark:hover:text-[#E6EDF3]"
               }`}
             >
-              <span className="relative z-10">API 생성 폼</span>
+              <span className="relative z-10">API Spec</span>
               {activeTab === "form" && (
                 <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#2563EB] dark:bg-[#58A6FF] rounded-t-full" />
               )}
@@ -2681,11 +2695,8 @@ export function ApiEditorLayout() {
                   ? "text-[#2563EB] dark:text-[#58A6FF]"
                   : "text-gray-500 dark:text-[#8B949E] hover:text-gray-900 dark:hover:text-[#E6EDF3]"
               } ${!selectedEndpoint ? "opacity-50 cursor-not-allowed" : ""}`}
-              title={
-                !selectedEndpoint ? "먼저 API를 생성하거나 선택해주세요" : ""
-              }
             >
-              <span className="relative z-10">테스트 폼</span>
+              <span className="relative z-10">API Test</span>
               {activeTab === "test" && (
                 <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#2563EB] dark:bg-[#58A6FF] rounded-t-full" />
               )}
@@ -2695,6 +2706,131 @@ export function ApiEditorLayout() {
           {/* Right: Actions - 조건부 표시 */}
           {activeTab === "form" ? (
             <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4 lg:gap-6">
+              {/* 작업 완료 토글 (WebSocket만, DUPLEX/SEND일 때만) */}
+              {protocol === "WebSocket" &&
+                selectedEndpoint &&
+                !isEditMode &&
+                (selectedEndpoint.method?.toLowerCase() === "duplex" ||
+                  selectedEndpoint.method?.toLowerCase() === "send") && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-600 dark:text-[#8B949E] font-medium">
+                      작업 완료:
+                    </span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={
+                          localProgress !== null
+                            ? localProgress === "completed"
+                            : selectedEndpoint.progress?.toLowerCase() ===
+                              "completed"
+                        }
+                        onChange={async (e) => {
+                          const newProgress = e.target.checked
+                            ? "completed"
+                            : "none";
+                          // 즉시 로컬 상태 업데이트
+                          setLocalProgress(newProgress);
+                          isUpdatingProgressRef.current = true;
+
+                          try {
+                            const currentEndpoint = selectedEndpointRef.current;
+                            if (!currentEndpoint || !isMountedRef.current) {
+                              isUpdatingProgressRef.current = false;
+                              return;
+                            }
+                            const endpointId = currentEndpoint.id;
+
+                            // 언마운트 체크 후 비동기 작업 수행
+                            if (!isMountedRef.current) {
+                              isUpdatingProgressRef.current = false;
+                              return;
+                            }
+                            await updateWebSocketOperation(endpointId, {
+                              progress: newProgress as "none" | "completed",
+                            });
+
+                            // 언마운트 체크 후 Operation 데이터 다시 로드
+                            if (!isMountedRef.current) {
+                              isUpdatingProgressRef.current = false;
+                              return;
+                            }
+                            await loadWebSocketOperationData(endpointId);
+
+                            // 언마운트 체크 후 selectedEndpoint 업데이트
+                            if (!isMountedRef.current) {
+                              isUpdatingProgressRef.current = false;
+                              return;
+                            }
+                            const latestEndpoint = selectedEndpointRef.current;
+                            if (
+                              latestEndpoint &&
+                              latestEndpoint.id === endpointId
+                            ) {
+                              setSelectedEndpoint({
+                                ...latestEndpoint,
+                                progress: newProgress,
+                              });
+                            }
+
+                            // 사이드바 목록은 백그라운드에서 비동기로 업데이트 (토글 반응성에 영향 없음)
+                            loadEndpoints().catch((err) => {
+                              console.error(
+                                "사이드바 목록 업데이트 실패:",
+                                err
+                              );
+                            });
+                          } catch (error) {
+                            console.error("Progress 업데이트 실패:", error);
+                            // 에러 발생 시 이전 상태로 되돌리기
+                            setLocalProgress(
+                              selectedEndpoint.progress?.toLowerCase() || "none"
+                            );
+                            setAlertModal({
+                              isOpen: true,
+                              title: "업데이트 실패",
+                              message: `Progress 업데이트에 실패했습니다: ${
+                                error instanceof Error
+                                  ? error.message
+                                  : "알 수 없는 오류"
+                              }`,
+                              variant: "error",
+                            });
+                          } finally {
+                            isUpdatingProgressRef.current = false;
+                          }
+                        }}
+                        className="sr-only peer"
+                      />
+                      <div
+                        className={`w-10 h-5 rounded-full transition-colors duration-200 ease-in-out ${
+                          localProgress !== null
+                            ? localProgress === "completed"
+                              ? "bg-[#2563EB]"
+                              : "bg-gray-300 dark:bg-gray-600"
+                            : selectedEndpoint.progress?.toLowerCase() ===
+                              "completed"
+                            ? "bg-[#2563EB]"
+                            : "bg-gray-300 dark:bg-gray-600"
+                        }`}
+                      >
+                        <div
+                          className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform duration-200 ease-in-out ${
+                            localProgress !== null
+                              ? localProgress === "completed"
+                                ? "translate-x-5"
+                                : "translate-x-0.5"
+                              : selectedEndpoint.progress?.toLowerCase() ===
+                                "completed"
+                              ? "translate-x-5"
+                              : "translate-x-0.5"
+                          } translate-y-0.5`}
+                        ></div>
+                      </div>
+                    </label>
+                  </div>
+                )}
+
               {/* Action Buttons */}
               <div className="flex flex-wrap items-center gap-2">
                 <button
@@ -2711,16 +2847,16 @@ export function ApiEditorLayout() {
                     Export
                   </button>
                   {isExportModalOpen && (
-                    <div className="absolute top-full right-0 mt-1 w-40 bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#30363D] rounded-lg shadow-lg z-50 overflow-hidden">
+                    <div className="absolute top-full right-0 mt-1 w-40 bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#30363D] shadow-lg z-50 overflow-hidden">
                       <button
                         onClick={handleExportMD}
-                        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#21262D] transition-colors focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0"
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#21262D] transition-colors rounded-none focus:outline-none focus-visible:outline-none focus:ring-0 hover:ring-0 active:ring-0"
                       >
                         Markdown (MD)
                       </button>
                       <button
                         onClick={handleExportYAML}
-                        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#21262D] transition-colors border-t border-gray-200 dark:border-[#30363D] focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0"
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#21262D] transition-colors border-t border-gray-200 dark:border-[#30363D] rounded-none focus:outline-none focus-visible:outline-none focus:ring-0 hover:ring-0 active:ring-0"
                       >
                         YAML
                       </button>
@@ -2731,9 +2867,9 @@ export function ApiEditorLayout() {
             </div>
           ) : (
             // 테스트 폼일 때 버튼들
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
               {/* Authorization Button & Input */}
-              <div className="relative flex items-center gap-2">
+              <div className="relative flex items-center gap-2 flex-shrink-0">
                 {!isAuthorizationInputOpen ? (
                   <button
                     onClick={() => setIsAuthorizationInputOpen(true)}
@@ -2802,7 +2938,7 @@ export function ApiEditorLayout() {
                       }}
                       placeholder="Authorization"
                       autoFocus
-                      className="px-3 py-2 pr-10 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm w-64"
+                      className="px-3 py-2 pr-10 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-2 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm w-full sm:w-64"
                     />
                     {authorization && authorization.trim() && (
                       <div className="absolute right-3 flex items-center">
@@ -2896,10 +3032,10 @@ export function ApiEditorLayout() {
                     }`}
                   >
                     {executionStatus === "running"
-                      ? "실행 중..."
+                      ? "Running..."
                       : executionStatus === "completed"
-                      ? "완료됨"
-                      : "에러 발생"}
+                      ? "Completed"
+                      : "Error"}
                   </div>
                 </div>
               </div>
@@ -2931,10 +3067,10 @@ export function ApiEditorLayout() {
                     </svg>
                   </div>
                   <h3 className="text-xl font-semibold text-gray-900 dark:text-[#E6EDF3] mb-2">
-                    프로토콜을 선택해주세요
+                    Select Protocol
                   </h3>
                   <p className="text-gray-600 dark:text-[#8B949E]">
-                    사이드바에서 프로토콜을 선택한 후 Add 버튼을 클릭하세요.
+                    Select Protocol in Sidebar and click Add button.
                   </p>
                 </div>
               </div>
@@ -3059,10 +3195,6 @@ export function ApiEditorLayout() {
                     <p className="text-gray-600 dark:text-[#8B949E] mb-4">
                       현재는 REST API와 WebSocket만 지원합니다.
                     </p>
-                    <p className="text-sm text-gray-500 dark:text-[#8B949E]">
-                      프로토콜 탭을 클릭하여 REST 또는 WebSocket으로 전환할 수
-                      있습니다.
-                    </p>
                   </div>
                 </div>
               )}
@@ -3104,7 +3236,7 @@ export function ApiEditorLayout() {
                       <button
                         onClick={() => setIsCodeSnippetOpen(true)}
                         className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0"
-                        title="Code Snippet 보기"
+                        title="View Code Snippet"
                       >
                         <svg
                           className="w-4 h-4"
@@ -3211,10 +3343,6 @@ export function ApiEditorLayout() {
                   ) : (
                     /* 편집 모드: 입력 필드 표시 */
                     <>
-                      <p className="text-xs text-gray-600 dark:text-[#8B949E] mb-4">
-                        HTTP 메서드와 엔드포인트 URL을 입력하세요
-                      </p>
-
                       <div className="space-y-4">
                         <div className="flex flex-col sm:flex-row gap-4">
                           <div className="relative sm:w-auto w-full">
@@ -3222,7 +3350,7 @@ export function ApiEditorLayout() {
                               value={method}
                               onChange={(e) => setMethod(e.target.value)}
                               disabled={!!(selectedEndpoint && !isEditMode)}
-                              className={`appearance-none w-full sm:w-auto px-3 py-2 pr-10 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm font-medium min-w-[120px] ${
+                              className={`appearance-none w-full sm:w-auto px-3 py-2 pr-10 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm font-medium min-w-[120px] ${
                                 selectedEndpoint && !isEditMode
                                   ? "opacity-60 cursor-not-allowed"
                                   : ""
@@ -3271,7 +3399,7 @@ export function ApiEditorLayout() {
                                   e.preventDefault();
                                 }
                               }}
-                              placeholder="예: /api/users, /api/auth/login"
+                              placeholder="/api/users"
                               disabled={!!(selectedEndpoint && !isEditMode)}
                               className={`w-full px-3 py-2 ${
                                 hasDiff ? "pr-10" : ""
@@ -3282,7 +3410,7 @@ export function ApiEditorLayout() {
                               } text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 ${
                                 urlError
                                   ? "focus:ring-red-500 focus:border-red-500"
-                                  : "focus:ring-[#2563EB] focus:border-[#2563EB]"
+                                  : "focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500"
                               } text-sm font-mono ${
                                 selectedEndpoint && !isEditMode
                                   ? "opacity-60 cursor-not-allowed"
@@ -3321,9 +3449,6 @@ export function ApiEditorLayout() {
 
                         {/* Method Badge */}
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-600 dark:text-[#8B949E]">
-                            Method:
-                          </span>
                           <span
                             className={`inline-flex items-center rounded-[4px] border border-gray-300 dark:border-[#2D333B] bg-white dark:bg-[#0D1117] px-2 py-[2px] text-[10px] font-mono font-semibold ${
                               method === "GET"
@@ -3350,9 +3475,9 @@ export function ApiEditorLayout() {
                               type="text"
                               value={tags}
                               onChange={(e) => setTags(e.target.value)}
-                              placeholder="예: AUTH, USER, PRODUCT, ORDER"
+                              placeholder="AUTH"
                               disabled={!!(selectedEndpoint && !isEditMode)}
-                              className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
+                              className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                                 selectedEndpoint && !isEditMode
                                   ? "opacity-60 cursor-not-allowed"
                                   : ""
@@ -3367,9 +3492,9 @@ export function ApiEditorLayout() {
                               type="text"
                               value={summary}
                               onChange={(e) => setSummary(e.target.value)}
-                              placeholder="예: 홍길동"
+                              placeholder="홍길동"
                               disabled={!!(selectedEndpoint && !isEditMode)}
-                              className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
+                              className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                                 selectedEndpoint && !isEditMode
                                   ? "opacity-60 cursor-not-allowed"
                                   : ""
@@ -3387,9 +3512,9 @@ export function ApiEditorLayout() {
                             type="text"
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
-                            placeholder="예: 사용자 로그인, 상품 목록 조회, 주문 생성"
+                            placeholder="사용자 로그인"
                             disabled={!!(selectedEndpoint && !isEditMode)}
-                            className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
+                            className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                               selectedEndpoint && !isEditMode
                                 ? "opacity-60 cursor-not-allowed"
                                 : ""
@@ -3405,9 +3530,9 @@ export function ApiEditorLayout() {
             {/* Request/Response/Schema 탭 */}
             {protocol === "REST" &&
               (selectedEndpoint !== null || isNewFormMode) && (
-                <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] shadow-sm mb-6 overflow-hidden">
+                <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm mb-6 overflow-hidden">
                   {/* 탭 헤더 - 폴더 느낌으로 통합 */}
-                  <div className="bg-gray-50 dark:bg-[#0D1117] border-b border-gray-200 dark:border-[#2D333B] px-4 pt-2">
+                  <div className="bg-gray-50 dark:bg-[#0D1117] border-b border-gray-200 dark:border-[#2D333B] -mx-4 -mt-4 px-4 pt-2">
                     <div className="flex gap-0.5 -mb-px">
                       <button
                         onClick={() => setSpecTab("request")}
@@ -3445,7 +3570,7 @@ export function ApiEditorLayout() {
                   </div>
 
                   {/* 탭 내용 */}
-                  <div className="p-4 bg-white dark:bg-[#161B22]">
+                  <div className="bg-white dark:bg-[#161B22] -mx-4 -mb-4 px-4 pt-4 pb-4">
                     {specTab === "request" && (
                       <ApiRequestCard
                         queryParams={queryParams}
@@ -3536,7 +3661,7 @@ export function ApiEditorLayout() {
                   }`}
                   title={isCompleted ? "완료된 API는 수정할 수 없습니다" : ""}
                 >
-                  수정
+                  Edit
                 </button>
                 <button
                   onClick={handleDelete}
@@ -3548,7 +3673,7 @@ export function ApiEditorLayout() {
                   }`}
                   title={isCompleted ? "완료된 API는 삭제할 수 없습니다" : ""}
                 >
-                  삭제
+                  Delete
                 </button>
               </>
             )}
@@ -3563,7 +3688,7 @@ export function ApiEditorLayout() {
               onClick={handleReset}
               className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0"
             >
-              초기화
+              Back
             </button>
             <button
               onClick={handleSave}
@@ -3574,7 +3699,7 @@ export function ApiEditorLayout() {
                   : "bg-[#2563EB] hover:bg-[#1E40AF] text-white"
               }`}
             >
-              생성
+              Create
             </button>
           </div>
         </div>
