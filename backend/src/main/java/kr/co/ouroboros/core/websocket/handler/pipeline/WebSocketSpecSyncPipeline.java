@@ -156,7 +156,9 @@ public class WebSocketSpecSyncPipeline implements SpecSyncPipeline {
                 if(Boolean.TRUE.equals(schemaMatches)){
                     // 정답인 경우
                     for (Operation operation : fileChannelNameOperationMap.get(channelRef)) {
-                        operation.setXOuroborosProgress("completed");
+                        if(!operation.getXOuroborosProgress().equals("completed")) {
+                            operation.setXOuroborosProgress("receive");
+                        }
                         operation.setXOuroborosDiff("none");
                     }
                 } else {

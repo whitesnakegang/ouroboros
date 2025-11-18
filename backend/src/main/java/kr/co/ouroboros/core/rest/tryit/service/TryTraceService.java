@@ -1,6 +1,7 @@
 package kr.co.ouroboros.core.rest.tryit.service;
 
 import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.TraceDataRetriever;
+import kr.co.ouroboros.core.rest.tryit.infrastructure.storage.TraceStorage;
 import kr.co.ouroboros.core.rest.tryit.trace.builder.TraceTreeBuilder;
 import kr.co.ouroboros.core.rest.tryit.trace.dto.SpanNode;
 import kr.co.ouroboros.core.rest.tryit.trace.util.TraceDurationCalculator;
@@ -36,6 +37,7 @@ public class TryTraceService {
     
     private final TraceDataRetriever traceDataRetriever;
     private final TraceTreeBuilder traceTreeBuilder;
+    private final TraceStorage traceStorage;
     
     /**
      * Retrieve the full call trace for a Try without performing issue analysis.
@@ -67,6 +69,26 @@ public class TryTraceService {
                             .build();
                 })
                 .orElse(buildEmptyResponse(tryIdStr));
+    }
+    
+    /**
+     * Deletes trace data for the given tryId from trace storage.
+     * <p>
+     * This method removes the trace data stored in the trace storage (e.g., in-memory storage)
+     * for the specified tryId.
+     *
+     * @param tryIdStr Try session ID as a UUID string
+     * @return true if trace was found and deleted, false otherwise
+     */
+    public boolean deleteTrace(String tryIdStr) {
+        log.info("Deleting trace for tryId: {}", tryIdStr);
+        boolean deleted = traceStorage.deleteTraceByTryId(tryIdStr);
+        if (deleted) {
+            log.info("Successfully deleted trace for tryId: {}", tryIdStr);
+        } else {
+            log.debug("Trace not found for deletion: tryId={}", tryIdStr);
+        }
+        return deleted;
     }
     
     /**

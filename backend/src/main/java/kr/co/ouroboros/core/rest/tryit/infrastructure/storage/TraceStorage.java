@@ -68,5 +68,13 @@ public interface TraceStorage {
      * @return Trace ID if found, null otherwise
      */
     String getTraceId(String tryId);
+    
+    /**
+     * Deletes trace data for the given tryId.
+     *
+     * @param tryId The try ID to delete
+     * @return true if trace was found and deleted, false otherwise
+     */
+    boolean deleteTraceByTryId(String tryId);
 }
 
