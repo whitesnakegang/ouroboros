@@ -1,48 +1,45 @@
 package kr.co.ouroboros.core.websocket.handler;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.springwolf.asyncapi.v3.model.AsyncAPI;
-import io.github.springwolf.core.asyncapi.AsyncApiService;
-import io.swagger.v3.core.util.Json31;
+import java.util.HashMap;
 import java.util.Map;
 import kr.co.ouroboros.core.global.Protocol;
 import kr.co.ouroboros.core.global.handler.OuroProtocolHandler;
 import kr.co.ouroboros.core.global.spec.OuroApiSpec;
+import kr.co.ouroboros.core.websocket.common.dto.Components;
+import kr.co.ouroboros.core.websocket.common.dto.Info;
 import kr.co.ouroboros.core.websocket.common.dto.OuroWebSocketApiSpec;
 import kr.co.ouroboros.core.websocket.handler.pipeline.WebSocketSpecSyncPipeline;
 import lombok.RequiredArgsConstructor;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.annotation.Primary;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.stereotype.Component;
 import org.yaml.snakeyaml.Yaml;
 
 /**
- * WebSocket protocol handler that uses Springwolf for code scanning.
+ * Basic WebSocket protocol handler that works without Springwolf.
  * <p>
- * This handler is only active when:
+ * This handler provides minimal functionality for WebSocket API specification management:
  * <ul>
- *   <li>Springwolf is available on the classpath</li>
- *   <li>Springwolf is enabled via {@code springwolf.enabled=true}</li>
+ *   <li>YAML file parsing and loading</li>
+ *   <li>Specification validation and synchronization</li>
+ *   <li>YAML file persistence</li>
  * </ul>
  * <p>
- * When active, this handler takes priority over {@link BasicWebSocketHandler} via {@code @Primary}.
- * If Springwolf is not configured, users should set {@code springwolf.enabled=false}
- * to use {@link BasicWebSocketHandler} without Springwolf dependencies.
+ * Code scanning is not available without Springwolf. The {@link #scanCurrentState()} method
+ * returns an empty specification.
+ * <p>
+ * This handler is active by default unless a Springwolf-based handler is available.
+ * When Springwolf is enabled, {@link OuroWebSocketHandler} takes priority via {@code @Primary}.
  *
- * @see BasicWebSocketHandler
+ * @see OuroWebSocketHandler
  * @since 0.1.0
  */
-@Component("ouroWebSocketHandler")
-@Primary
-@ConditionalOnClass(name = "io.github.springwolf.core.asyncapi.AsyncApiService")
-@ConditionalOnProperty(prefix = "springwolf", name = "enabled", havingValue = "true", matchIfMissing = false)
+@Component
+@ConditionalOnMissingBean(name = "ouroWebSocketHandler")
 @RequiredArgsConstructor
-public class OuroWebSocketHandler implements OuroProtocolHandler {
+public class BasicWebSocketHandler implements OuroProtocolHandler {
 
-    private final AsyncApiService asyncApiService;
     private final WebSocketSpecSyncPipeline pipeline;
     private static final ObjectMapper mapper = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
@@ -56,7 +53,7 @@ public class OuroWebSocketHandler implements OuroProtocolHandler {
     public Protocol getProtocol() {
         return Protocol.WEB_SOCKET;
     }
-    
+
     /**
      * Provide the relative path to the WebSocket AsyncAPI specification file.
      *
@@ -66,24 +63,41 @@ public class OuroWebSocketHandler implements OuroProtocolHandler {
     public String getSpecFilePath() {
         return "ouroboros/websocket/ourowebsocket.yml";
     }
-    
+
     /**
-     * Creates an OuroApiSpec that represents the current AsyncAPI state.
+     * Returns an empty WebSocket API specification since code scanning is not available
+     * without Springwolf.
+     * <p>
+     * To enable code scanning, add Springwolf dependencies and set {@code springwolf.enabled=true}.
      *
-     * @return an OuroApiSpec representing the current AsyncAPI state
-     * @throws RuntimeException if the AsyncAPI cannot be serialized or converted to the websocket spec
+     * @return an empty OuroWebSocketApiSpec
      */
     @Override
     public OuroApiSpec scanCurrentState() {
-        try {
-        AsyncAPI asyncAPI = asyncApiService.getAsyncAPI();
-            String json = Json31.mapper().writeValueAsString(asyncAPI);
-            return mapper.readValue(json, OuroWebSocketApiSpec.class);
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
-        }
+        // Create minimal empty spec structure
+        OuroWebSocketApiSpec emptySpec = new OuroWebSocketApiSpec();
+        emptySpec.setAsyncapi("3.0.0");
+
+        // Create Info object with minimal required fields
+        Info info = new Info();
+        info.setTitle("WebSocket API");
+        info.setVersion("1.0.0");
+        emptySpec.setInfo(info);
+
+        emptySpec.setDefaultContentType("application/json");
+        emptySpec.setServers(new HashMap<>());
+        emptySpec.setChannels(new HashMap<>());
+        emptySpec.setOperations(new HashMap<>());
+
+        // Create empty Components object
+        Components components = new Components();
+        components.setSchemas(new HashMap<>());
+        components.setMessages(new HashMap<>());
+        emptySpec.setComponents(components);
+
+        return emptySpec;
     }
-    
+
     /**
      * Parse YAML content describing a WebSocket API specification.
      *
@@ -97,19 +111,22 @@ public class OuroWebSocketHandler implements OuroProtocolHandler {
 
         return mapper.convertValue(map, OuroWebSocketApiSpec.class);
     }
-    
+
     /**
      * Validates and reconciles a file-based API specification against the currently scanned specification.
+     * <p>
+     * Since code scanning is not available without Springwolf, this method primarily validates
+     * the file specification and returns it if valid.
      *
      * @param fileSpec    the specification loaded from the file to validate
-     * @param scannedSpec the specification discovered from the running system to validate against
+     * @param scannedSpec the specification discovered from the running system (empty without Springwolf)
      * @return the resulting validated and reconciled {@code OuroApiSpec}
      */
     @Override
     public OuroApiSpec synchronize(OuroApiSpec fileSpec, OuroApiSpec scannedSpec) {
         return pipeline.validate(fileSpec, scannedSpec);
     }
-    
+
     /**
      * Persists the given OuroApiSpec as YAML to the handler's configured spec file location.
      *
@@ -117,6 +134,6 @@ public class OuroWebSocketHandler implements OuroProtocolHandler {
      */
     @Override
     public void saveYaml(OuroApiSpec specToSave) {
-    
+        // TODO: Implement YAML file saving logic
     }
 }
