@@ -1,8 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { useState } from "react";
 import { deleteSchema, deleteWebSocketSchema } from "../services/api";
 import type { SchemaResponse } from "../services/api";
 import type { SchemaField } from "../types/schema.types";
 import { parseOpenAPISchemaToSchemaField } from "../utils/schemaConverter";
+import { ConfirmModal } from "@/ui/ConfirmModal";
+import { AlertModal } from "@/ui/AlertModal";
 
 interface Schema {
   id: string;
@@ -30,6 +33,30 @@ export function SchemaModal({
   setSchemas,
   protocol = "REST",
 }: SchemaModalProps) {
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    variant?: "danger" | "warning" | "info";
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
+
+  const [alertModal, setAlertModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    variant?: "success" | "error" | "warning" | "info";
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+  });
+
   if (!isOpen) return null;
 
   // Schema 이름에서 마지막 부분만 추출 (예: com.example.dto.UserDTO -> UserDTO)
@@ -38,27 +65,40 @@ export function SchemaModal({
     return parts[parts.length - 1];
   };
 
-  const handleDeleteSchema = async (schemaName: string) => {
-    if (!confirm(`"${schemaName}" 스키마를 삭제하시겠습니까?`)) {
-      return;
-    }
-
-    try {
-      if (protocol === "WebSocket") {
-        await deleteWebSocketSchema(schemaName);
-      } else {
-        await deleteSchema(schemaName);
-      }
-      setSchemas(schemas.filter((s) => s.schemaName !== schemaName));
-      alert(`"${schemaName}" 스키마가 삭제되었습니다.`);
-    } catch (err) {
-      console.error("스키마 삭제 실패:", err);
-      alert(
-        `스키마 삭제에 실패했습니다: ${
-          err instanceof Error ? err.message : "알 수 없는 오류"
-        }`
-      );
-    }
+  const handleDeleteSchema = (schemaName: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "스키마 삭제",
+      message: `"${schemaName}" 스키마를 삭제하시겠습니까?`,
+      variant: "danger",
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          if (protocol === "WebSocket") {
+            await deleteWebSocketSchema(schemaName);
+          } else {
+            await deleteSchema(schemaName);
+          }
+          setSchemas(schemas.filter((s) => s.schemaName !== schemaName));
+          setAlertModal({
+            isOpen: true,
+            title: "삭제 완료",
+            message: `"${schemaName}" 스키마가 삭제되었습니다.`,
+            variant: "success",
+          });
+        } catch (err) {
+          console.error("스키마 삭제 실패:", err);
+          setAlertModal({
+            isOpen: true,
+            title: "삭제 실패",
+            message: `스키마 삭제에 실패했습니다: ${
+              err instanceof Error ? err.message : "알 수 없는 오류"
+            }`,
+            variant: "error",
+          });
+        }
+      },
+    });
   };
 
   const handleSelectSchema = (schema: SchemaResponse) => {
@@ -189,6 +229,25 @@ export function SchemaModal({
           </div>
         </div>
       </div>
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+      />
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={() => setAlertModal((prev) => ({ ...prev, isOpen: false }))}
+        title={alertModal.title}
+        message={alertModal.message}
+        variant={alertModal.variant}
+      />
     </div>
   );
 }

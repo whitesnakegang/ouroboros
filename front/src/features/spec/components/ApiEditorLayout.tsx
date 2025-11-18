@@ -8,6 +8,8 @@ import { ImportResultModal } from "./ImportResultModal";
 import { TestLayout } from "@/features/testing/components/TestLayout";
 import { DiffNotification } from "./DiffNotification";
 import { WsEditorForm } from "./WsEditorForm";
+import { ConfirmModal } from "@/ui/ConfirmModal";
+import { AlertModal } from "@/ui/AlertModal";
 import type { RequestBody } from "../types/schema.types";
 import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
 import { useTestingStore } from "@/features/testing/store/testing.store";
@@ -99,7 +101,25 @@ export function ApiEditorLayout() {
   const [specTab, setSpecTab] = useState<"request" | "response" | "schema">(
     "request"
   );
+  // WebSocket 탭 기본값: SEND 타입이면 reply, 아니면 receiver
+  const getDefaultWsSpecTab = (endpoint: any): "receiver" | "reply" => {
+    // method가 "SEND"이거나 tag가 "send"/"sendto"인 경우 reply 탭
+    const method = endpoint?.method?.toLowerCase();
+    const tag = endpoint?.tag?.toLowerCase();
+    if (method === "send" || tag === "send" || tag === "sendto") {
+      return "reply";
+    }
+    return "receiver";
+  };
   const [wsSpecTab, setWsSpecTab] = useState<"receiver" | "reply">("receiver");
+
+  // selectedEndpoint가 변경될 때 기본 탭 설정
+  useEffect(() => {
+    if (selectedEndpoint && selectedEndpoint.protocol === "WebSocket") {
+      const defaultTab = getDefaultWsSpecTab(selectedEndpoint);
+      setWsSpecTab(defaultTab);
+    }
+  }, [selectedEndpoint?.id, selectedEndpoint?.method, selectedEndpoint?.tag]);
   const [isCodeSnippetOpen, setIsCodeSnippetOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isNewFormMode, setIsNewFormMode] = useState(false);
@@ -121,6 +141,72 @@ export function ApiEditorLayout() {
     "API_DOCUMENTATION.md"
   );
   // Removed filename option states; use automatic filenames instead
+
+  // Modal 상태
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    variant?: "danger" | "warning" | "info";
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
+
+  const [alertModal, setAlertModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    variant?: "success" | "error" | "warning" | "info";
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+  });
+
+  // Export 타입 선택 모달 상태
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const exportDropdownRef = useRef<HTMLDivElement>(null);
+
+  // selectedEndpoint의 최신 값을 추적하기 위한 ref (stale closure 방지)
+  const selectedEndpointRef = useRef(selectedEndpoint);
+  const isMountedRef = useRef(true);
+
+  // selectedEndpoint 변경 시 ref 업데이트
+  useEffect(() => {
+    selectedEndpointRef.current = selectedEndpoint;
+  }, [selectedEndpoint]);
+
+  // 언마운트 체크를 위한 cleanup
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // Export 드롭다운 외부 클릭 시 닫기
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        exportDropdownRef.current &&
+        !exportDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsExportModalOpen(false);
+      }
+    };
+
+    if (isExportModalOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isExportModalOpen]);
 
   // Diff가 있는지 확인 (boolean으로 명시적 변환)
   const hasDiff = !!(
@@ -808,21 +894,49 @@ export function ApiEditorLayout() {
       const operationData = response.data;
 
       // WebSocket form state 설정
-      setWsEntryPoint(operationData.operation.entrypoint || "/ws");
+      const entrypoint = operationData.operation.entrypoint || "/ws";
+      setWsEntryPoint(entrypoint);
       setWsEntryPointError(""); // 에러 상태 초기화
+
+      // Protocol 설정 (백엔드에서 제공하는 protocol 값 사용)
+      const protocol = operationData.protocol || "ws"; // null이면 기본값 "ws"
+      setWsProtocol(protocol as "ws" | "wss");
+
+      // selectedEndpoint에 entrypoint 업데이트
+      if (selectedEndpoint) {
+        setSelectedEndpoint({
+          ...selectedEndpoint,
+          entrypoint: entrypoint,
+        });
+      }
       setWsSummary(""); // Operation에는 summary가 없음
       setWsDescription(operationData.operationName || ""); // operationName을 description으로
-      // 백엔드에서 관리하는 tags 사용 (REST API와 동일하게)
+      // 백엔드에서 관리하는 tags 사용
+      // WebSocket의 경우 tags는 [{name: "TAG_NAME"}] 형태
       const operationTags = (operationData.operation as any).tags;
-      setWsTags(
+      let tagsString = "";
+      if (
         operationTags &&
-          Array.isArray(operationTags) &&
-          operationTags.length > 0
-          ? operationTags.join(", ") // REST와 동일하게 쉼표로 구분된 문자열로 변환
-          : ""
-      );
+        Array.isArray(operationTags) &&
+        operationTags.length > 0
+      ) {
+        // tags에서 name 값만 추출
+        const tagNames = operationTags
+          .map((tag: any) => {
+            if (typeof tag === "string") {
+              return tag; // 이미 문자열인 경우 (호환성)
+            } else if (tag && typeof tag === "object" && tag.name) {
+              return tag.name; // {name: "TAG_NAME"} 형태에서 name 추출
+            }
+            return null;
+          })
+          .filter((tag: string | null): tag is string => tag !== null);
 
-      // Receiver 설정
+        tagsString = tagNames.join(", ");
+      }
+      setWsTags(tagsString);
+
+      // Receiver 설정 (action === "receive"인 경우만)
       if (
         operationData.operation.action === "receive" &&
         operationData.operation.channel
@@ -880,68 +994,19 @@ export function ApiEditorLayout() {
           schema: { type: "json", fields: [] },
           messages: messageNames.length > 0 ? messageNames : undefined,
         });
-      } else if (
-        operationData.operation.action === "send" &&
-        operationData.operation.channel
-      ) {
-        // Send-only operation의 경우도 channel을 receiver로 설정
-        const channelRef = operationData.operation.channel.ref || "";
-        const channelName = channelRef.replace("#/channels/", "");
-
-        let actualAddress = channelName;
-        try {
-          const channelResponse = await getWebSocketChannel(channelName);
-          actualAddress = channelResponse.data.channel?.address || channelName;
-        } catch {
-          // Channel 조회 실패 시 channel name 사용
-        }
-
-        // operation.messages에서 메시지 이름 추출
-        const messageNames: string[] = [];
-        if (
-          operationData.operation.messages &&
-          Array.isArray(operationData.operation.messages)
-        ) {
-          operationData.operation.messages.forEach((msg: any) => {
-            if (typeof msg === "string") {
-              messageNames.push(msg);
-            } else if (msg.$ref) {
-              const refPath = msg.$ref;
-              if (refPath.includes("/messages/")) {
-                const messageName = refPath.split("/messages/")[1];
-                if (messageName) {
-                  messageNames.push(messageName);
-                }
-              }
-            } else if (msg.ref) {
-              const refPath = msg.ref;
-              if (refPath.includes("/messages/")) {
-                const messageName = refPath.split("/messages/")[1];
-                if (messageName) {
-                  messageNames.push(messageName);
-                }
-              } else {
-                messageNames.push(refPath);
-              }
-            }
-          });
-        }
-
-        setWsReceiver({
-          address: actualAddress,
-          headers: [],
-          schema: { type: "json", fields: [] },
-          messages: messageNames.length > 0 ? messageNames : undefined,
-        });
       } else {
+        // action === "send"인 경우 receiver는 null
         setWsReceiver(null);
       }
 
-      // Reply 설정 (reply가 있는 경우)
+      // Reply 설정
+      // 1. operation.reply이 있는 경우 (DUPLEX)
+      // 2. action === "send"인 경우 channel을 reply로 설정
       if (
         operationData.operation.reply &&
         operationData.operation.reply.channel
       ) {
+        // DUPLEX: reply.channel 사용
         const replyChannelRef = operationData.operation.reply.channel.ref || "";
         const replyChannelName = replyChannelRef.replace("#/channels/", "");
 
@@ -991,6 +1056,58 @@ export function ApiEditorLayout() {
           schema: { type: "json", fields: [] },
           messages:
             replyMessageNames.length > 0 ? replyMessageNames : undefined,
+        });
+      } else if (
+        operationData.operation.action === "send" &&
+        operationData.operation.channel
+      ) {
+        // SEND: operation.channel을 reply로 설정
+        const channelRef = operationData.operation.channel.ref || "";
+        const channelName = channelRef.replace("#/channels/", "");
+
+        let actualAddress = channelName;
+        try {
+          const channelResponse = await getWebSocketChannel(channelName);
+          actualAddress = channelResponse.data.channel?.address || channelName;
+        } catch {
+          // Channel 조회 실패 시 channel name 사용
+        }
+
+        // operation.messages에서 메시지 이름 추출
+        const messageNames: string[] = [];
+        if (
+          operationData.operation.messages &&
+          Array.isArray(operationData.operation.messages)
+        ) {
+          operationData.operation.messages.forEach((msg: any) => {
+            if (typeof msg === "string") {
+              messageNames.push(msg);
+            } else if (msg.$ref) {
+              const refPath = msg.$ref;
+              if (refPath.includes("/messages/")) {
+                const messageName = refPath.split("/messages/")[1];
+                if (messageName) {
+                  messageNames.push(messageName);
+                }
+              }
+            } else if (msg.ref) {
+              const refPath = msg.ref;
+              if (refPath.includes("/messages/")) {
+                const messageName = refPath.split("/messages/")[1];
+                if (messageName) {
+                  messageNames.push(messageName);
+                }
+              } else {
+                messageNames.push(refPath);
+              }
+            }
+          });
+        }
+
+        setWsReply({
+          address: actualAddress,
+          schema: { type: "json", fields: [] },
+          messages: messageNames.length > 0 ? messageNames : undefined,
         });
       } else {
         setWsReply(null);
@@ -1460,7 +1577,12 @@ export function ApiEditorLayout() {
           // 수정 로직
           // receive나 reply 중 하나는 필수
           if (!receives && !replies) {
-            alert("Receiver 또는 Reply 중 하나는 반드시 입력해야 합니다.");
+            setAlertModal({
+              isOpen: true,
+              title: "입력 오류",
+              message: "Receiver 또는 Reply 중 하나는 반드시 입력해야 합니다.",
+              variant: "warning",
+            });
             return;
           }
 
@@ -1477,7 +1599,12 @@ export function ApiEditorLayout() {
                     .filter((t) => t.length > 0)
                 : undefined, // 백엔드로 tags 전달
           });
-          alert("WebSocket Operation이 수정되었습니다.");
+          setAlertModal({
+            isOpen: true,
+            title: "수정 완료",
+            message: "WebSocket Operation이 수정되었습니다.",
+            variant: "success",
+          });
 
           // 초기 상태 참조 초기화
           wsInitialStateRef.current = null;
@@ -1486,7 +1613,8 @@ export function ApiEditorLayout() {
           await loadEndpoints();
 
           // 저장 후 다시 로드하여 백엔드에서 최신 데이터 가져오기
-          await loadEndpointData(selectedEndpoint.id);
+          // WebSocket의 경우 loadWebSocketOperationData 사용
+          await loadWebSocketOperationData(selectedEndpoint.id);
         } else {
           // 생성 로직
           const response = await createWebSocketOperation(request);
@@ -1554,7 +1682,29 @@ export function ApiEditorLayout() {
               })(),
               hasSpecError:
                 operation.diff && operation.diff !== "none" ? true : undefined,
-              tags: (operation as any).tags || [], // 백엔드에서 받은 tags 사용
+              tags: (() => {
+                // WebSocket tags는 [{name: "TAG_NAME"}] 형태이므로 name 값만 추출
+                const operationTags = (operation as any).tags;
+                if (
+                  operationTags &&
+                  Array.isArray(operationTags) &&
+                  operationTags.length > 0
+                ) {
+                  return operationTags
+                    .map((tag: any) => {
+                      if (typeof tag === "string") {
+                        return tag; // 이미 문자열인 경우 (호환성)
+                      } else if (tag && typeof tag === "object" && tag.name) {
+                        return tag.name; // {name: "TAG_NAME"} 형태에서 name 추출
+                      }
+                      return null;
+                    })
+                    .filter(
+                      (tag: string | null): tag is string => tag !== null
+                    );
+                }
+                return [];
+              })(),
               progress: operation.progress || "none",
               tag: tag,
               diff: operation.diff || "none",
@@ -1566,7 +1716,12 @@ export function ApiEditorLayout() {
             const { addEndpoint } = useSidebarStore.getState();
             addEndpoint(newEndpoint, group);
 
-            alert(`WebSocket Operation이 생성되었습니다.`);
+            setAlertModal({
+              isOpen: true,
+              title: "생성 완료",
+              message: "WebSocket Operation이 생성되었습니다.",
+              variant: "success",
+            });
 
             // 사이드바 목록 다시 로드
             await loadEndpoints();
@@ -1597,7 +1752,12 @@ export function ApiEditorLayout() {
               // 최신 operation 정보 로드 실패 시 무시
             }
           } else {
-            alert("WebSocket Operation이 생성되었습니다.");
+            setAlertModal({
+              isOpen: true,
+              title: "생성 완료",
+              message: "WebSocket Operation이 생성되었습니다.",
+              variant: "success",
+            });
             // 사이드바 목록 다시 로드
             await loadEndpoints();
             // 폼 초기화
@@ -1606,7 +1766,12 @@ export function ApiEditorLayout() {
         }
       } catch (error: any) {
         console.error("WebSocket Operation 저장 실패:", error);
-        alert(error.message || "WebSocket Operation 저장에 실패했습니다.");
+        setAlertModal({
+          isOpen: true,
+          title: "저장 실패",
+          message: error.message || "WebSocket Operation 저장에 실패했습니다.",
+          variant: "error",
+        });
       }
       return;
     }
@@ -1615,7 +1780,12 @@ export function ApiEditorLayout() {
     // 필수 필드 검증은 이미 isFormValid()에서 처리되므로 여기서는 추가 검증 불필요
     // 하지만 안전을 위해 한 번 더 체크
     if (protocol === "REST" && (!method || !url || !url.trim())) {
-      alert("Method와 URL을 입력해주세요.");
+      setAlertModal({
+        isOpen: true,
+        title: "입력 오류",
+        message: "Method와 URL을 입력해주세요.",
+        variant: "warning",
+      });
       return;
     }
 
@@ -1642,7 +1812,12 @@ export function ApiEditorLayout() {
         // 초기 상태 참조 초기화
         restInitialStateRef.current = null;
 
-        alert("API 스펙이 수정되었습니다.");
+        setAlertModal({
+          isOpen: true,
+          title: "수정 완료",
+          message: "API 스펙이 수정되었습니다.",
+          variant: "success",
+        });
         setIsEditMode(false);
 
         // 사이드바 목록 다시 로드 (백그라운드에서)
@@ -1700,7 +1875,12 @@ export function ApiEditorLayout() {
         };
 
         addEndpoint(newEndpoint, group);
-        alert(`${method} ${url} API가 생성되었습니다.`);
+        setAlertModal({
+          isOpen: true,
+          title: "생성 완료",
+          message: `${method} ${url} API가 생성되었습니다.`,
+          variant: "success",
+        });
 
         // 사이드바 목록 다시 로드
         await loadEndpoints();
@@ -1716,56 +1896,100 @@ export function ApiEditorLayout() {
     } catch (error: unknown) {
       console.error("API 저장 실패:", error);
       const errorMessage = getErrorMessage(error);
-      alert(`API 저장에 실패했습니다: ${errorMessage}`);
+      setAlertModal({
+        isOpen: true,
+        title: "저장 실패",
+        message: `API 저장에 실패했습니다: ${errorMessage}`,
+        variant: "error",
+      });
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!selectedEndpoint) return;
 
     // WebSocket 삭제 로직
     if (protocol === "WebSocket") {
-      if (confirm("이 WebSocket Operation을 삭제하시겠습니까?")) {
-        alert("WebSocket Operation 삭제 기능은 준비 중입니다.");
-        // TODO: Implement WebSocket Operation delete logic
-        // - deleteWebSocketOperation 호출
-      }
+      setConfirmModal({
+        isOpen: true,
+        title: "WebSocket Operation 삭제",
+        message: "이 WebSocket Operation을 삭제하시겠습니까?",
+        variant: "danger",
+        onConfirm: () => {
+          setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+          setAlertModal({
+            isOpen: true,
+            title: "준비 중",
+            message: "WebSocket Operation 삭제 기능은 준비 중입니다.",
+            variant: "info",
+          });
+          // TODO: Implement WebSocket Operation delete logic
+          // - deleteWebSocketOperation 호출
+        },
+      });
       return;
     }
 
     // completed 상태만 삭제 불가 (mock 상태는 diff가 있어도 삭제 가능)
     if (isCompleted) {
-      alert("이미 완료(completed)된 API는 삭제할 수 없습니다.");
+      setAlertModal({
+        isOpen: true,
+        title: "삭제 불가",
+        message: "이미 완료(completed)된 API는 삭제할 수 없습니다.",
+        variant: "warning",
+      });
       return;
     }
 
-    if (confirm("이 엔드포인트를 삭제하시겠습니까?")) {
-      try {
-        await deleteRestApiSpec(selectedEndpoint.id);
-        deleteEndpoint(selectedEndpoint.id);
-        alert("엔드포인트가 삭제되었습니다.");
+    setConfirmModal({
+      isOpen: true,
+      title: "엔드포인트 삭제",
+      message: "이 엔드포인트를 삭제하시겠습니까?",
+      variant: "danger",
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          await deleteRestApiSpec(selectedEndpoint.id);
+          deleteEndpoint(selectedEndpoint.id);
+          setAlertModal({
+            isOpen: true,
+            title: "삭제 완료",
+            message: "엔드포인트가 삭제되었습니다.",
+            variant: "success",
+          });
 
-        // 폼 초기화
-        setSelectedEndpoint(null);
-        setMethod("POST");
-        setUrl("/api/auth/login");
-        setUrlError(""); // 에러 상태 초기화
-        setTags("AUTH");
-        setDescription("사용자 로그인");
-        setIsEditMode(false);
-        loadEndpoints();
-      } catch (error: unknown) {
-        console.error("API 삭제 실패:", error);
-        const errorMessage = getErrorMessage(error);
-        alert(`API 삭제에 실패했습니다: ${errorMessage}`);
-      }
-    }
+          // 폼 초기화
+          setSelectedEndpoint(null);
+          setMethod("POST");
+          setUrl("/api/auth/login");
+          setUrlError(""); // 에러 상태 초기화
+          setTags("AUTH");
+          setDescription("사용자 로그인");
+          setIsEditMode(false);
+          loadEndpoints();
+        } catch (error: unknown) {
+          console.error("API 삭제 실패:", error);
+          const errorMessage = getErrorMessage(error);
+          setAlertModal({
+            isOpen: true,
+            title: "삭제 실패",
+            message: `API 삭제에 실패했습니다: ${errorMessage}`,
+            variant: "error",
+          });
+        }
+      },
+    });
   };
 
   const handleEdit = () => {
     // completed 상태만 수정 불가 (mock 상태는 diff가 있어도 수정 가능)
     if (isCompleted) {
-      alert("이미 완료(completed)된 API는 수정할 수 없습니다.");
+      setAlertModal({
+        isOpen: true,
+        title: "수정 불가",
+        message: "이미 완료(completed)된 API는 수정할 수 없습니다.",
+        variant: "warning",
+      });
       return;
     }
 
@@ -1808,23 +2032,30 @@ export function ApiEditorLayout() {
   };
 
   const handleReset = () => {
-    if (confirm("작성 중인 내용을 초기화하시겠습니까?")) {
-      setMethod("POST");
-      setUrl("");
-      setUrlError(""); // 에러 상태 초기화
-      setTags("");
-      setDescription("");
-      setSummary("");
-      setQueryParams([]);
-      setRequestHeaders([]);
-      setPathParams([]);
-      setAuth({ type: "none" });
-      setRequestBody({
-        type: "json",
-        fields: [createPrimitiveField("email", "string")],
-      });
-      setStatusCodes([]);
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: "초기화 확인",
+      message: "작성 중인 내용을 초기화하시겠습니까?",
+      variant: "warning",
+      onConfirm: () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        setMethod("POST");
+        setUrl("");
+        setUrlError(""); // 에러 상태 초기화
+        setTags("");
+        setDescription("");
+        setSummary("");
+        setQueryParams([]);
+        setRequestHeaders([]);
+        setPathParams([]);
+        setAuth({ type: "none" });
+        setRequestBody({
+          type: "json",
+          fields: [createPrimitiveField("email", "string")],
+        });
+        setStatusCodes([]);
+      },
+    });
   };
 
   const handleNewForm = useCallback(() => {
@@ -1909,7 +2140,12 @@ export function ApiEditorLayout() {
       // 파일 확장자 검증
       const fileName = file.name.toLowerCase();
       if (!fileName.endsWith(".yml") && !fileName.endsWith(".yaml")) {
-        alert("YAML 파일(.yml 또는 .yaml)만 업로드 가능합니다.");
+        setAlertModal({
+          isOpen: true,
+          title: "파일 형식 오류",
+          message: "YAML 파일(.yml 또는 .yaml)만 업로드 가능합니다.",
+          variant: "warning",
+        });
         return;
       }
 
@@ -1922,7 +2158,12 @@ export function ApiEditorLayout() {
             setImportResult({ data } as unknown as ImportYamlResponse);
             setIsImportModalOpen(true);
           } else {
-            alert("WebSocket YAML Import가 완료되었습니다.");
+            setAlertModal({
+              isOpen: true,
+              title: "Import 완료",
+              message: "WebSocket YAML Import가 완료되었습니다.",
+              variant: "success",
+            });
           }
         } else {
           const restResult: ImportYamlResponse = await importYaml(file);
@@ -1935,12 +2176,79 @@ export function ApiEditorLayout() {
       } catch (error) {
         console.error("YAML Import 오류:", error);
         const errorMsg = getErrorMessage(error);
-        alert(`YAML Import 실패\n\n${errorMsg}`);
+        setAlertModal({
+          isOpen: true,
+          title: "Import 실패",
+          message: `YAML Import 실패\n\n${errorMsg}`,
+          variant: "error",
+        });
       }
     };
 
     // 파일 선택 다이얼로그 열기
     input.click();
+  };
+
+  const handleExportMD = async () => {
+    try {
+      const { convertYamlToMarkdown, convertWsYamlToMarkdown } = await import(
+        "../utils/markdownExporter"
+      );
+      if (protocol === "WebSocket") {
+        const wsYaml = await exportWebSocketYaml();
+        const wsMd = convertWsYamlToMarkdown(wsYaml);
+        setMdPreviewContent(wsMd);
+        setMdPreviewFilename("WS_API_DOCUMENTATION.md");
+        setIsMdPreviewOpen(true);
+      } else {
+        const yaml = await exportYaml();
+        const md = convertYamlToMarkdown(yaml);
+        setMdPreviewContent(md);
+        setMdPreviewFilename("API_DOCUMENTATION.md");
+        setIsMdPreviewOpen(true);
+      }
+      setIsExportModalOpen(false);
+    } catch (e) {
+      console.error("Markdown 내보내기 오류:", e);
+      const errorMsg = getErrorMessage(e);
+      setAlertModal({
+        isOpen: true,
+        title: "Export 실패",
+        message: `Markdown 내보내기에 실패했습니다.\n오류: ${errorMsg}`,
+        variant: "error",
+      });
+      setIsExportModalOpen(false);
+    }
+  };
+
+  const handleExportYAML = async () => {
+    try {
+      const yaml =
+        protocol === "WebSocket"
+          ? await exportWebSocketYaml()
+          : await exportYaml();
+      downloadYaml(
+        yaml,
+        protocol === "WebSocket" ? "ourowebsocket.yml" : "ourorest.yml"
+      );
+      setAlertModal({
+        isOpen: true,
+        title: "다운로드 완료",
+        message: "YAML 파일이 다운로드되었습니다.",
+        variant: "success",
+      });
+      setIsExportModalOpen(false);
+    } catch (e) {
+      console.error("YAML 내보내기 오류:", e);
+      const errorMsg = getErrorMessage(e);
+      setAlertModal({
+        isOpen: true,
+        title: "Export 실패",
+        message: `YAML 내보내기에 실패했습니다.\n오류: ${errorMsg}`,
+        variant: "error",
+      });
+      setIsExportModalOpen(false);
+    }
   };
 
   const handleSyncDiffToSpec = async () => {
@@ -2032,6 +2340,49 @@ export function ApiEditorLayout() {
         if (diffType === "channel") {
           const syncResponse = await syncWebSocketOperation(operationId);
 
+          // sync 후 도메인 이름을 tags.name으로 설정
+          const updatedOperation = syncResponse.data?.operation;
+          if (updatedOperation) {
+            // 도메인 추출 함수
+            const extractDomain = (address: string): string => {
+              if (!address || address === "/unknown") {
+                return "OTHERS";
+              }
+              const parts = address
+                .split("/")
+                .filter((part) => part.length > 0);
+              if (parts.length === 0) {
+                return "OTHERS";
+              }
+              const domain = parts[0];
+              return (
+                domain.charAt(0).toUpperCase() + domain.slice(1).toLowerCase()
+              );
+            };
+
+            // receiver address에서 도메인 추출
+            let domainName = "OTHERS";
+            if (updatedOperation.channel) {
+              const channelRef = updatedOperation.channel.ref || "";
+              const channelName = channelRef.replace("#/channels/", "");
+              try {
+                const channelResponse = await getWebSocketChannel(channelName);
+                const actualAddress =
+                  channelResponse.data.channel?.address || channelName;
+                domainName = extractDomain(actualAddress);
+              } catch {
+                // Channel 조회 실패 시 channel name에서 도메인 추출
+                domainName = extractDomain(channelName);
+              }
+            }
+
+            // 도메인 이름을 tags로 업데이트
+            // 백엔드에서 tags는 string[] 형태로 받지만, 실제 저장 시 [{name: "TAG_NAME"}] 형태로 변환됨
+            await updateWebSocketOperation(operationId, {
+              tags: [domainName], // 도메인 이름을 tags로 설정 (백엔드에서 {name: domainName} 형태로 변환)
+            });
+          }
+
           // Operation 데이터 다시 로드하여 최신 상태 반영
           await loadWebSocketOperationData(operationId);
 
@@ -2039,7 +2390,6 @@ export function ApiEditorLayout() {
           await loadEndpoints();
 
           // selectedEndpoint 업데이트
-          const updatedOperation = syncResponse.data?.operation;
           if (updatedOperation) {
             setSelectedEndpoint({
               ...selectedEndpoint,
@@ -2303,16 +2653,19 @@ export function ApiEditorLayout() {
       <div className="border-b border-gray-200 dark:border-[#2D333B] px-6 py-4 bg-white dark:bg-[#0D1117]">
         <div className="flex items-center justify-between mb-4">
           {/* Left: Tabs */}
-          <div className="flex gap-1 border-b border-gray-200 dark:border-[#2D333B]">
+          <div className="flex gap-0 border-b border-gray-200 dark:border-[#2D333B]">
             <button
               onClick={() => setActiveTab("form")}
-              className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 focus:outline-none focus-visible:outline-none ${
+              className={`relative px-5 py-2.5 text-sm font-medium transition-colors duration-200 focus:outline-none focus-visible:outline-none border-0 outline-none ring-0 hover:ring-0 active:ring-0 ${
                 activeTab === "form"
-                  ? "text-gray-900 dark:text-[#E6EDF3] border-[#2563EB]"
-                  : "text-gray-500 dark:text-[#8B949E] border-transparent hover:text-gray-900 dark:hover:text-[#E6EDF3]"
+                  ? "text-[#2563EB] dark:text-[#58A6FF]"
+                  : "text-gray-500 dark:text-[#8B949E] hover:text-gray-900 dark:hover:text-[#E6EDF3]"
               }`}
             >
-              API 생성 폼
+              <span className="relative z-10">API 생성 폼</span>
+              {activeTab === "form" && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#2563EB] dark:bg-[#58A6FF] rounded-t-full" />
+              )}
             </button>
             <button
               onClick={() => {
@@ -2323,130 +2676,57 @@ export function ApiEditorLayout() {
                 setActiveTab("test");
               }}
               disabled={!selectedEndpoint}
-              className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 focus:outline-none focus-visible:outline-none ${
+              className={`relative px-5 py-2.5 text-sm font-medium transition-colors duration-200 focus:outline-none focus-visible:outline-none border-0 outline-none ring-0 hover:ring-0 active:ring-0 ${
                 activeTab === "test"
-                  ? "text-gray-900 dark:text-[#E6EDF3] border-[#2563EB]"
-                  : "text-gray-500 dark:text-[#8B949E] border-transparent hover:text-gray-900 dark:hover:text-[#E6EDF3]"
+                  ? "text-[#2563EB] dark:text-[#58A6FF]"
+                  : "text-gray-500 dark:text-[#8B949E] hover:text-gray-900 dark:hover:text-[#E6EDF3]"
               } ${!selectedEndpoint ? "opacity-50 cursor-not-allowed" : ""}`}
               title={
                 !selectedEndpoint ? "먼저 API를 생성하거나 선택해주세요" : ""
               }
             >
-              테스트 폼
+              <span className="relative z-10">테스트 폼</span>
+              {activeTab === "test" && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#2563EB] dark:bg-[#58A6FF] rounded-t-full" />
+              )}
             </button>
           </div>
 
           {/* Right: Actions - 조건부 표시 */}
           {activeTab === "form" ? (
             <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4 lg:gap-6">
-              {/* Action Buttons - Utility만 유지 */}
+              {/* Action Buttons */}
               <div className="flex flex-wrap items-center gap-2">
-                {/* Utility Buttons */}
                 <button
                   onClick={handleImportYAML}
-                  className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2"
-                  title="YAML 파일 가져오기"
+                  className="px-4 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-lg bg-transparent transition-colors text-sm font-medium focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0"
                 >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
-                    />
-                  </svg>
+                  Import
                 </button>
-                <button
-                  onClick={async () => {
-                    try {
-                      const { convertYamlToMarkdown, convertWsYamlToMarkdown } =
-                        await import("../utils/markdownExporter");
-                      if (protocol === "WebSocket") {
-                        const wsYaml = await exportWebSocketYaml();
-                        const wsMd = convertWsYamlToMarkdown(wsYaml);
-                        setMdPreviewContent(wsMd);
-                        setMdPreviewFilename("WS_API_DOCUMENTATION.md");
-                        setIsMdPreviewOpen(true);
-                      } else {
-                        const yaml = await exportYaml();
-                        const md = convertYamlToMarkdown(yaml);
-                        setMdPreviewContent(md);
-                        setMdPreviewFilename("API_DOCUMENTATION.md");
-                        setIsMdPreviewOpen(true);
-                      }
-                    } catch (e) {
-                      console.error("Markdown 내보내기 오류:", e);
-                      const errorMsg = getErrorMessage(e);
-                      alert(
-                        `Markdown 내보내기에 실패했습니다.\n오류: ${errorMsg}`
-                      );
-                    }
-                  }}
-                  className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2"
-                  title="Markdown 파일 내보내기"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+                <div className="relative" ref={exportDropdownRef}>
+                  <button
+                    onClick={() => setIsExportModalOpen(!isExportModalOpen)}
+                    className="px-4 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-lg bg-transparent transition-colors text-sm font-medium focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
-                </button>
-                <button
-                  onClick={async () => {
-                    try {
-                      const yaml =
-                        protocol === "WebSocket"
-                          ? await exportWebSocketYaml()
-                          : await exportYaml();
-                      downloadYaml(
-                        yaml,
-                        protocol === "WebSocket"
-                          ? "ourowebsocket.yml"
-                          : "ourorest.yml"
-                      );
-                      alert("YAML 파일이 다운로드되었습니다.");
-                    } catch (e) {
-                      console.error("YAML 내보내기 오류:", e);
-                      const errorMsg = getErrorMessage(e);
-                      alert(`YAML 내보내기에 실패했습니다.\n오류: ${errorMsg}`);
-                    }
-                  }}
-                  className="px-3 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none text-sm font-medium flex items-center gap-2"
-                  title="API YAML 파일 생성"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                    />
-                  </svg>
-                </button>
+                    Export
+                  </button>
+                  {isExportModalOpen && (
+                    <div className="absolute top-full right-0 mt-1 w-40 bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#30363D] rounded-lg shadow-lg z-50 overflow-hidden">
+                      <button
+                        onClick={handleExportMD}
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#21262D] transition-colors focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0"
+                      >
+                        Markdown (MD)
+                      </button>
+                      <button
+                        onClick={handleExportYAML}
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#21262D] transition-colors border-t border-gray-200 dark:border-[#30363D] focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0"
+                      >
+                        YAML
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           ) : (
@@ -2457,7 +2737,7 @@ export function ApiEditorLayout() {
                 {!isAuthorizationInputOpen ? (
                   <button
                     onClick={() => setIsAuthorizationInputOpen(true)}
-                    className={`px-3 py-2 rounded-md border transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus-visible:outline-none active:translate-y-[1px] ${
+                    className={`px-3 py-2 rounded-md border transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus-visible:outline-none active:translate-y-[1px] ring-0 hover:ring-0 active:ring-0 ${
                       authorization && authorization.trim()
                         ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300"
                         : "bg-white dark:bg-[#0D1117] border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22]"
@@ -2703,6 +2983,53 @@ export function ApiEditorLayout() {
                         ? handleSyncWebSocketToActual
                         : undefined
                     }
+                    onProgressUpdate={
+                      selectedEndpoint
+                        ? async (progress: "none" | "completed") => {
+                            // 호출 시점의 최신 endpoint ID 캡처
+                            const currentEndpoint = selectedEndpointRef.current;
+                            if (!currentEndpoint || !isMountedRef.current) {
+                              return;
+                            }
+                            const endpointId = currentEndpoint.id;
+
+                            try {
+                              // 언마운트 체크 후 비동기 작업 수행
+                              if (!isMountedRef.current) return;
+                              await updateWebSocketOperation(endpointId, {
+                                progress,
+                              });
+
+                              // 언마운트 체크 후 Operation 데이터 다시 로드
+                              if (!isMountedRef.current) return;
+                              await loadWebSocketOperationData(endpointId);
+
+                              // 언마운트 체크 후 사이드바 목록도 다시 로드
+                              if (!isMountedRef.current) return;
+                              await loadEndpoints();
+
+                              // 언마운트 체크 후 selectedEndpoint 업데이트
+                              if (!isMountedRef.current) return;
+                              // ref에서 최신 값을 가져와서 확인
+                              const latestEndpoint =
+                                selectedEndpointRef.current;
+                              // 현재 선택된 endpoint가 우리가 업데이트하려는 endpoint인지 확인
+                              if (
+                                latestEndpoint &&
+                                latestEndpoint.id === endpointId
+                              ) {
+                                setSelectedEndpoint({
+                                  ...latestEndpoint,
+                                  progress,
+                                });
+                              }
+                            } catch (error) {
+                              console.error("Progress 업데이트 실패:", error);
+                              throw error;
+                            }
+                          }
+                        : undefined
+                    }
                   />
                 </>
               )}
@@ -2776,7 +3103,7 @@ export function ApiEditorLayout() {
                     {selectedEndpoint && !isEditMode && (
                       <button
                         onClick={() => setIsCodeSnippetOpen(true)}
-                        className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2"
+                        className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0"
                         title="Code Snippet 보기"
                       >
                         <svg
@@ -3084,7 +3411,7 @@ export function ApiEditorLayout() {
                     <div className="flex gap-0.5 -mb-px">
                       <button
                         onClick={() => setSpecTab("request")}
-                        className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ${
+                        className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0 ${
                           specTab === "request"
                             ? "text-gray-900 dark:text-[#E6EDF3] bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] border-b-white dark:border-b-[#161B22] relative z-10"
                             : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
@@ -3094,7 +3421,7 @@ export function ApiEditorLayout() {
                       </button>
                       <button
                         onClick={() => setSpecTab("response")}
-                        className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ${
+                        className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0 ${
                           specTab === "response"
                             ? "text-gray-900 dark:text-[#E6EDF3] bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] border-b-white dark:border-b-[#161B22] relative z-10"
                             : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
@@ -3105,7 +3432,7 @@ export function ApiEditorLayout() {
                       {!isCompletedView && (
                         <button
                           onClick={() => setSpecTab("schema")}
-                          className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ${
+                          className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0 ${
                             specTab === "schema"
                               ? "text-gray-900 dark:text-[#E6EDF3] bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] border-b-white dark:border-b-[#161B22] relative z-10"
                               : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
@@ -3175,7 +3502,7 @@ export function ApiEditorLayout() {
               <>
                 <button
                   onClick={handleCancelEdit}
-                  className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2"
+                  className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0"
                 >
                   취소
                 </button>
@@ -3186,7 +3513,7 @@ export function ApiEditorLayout() {
                     (protocol === "REST" && !hasRestChanges()) ||
                     (protocol === "WebSocket" && !hasWebSocketChanges())
                   }
-                  className={`px-3 py-2 rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none text-sm font-medium flex items-center gap-2 ${
+                  className={`px-3 py-2 rounded-md transition-colors active:translate-y-[1px] focus:outline-none focus-visible:outline-none text-sm font-medium flex items-center gap-2 ring-0 hover:ring-0 active:ring-0 ${
                     !isFormValid() ||
                     (protocol === "REST" && !hasRestChanges()) ||
                     (protocol === "WebSocket" && !hasWebSocketChanges())
@@ -3202,7 +3529,7 @@ export function ApiEditorLayout() {
                 <button
                   onClick={handleEdit}
                   disabled={isReadOnly}
-                  className={`px-3 py-2 rounded-md transition-colors text-sm font-medium flex items-center gap-2 ${
+                  className={`px-3 py-2 rounded-md transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0 ${
                     isReadOnly
                       ? "bg-gray-200 dark:bg-[#161B22] text-gray-400 dark:text-[#8B949E] cursor-not-allowed"
                       : "bg-[#2563EB] hover:bg-[#1E40AF] text-white"
@@ -3214,7 +3541,7 @@ export function ApiEditorLayout() {
                 <button
                   onClick={handleDelete}
                   disabled={isReadOnly}
-                  className={`px-3 py-2 rounded-md transition-colors text-sm font-medium flex items-center gap-2 ${
+                  className={`px-3 py-2 rounded-md transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0 ${
                     isReadOnly
                       ? "bg-gray-200 dark:bg-[#161B22] text-gray-400 dark:text-[#8B949E] cursor-not-allowed"
                       : "bg-red-500 hover:bg-red-600 text-white"
@@ -3234,14 +3561,14 @@ export function ApiEditorLayout() {
           <div className="flex items-center justify-end gap-3">
             <button
               onClick={handleReset}
-              className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2"
+              className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0"
             >
               초기화
             </button>
             <button
               onClick={handleSave}
               disabled={!isFormValid()}
-              className={`px-3 py-2 rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none text-sm font-medium flex items-center gap-2 ${
+              className={`px-3 py-2 rounded-md transition-colors active:translate-y-[1px] focus:outline-none focus-visible:outline-none text-sm font-medium flex items-center gap-2 ring-0 hover:ring-0 active:ring-0 ${
                 !isFormValid()
                   ? "bg-gray-300 dark:bg-[#21262D] text-gray-500 dark:text-[#8B949E] cursor-not-allowed"
                   : "bg-[#2563EB] hover:bg-[#1E40AF] text-white"
@@ -3278,6 +3605,25 @@ export function ApiEditorLayout() {
         onClose={() => setIsMdPreviewOpen(false)}
         content={mdPreviewContent}
         filename={mdPreviewFilename}
+      />
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+      />
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={() => setAlertModal((prev) => ({ ...prev, isOpen: false }))}
+        title={alertModal.title}
+        message={alertModal.message}
+        variant={alertModal.variant}
       />
     </div>
   );

@@ -3,6 +3,7 @@ import { SchemaFieldEditor } from "./SchemaFieldEditor";
 import { SchemaModal } from "./SchemaModal";
 import { SchemaCard } from "./SchemaCard";
 import { SchemaViewer } from "./SchemaViewer";
+import { AlertModal } from "@/ui/AlertModal";
 import {
   getAllWebSocketSchemas,
   getAllWebSocketMessages,
@@ -70,6 +71,7 @@ interface WsEditorFormProps {
     progress?: string;
   };
   onSyncToActual?: () => void; // 실제 구현을 명세에 반영하는 콜백
+  onProgressUpdate?: (progress: "none" | "completed") => Promise<void>; // progress 수동 업데이트 콜백
 }
 
 export function WsEditorForm({
@@ -96,6 +98,7 @@ export function WsEditorForm({
   diff,
   operationInfo,
   onSyncToActual,
+  onProgressUpdate,
 }: WsEditorFormProps) {
   const [schemas, setSchemas] = useState<SchemaResponse[]>([]);
   const [messages, setMessages] = useState<MessageResponse[]>([]);
@@ -106,10 +109,39 @@ export function WsEditorForm({
   const [isMessageSchemaModalOpen, setIsMessageSchemaModalOpen] =
     useState(false);
 
+  // Modal 상태
+  const [alertModal, setAlertModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    variant?: "success" | "error" | "warning" | "info";
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+  });
+
   // 내부 wsSpecTab state (외부에서 제공되지 않으면 내부에서 관리)
+  // SEND 타입의 경우 기본 탭을 reply로 설정
+  const getDefaultTab = (): "receiver" | "reply" => {
+    if (operationInfo?.tag === "send" || operationInfo?.tag === "sendto") {
+      return "reply";
+    }
+    return "receiver";
+  };
   const [internalWsSpecTab, setInternalWsSpecTab] = useState<
     "receiver" | "reply"
-  >("receiver");
+  >(getDefaultTab());
+  
+  // operationInfo.tag가 변경될 때 기본 탭 업데이트 (초기 로드 및 변경 시)
+  useEffect(() => {
+    if (!externalWsSpecTab && operationInfo?.tag) {
+      const defaultTab = getDefaultTab();
+      setInternalWsSpecTab(defaultTab);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [operationInfo?.tag, externalWsSpecTab]);
+  
   const wsSpecTab = externalWsSpecTab ?? internalWsSpecTab;
   // setWsSpecTab는 외부(ApiEditorLayout)에서 탭 전환 시 사용되므로 유지
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -145,6 +177,9 @@ export function WsEditorForm({
     string | null
   >(null);
 
+  // Progress 토글 로컬 상태 (즉시 UI 반영용)
+  const [localProgress, setLocalProgress] = useState<string | null>(null);
+
   // Protocol state (entryPoint에서 분리)
   const [internalProtocol, setInternalProtocol] = useState<"ws" | "wss">("ws");
   const protocol = externalProtocol ?? internalProtocol;
@@ -171,12 +206,25 @@ export function WsEditorForm({
 
   // entryPoint 파싱 (기존 데이터 로드 시)
   useEffect(() => {
+    // 외부에서 protocol이 전달되면 그것을 우선 사용 (백엔드에서 받은 protocol 값)
+    if (externalProtocol && setExternalProtocol) {
+      setExternalProtocol(externalProtocol);
+    }
+    
     if (entryPoint && entryPoint.includes("://")) {
-      // ws://localhost:8080/ws 형태 파싱
+      // ws://localhost:8080/ws 형태 파싱 (외부 protocol이 없을 때만)
+      if (!externalProtocol) {
       const match = entryPoint.match(/^(ws|wss):\/\/[^/]+(\/.*)?$/);
       if (match) {
         setProtocol(match[1] as "ws" | "wss");
         setPathname(match[2] || "/ws");
+        }
+      } else {
+        // 외부 protocol이 있으면 pathname만 추출
+        const pathMatch = entryPoint.match(/^[^:]+:\/\/[^/]+(\/.*)?$/);
+        if (pathMatch) {
+          setPathname(pathMatch[1] || "/ws");
+        }
       }
     } else if (entryPoint) {
       // /ws 형태만 있으면 pathname으로
@@ -189,7 +237,7 @@ export function WsEditorForm({
       setEntryPointError("");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entryPoint, setProtocol]);
+  }, [entryPoint, externalProtocol, setProtocol]);
 
   // Messages 목록 로드
   const loadMessages = async () => {
@@ -230,6 +278,15 @@ export function WsEditorForm({
   useEffect(() => {
     loadSchemas();
   }, []);
+
+  // operationInfo.progress 변경 시 로컬 상태 동기화
+  useEffect(() => {
+    if (operationInfo?.progress) {
+      setLocalProgress(operationInfo.progress.toLowerCase());
+    } else {
+      setLocalProgress(null);
+    }
+  }, [operationInfo?.progress]);
 
   // Receiver 초기화
   const initializeReceiver = () => {
@@ -357,7 +414,12 @@ export function WsEditorForm({
   // 메시지 생성
   const handleCreateMessage = async () => {
     if (!messageName.trim()) {
-      alert("메시지 이름을 입력해주세요.");
+      setAlertModal({
+        isOpen: true,
+        title: "입력 오류",
+        message: "메시지 이름을 입력해주세요.",
+        variant: "warning",
+      });
       return;
     }
 
@@ -407,7 +469,12 @@ export function WsEditorForm({
       }
 
       await createWebSocketMessage(request);
-      alert("메시지가 생성되었습니다.");
+      setAlertModal({
+        isOpen: true,
+        title: "생성 완료",
+        message: "메시지가 생성되었습니다.",
+        variant: "success",
+      });
 
       // 폼 초기화
       setMessageName("");
@@ -420,11 +487,14 @@ export function WsEditorForm({
       // 메시지 목록 새로고침
       await loadMessages();
     } catch (error) {
-      alert(
-        `메시지 생성 실패: ${
+      setAlertModal({
+        isOpen: true,
+        title: "생성 실패",
+        message: `메시지 생성 실패: ${
           error instanceof Error ? error.message : "알 수 없는 오류"
-        }`
-      );
+        }`,
+        variant: "error",
+      });
     }
   };
 
@@ -575,7 +645,12 @@ export function WsEditorForm({
         },
       });
     } else {
-      alert("스키마는 object 타입만 지원됩니다.");
+      setAlertModal({
+        isOpen: true,
+        title: "타입 오류",
+        message: "스키마는 object 타입만 지원됩니다.",
+        variant: "warning",
+      });
     }
     setIsReceiverSchemaModalOpen(false);
   };
@@ -596,7 +671,12 @@ export function WsEditorForm({
         },
       });
     } else {
-      alert("스키마는 object 타입만 지원됩니다.");
+      setAlertModal({
+        isOpen: true,
+        title: "타입 오류",
+        message: "스키마는 object 타입만 지원됩니다.",
+        variant: "warning",
+      });
     }
     setIsReplySchemaModalOpen(false);
   };
@@ -610,7 +690,12 @@ export function WsEditorForm({
     if (selectedSchema.type === "object") {
       setSelectedMessageSchema(selectedSchema.name);
     } else {
-      alert("스키마는 object 타입만 지원됩니다.");
+      setAlertModal({
+        isOpen: true,
+        title: "타입 오류",
+        message: "스키마는 object 타입만 지원됩니다.",
+        variant: "warning",
+      });
     }
     setIsMessageSchemaModalOpen(false);
   };
@@ -828,214 +913,432 @@ export function WsEditorForm({
 
   // 문서 형식 뷰 - REST 스타일로 재구성
   if (isDocumentView) {
-    // 현재 선택된 탭에 따라 표시할 내용 결정
-    const currentChannel = wsSpecTab === "receiver" ? receiver : reply;
-    const channelType = wsSpecTab === "receiver" ? "Receiver" : "Reply";
+    // 메시지 표시 헬퍼 함수
+    const renderMessages = (channel: Receiver | Reply | null, channelType: string) => {
+      if (!channel) {
+        return (
+          <div className="text-sm text-gray-500 dark:text-[#8B949E] italic">
+            No {channelType.toLowerCase()} configuration.
+          </div>
+        );
+      }
+
+      return (
+        <div className="space-y-4">
+          {/* Address */}
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">
+              Address
+            </h3>
+            <div className="flex items-start gap-3 text-sm">
+              <span className="font-mono text-gray-900 dark:text-[#E6EDF3]">
+                {channel.address || (
+                  <span className="text-gray-400 italic">(empty)</span>
+                )}
+              </span>
+            </div>
+          </div>
+
+          {/* Messages */}
+          {channel.messages && channel.messages.length > 0 ? (
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">
+                Messages
+              </h3>
+              <div className="space-y-4">
+                {channel.messages.map((messageName, idx) => {
+                  // 메시지 정보 찾기
+                  const messageInfo = messages.find(
+                    (msg) =>
+                      msg.messageName === messageName ||
+                      msg.name === messageName
+                  );
+
+                  return (
+                    <div
+                      key={`${channelType}-${messageName}-${idx}`}
+                      className="border border-gray-200 dark:border-[#2D333B] rounded-md p-3 bg-gray-50 dark:bg-[#0D1117]"
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="font-mono text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
+                          {messageName}
+                        </span>
+                        {messageInfo?.description && (
+                          <span className="text-xs text-gray-500 dark:text-[#8B949E]">
+                            - {messageInfo.description}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* 메시지 구조 표시: name/header/payload 중 실제로 있는 것만 */}
+                      <div className="space-y-2 ml-4">
+                        {/* Name */}
+                        {messageInfo?.name && (
+                          <div>
+                            <span className="text-xs font-semibold text-gray-600 dark:text-[#8B949E]">
+                              Name:
+                            </span>
+                            <span className="ml-2 text-sm text-gray-900 dark:text-[#E6EDF3]">
+                              {messageInfo.name}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Headers */}
+                        {messageInfo?.headers &&
+                          Object.keys(messageInfo.headers).length > 0 && (
+                            <div>
+                              <span className="text-xs font-semibold text-gray-600 dark:text-[#8B949E]">
+                                Headers:
+                              </span>
+                              <div className="mt-1 space-y-1">
+                                {Object.entries(messageInfo.headers).map(
+                                  ([key, value]) => (
+                                    <div
+                                      key={key}
+                                      className="flex items-start gap-2 text-sm"
+                                    >
+                                      <span className="font-mono text-gray-900 dark:text-[#E6EDF3] min-w-[100px]">
+                                        {key}
+                                      </span>
+                                      <span className="text-gray-600 dark:text-[#8B949E]">
+                                        :
+                                      </span>
+                                      <span className="text-gray-900 dark:text-[#E6EDF3]">
+                                        {String(value)}
+                                      </span>
+                                    </div>
+                                  )
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                        {/* Payload */}
+                        {messageInfo?.payload && (() => {
+                          // payload가 schema로 감싸져 있으면 사용하고, 아니면 payload 자체를 schema로 사용
+                          const schema = messageInfo.payload.schema ?? messageInfo.payload;
+                          
+                          return (
+                            <div>
+                              <span className="text-xs font-semibold text-gray-600 dark:text-[#8B949E]">
+                                Payload:
+                              </span>
+                              <div className="mt-2">
+                                {schema?.$ref ? (
+                                  <MessagePayloadSchemaViewer
+                                    schemaRef={schema.$ref}
+                                  />
+                                ) : schema?.ref ? (
+                                  <MessagePayloadSchemaViewer
+                                    schemaRef={schema.ref}
+                                  />
+                                ) : schema?.type ? (
+                                  <div>
+                                    <span className="text-sm text-gray-900 dark:text-[#E6EDF3]">
+                                      type: {schema.type}
+                                    </span>
+                                    {schema.properties && (
+                                      <div className="mt-2">
+                                        <SchemaViewer
+                                          schemaType={{
+                                            kind: "object",
+                                            properties: Object.entries(
+                                              schema.properties
+                                            ).map(
+                                              ([key, prop]: [string, unknown]) => {
+                                                const propObj = prop as {
+                                                  description?: string;
+                                                  type?: string;
+                                                  [key: string]: unknown;
+                                                };
+                                                return {
+                                                  key,
+                                                  description: propObj.description,
+                                                  required:
+                                                    schema.required?.includes(
+                                                      key
+                                                    ) || false,
+                                                  schemaType:
+                                                    parseOpenAPISchemaToSchemaType(
+                                                      propObj
+                                                    ),
+                                                };
+                                              }
+                                            ),
+                                          }}
+                                          contentType="application/json"
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-sm text-gray-500 dark:text-[#8B949E] italic">
+                                    (schema 정보 없음)
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        {/* 메시지 정보가 없는 경우 */}
+                        {!messageInfo && (
+                          <div className="text-xs text-gray-500 dark:text-[#8B949E] italic">
+                            메시지 정보를 불러올 수 없습니다.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="text-sm text-gray-500 dark:text-[#8B949E] italic">
+              No messages configured.
+            </div>
+          )}
+        </div>
+      );
+    };
 
     return (
       <div className="w-full max-w-6xl mx-auto px-6 py-8">
         {/* Diff 알림 */}
         {renderDiffNotification()}
 
-        <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] shadow-sm overflow-hidden">
-          {/* 탭 내용 */}
-          <div className="p-4 bg-white dark:bg-[#161B22]">
-            {currentChannel ? (
-              <div className="space-y-4">
-                {/* Address */}
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">
-                    Address
-                  </h3>
-                  <div className="flex items-start gap-3 text-sm">
-                    <span className="font-mono text-gray-900 dark:text-[#E6EDF3]">
-                      {currentChannel.address || (
-                        <span className="text-gray-400 italic">(empty)</span>
-                      )}
-                    </span>
-                  </div>
+        {/* Progress 수동 관리 토글 (읽기 전용 모드에서만 표시, DUPLEX나 SEND인 경우만) */}
+        <div className="mb-4 flex items-center justify-end gap-2 h-6">
+          {isReadOnly &&
+          operationInfo &&
+          (operationInfo.tag === "duplex" || operationInfo.tag === "send") &&
+          onProgressUpdate && (
+            <>
+              <span className="text-xs text-gray-600 dark:text-[#8B949E] font-medium">
+                작업 완료:
+              </span>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={
+                    localProgress !== null
+                      ? localProgress === "completed"
+                      : operationInfo.progress?.toLowerCase() === "completed"
+                  }
+                  onChange={async (e) => {
+                    const newProgress = e.target.checked ? "completed" : "none";
+                    // 즉시 로컬 상태 업데이트
+                    setLocalProgress(newProgress);
+                    try {
+                      await onProgressUpdate(
+                        newProgress as "none" | "completed"
+                      );
+                      // 성공 시 로컬 상태 유지 (operationInfo가 업데이트되면 자동으로 동기화됨)
+                    } catch (error) {
+                      console.error("Progress 업데이트 실패:", error);
+                      // 에러 발생 시 이전 상태로 되돌리기
+                      setLocalProgress(
+                        operationInfo.progress?.toLowerCase() || "none"
+                      );
+                      setAlertModal({
+                        isOpen: true,
+                        title: "업데이트 실패",
+                        message: `Progress 업데이트에 실패했습니다: ${
+                          error instanceof Error
+                            ? error.message
+                            : "알 수 없는 오류"
+                        }`,
+                        variant: "error",
+                      });
+                    }
+                  }}
+                  className="sr-only"
+                />
+                <div
+                  className={`w-10 h-5 rounded-full transition-colors duration-200 ease-in-out ${
+                    localProgress !== null
+                      ? localProgress === "completed"
+                        ? "bg-[#2563EB]"
+                        : "bg-gray-300 dark:bg-gray-600"
+                      : operationInfo.progress?.toLowerCase() === "completed"
+                      ? "bg-[#2563EB]"
+                      : "bg-gray-300 dark:bg-gray-600"
+                  }`}
+                >
+                  <div
+                    className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform duration-200 ease-in-out ${
+                      localProgress !== null
+                        ? localProgress === "completed"
+                          ? "translate-x-5"
+                          : "translate-x-0.5"
+                        : operationInfo.progress?.toLowerCase() === "completed"
+                        ? "translate-x-5"
+                        : "translate-x-0.5"
+                    } translate-y-0.5`}
+                  ></div>
                 </div>
+              </label>
+            </>
+          )}
+        </div>
 
-                {/* Messages */}
-                {currentChannel.messages &&
-                  currentChannel.messages.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">
-                        Messages
-                      </h3>
-                      <div className="space-y-4">
-                        {currentChannel.messages.map((messageName, idx) => {
-                          // 메시지 정보 찾기
-                          const messageInfo = messages.find(
-                            (msg) =>
-                              msg.messageName === messageName ||
-                              msg.name === messageName
-                          );
-
-                          return (
-                            <div
-                              key={`${messageName}-${idx}`}
-                              className="border border-gray-200 dark:border-[#2D333B] rounded-md p-3 bg-gray-50 dark:bg-[#0D1117]"
-                            >
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className="font-mono text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
-                                  {messageName}
-                                </span>
-                                {messageInfo?.description && (
-                                  <span className="text-xs text-gray-500 dark:text-[#8B949E]">
-                                    - {messageInfo.description}
-                                  </span>
-                                )}
-                              </div>
-
-                              {/* 메시지 구조 표시: name/header/payload 중 실제로 있는 것만 */}
-                              <div className="space-y-2 ml-4">
-                                {/* Name */}
-                                {messageInfo?.name && (
-                                  <div>
-                                    <span className="text-xs font-semibold text-gray-600 dark:text-[#8B949E]">
-                                      Name:
-                                    </span>
-                                    <span className="ml-2 text-sm text-gray-900 dark:text-[#E6EDF3]">
-                                      {messageInfo.name}
-                                    </span>
-                                  </div>
-                                )}
-
-                                {/* Headers */}
-                                {messageInfo?.headers &&
-                                  Object.keys(messageInfo.headers).length >
-                                    0 && (
-                                    <div>
-                                      <span className="text-xs font-semibold text-gray-600 dark:text-[#8B949E]">
-                                        Headers:
-                                      </span>
-                                      <div className="mt-1 space-y-1">
-                                        {Object.entries(
-                                          messageInfo.headers
-                                        ).map(([key, value]) => (
-                                          <div
-                                            key={key}
-                                            className="flex items-start gap-2 text-sm"
-                                          >
-                                            <span className="font-mono text-gray-900 dark:text-[#E6EDF3] min-w-[100px]">
-                                              {key}
-                                            </span>
-                                            <span className="text-gray-600 dark:text-[#8B949E]">
-                                              :
-                                            </span>
-                                            <span className="text-gray-900 dark:text-[#E6EDF3]">
-                                              {String(value)}
-                                            </span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
-
-                                {/* Payload */}
-                                {messageInfo?.payload && (
-                                  <div>
-                                    <span className="text-xs font-semibold text-gray-600 dark:text-[#8B949E]">
-                                      Payload:
-                                    </span>
-                                    <div className="mt-2">
-                                      {messageInfo.payload.schema?.$ref ? (
-                                        <MessagePayloadSchemaViewer
-                                          schemaRef={
-                                            messageInfo.payload.schema.$ref
-                                          }
-                                        />
-                                      ) : messageInfo.payload.schema?.ref ? (
-                                        <MessagePayloadSchemaViewer
-                                          schemaRef={
-                                            messageInfo.payload.schema.ref
-                                          }
-                                        />
-                                      ) : messageInfo.payload.schema?.type ? (
-                                        <div>
-                                          <span className="text-sm text-gray-900 dark:text-[#E6EDF3]">
-                                            type:{" "}
-                                            {messageInfo.payload.schema.type}
-                                          </span>
-                                          {messageInfo.payload.schema
-                                            .properties && (
-                                            <div className="mt-2">
-                                              <SchemaViewer
-                                                schemaType={{
-                                                  kind: "object",
-                                                  properties: Object.entries(
-                                                    messageInfo.payload.schema
-                                                      .properties
-                                                  ).map(
-                                                    ([key, prop]: [
-                                                      string,
-                                                      unknown
-                                                    ]) => {
-                                                      const propObj = prop as {
-                                                        description?: string;
-                                                        type?: string;
-                                                        [key: string]: unknown;
-                                                      };
-                                                      return {
-                                                        key,
-                                                        description:
-                                                          propObj.description,
-                                                        required:
-                                                          messageInfo.payload.schema.required?.includes(
-                                                            key
-                                                          ) || false,
-                                                        schemaType:
-                                                          parseOpenAPISchemaToSchemaType(
-                                                            propObj
-                                                          ),
-                                                      };
-                                                    }
-                                                  ),
-                                                }}
-                                                contentType="application/json"
-                                              />
-                                            </div>
-                                          )}
-                                        </div>
-                                      ) : (
-                                        <span className="text-sm text-gray-500 dark:text-[#8B949E] italic">
-                                          (schema 정보 없음)
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* 메시지 정보가 없는 경우 */}
-                                {!messageInfo && (
-                                  <div className="text-xs text-gray-500 dark:text-[#8B949E] italic">
-                                    메시지 정보를 불러올 수 없습니다.
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                {/* Messages가 없는 경우 */}
-                {(!currentChannel.messages ||
-                  currentChannel.messages.length === 0) && (
-                  <div className="text-sm text-gray-500 dark:text-[#8B949E] italic">
-                    No messages configured.
-                  </div>
-                )}
+        {/* Protocol & Entrypoint */}
+        <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] shadow-sm overflow-hidden mb-4">
+          <div className="p-4 bg-white dark:bg-[#161B22]">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <svg
+                  className="w-5 h-5 text-gray-500 dark:text-[#8B949E]"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                  />
+                </svg>
+                <h2 className="text-base font-semibold text-gray-900 dark:text-[#E6EDF3]">
+                  Protocol & Entrypoint
+                </h2>
               </div>
-            ) : (
-              <div className="text-sm text-gray-500 dark:text-[#8B949E] italic">
-                No {channelType.toLowerCase()} configuration.
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span
+                className={`inline-flex items-center rounded-[4px] border border-gray-300 dark:border-[#2D333B] bg-white dark:bg-[#0D1117] px-2 py-[2px] text-[10px] font-mono font-semibold ${
+                  protocol === "wss"
+                    ? "text-[#10B981]"
+                    : "text-[#2563EB]"
+                }`}
+              >
+                {protocol?.toUpperCase() || "WS"}
+              </span>
+              <span className="text-sm text-gray-900 dark:text-[#E6EDF3] font-mono">
+                {entryPoint || "/ws"}
+              </span>
+            </div>
+
+            {/* Owner */}
+            {summary && (
+              <div className="mt-4">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-1">
+                  Owner
+                </h3>
+                <p className="text-sm text-gray-900 dark:text-[#E6EDF3]">
+                  {summary}
+                </p>
+              </div>
+            )}
+
+            {/* Description */}
+            {description && (
+              <div className="mt-4">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-1">
+                  Description
+                </h3>
+                <p className="text-sm text-gray-900 dark:text-[#E6EDF3]">
+                  {description}
+                </p>
+              </div>
+            )}
+
+            {/* Tags */}
+            {tags && (
+              <div className="mt-4">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-1">
+                  Tags
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {tags.split(",").map((tag, idx) => (
+                    <span
+                      key={idx}
+                      className="px-2 py-1 bg-gray-100 dark:bg-[#21262D] text-gray-700 dark:text-[#C9D1D9] rounded text-xs"
+                    >
+                      {tag.trim()}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Tag (operationInfo.tag) */}
+            {operationInfo?.tag && !tags && (
+              <div className="mt-4">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-1">
+                  Tag
+                </h3>
+                <span className="px-2 py-1 bg-gray-100 dark:bg-[#21262D] text-gray-700 dark:text-[#C9D1D9] rounded text-xs">
+                  {operationInfo.tag.toUpperCase()}
+                </span>
               </div>
             )}
           </div>
         </div>
+
+        {/* Receiver & Reply 섹션 (탭 전환) */}
+        {(receiver || reply) && (
+          <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] shadow-sm overflow-hidden">
+            {/* 탭 헤더 */}
+            <div className="bg-gray-50 dark:bg-[#0D1117] border-b border-gray-200 dark:border-[#2D333B] px-4 pt-2">
+              <div className="flex gap-0.5 -mb-px">
+                <button
+                  onClick={() => setWsSpecTab("receiver")}
+                  className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ${
+                    wsSpecTab === "receiver"
+                      ? "text-gray-900 dark:text-[#E6EDF3] bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] border-b-white dark:border-b-[#161B22] relative z-10"
+                      : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
+                  }`}
+                >
+                  Receiver
+                </button>
+                <button
+                  onClick={() => setWsSpecTab("reply")}
+                  className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ${
+                    wsSpecTab === "reply"
+                      ? "text-gray-900 dark:text-[#E6EDF3] bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] border-b-white dark:border-b-[#161B22] relative z-10"
+                      : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
+                  }`}
+                >
+                  Reply
+                </button>
+              </div>
+            </div>
+
+            {/* 탭 내용 */}
+            <div className="p-4 bg-white dark:bg-[#161B22]">
+              {wsSpecTab === "receiver" ? (
+                receiver ? (
+                  renderMessages(receiver, "Receiver")
+                ) : (
+                  <div className="text-sm text-gray-500 dark:text-[#8B949E] italic text-center py-8">
+                    No Receiver configuration.
+                  </div>
+                )
+              ) : reply ? (
+                renderMessages(reply, "Reply")
+              ) : (
+                <div className="text-sm text-gray-500 dark:text-[#8B949E] italic text-center py-8">
+                  No Reply configuration.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Receiver와 Reply가 모두 없는 경우 */}
+        {!receiver && !reply && (
+          <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] shadow-sm overflow-hidden">
+            <div className="p-4 bg-white dark:bg-[#161B22]">
+              <div className="text-sm text-gray-500 dark:text-[#8B949E] italic text-center py-8">
+                No configuration available.
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -1206,38 +1509,71 @@ export function WsEditorForm({
         </div>
       </div>
 
-      {/* Operation Type 표시 (읽기 전용 모드) */}
-      {isReadOnly && operationInfo && (
-        <div className="mb-4 p-3 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border border-purple-200 dark:border-purple-800 rounded-md">
-          <div className="flex items-center gap-2">
-            <svg
-              className="w-5 h-5 text-purple-600 dark:text-purple-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+      {/* Progress 수동 관리 토글 (읽기 전용 모드에서만 표시, DUPLEX나 SEND인 경우만) */}
+      {isReadOnly &&
+        operationInfo &&
+        (operationInfo.tag === "duplex" || operationInfo.tag === "send") &&
+        onProgressUpdate && (
+          <div className="mb-4 flex items-center justify-end gap-2">
+            <span className="text-xs text-gray-600 dark:text-[#8B949E] font-medium">
+              작업 완료:
+              </span>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={
+                  localProgress !== null
+                    ? localProgress === "completed"
+                    : operationInfo.progress?.toLowerCase() === "completed"
+                }
+                onChange={async (e) => {
+                  const newProgress = e.target.checked ? "completed" : "none";
+                  // 즉시 로컬 상태 업데이트
+                  setLocalProgress(newProgress);
+                  try {
+                    await onProgressUpdate(newProgress as "none" | "completed");
+                    // 성공 시 로컬 상태 유지 (operationInfo가 업데이트되면 자동으로 동기화됨)
+                  } catch (error) {
+                    console.error("Progress 업데이트 실패:", error);
+                    // 에러 발생 시 이전 상태로 되돌리기
+                    setLocalProgress(
+                      operationInfo.progress?.toLowerCase() || "none"
+                    );
+                    alert(
+                      `Progress 업데이트에 실패했습니다: ${
+                        error instanceof Error
+                          ? error.message
+                          : "알 수 없는 오류"
+                      }`
+                    );
+                  }
+                }}
+                className="sr-only peer"
               />
-            </svg>
-            <div>
-              <span className="text-xs text-purple-600 dark:text-purple-500 font-medium mr-2">
-                Operation Type:
-              </span>
-              <span className="text-sm font-bold text-purple-800 dark:text-purple-300">
-                {operationInfo.tag === "duplicate"
-                  ? "DUPLEX (양방향 통신)"
-                  : operationInfo.tag === "receive"
-                  ? "RECEIVE (메시지 수신)"
-                  : operationInfo.tag === "sendto"
-                  ? "SEND (메시지 송신)"
-                  : operationInfo.tag}
-              </span>
+              <div
+                className={`w-10 h-5 rounded-full transition-colors duration-200 ease-in-out ${
+                  localProgress !== null
+                    ? localProgress === "completed"
+                      ? "bg-[#2563EB]"
+                      : "bg-gray-300 dark:bg-gray-600"
+                    : operationInfo.progress?.toLowerCase() === "completed"
+                    ? "bg-[#2563EB]"
+                    : "bg-gray-300 dark:bg-gray-600"
+                }`}
+              >
+                <div
+                  className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform duration-200 ease-in-out ${
+                    localProgress !== null
+                      ? localProgress === "completed"
+                        ? "translate-x-5"
+                        : "translate-x-0.5"
+                      : operationInfo.progress?.toLowerCase() === "completed"
+                      ? "translate-x-5"
+                      : "translate-x-0.5"
+                  } translate-y-0.5`}
+                ></div>
             </div>
-          </div>
+            </label>
         </div>
       )}
 
@@ -2149,6 +2485,15 @@ export function WsEditorForm({
         schemas={schemas}
         setSchemas={setSchemas}
         protocol="WebSocket"
+      />
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={() => setAlertModal((prev) => ({ ...prev, isOpen: false }))}
+        title={alertModal.title}
+        message={alertModal.message}
+        variant={alertModal.variant}
       />
     </div>
   );

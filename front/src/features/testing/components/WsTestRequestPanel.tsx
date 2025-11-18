@@ -9,8 +9,6 @@ interface Subscription {
   subscriptionId: string | null; // null이면 구독 해제 상태
 }
 
-
-
 export function WsTestRequestPanel() {
   const {
     wsConnectionStatus,
@@ -26,14 +24,18 @@ export function WsTestRequestPanel() {
 
   const [entryPoint, setEntryPoint] = useState("");
   const [roomId, setRoomId] = useState("room1");
-  const [connectHeaders, setConnectHeaders] = useState<Array<{ key: string; value: string }>>([]);
+  const [connectHeaders, setConnectHeaders] = useState<
+    Array<{ key: string; value: string }>
+  >([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [newTopic, setNewTopic] = useState("");
-  
+
   // 간단한 모드 상태
   const [sender, setSender] = useState("tester");
   const [content, setContent] = useState("");
-  const [messageType, setMessageType] = useState<"TALK" | "ENTER" | "LEAVE">("TALK");
+  const [messageType, setMessageType] = useState<"TALK" | "ENTER" | "LEAVE">(
+    "TALK"
+  );
   const [enableTryHeader, setEnableTryHeader] = useState(true);
 
   const stompClientRef = useRef<StompClient | null>(null);
@@ -43,14 +45,14 @@ export function WsTestRequestPanel() {
     if (!address || address === "/unknown") {
       return "OTHERS";
     }
-    
+
     // "/"로 시작하는 주소에서 첫 번째 경로 세그먼트 추출
     const parts = address.split("/").filter((part) => part.length > 0);
-    
+
     if (parts.length === 0) {
       return "OTHERS";
     }
-    
+
     // 첫 번째 경로 세그먼트를 도메인으로 사용 (대문자로 변환)
     const domain = parts[0];
     return domain.charAt(0).toUpperCase() + domain.slice(1).toLowerCase();
@@ -71,8 +73,12 @@ export function WsTestRequestPanel() {
     const currentDomain = extractDomainFromAddress(receiverAddress);
 
     // 모든 WebSocket 엔드포인트에서 같은 도메인을 가진 엔드포인트 찾기
-    const paths: Array<{ path: string; description: string; isSubscribed: boolean }> = [];
-    
+    const paths: Array<{
+      path: string;
+      description: string;
+      isSubscribed: boolean;
+    }> = [];
+
     Object.values(endpoints).forEach((groupEndpoints) => {
       groupEndpoints.forEach((endpoint) => {
         if (
@@ -81,13 +87,17 @@ export function WsTestRequestPanel() {
         ) {
           const endpointReceiverAddress = endpoint.tags?.[1] || "";
           if (endpointReceiverAddress) {
-            const endpointDomain = extractDomainFromAddress(endpointReceiverAddress);
+            const endpointDomain = extractDomainFromAddress(
+              endpointReceiverAddress
+            );
             if (endpointDomain === currentDomain) {
               // 구독 상태 확인 (subscriptionId가 null이 아니면 활성 상태)
               const subscription = subscriptions.find(
                 (sub) => sub.destination === endpointReceiverAddress
               );
-              const isSubscribed = subscription?.subscriptionId !== null && subscription?.subscriptionId !== undefined;
+              const isSubscribed =
+                subscription?.subscriptionId !== null &&
+                subscription?.subscriptionId !== undefined;
               paths.push({
                 path: endpointReceiverAddress,
                 description: endpoint.description || endpointReceiverAddress,
@@ -105,10 +115,11 @@ export function WsTestRequestPanel() {
   // 엔드포인트 선택 시 Entry Point 로드
   useEffect(() => {
     if (selectedEndpoint && selectedEndpoint.protocol === "WebSocket") {
-      // WebSocket 엔드포인트의 entrypoint는 tags[0]에 저장되어 있음
-      // convertOperationToEndpoint에서 tags: [entrypoint, receiverAddress, tag] 형태로 저장
-      const entrypoint = selectedEndpoint.tags?.[0] || "/ws";
-      const wsUrl = buildWebSocketUrl(entrypoint);
+      // WebSocket 엔드포인트의 entrypoint는 entrypoint 필드에 저장되어 있음
+      const entrypoint = selectedEndpoint.entrypoint || "/ws";
+      // protocol 정보 사용 (ws/wss/null, null이면 기본값 "ws")
+      const protocol = selectedEndpoint.wsProtocol || "ws";
+      const wsUrl = buildWebSocketUrl(entrypoint, protocol);
       setEntryPoint(wsUrl);
     } else {
       setEntryPoint("");
@@ -144,12 +155,16 @@ export function WsTestRequestPanel() {
       });
 
       const headers: Record<string, string> = {};
-      
+
       // 기본 STOMP 헤더 추가 (없는 경우)
-      if (!connectHeaders.some(h => h.key && h.key.toLowerCase() === "accept-version")) {
+      if (
+        !connectHeaders.some(
+          (h) => h.key && h.key.toLowerCase() === "accept-version"
+        )
+      ) {
         headers["accept-version"] = "1.1,1.2";
       }
-      
+
       // 사용자 정의 헤더 추가
       connectHeaders.forEach((h) => {
         if (h.key && h.value) {
@@ -164,17 +179,21 @@ export function WsTestRequestPanel() {
         headers,
         () => {
           if (!stompClientRef.current) return;
-          
+
           setWsConnectionStatus("connected");
           setWsConnectionStartTime(Date.now());
-          
+
           // CONNECTED 메시지 로그
           const message = {
             id: `msg-${Date.now()}-${Math.random()}`,
             timestamp: Date.now(),
             direction: "received" as const,
             address: "CONNECTED",
-            content: JSON.stringify({ status: "Connected to STOMP server", url: entryPoint }, null, 2),
+            content: JSON.stringify(
+              { status: "Connected to STOMP server", url: entryPoint },
+              null,
+              2
+            ),
           };
           addWsMessage(message);
 
@@ -188,62 +207,70 @@ export function WsTestRequestPanel() {
           const tryNotificationDestination = "/user/queue/ouro/try";
           try {
             if (stompClientRef.current) {
-              stompClientRef.current.subscribe(tryNotificationDestination, (frame) => {
-                // Try 알림 메시지에서 tryId 추출
-                const tryIdHeader = frame.headers["X-Ouroboros-Try-Id"] || 
-                                   frame.headers["x-ouroboros-try-id"];
-                
-                if (tryIdHeader) {
-                  setTryId(tryIdHeader);
-                }
-                
-                // Try 알림 메시지 본문 파싱 (payload, headers 포함)
-                try {
-                  const dispatchMessage = JSON.parse(frame.body);
-                  
-                  // payload가 문자열이면 파싱해서 객체로 변환 (일반 메시지처럼 깔끔하게 표시)
-                  let parsedPayload = dispatchMessage.payload;
-                  if (typeof dispatchMessage.payload === "string") {
-                    try {
-                      parsedPayload = JSON.parse(dispatchMessage.payload);
-                    } catch (e) {
-                      // 파싱 실패 시 원본 문자열 유지
-                      parsedPayload = dispatchMessage.payload;
-                    }
+              stompClientRef.current.subscribe(
+                tryNotificationDestination,
+                (frame) => {
+                  // Try 알림 메시지에서 tryId 추출
+                  const tryIdHeader =
+                    frame.headers["X-Ouroboros-Try-Id"] ||
+                    frame.headers["x-ouroboros-try-id"];
+
+                  if (tryIdHeader) {
+                    setTryId(tryIdHeader);
                   }
-                  
-                  const tryMessage = {
-                    id: `msg-${Date.now()}-${Math.random()}`,
-                    timestamp: Date.now(),
-                    direction: "received" as const,
-                    address: tryNotificationDestination,
-                    content: JSON.stringify({
+
+                  // Try 알림 메시지 본문 파싱 (payload, headers 포함)
+                  try {
+                    const dispatchMessage = JSON.parse(frame.body);
+
+                    // payload가 문자열이면 파싱해서 객체로 변환 (일반 메시지처럼 깔끔하게 표시)
+                    let parsedPayload = dispatchMessage.payload;
+                    if (typeof dispatchMessage.payload === "string") {
+                      try {
+                        parsedPayload = JSON.parse(dispatchMessage.payload);
+                      } catch (e) {
+                        // 파싱 실패 시 원본 문자열 유지
+                        parsedPayload = dispatchMessage.payload;
+                      }
+                    }
+
+                    const tryMessage = {
+                      id: `msg-${Date.now()}-${Math.random()}`,
+                      timestamp: Date.now(),
+                      direction: "received" as const,
+                      address: tryNotificationDestination,
+                      content: JSON.stringify(
+                        {
+                          tryId: tryIdHeader,
+                          payload: parsedPayload,
+                          headers: dispatchMessage.headers,
+                        },
+                        null,
+                        2
+                      ),
                       tryId: tryIdHeader,
-                      payload: parsedPayload,
-                      headers: dispatchMessage.headers,
-                    }, null, 2),
-                    tryId: tryIdHeader,
-                  };
-                  addWsMessage(tryMessage);
-                  updateWsStats((prev) => ({
-                    totalReceived: (prev?.totalReceived || 0) + 1,
-                  }));
-                } catch (parseError) {
-                  // 파싱 실패 시 원본 body 그대로 표시
-                  const tryMessage = {
-                    id: `msg-${Date.now()}-${Math.random()}`,
-                    timestamp: Date.now(),
-                    direction: "received" as const,
-                    address: tryNotificationDestination,
-                    content: frame.body,
-                    tryId: tryIdHeader,
-                  };
-                  addWsMessage(tryMessage);
-                  updateWsStats((prev) => ({
-                    totalReceived: (prev?.totalReceived || 0) + 1,
-                  }));
+                    };
+                    addWsMessage(tryMessage);
+                    updateWsStats((prev) => ({
+                      totalReceived: (prev?.totalReceived || 0) + 1,
+                    }));
+                  } catch (parseError) {
+                    // 파싱 실패 시 원본 body 그대로 표시
+                    const tryMessage = {
+                      id: `msg-${Date.now()}-${Math.random()}`,
+                      timestamp: Date.now(),
+                      direction: "received" as const,
+                      address: tryNotificationDestination,
+                      content: frame.body,
+                      tryId: tryIdHeader,
+                    };
+                    addWsMessage(tryMessage);
+                    updateWsStats((prev) => ({
+                      totalReceived: (prev?.totalReceived || 0) + 1,
+                    }));
+                  }
                 }
-              });
+              );
             }
           } catch (error) {
             // Try 알림 구독 실패
@@ -254,15 +281,21 @@ export function WsTestRequestPanel() {
           setWsConnectionStartTime(null);
           updateWsStats({ connectionDuration: null });
           const errorMessage = error.message || "알 수 없는 오류";
-          alert(`STOMP 연결 중 오류가 발생했습니다:\n\n${errorMessage}\n\nURL: ${entryPoint}`);
-          
+          alert(
+            `STOMP 연결 중 오류가 발생했습니다:\n\n${errorMessage}\n\nURL: ${entryPoint}`
+          );
+
           // 에러 메시지도 로그에 추가
           const errorMsg = {
             id: `msg-${Date.now()}-${Math.random()}`,
             timestamp: Date.now(),
             direction: "received" as const,
             address: "ERROR",
-            content: JSON.stringify({ error: errorMessage, url: entryPoint }, null, 2),
+            content: JSON.stringify(
+              { error: errorMessage, url: entryPoint },
+              null,
+              2
+            ),
           };
           addWsMessage(errorMsg);
         }
@@ -287,7 +320,7 @@ export function WsTestRequestPanel() {
 
   const handleSubscribe = (topic?: string) => {
     const destination = topic || newTopic.trim();
-    
+
     if (!destination) {
       alert("Topic을 입력해주세요.");
       return;
@@ -304,37 +337,41 @@ export function WsTestRequestPanel() {
     );
 
     try {
-      const subscriptionId = stompClientRef.current.subscribe(destination, (frame) => {
-        // 응답 메시지에서 X-Ouroboros-Try-Id 헤더 추출
-        const tryIdHeader = frame.headers["X-Ouroboros-Try-Id"] || 
-                           frame.headers["x-ouroboros-try-id"];
-        
-        // tryId가 있으면 store에 저장
-        if (tryIdHeader) {
-          setTryId(tryIdHeader);
-        }
+      const subscriptionId = stompClientRef.current.subscribe(
+        destination,
+        (frame) => {
+          // 응답 메시지에서 X-Ouroboros-Try-Id 헤더 추출
+          const tryIdHeader =
+            frame.headers["X-Ouroboros-Try-Id"] ||
+            frame.headers["x-ouroboros-try-id"];
 
-        const message = {
-          id: `msg-${Date.now()}-${Math.random()}`,
-          timestamp: Date.now(),
-          direction: "received" as const,
-          address: frame.headers.destination || destination,
-          content: frame.body,
-          tryId: tryIdHeader || undefined,
-        };
-        addWsMessage(message);
-        updateWsStats((prev) => ({
-          totalReceived: (prev?.totalReceived || 0) + 1,
-        }));
-      });
+          // tryId가 있으면 store에 저장
+          if (tryIdHeader) {
+            setTryId(tryIdHeader);
+          }
+
+          const message = {
+            id: `msg-${Date.now()}-${Math.random()}`,
+            timestamp: Date.now(),
+            direction: "received" as const,
+            address: frame.headers.destination || destination,
+            content: frame.body,
+            tryId: tryIdHeader || undefined,
+          };
+          addWsMessage(message);
+          updateWsStats((prev) => ({
+            totalReceived: (prev?.totalReceived || 0) + 1,
+          }));
+        }
+      );
 
       if (existingSubscription) {
         // 기존 구독 해제된 항목을 다시 활성화
-        setSubscriptions(subscriptions.map((s) =>
-          s.id === existingSubscription.id
-            ? { ...s, subscriptionId }
-            : s
-        ));
+        setSubscriptions(
+          subscriptions.map((s) =>
+            s.id === existingSubscription.id ? { ...s, subscriptionId } : s
+          )
+        );
       } else {
         // 새로운 구독 추가
         const subscription: Subscription = {
@@ -355,11 +392,15 @@ export function WsTestRequestPanel() {
         timestamp: Date.now(),
         direction: "sent" as const,
         address: destination,
-        content: JSON.stringify({ action: "SUBSCRIBE", destination: destination }, null, 2),
+        content: JSON.stringify(
+          { action: "SUBSCRIBE", destination: destination },
+          null,
+          2
+        ),
       };
       addWsMessage(message);
-      } catch (error) {
-        alert("구독에 실패했습니다.");
+    } catch (error) {
+      alert("구독에 실패했습니다.");
     }
   };
 
@@ -376,11 +417,11 @@ export function WsTestRequestPanel() {
     try {
       stompClientRef.current.unsubscribe(subscription.subscriptionId);
       // 구독 해제하되 목록에서 제거하지 않고 subscriptionId를 null로 설정
-      setSubscriptions(subscriptions.map((s) => 
-        s.id === subscription.id 
-          ? { ...s, subscriptionId: null }
-          : s
-      ));
+      setSubscriptions(
+        subscriptions.map((s) =>
+          s.id === subscription.id ? { ...s, subscriptionId: null } : s
+        )
+      );
 
       // 구독 해제 메시지 로그
       const message = {
@@ -388,7 +429,11 @@ export function WsTestRequestPanel() {
         timestamp: Date.now(),
         direction: "sent" as const,
         address: subscription.destination,
-        content: JSON.stringify({ action: "UNSUBSCRIBE", destination: subscription.destination }, null, 2),
+        content: JSON.stringify(
+          { action: "UNSUBSCRIBE", destination: subscription.destination },
+          null,
+          2
+        ),
       };
       addWsMessage(message);
     } catch (error) {
@@ -461,7 +506,8 @@ export function WsTestRequestPanel() {
       // Content 초기화
       setContent("");
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "알 수 없는 오류";
+      const errorMessage =
+        error instanceof Error ? error.message : "알 수 없는 오류";
       alert(`메시지 전송에 실패했습니다:\n\n${errorMessage}`);
     }
   };
@@ -529,8 +575,10 @@ export function WsTestRequestPanel() {
       <div className="p-4">
         {/* 연결 설정 Section */}
         <div className="mb-6 space-y-4">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">연결 설정</h3>
-          
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
+            연결 설정
+          </h3>
+
           <div>
             <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
               WS Endpoint
@@ -563,7 +611,16 @@ export function WsTestRequestPanel() {
             {wsConnectionStatus === "disconnected" ? (
               <button
                 onClick={handleConnect}
-                className="flex-1 px-4 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-all text-sm font-semibold active:translate-y-[1px] focus:outline-none focus-visible:outline-none md:flex-none md:w-auto w-full"
+                disabled={
+                  !selectedEndpoint ||
+                  selectedEndpoint.progress?.toLowerCase() !== "completed"
+                }
+                className={`flex-1 px-4 py-2 rounded-md transition-all text-sm font-semibold active:translate-y-[1px] focus:outline-none focus-visible:outline-none md:flex-none md:w-auto w-full ${
+                  !selectedEndpoint ||
+                  selectedEndpoint.progress?.toLowerCase() !== "completed"
+                    ? "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                    : "bg-[#2563EB] hover:bg-[#1E40AF] text-white"
+                }`}
               >
                 Connect
               </button>
@@ -577,7 +634,6 @@ export function WsTestRequestPanel() {
             )}
           </div>
         </div>
-
 
         {/* STOMP CONNECT Headers - Collapsible */}
         {wsConnectionStatus === "disconnected" && (
@@ -623,8 +679,18 @@ export function WsTestRequestPanel() {
                       onClick={() => removeConnectHeader(index)}
                       className="px-3 py-2 text-red-500 hover:text-red-700"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
                       </svg>
                     </button>
                   </div>
@@ -639,8 +705,10 @@ export function WsTestRequestPanel() {
       {wsConnectionStatus === "connected" && (
         <div className="border-t border-gray-200 dark:border-[#2D333B] p-4">
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">메시지 전송</h3>
-            
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
+              메시지 전송
+            </h3>
+
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
                 Sender
@@ -678,7 +746,9 @@ export function WsTestRequestPanel() {
               </label>
               <select
                 value={messageType}
-                onChange={(e) => setMessageType(e.target.value as "TALK" | "ENTER" | "LEAVE")}
+                onChange={(e) =>
+                  setMessageType(e.target.value as "TALK" | "ENTER" | "LEAVE")
+                }
                 className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm"
               >
                 <option value="TALK">TALK</option>
@@ -695,10 +765,15 @@ export function WsTestRequestPanel() {
                 onChange={(e) => setEnableTryHeader(e.target.checked)}
                 className="w-4 h-4 text-[#2563EB] bg-gray-100 border-gray-300 rounded focus:ring-[#2563EB]"
               />
-              <label htmlFor="enableTryHeader" className="text-xs font-medium text-gray-700 dark:text-[#E6EDF3]">
+              <label
+                htmlFor="enableTryHeader"
+                className="text-xs font-medium text-gray-700 dark:text-[#E6EDF3]"
+              >
                 X-Ouroboros-Try
               </label>
-              <span className="text-xs text-gray-500 dark:text-[#8B949E]">추적 헤더 추가</span>
+              <span className="text-xs text-gray-500 dark:text-[#8B949E]">
+                추적 헤더 추가
+              </span>
             </div>
 
             <button
@@ -765,10 +840,22 @@ export function WsTestRequestPanel() {
       {wsConnectionStatus === "connected" && subscriptions.length > 0 && (
         <div className="border-t border-gray-200 dark:border-[#2D333B] p-4">
           <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-3 flex items-center gap-2">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+              />
             </svg>
-            Subscriptions ({subscriptions.filter(s => s.subscriptionId !== null).length} active / {subscriptions.length} total)
+            Subscriptions (
+            {subscriptions.filter((s) => s.subscriptionId !== null).length}{" "}
+            active / {subscriptions.length} total)
           </label>
           <div className="space-y-2">
             {subscriptions.map((subscription) => {
@@ -783,11 +870,13 @@ export function WsTestRequestPanel() {
                   }`}
                 >
                   <div className="flex-1 min-w-0">
-                    <span className={`text-sm font-mono ${
-                      isActive
-                        ? "text-gray-900 dark:text-[#E6EDF3]"
-                        : "text-gray-500 dark:text-[#8B949E]"
-                    }`}>
+                    <span
+                      className={`text-sm font-mono ${
+                        isActive
+                          ? "text-gray-900 dark:text-[#E6EDF3]"
+                          : "text-gray-500 dark:text-[#8B949E]"
+                      }`}
+                    >
                       {subscription.destination}
                     </span>
                   </div>
