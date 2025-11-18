@@ -29,6 +29,7 @@ interface SchemaCardProps {
   isReadOnly?: boolean;
   protocol?: "REST" | "WebSocket";
   isDocumentView?: boolean;
+  onSchemaChange?: () => void;
 }
 
 // Schema 이름에서 마지막 부분만 추출 (예: com.example.dto.UserDTO -> UserDTO)
@@ -41,6 +42,7 @@ export function SchemaCard({
   isReadOnly = false,
   protocol = "REST",
   isDocumentView = false,
+  onSchemaChange,
 }: SchemaCardProps) {
   const [schemas, setSchemas] = useState<SchemaResponse[]>([]);
   const [isSchemaModalOpen, setIsSchemaModalOpen] = useState(false);
@@ -192,6 +194,11 @@ export function SchemaCard({
             message: `Schema "${schemaName}" has been deleted successfully.`,
             variant: "success",
           });
+
+          // 부모 컴포넌트에 스키마 변경 알림
+          if (onSchemaChange) {
+            onSchemaChange();
+          }
         } catch (err) {
           console.error("스키마 삭제 실패:", err);
           setAlertModal({
@@ -304,6 +311,11 @@ export function SchemaCard({
 
       // 스키마 목록 다시 로드
       await loadSchemas();
+
+      // 부모 컴포넌트에 스키마 변경 알림
+      if (onSchemaChange) {
+        onSchemaChange();
+      }
 
       // 선택된 스키마 업데이트 (수정 모드인 경우 originalSchemaName 유지)
       if (originalSchemaName) {

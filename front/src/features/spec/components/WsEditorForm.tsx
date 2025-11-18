@@ -1713,7 +1713,11 @@ export function WsEditorForm({
           )}
 
           {wsTab === "schema" && (
-            <SchemaCard isReadOnly={isReadOnly} protocol="WebSocket" />
+            <SchemaCard
+              isReadOnly={isReadOnly}
+              protocol="WebSocket"
+              onSchemaChange={loadSchemas}
+            />
           )}
 
           {wsTab === "message" && (
@@ -1773,7 +1777,7 @@ export function WsEditorForm({
                         : "bg-gray-100 dark:bg-[#21262D] text-gray-700 dark:text-[#C9D1D9] hover:bg-gray-200 dark:hover:bg-[#30363D]"
                     } ${isReadOnly ? "opacity-60 cursor-not-allowed" : ""}`}
                   >
-                    Name
+                    None
                   </button>
                   <button
                     onClick={() => setMessageType("header")}
