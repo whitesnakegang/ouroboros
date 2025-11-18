@@ -112,7 +112,7 @@ export function ApiEditorLayout() {
     return "receiver";
   };
   const [wsSpecTab, setWsSpecTab] = useState<"receiver" | "reply">("receiver");
-  
+
   // selectedEndpoint가 변경될 때 기본 탭 설정
   useEffect(() => {
     if (selectedEndpoint && selectedEndpoint.protocol === "WebSocket") {
@@ -170,6 +170,23 @@ export function ApiEditorLayout() {
   // Export 타입 선택 모달 상태
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const exportDropdownRef = useRef<HTMLDivElement>(null);
+
+  // selectedEndpoint의 최신 값을 추적하기 위한 ref (stale closure 방지)
+  const selectedEndpointRef = useRef(selectedEndpoint);
+  const isMountedRef = useRef(true);
+
+  // selectedEndpoint 변경 시 ref 업데이트
+  useEffect(() => {
+    selectedEndpointRef.current = selectedEndpoint;
+  }, [selectedEndpoint]);
+
+  // 언마운트 체크를 위한 cleanup
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Export 드롭다운 외부 클릭 시 닫기
   useEffect(() => {
@@ -880,11 +897,11 @@ export function ApiEditorLayout() {
       const entrypoint = operationData.operation.entrypoint || "/ws";
       setWsEntryPoint(entrypoint);
       setWsEntryPointError(""); // 에러 상태 초기화
-      
+
       // Protocol 설정 (백엔드에서 제공하는 protocol 값 사용)
       const protocol = operationData.protocol || "ws"; // null이면 기본값 "ws"
       setWsProtocol(protocol as "ws" | "wss");
-      
+
       // selectedEndpoint에 entrypoint 업데이트
       if (selectedEndpoint) {
         setSelectedEndpoint({
@@ -2174,8 +2191,9 @@ export function ApiEditorLayout() {
 
   const handleExportMD = async () => {
     try {
-      const { convertYamlToMarkdown, convertWsYamlToMarkdown } =
-        await import("../utils/markdownExporter");
+      const { convertYamlToMarkdown, convertWsYamlToMarkdown } = await import(
+        "../utils/markdownExporter"
+      );
       if (protocol === "WebSocket") {
         const wsYaml = await exportWebSocketYaml();
         const wsMd = convertWsYamlToMarkdown(wsYaml);
@@ -2211,9 +2229,7 @@ export function ApiEditorLayout() {
           : await exportYaml();
       downloadYaml(
         yaml,
-        protocol === "WebSocket"
-          ? "ourowebsocket.yml"
-          : "ourorest.yml"
+        protocol === "WebSocket" ? "ourowebsocket.yml" : "ourorest.yml"
       );
       setAlertModal({
         isOpen: true,
@@ -2637,16 +2653,19 @@ export function ApiEditorLayout() {
       <div className="border-b border-gray-200 dark:border-[#2D333B] px-6 py-4 bg-white dark:bg-[#0D1117]">
         <div className="flex items-center justify-between mb-4">
           {/* Left: Tabs */}
-          <div className="flex gap-1 border-b border-gray-200 dark:border-[#2D333B]">
+          <div className="flex gap-0 border-b border-gray-200 dark:border-[#2D333B]">
             <button
               onClick={() => setActiveTab("form")}
-              className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 focus:outline-none focus-visible:outline-none ${
+              className={`relative px-5 py-2.5 text-sm font-medium transition-colors duration-200 focus:outline-none focus-visible:outline-none border-0 outline-none ring-0 hover:ring-0 active:ring-0 ${
                 activeTab === "form"
-                  ? "text-gray-900 dark:text-[#E6EDF3] border-[#2563EB]"
-                  : "text-gray-500 dark:text-[#8B949E] border-transparent hover:text-gray-900 dark:hover:text-[#E6EDF3]"
+                  ? "text-[#2563EB] dark:text-[#58A6FF]"
+                  : "text-gray-500 dark:text-[#8B949E] hover:text-gray-900 dark:hover:text-[#E6EDF3]"
               }`}
             >
-              API 생성 폼
+              <span className="relative z-10">API 생성 폼</span>
+              {activeTab === "form" && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#2563EB] dark:bg-[#58A6FF] rounded-t-full" />
+              )}
             </button>
             <button
               onClick={() => {
@@ -2657,16 +2676,19 @@ export function ApiEditorLayout() {
                 setActiveTab("test");
               }}
               disabled={!selectedEndpoint}
-              className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 focus:outline-none focus-visible:outline-none ${
+              className={`relative px-5 py-2.5 text-sm font-medium transition-colors duration-200 focus:outline-none focus-visible:outline-none border-0 outline-none ring-0 hover:ring-0 active:ring-0 ${
                 activeTab === "test"
-                  ? "text-gray-900 dark:text-[#E6EDF3] border-[#2563EB]"
-                  : "text-gray-500 dark:text-[#8B949E] border-transparent hover:text-gray-900 dark:hover:text-[#E6EDF3]"
+                  ? "text-[#2563EB] dark:text-[#58A6FF]"
+                  : "text-gray-500 dark:text-[#8B949E] hover:text-gray-900 dark:hover:text-[#E6EDF3]"
               } ${!selectedEndpoint ? "opacity-50 cursor-not-allowed" : ""}`}
               title={
                 !selectedEndpoint ? "먼저 API를 생성하거나 선택해주세요" : ""
               }
             >
-              테스트 폼
+              <span className="relative z-10">테스트 폼</span>
+              {activeTab === "test" && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#2563EB] dark:bg-[#58A6FF] rounded-t-full" />
+              )}
             </button>
           </div>
 
@@ -2677,14 +2699,14 @@ export function ApiEditorLayout() {
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={handleImportYAML}
-                  className="px-4 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-lg bg-transparent transition-colors text-sm font-medium"
+                  className="px-4 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-lg bg-transparent transition-colors text-sm font-medium focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0"
                 >
                   Import
                 </button>
                 <div className="relative" ref={exportDropdownRef}>
                   <button
                     onClick={() => setIsExportModalOpen(!isExportModalOpen)}
-                    className="px-4 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-lg bg-transparent transition-colors text-sm font-medium"
+                    className="px-4 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-lg bg-transparent transition-colors text-sm font-medium focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0"
                   >
                     Export
                   </button>
@@ -2692,13 +2714,13 @@ export function ApiEditorLayout() {
                     <div className="absolute top-full right-0 mt-1 w-40 bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#30363D] rounded-lg shadow-lg z-50 overflow-hidden">
                       <button
                         onClick={handleExportMD}
-                        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#21262D] transition-colors"
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#21262D] transition-colors focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0"
                       >
                         Markdown (MD)
                       </button>
                       <button
                         onClick={handleExportYAML}
-                        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#21262D] transition-colors border-t border-gray-200 dark:border-[#30363D]"
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#21262D] transition-colors border-t border-gray-200 dark:border-[#30363D] focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0"
                       >
                         YAML
                       </button>
@@ -2715,7 +2737,7 @@ export function ApiEditorLayout() {
                 {!isAuthorizationInputOpen ? (
                   <button
                     onClick={() => setIsAuthorizationInputOpen(true)}
-                    className={`px-3 py-2 rounded-md border transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus-visible:outline-none active:translate-y-[1px] ${
+                    className={`px-3 py-2 rounded-md border transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus-visible:outline-none active:translate-y-[1px] ring-0 hover:ring-0 active:ring-0 ${
                       authorization && authorization.trim()
                         ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300"
                         : "bg-white dark:bg-[#0D1117] border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22]"
@@ -2964,21 +2986,40 @@ export function ApiEditorLayout() {
                     onProgressUpdate={
                       selectedEndpoint
                         ? async (progress: "none" | "completed") => {
+                            // 호출 시점의 최신 endpoint ID 캡처
+                            const currentEndpoint = selectedEndpointRef.current;
+                            if (!currentEndpoint || !isMountedRef.current) {
+                              return;
+                            }
+                            const endpointId = currentEndpoint.id;
+
                             try {
-                              await updateWebSocketOperation(
-                                selectedEndpoint.id,
-                                { progress }
-                              );
-                              // Operation 데이터 다시 로드하여 최신 상태 반영
-                              await loadWebSocketOperationData(
-                                selectedEndpoint.id
-                              );
-                              // 사이드바 목록도 다시 로드하여 progress 상태 업데이트
+                              // 언마운트 체크 후 비동기 작업 수행
+                              if (!isMountedRef.current) return;
+                              await updateWebSocketOperation(endpointId, {
+                                progress,
+                              });
+
+                              // 언마운트 체크 후 Operation 데이터 다시 로드
+                              if (!isMountedRef.current) return;
+                              await loadWebSocketOperationData(endpointId);
+
+                              // 언마운트 체크 후 사이드바 목록도 다시 로드
+                              if (!isMountedRef.current) return;
                               await loadEndpoints();
-                              // selectedEndpoint 업데이트
-                              if (selectedEndpoint) {
+
+                              // 언마운트 체크 후 selectedEndpoint 업데이트
+                              if (!isMountedRef.current) return;
+                              // ref에서 최신 값을 가져와서 확인
+                              const latestEndpoint =
+                                selectedEndpointRef.current;
+                              // 현재 선택된 endpoint가 우리가 업데이트하려는 endpoint인지 확인
+                              if (
+                                latestEndpoint &&
+                                latestEndpoint.id === endpointId
+                              ) {
                                 setSelectedEndpoint({
-                                  ...selectedEndpoint,
+                                  ...latestEndpoint,
                                   progress,
                                 });
                               }
@@ -3062,7 +3103,7 @@ export function ApiEditorLayout() {
                     {selectedEndpoint && !isEditMode && (
                       <button
                         onClick={() => setIsCodeSnippetOpen(true)}
-                        className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2"
+                        className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0"
                         title="Code Snippet 보기"
                       >
                         <svg
@@ -3370,7 +3411,7 @@ export function ApiEditorLayout() {
                     <div className="flex gap-0.5 -mb-px">
                       <button
                         onClick={() => setSpecTab("request")}
-                        className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ${
+                        className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0 ${
                           specTab === "request"
                             ? "text-gray-900 dark:text-[#E6EDF3] bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] border-b-white dark:border-b-[#161B22] relative z-10"
                             : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
@@ -3380,7 +3421,7 @@ export function ApiEditorLayout() {
                       </button>
                       <button
                         onClick={() => setSpecTab("response")}
-                        className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ${
+                        className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0 ${
                           specTab === "response"
                             ? "text-gray-900 dark:text-[#E6EDF3] bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] border-b-white dark:border-b-[#161B22] relative z-10"
                             : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
@@ -3391,7 +3432,7 @@ export function ApiEditorLayout() {
                       {!isCompletedView && (
                         <button
                           onClick={() => setSpecTab("schema")}
-                          className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ${
+                          className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0 ${
                             specTab === "schema"
                               ? "text-gray-900 dark:text-[#E6EDF3] bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] border-b-white dark:border-b-[#161B22] relative z-10"
                               : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
@@ -3461,7 +3502,7 @@ export function ApiEditorLayout() {
               <>
                 <button
                   onClick={handleCancelEdit}
-                  className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2"
+                  className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0"
                 >
                   취소
                 </button>
@@ -3472,7 +3513,7 @@ export function ApiEditorLayout() {
                     (protocol === "REST" && !hasRestChanges()) ||
                     (protocol === "WebSocket" && !hasWebSocketChanges())
                   }
-                  className={`px-3 py-2 rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none text-sm font-medium flex items-center gap-2 ${
+                  className={`px-3 py-2 rounded-md transition-colors active:translate-y-[1px] focus:outline-none focus-visible:outline-none text-sm font-medium flex items-center gap-2 ring-0 hover:ring-0 active:ring-0 ${
                     !isFormValid() ||
                     (protocol === "REST" && !hasRestChanges()) ||
                     (protocol === "WebSocket" && !hasWebSocketChanges())
@@ -3488,7 +3529,7 @@ export function ApiEditorLayout() {
                 <button
                   onClick={handleEdit}
                   disabled={isReadOnly}
-                  className={`px-3 py-2 rounded-md transition-colors text-sm font-medium flex items-center gap-2 ${
+                  className={`px-3 py-2 rounded-md transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0 ${
                     isReadOnly
                       ? "bg-gray-200 dark:bg-[#161B22] text-gray-400 dark:text-[#8B949E] cursor-not-allowed"
                       : "bg-[#2563EB] hover:bg-[#1E40AF] text-white"
@@ -3500,7 +3541,7 @@ export function ApiEditorLayout() {
                 <button
                   onClick={handleDelete}
                   disabled={isReadOnly}
-                  className={`px-3 py-2 rounded-md transition-colors text-sm font-medium flex items-center gap-2 ${
+                  className={`px-3 py-2 rounded-md transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0 ${
                     isReadOnly
                       ? "bg-gray-200 dark:bg-[#161B22] text-gray-400 dark:text-[#8B949E] cursor-not-allowed"
                       : "bg-red-500 hover:bg-red-600 text-white"
@@ -3520,14 +3561,14 @@ export function ApiEditorLayout() {
           <div className="flex items-center justify-end gap-3">
             <button
               onClick={handleReset}
-              className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2"
+              className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0"
             >
               초기화
             </button>
             <button
               onClick={handleSave}
               disabled={!isFormValid()}
-              className={`px-3 py-2 rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none text-sm font-medium flex items-center gap-2 ${
+              className={`px-3 py-2 rounded-md transition-colors active:translate-y-[1px] focus:outline-none focus-visible:outline-none text-sm font-medium flex items-center gap-2 ring-0 hover:ring-0 active:ring-0 ${
                 !isFormValid()
                   ? "bg-gray-300 dark:bg-[#21262D] text-gray-500 dark:text-[#8B949E] cursor-not-allowed"
                   : "bg-[#2563EB] hover:bg-[#1E40AF] text-white"
@@ -3584,7 +3625,6 @@ export function ApiEditorLayout() {
         message={alertModal.message}
         variant={alertModal.variant}
       />
-
     </div>
   );
 }

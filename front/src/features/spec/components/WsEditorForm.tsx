@@ -1015,67 +1015,72 @@ export function WsEditorForm({
                           )}
 
                         {/* Payload */}
-                        {messageInfo?.payload && (
-                          <div>
-                            <span className="text-xs font-semibold text-gray-600 dark:text-[#8B949E]">
-                              Payload:
-                            </span>
-                            <div className="mt-2">
-                              {messageInfo.payload.schema?.$ref ? (
-                                <MessagePayloadSchemaViewer
-                                  schemaRef={messageInfo.payload.schema.$ref}
-                                />
-                              ) : messageInfo.payload.schema?.ref ? (
-                                <MessagePayloadSchemaViewer
-                                  schemaRef={messageInfo.payload.schema.ref}
-                                />
-                              ) : messageInfo.payload.schema?.type ? (
-                                <div>
-                                  <span className="text-sm text-gray-900 dark:text-[#E6EDF3]">
-                                    type: {messageInfo.payload.schema.type}
+                        {messageInfo?.payload && (() => {
+                          // payload가 schema로 감싸져 있으면 사용하고, 아니면 payload 자체를 schema로 사용
+                          const schema = messageInfo.payload.schema ?? messageInfo.payload;
+                          
+                          return (
+                            <div>
+                              <span className="text-xs font-semibold text-gray-600 dark:text-[#8B949E]">
+                                Payload:
+                              </span>
+                              <div className="mt-2">
+                                {schema?.$ref ? (
+                                  <MessagePayloadSchemaViewer
+                                    schemaRef={schema.$ref}
+                                  />
+                                ) : schema?.ref ? (
+                                  <MessagePayloadSchemaViewer
+                                    schemaRef={schema.ref}
+                                  />
+                                ) : schema?.type ? (
+                                  <div>
+                                    <span className="text-sm text-gray-900 dark:text-[#E6EDF3]">
+                                      type: {schema.type}
+                                    </span>
+                                    {schema.properties && (
+                                      <div className="mt-2">
+                                        <SchemaViewer
+                                          schemaType={{
+                                            kind: "object",
+                                            properties: Object.entries(
+                                              schema.properties
+                                            ).map(
+                                              ([key, prop]: [string, unknown]) => {
+                                                const propObj = prop as {
+                                                  description?: string;
+                                                  type?: string;
+                                                  [key: string]: unknown;
+                                                };
+                                                return {
+                                                  key,
+                                                  description: propObj.description,
+                                                  required:
+                                                    schema.required?.includes(
+                                                      key
+                                                    ) || false,
+                                                  schemaType:
+                                                    parseOpenAPISchemaToSchemaType(
+                                                      propObj
+                                                    ),
+                                                };
+                                              }
+                                            ),
+                                          }}
+                                          contentType="application/json"
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-sm text-gray-500 dark:text-[#8B949E] italic">
+                                    (schema 정보 없음)
                                   </span>
-                                  {messageInfo.payload.schema.properties && (
-                                    <div className="mt-2">
-                                      <SchemaViewer
-                                        schemaType={{
-                                          kind: "object",
-                                          properties: Object.entries(
-                                            messageInfo.payload.schema.properties
-                                          ).map(
-                                            ([key, prop]: [string, unknown]) => {
-                                              const propObj = prop as {
-                                                description?: string;
-                                                type?: string;
-                                                [key: string]: unknown;
-                                              };
-                                              return {
-                                                key,
-                                                description: propObj.description,
-                                                required:
-                                                  messageInfo.payload.schema.required?.includes(
-                                                    key
-                                                  ) || false,
-                                                schemaType:
-                                                  parseOpenAPISchemaToSchemaType(
-                                                    propObj
-                                                  ),
-                                              };
-                                            }
-                                          ),
-                                        }}
-                                        contentType="application/json"
-                                      />
-                                    </div>
-                                  )}
-                                </div>
-                              ) : (
-                                <span className="text-sm text-gray-500 dark:text-[#8B949E] italic">
-                                  (schema 정보 없음)
-                                </span>
-                              )}
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        )}
+                          );
+                        })()}
 
                         {/* 메시지 정보가 없는 경우 */}
                         {!messageInfo && (

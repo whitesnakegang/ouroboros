@@ -176,12 +176,17 @@ export function SchemaCard({
           } else {
             await deleteSchema(schemaName);
           }
-          setSchemas(schemas.filter((s) => s.schemaName !== schemaName));
+          // 함수형 업데이터를 사용하여 최신 schemas 상태 참조
+          setSchemas((prev) => prev.filter((s) => s.schemaName !== schemaName));
 
-          // 삭제된 스키마가 선택된 스키마인 경우 초기화
-          if (selectedSchemaName === schemaName) {
-            handleNewSchema();
-          }
+          // 함수형 업데이터를 사용하여 최신 selectedSchemaName 상태 참조
+          setSelectedSchemaName((prev) => {
+            if (prev === schemaName) {
+              handleNewSchema();
+              return null;
+            }
+            return prev;
+          });
 
           setAlertModal({
             isOpen: true,
