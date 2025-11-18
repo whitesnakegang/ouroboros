@@ -87,7 +87,7 @@ export function TestRequestPanel() {
               detectedContentType
             );
             if (parsed) {
-              // schemaRef가 있으면 스키마를 조회해서 fields 채우기 (모든 contentType에 대해 동일하게 처리)
+              // schemaRef가 있으면 스키마를 조회해서 fields 채우기 (form-data 등)
               if (
                 parsed.schemaRef &&
                 (!parsed.fields || parsed.fields.length === 0)
@@ -120,6 +120,53 @@ export function TestRequestPanel() {
                 } catch (error) {
                   // 스키마 조회 실패 시 무시
                 }
+              }
+
+              // rootSchemaType이 ref인 경우 스키마를 조회해서 fields 채우기 (json/xml 타입)
+              if (
+                parsed.rootSchemaType &&
+                isRefSchema(parsed.rootSchemaType) &&
+                (!parsed.fields || parsed.fields.length === 0)
+              ) {
+                try {
+                  const schemaResponse = await getSchema(parsed.rootSchemaType.schemaName);
+                  const schemaData = schemaResponse.data;
+
+                  if (schemaData.properties) {
+                    const fields = Object.entries(schemaData.properties).map(
+                      ([key, propSchema]: [string, any]) => {
+                        return parseOpenAPISchemaToSchemaField(key, propSchema);
+                      }
+                    );
+
+                    // required 필드 설정
+                    if (
+                      schemaData.required &&
+                      Array.isArray(schemaData.required)
+                    ) {
+                      fields.forEach((field) => {
+                        if (schemaData.required!.includes(field.key)) {
+                          field.required = true;
+                        }
+                      });
+                    }
+
+                    parsed.fields = fields;
+                  }
+                } catch (error) {
+                  // 스키마 조회 실패 시 무시
+                }
+              }
+
+              // rootSchemaType이 object이고 properties가 있지만 fields가 없는 경우 (하위 호환성)
+              if (
+                parsed.rootSchemaType &&
+                parsed.rootSchemaType.kind === "object" &&
+                parsed.rootSchemaType.properties &&
+                parsed.rootSchemaType.properties.length > 0 &&
+                (!parsed.fields || parsed.fields.length === 0)
+              ) {
+                parsed.fields = parsed.rootSchemaType.properties;
               }
 
               // rootSchemaType이 array이고 items가 ref인 경우 스키마 조회
@@ -381,40 +428,33 @@ export function TestRequestPanel() {
       )}
 
       {/* Request Body */}
-      {request.method !== "GET" && (
+      {requestBody && requestBody.type !== "none" && (
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="block text-xs font-medium text-[#8B949E]">
               Request body
-              {requestBody?.required && (
+              {requestBody.required && (
                 <span className="text-red-500 ml-1">required</span>
               )}
             </label>
-            {requestBody && requestBody.type !== "none" && (
-              <span className="text-xs text-[#8B949E]">
-                {requestBody.type === "json" && "application/json"}
-                {requestBody.type === "form-data" && "multipart/form-data"}
-                {requestBody.type === "x-www-form-urlencoded" &&
-                  "application/x-www-form-urlencoded"}
-                {requestBody.type === "xml" &&
-                  (contentType.includes("text/xml")
-                    ? "text/xml"
-                    : "application/xml")}
-              </span>
-            )}
-            {(!requestBody || requestBody.type === "none") && (
-              <span className="text-xs text-[#8B949E]">application/json</span>
-            )}
+            <span className="text-xs text-[#8B949E]">
+              {requestBody.type === "json" && "application/json"}
+              {requestBody.type === "form-data" && "multipart/form-data"}
+              {requestBody.type === "x-www-form-urlencoded" &&
+                "application/x-www-form-urlencoded"}
+              {requestBody.type === "xml" &&
+                (contentType.includes("text/xml")
+                  ? "text/xml"
+                  : "application/xml")}
+            </span>
           </div>
-          {requestBody?.description && (
+          {requestBody.description && (
             <p className="text-xs text-[#8B949E] mb-2">
               {requestBody.description}
             </p>
           )}
           <RequestBodyForm
-            requestBody={
-              requestBody || { type: "json", required: false, fields: [] }
-            }
+            requestBody={requestBody}
             contentType={contentType}
             value={request.body}
             onChange={handleBodyChange}

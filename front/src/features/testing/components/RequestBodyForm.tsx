@@ -69,7 +69,7 @@ function getDefaultValue(schemaType: SchemaType): any {
   return null;
 }
 
-// JSON Body Form (기존 textarea)
+// JSON Body Form
 function JsonBodyForm({
   requestBody,
   value,
@@ -80,6 +80,25 @@ function JsonBodyForm({
   onChange: (value: string) => void;
 }) {
   const initializedRef = useRef<string>("");
+  const [jsonData, setJsonData] = useState<Record<string, any>>({});
+  const prevValueRef = useRef<string>("");
+
+  // value prop이 변경될 때만 jsonData 업데이트 (외부에서 변경된 경우)
+  useEffect(() => {
+    if (value !== prevValueRef.current) {
+      prevValueRef.current = value;
+      if (value) {
+        try {
+          const parsed = JSON.parse(value);
+          setJsonData(typeof parsed === "object" && parsed !== null ? parsed : {});
+        } catch {
+          setJsonData({});
+        }
+      } else {
+        setJsonData({});
+      }
+    }
+  }, [value]);
 
   // rootSchemaType을 기반으로 기본값 생성
   const generateDefaultFromRootSchema = (rootSchemaType: SchemaType): any => {
@@ -97,7 +116,23 @@ function JsonBodyForm({
 
   // 초기값 설정
   useEffect(() => {
-    // rootSchemaType이 있으면 우선 사용
+    // fields가 있으면 fields를 우선 사용 (스키마 참조로부터 로드된 fields 포함)
+    if (requestBody?.fields && requestBody.fields.length > 0) {
+      const fieldsKey = JSON.stringify(requestBody.fields.map((f) => f.key));
+
+      if (fieldsKey !== initializedRef.current) {
+        initializedRef.current = fieldsKey;
+
+        // fields가 있으면 기본 JSON 생성
+        if (!value || value.trim() === "" || value === "{}") {
+          const defaultJson = generateDefaultJson(requestBody.fields);
+          onChange(defaultJson);
+        }
+      }
+      return;
+    }
+
+    // rootSchemaType이 있고 fields가 없는 경우
     if (requestBody?.rootSchemaType) {
       const rootKey = JSON.stringify(requestBody.rootSchemaType);
 
@@ -119,7 +154,7 @@ function JsonBodyForm({
             onChange(defaultJson);
           }
         } else {
-          // Ref 타입이면 빈 값
+          // Ref 타입이고 fields도 없으면 빈 값
           if (value && value.trim() !== "") {
             onChange("");
           }
@@ -128,31 +163,17 @@ function JsonBodyForm({
       return;
     }
 
-    // 기존 방식: fields 사용
-    const fieldsKey = requestBody?.fields
-      ? JSON.stringify(requestBody.fields.map((f) => f.key))
-      : "";
-
-    // requestBody가 변경되었거나 fields가 없어졌으면 초기화
-    if (fieldsKey !== initializedRef.current) {
-      initializedRef.current = fieldsKey;
-
-      if (requestBody?.fields && requestBody.fields.length > 0) {
-        // fields가 있으면 기본 JSON 생성
-        if (!value || value.trim() === "" || value === "{}") {
-          const defaultJson = generateDefaultJson(requestBody.fields);
-          onChange(defaultJson);
-        }
-      } else {
-        // fields가 없으면 빈 값으로 설정 (이전 API의 값 제거)
-        if (value && value.trim() !== "") {
-          onChange("");
-        }
+    // fields도 없고 rootSchemaType도 없으면 빈 값으로 설정 (이전 API의 값 제거)
+    if (initializedRef.current !== "") {
+      initializedRef.current = "";
+      if (value && value.trim() !== "") {
+        onChange("");
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestBody?.rootSchemaType, requestBody?.fields]);
 
+  // JSON 타입은 항상 JSON 에디터로 표시 (form-data처럼 필드별로 표시하지 않음)
   return (
     <div>
       <JsonEditor

@@ -125,12 +125,14 @@ export function ApiEditorLayout() {
   const [isNewFormMode, setIsNewFormMode] = useState(false);
   // Progress 토글 로컬 상태 (즉시 UI 반영용)
   const [localProgress, setLocalProgress] = useState<string | null>(null);
+  // Progress 업데이트 중인지 추적하는 플래그
+  const isUpdatingProgressRef = useRef(false);
 
-  // selectedEndpoint.progress 변경 시 로컬 상태 동기화
+  // selectedEndpoint.progress 변경 시 로컬 상태 동기화 (업데이트 중이 아닐 때만)
   useEffect(() => {
-    if (selectedEndpoint?.progress) {
+    if (!isUpdatingProgressRef.current && selectedEndpoint?.progress) {
       setLocalProgress(selectedEndpoint.progress.toLowerCase());
-    } else {
+    } else if (!isUpdatingProgressRef.current) {
       setLocalProgress(null);
     }
   }, [selectedEndpoint]);
@@ -2732,29 +2734,37 @@ export function ApiEditorLayout() {
                             : "none";
                           // 즉시 로컬 상태 업데이트
                           setLocalProgress(newProgress);
+                          isUpdatingProgressRef.current = true;
+
                           try {
                             const currentEndpoint = selectedEndpointRef.current;
                             if (!currentEndpoint || !isMountedRef.current) {
+                              isUpdatingProgressRef.current = false;
                               return;
                             }
                             const endpointId = currentEndpoint.id;
 
                             // 언마운트 체크 후 비동기 작업 수행
-                            if (!isMountedRef.current) return;
+                            if (!isMountedRef.current) {
+                              isUpdatingProgressRef.current = false;
+                              return;
+                            }
                             await updateWebSocketOperation(endpointId, {
                               progress: newProgress as "none" | "completed",
                             });
 
                             // 언마운트 체크 후 Operation 데이터 다시 로드
-                            if (!isMountedRef.current) return;
+                            if (!isMountedRef.current) {
+                              isUpdatingProgressRef.current = false;
+                              return;
+                            }
                             await loadWebSocketOperationData(endpointId);
 
-                            // 언마운트 체크 후 사이드바 목록도 다시 로드
-                            if (!isMountedRef.current) return;
-                            await loadEndpoints();
-
                             // 언마운트 체크 후 selectedEndpoint 업데이트
-                            if (!isMountedRef.current) return;
+                            if (!isMountedRef.current) {
+                              isUpdatingProgressRef.current = false;
+                              return;
+                            }
                             const latestEndpoint = selectedEndpointRef.current;
                             if (
                               latestEndpoint &&
@@ -2765,6 +2775,14 @@ export function ApiEditorLayout() {
                                 progress: newProgress,
                               });
                             }
+
+                            // 사이드바 목록은 백그라운드에서 비동기로 업데이트 (토글 반응성에 영향 없음)
+                            loadEndpoints().catch((err) => {
+                              console.error(
+                                "사이드바 목록 업데이트 실패:",
+                                err
+                              );
+                            });
                           } catch (error) {
                             console.error("Progress 업데이트 실패:", error);
                             // 에러 발생 시 이전 상태로 되돌리기
@@ -2781,6 +2799,8 @@ export function ApiEditorLayout() {
                               }`,
                               variant: "error",
                             });
+                          } finally {
+                            isUpdatingProgressRef.current = false;
                           }
                         }}
                         className="sr-only peer"
