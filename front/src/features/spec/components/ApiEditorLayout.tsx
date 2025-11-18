@@ -2663,7 +2663,7 @@ export function ApiEditorLayout() {
     <div className="h-full flex flex-col bg-white dark:bg-[#0D1117] min-h-0">
       {/* Header Tabs */}
       <div className="border-b border-gray-200 dark:border-[#2D333B] px-6 py-4 bg-white dark:bg-[#0D1117]">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
           {/* Left: Tabs */}
           <div className="flex gap-0 border-b border-gray-200 dark:border-[#2D333B]">
             <button
@@ -2830,16 +2830,16 @@ export function ApiEditorLayout() {
                     Export
                   </button>
                   {isExportModalOpen && (
-                    <div className="absolute top-full right-0 mt-1 w-40 bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#30363D] rounded-lg shadow-lg z-50 overflow-hidden">
+                    <div className="absolute top-full right-0 mt-1 w-40 bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#30363D] shadow-lg z-50 overflow-hidden">
                       <button
                         onClick={handleExportMD}
-                        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#21262D] transition-colors focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0"
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#21262D] transition-colors rounded-none focus:outline-none focus-visible:outline-none focus:ring-0 hover:ring-0 active:ring-0"
                       >
                         Markdown (MD)
                       </button>
                       <button
                         onClick={handleExportYAML}
-                        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#21262D] transition-colors border-t border-gray-200 dark:border-[#30363D] focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0"
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#21262D] transition-colors border-t border-gray-200 dark:border-[#30363D] rounded-none focus:outline-none focus-visible:outline-none focus:ring-0 hover:ring-0 active:ring-0"
                       >
                         YAML
                       </button>
@@ -2850,9 +2850,9 @@ export function ApiEditorLayout() {
             </div>
           ) : (
             // 테스트 폼일 때 버튼들
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
               {/* Authorization Button & Input */}
-              <div className="relative flex items-center gap-2">
+              <div className="relative flex items-center gap-2 flex-shrink-0">
                 {!isAuthorizationInputOpen ? (
                   <button
                     onClick={() => setIsAuthorizationInputOpen(true)}
@@ -2921,7 +2921,7 @@ export function ApiEditorLayout() {
                       }}
                       placeholder="Authorization"
                       autoFocus
-                      className="px-3 py-2 pr-10 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm w-64"
+                      className="px-3 py-2 pr-10 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-2 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm w-full sm:w-64"
                     />
                     {authorization && authorization.trim() && (
                       <div className="absolute right-3 flex items-center">
@@ -3341,7 +3341,7 @@ export function ApiEditorLayout() {
                               value={method}
                               onChange={(e) => setMethod(e.target.value)}
                               disabled={!!(selectedEndpoint && !isEditMode)}
-                              className={`appearance-none w-full sm:w-auto px-3 py-2 pr-10 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm font-medium min-w-[120px] ${
+                              className={`appearance-none w-full sm:w-auto px-3 py-2 pr-10 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm font-medium min-w-[120px] ${
                                 selectedEndpoint && !isEditMode
                                   ? "opacity-60 cursor-not-allowed"
                                   : ""
@@ -3401,7 +3401,7 @@ export function ApiEditorLayout() {
                               } text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 ${
                                 urlError
                                   ? "focus:ring-red-500 focus:border-red-500"
-                                  : "focus:ring-[#2563EB] focus:border-[#2563EB]"
+                                  : "focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500"
                               } text-sm font-mono ${
                                 selectedEndpoint && !isEditMode
                                   ? "opacity-60 cursor-not-allowed"
@@ -3471,7 +3471,7 @@ export function ApiEditorLayout() {
                               onChange={(e) => setTags(e.target.value)}
                               placeholder="예: AUTH, USER, PRODUCT, ORDER"
                               disabled={!!(selectedEndpoint && !isEditMode)}
-                              className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
+                              className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                                 selectedEndpoint && !isEditMode
                                   ? "opacity-60 cursor-not-allowed"
                                   : ""
@@ -3488,7 +3488,7 @@ export function ApiEditorLayout() {
                               onChange={(e) => setSummary(e.target.value)}
                               placeholder="예: 홍길동"
                               disabled={!!(selectedEndpoint && !isEditMode)}
-                              className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
+                              className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                                 selectedEndpoint && !isEditMode
                                   ? "opacity-60 cursor-not-allowed"
                                   : ""
@@ -3508,7 +3508,7 @@ export function ApiEditorLayout() {
                             onChange={(e) => setDescription(e.target.value)}
                             placeholder="예: 사용자 로그인, 상품 목록 조회, 주문 생성"
                             disabled={!!(selectedEndpoint && !isEditMode)}
-                            className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm ${
+                            className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                               selectedEndpoint && !isEditMode
                                 ? "opacity-60 cursor-not-allowed"
                                 : ""

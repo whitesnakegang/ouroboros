@@ -546,7 +546,7 @@ export function SchemaCard({
                 }}
                 placeholder="Schema 이름을 입력하세요 (예: UserInfo, ProductData)"
                 disabled={isReadOnly || originalSchemaName !== null}
-                className={`w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] ${
+                className={`w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 ${
                   isReadOnly || originalSchemaName !== null
                     ? "opacity-60 cursor-not-allowed"
                     : ""
@@ -570,7 +570,7 @@ export function SchemaCard({
                 placeholder="Schema에 대한 설명을 입력하세요 (선택사항)"
                 rows={2}
                 disabled={isReadOnly}
-                className={`w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] resize-none ${
+                className={`w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 resize-none ${
                   isReadOnly ? "opacity-60 cursor-not-allowed" : ""
                 }`}
               />

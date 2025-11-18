@@ -116,9 +116,9 @@ export function TestResponseTabs() {
       <div className="flex border-b border-gray-200 dark:border-[#2D333B]">
         <button
           onClick={() => setActiveTab("response")}
-          className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+          className={`flex-1 px-4 py-3 text-sm font-medium transition-colors focus:outline-none focus:ring-0 ${
             activeTab === "response"
-              ? "text-[#2563EB] border-b-2 border-[#2563EB] bg-blue-50 dark:bg-blue-900/20"
+              ? "text-gray-900 dark:text-[#E6EDF3] border-b-2 border-gray-900 dark:border-[#E6EDF3] bg-gray-50 dark:bg-[#0D1117]"
               : "text-gray-600 dark:text-[#8B949E] hover:text-gray-900 dark:hover:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#0D1117]"
           }`}
         >
@@ -126,9 +126,9 @@ export function TestResponseTabs() {
         </button>
         <button
           onClick={() => setActiveTab("test")}
-          className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+          className={`flex-1 px-4 py-3 text-sm font-medium transition-colors focus:outline-none focus:ring-0 ${
             activeTab === "test"
-              ? "text-[#2563EB] border-b-2 border-[#2563EB] bg-blue-50 dark:bg-blue-900/20"
+              ? "text-gray-900 dark:text-[#E6EDF3] border-b-2 border-gray-900 dark:border-[#E6EDF3] bg-gray-50 dark:bg-[#0D1117]"
               : "text-gray-600 dark:text-[#8B949E] hover:text-gray-900 dark:hover:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#0D1117]"
           }`}
         >
@@ -434,7 +434,7 @@ function TestContent({
               <button
                 onClick={() => onShowTrace()}
                 disabled={isLoadingTrace || !tryId}
-                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-[#2D333B] disabled:text-gray-500 dark:disabled:text-[#8B949E] text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none text-sm font-medium flex items-center gap-2 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-300 dark:disabled:bg-[#2D333B] disabled:text-gray-500 dark:disabled:text-[#8B949E] text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none focus:ring-0 text-sm font-medium flex items-center gap-2 disabled:cursor-not-allowed"
               >
                 {isLoadingTrace ? (
                   <>
@@ -494,7 +494,7 @@ function TestContent({
             <div
               key={method.spanId || index}
               onClick={() => onShowTrace(method.spanId)}
-              className="p-4 bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] rounded-md hover:border-blue-300 dark:hover:border-blue-700 transition-colors cursor-pointer"
+              className="p-4 bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] rounded-md hover:border-gray-400 dark:hover:border-gray-600 transition-colors cursor-pointer focus:outline-none focus:ring-0"
             >
               <div className="flex items-start justify-between mb-2">
                 <div className="flex-1">

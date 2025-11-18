@@ -350,9 +350,9 @@ export function ApiRequestCard({
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 text-sm font-medium transition-colors capitalize border-b-2 ${
+            className={`px-4 py-2 text-sm font-medium transition-colors capitalize border-b-2 focus:outline-none focus:ring-0 ${
               activeTab === tab
-                ? "text-gray-900 dark:text-[#E6EDF3] border-[#2563EB]"
+                ? "text-gray-900 dark:text-[#E6EDF3] border-gray-900 dark:border-[#E6EDF3]"
                 : "text-gray-500 dark:text-[#8B949E] border-transparent hover:text-gray-900 dark:hover:text-[#E6EDF3]"
             }`}
           >
@@ -405,7 +405,7 @@ export function ApiRequestCard({
                     onChange={(e) => updateHeader(index, "key", e.target.value)}
                     placeholder="Header Name (e.g., X-API-Key)"
                     disabled={isReadOnly}
-                    className="flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm"
+                    className="flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
                   />
                   <input
                     type="text"
@@ -415,7 +415,7 @@ export function ApiRequestCard({
                     }
                     placeholder="Header Value (e.g., abc123)"
                     disabled={isReadOnly}
-                    className="flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm"
+                    className="flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
                   />
                   <button
                     onClick={() => removeHeader(index)}
@@ -466,9 +466,9 @@ export function ApiRequestCard({
                     setRequestBody(newBody);
                   }}
                   disabled={isReadOnly}
-                  className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+                  className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 focus:outline-none focus:ring-0 ${
                     requestBody.type === type
-                      ? "text-gray-900 dark:text-[#E6EDF3] border-[#2563EB]"
+                      ? "text-gray-900 dark:text-[#E6EDF3] border-gray-900 dark:border-[#E6EDF3]"
                       : "text-gray-500 dark:text-[#8B949E] border-transparent hover:text-gray-900 dark:hover:text-[#E6EDF3]"
                   } disabled:opacity-50`}
                 >
@@ -526,7 +526,7 @@ export function ApiRequestCard({
                         });
                       }}
                       disabled={isReadOnly}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
                     >
                       <option value="object">Object</option>
                       <option value="array">Array</option>
@@ -862,7 +862,7 @@ export function ApiRequestCard({
                               });
                             }}
                             disabled={isReadOnly}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
                           >
                             <option value="string">string</option>
                             <option value="integer">integer</option>
@@ -1001,7 +1001,7 @@ export function ApiRequestCard({
                         }}
                         placeholder="Key (예: id, userId)"
                         disabled={isReadOnly}
-                        className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
+                        className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500"
                       />
                       <select
                         value={param.type || "string"}
@@ -1012,7 +1012,7 @@ export function ApiRequestCard({
                           setPathParams(updated);
                         }}
                         disabled={isReadOnly}
-                        className="px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
+                        className="px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500"
                       >
                         <option value="string">string</option>
                         <option value="number">number</option>
@@ -1030,7 +1030,7 @@ export function ApiRequestCard({
                         }}
                         placeholder="Value (예: 1, user123)"
                         disabled={isReadOnly}
-                        className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
+                        className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500"
                       />
                       {setPathParams && (
                         <button
@@ -1116,7 +1116,7 @@ export function ApiRequestCard({
                         }}
                         placeholder="Key (예: page, limit)"
                         disabled={isReadOnly}
-                        className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
+                        className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500"
                       />
                       <select
                         value={param.type || "string"}
@@ -1126,7 +1126,7 @@ export function ApiRequestCard({
                           setQueryParams(updated);
                         }}
                         disabled={isReadOnly}
-                        className="px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
+                        className="px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500"
                       >
                         <option value="string">string</option>
                         <option value="number">number</option>
@@ -1143,7 +1143,7 @@ export function ApiRequestCard({
                         }}
                         placeholder="Value (예: 1, true)"
                         disabled={isReadOnly}
-                        className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB]"
+                        className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500"
                       />
                       <button
                         onClick={() =>

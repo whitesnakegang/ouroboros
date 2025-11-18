@@ -139,7 +139,7 @@ const JsonHighlighter = ({
       tabIndex={0}
       className={`p-3 text-sm ${fontClass} ${wrapClass} overflow-x-auto rounded ${
         isSent ? "bg-black/20 text-white" : "bg-[#1e1e1e] text-[#d4d4d4]"
-      } focus-visible:outline-none focus-visible:[box-shadow:inset_2px_0_0_#3B82F6] dark:focus-visible:[box-shadow:inset_2px_0_0_#60A5FA]`}
+      } focus-visible:outline-none focus-visible:ring-0`}
     >
       <code>{highlightJson(code)}</code>
     </pre>
@@ -567,7 +567,7 @@ function ResponseContent({
                 if (e.key === "Escape") setSearchQuery("");
               }}
               placeholder="Search messages..."
-              className="w-full pl-9 pr-9 py-2 text-sm rounded-md bg-white dark:bg-[#161B22] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-transparent"
+              className="w-full pl-9 pr-9 py-2 text-sm rounded-md bg-white dark:bg-[#161B22] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-2 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-transparent"
             />
             {searchQuery && (
               <button
@@ -822,7 +822,7 @@ function MessageBubble({
         }}
         className={`flex items-start gap-3 ${
           compactMode ? "p-3" : "p-4"
-        } rounded-lg border transition-all hover:shadow-md focus-visible:outline-none focus-visible:[box-shadow:inset_2px_0_0_#3B82F6] dark:focus-visible:[box-shadow:inset_2px_0_0_#60A5FA] ${
+        } rounded-lg border transition-all hover:shadow-md focus-visible:outline-none focus-visible:ring-0 ${
           onClick ? "cursor-pointer" : ""
         } ${
           isSent
@@ -1111,7 +1111,7 @@ export function TestContent({
               <button
                 onClick={() => onShowTrace()}
                 disabled={isLoadingTrace || !tryId}
-                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-[#2D333B] text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none text-sm font-medium flex items-center gap-2 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-300 dark:disabled:bg-[#2D333B] text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none focus:ring-0 text-sm font-medium flex items-center gap-2 disabled:cursor-not-allowed"
               >
                 {isLoadingTrace ? (
                   <>
@@ -1171,7 +1171,7 @@ export function TestContent({
             <div
               key={method.spanId || index}
               onClick={() => onShowTrace(method.spanId)}
-              className="p-4 bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] rounded-md hover:border-blue-300 dark:hover:border-blue-700 transition-colors cursor-pointer"
+              className="p-4 bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] rounded-md hover:border-gray-400 dark:hover:border-gray-600 transition-colors cursor-pointer focus:outline-none focus:ring-0"
             >
               <div className="flex items-start justify-between mb-2">
                 <div className="flex-1">

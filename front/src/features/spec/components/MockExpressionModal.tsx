@@ -172,9 +172,9 @@ export function MockExpressionModal({
                     setSelectedProvider(provider);
                     setSelectedMethod(null);
                   }}
-                  className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
+                  className={`w-full text-left px-4 py-3 rounded-lg transition-all focus:outline-none focus:ring-0 ${
                     selectedProvider?.name === provider.name
-                      ? "bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-500"
+                      ? "bg-gray-100 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600"
                       : "hover:bg-gray-100 dark:hover:bg-[#161B22] border-2 border-transparent"
                   }`}
                 >
@@ -205,9 +205,9 @@ export function MockExpressionModal({
                   <button
                     key={method.name}
                     onClick={() => setSelectedMethod(method)}
-                    className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
+                    className={`w-full text-left px-4 py-3 rounded-lg transition-all focus:outline-none focus:ring-0 ${
                       selectedMethod?.name === method.name
-                        ? "bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-500"
+                        ? "bg-gray-100 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600"
                         : "hover:bg-gray-100 dark:hover:bg-[#161B22] border-2 border-transparent"
                     }`}
                   >
