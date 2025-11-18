@@ -152,13 +152,9 @@ export function WsEditorForm({
     "receiver" | "reply" | "schema" | "message"
   >("receiver");
 
-  // 채널 선택 모드 (기존 채널 선택 vs 새 채널 생성)
-  const [receiverChannelMode, setReceiverChannelMode] = useState<
-    "select" | "create"
-  >("select");
-  const [replyChannelMode, setReplyChannelMode] = useState<"select" | "create">(
-    "select"
-  );
+  // 채널 선택 모드 (새 채널 생성만 허용)
+  const receiverChannelMode: "create" = "create";
+  const replyChannelMode: "create" = "create";
 
   // 메시지 작성 상태
   const [messageName, setMessageName] = useState("");
@@ -526,7 +522,6 @@ export function WsEditorForm({
           },
           messages: channelMessageNames,
         });
-        setReceiverChannelMode("select");
       }
     } else if (type === "reply") {
       // 이미 선택된 채널인지 확인 (토글)
@@ -559,7 +554,6 @@ export function WsEditorForm({
           },
           messages: channelMessageNames,
         });
-        setReplyChannelMode("select");
       }
     }
   };
@@ -1480,8 +1474,7 @@ export function WsEditorForm({
                     Receiver
                   </h3>
                   <p className="text-xs text-gray-600 dark:text-[#8B949E] mt-1">
-                    메시지와 주소를 입력하면 채널을 생성하거나 기존 채널을
-                    선택할 수 있습니다.
+                    메시지와 주소를 입력하면 채널을 생성합니다.
                   </p>
                 </div>
                 {!isReadOnly && (
@@ -1520,125 +1513,6 @@ export function WsEditorForm({
 
               {receiver ? (
                 <div className="space-y-4">
-                  {/* 채널 선택 모드 선택 */}
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                      채널 선택 방식
-                    </label>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          setReceiverChannelMode("select");
-                          if (receiver) {
-                            setReceiver({
-                              ...receiver,
-                              address: "",
-                              messages: [],
-                            });
-                          }
-                        }}
-                        disabled={isReadOnly}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                          receiverChannelMode === "select"
-                            ? "bg-[#2563EB] text-white"
-                            : "bg-gray-100 dark:bg-[#21262D] text-gray-700 dark:text-[#C9D1D9] hover:bg-gray-200 dark:hover:bg-[#30363D]"
-                        } ${isReadOnly ? "opacity-60 cursor-not-allowed" : ""}`}
-                      >
-                        기존 채널 선택
-                      </button>
-                      <button
-                        onClick={() => {
-                          setReceiverChannelMode("create");
-                          if (receiver) {
-                            setReceiver({
-                              ...receiver,
-                              address: "",
-                              messages: [],
-                            });
-                          }
-                        }}
-                        disabled={isReadOnly}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                          receiverChannelMode === "create"
-                            ? "bg-[#2563EB] text-white"
-                            : "bg-gray-100 dark:bg-[#21262D] text-gray-700 dark:text-[#C9D1D9] hover:bg-gray-200 dark:hover:bg-[#30363D]"
-                        } ${isReadOnly ? "opacity-60 cursor-not-allowed" : ""}`}
-                      >
-                        새 채널 생성
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* 기존 채널 선택 모드 */}
-                  {receiverChannelMode === "select" && (
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                        기존 채널 선택
-                      </label>
-                      {channels.length > 0 ? (
-                        <div className="max-h-64 overflow-y-auto space-y-2 border border-gray-200 dark:border-[#2D333B] rounded-md p-3 bg-gray-50 dark:bg-[#0D1117]">
-                          {channels.map((ch) => {
-                            const channelMessageNames = Object.keys(
-                              ch.channel.messages || {}
-                            );
-                            const isSelected =
-                              receiver &&
-                              receiver.address === ch.channel.address &&
-                              receiver.messages?.length ===
-                                channelMessageNames.length &&
-                              receiver.messages.every((msg) =>
-                                channelMessageNames.includes(msg)
-                              );
-
-                            return (
-                              <div
-                                key={ch.channelName}
-                                onClick={() =>
-                                  !isReadOnly &&
-                                  handleSelectExistingChannel(ch, "receiver")
-                                }
-                                className={`text-sm p-3 border rounded cursor-pointer transition-colors ${
-                                  isSelected
-                                    ? "bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700"
-                                    : "bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] hover:bg-gray-100 dark:hover:bg-[#21262D]"
-                                } ${
-                                  isReadOnly
-                                    ? "cursor-not-allowed opacity-60"
-                                    : ""
-                                }`}
-                              >
-                                <div className="font-mono text-gray-800 dark:text-[#E6EDF3] font-medium">
-                                  {ch.channelName}
-                                </div>
-                                <div className="text-xs text-gray-600 dark:text-[#8B949E] mt-1">
-                                  주소: {ch.channel.address}
-                                </div>
-                                <div className="text-xs text-gray-600 dark:text-[#8B949E] mt-1">
-                                  메시지:{" "}
-                                  {channelMessageNames.join(", ") || "없음"}
-                                </div>
-                                {isSelected && (
-                                  <div className="text-xs text-blue-600 dark:text-blue-400 mt-2 font-medium">
-                                    ✓ 선택됨
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="text-center py-6 border border-gray-200 dark:border-[#2D333B] rounded-md bg-gray-50 dark:bg-[#0D1117]">
-                          <p className="text-sm text-gray-500 dark:text-[#8B949E]">
-                            기존 채널이 없습니다
-                          </p>
-                          <p className="text-xs text-gray-400 dark:text-[#6E7681] mt-1">
-                            "새 채널 생성"을 선택하여 채널을 생성하세요
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
                   {/* 새 채널 생성 모드 */}
                   {receiverChannelMode === "create" && (
                     <>
@@ -1761,8 +1635,7 @@ export function WsEditorForm({
                     Reply
                   </h3>
                   <p className="text-xs text-gray-600 dark:text-[#8B949E] mt-1">
-                    메시지와 주소를 입력하면 채널을 생성하거나 기존 채널을
-                    선택할 수 있습니다.
+                    메시지와 주소를 입력하면 채널을 생성합니다.
                   </p>
                 </div>
                 {!isReadOnly && (
@@ -1801,117 +1674,6 @@ export function WsEditorForm({
 
               {reply ? (
                 <div className="space-y-4">
-                  {/* 채널 선택 모드 선택 */}
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                      채널 선택 방식
-                    </label>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          setReplyChannelMode("select");
-                          if (reply) {
-                            setReply({ ...reply, address: "", messages: [] });
-                          }
-                        }}
-                        disabled={isReadOnly}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                          replyChannelMode === "select"
-                            ? "bg-[#2563EB] text-white"
-                            : "bg-gray-100 dark:bg-[#21262D] text-gray-700 dark:text-[#C9D1D9] hover:bg-gray-200 dark:hover:bg-[#30363D]"
-                        } ${isReadOnly ? "opacity-60 cursor-not-allowed" : ""}`}
-                      >
-                        기존 채널 선택
-                      </button>
-                      <button
-                        onClick={() => {
-                          setReplyChannelMode("create");
-                          if (reply) {
-                            setReply({ ...reply, address: "", messages: [] });
-                          }
-                        }}
-                        disabled={isReadOnly}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                          replyChannelMode === "create"
-                            ? "bg-[#2563EB] text-white"
-                            : "bg-gray-100 dark:bg-[#21262D] text-gray-700 dark:text-[#C9D1D9] hover:bg-gray-200 dark:hover:bg-[#30363D]"
-                        } ${isReadOnly ? "opacity-60 cursor-not-allowed" : ""}`}
-                      >
-                        새 채널 생성
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* 기존 채널 선택 모드 */}
-                  {replyChannelMode === "select" && (
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                        기존 채널 선택
-                      </label>
-                      {channels.length > 0 ? (
-                        <div className="max-h-64 overflow-y-auto space-y-2 border border-gray-200 dark:border-[#2D333B] rounded-md p-3 bg-gray-50 dark:bg-[#0D1117]">
-                          {channels.map((ch) => {
-                            const channelMessageNames = Object.keys(
-                              ch.channel.messages || {}
-                            );
-                            const isSelected =
-                              reply &&
-                              reply.address === ch.channel.address &&
-                              reply.messages?.length ===
-                                channelMessageNames.length &&
-                              reply.messages.every((msg) =>
-                                channelMessageNames.includes(msg)
-                              );
-
-                            return (
-                              <div
-                                key={ch.channelName}
-                                onClick={() =>
-                                  !isReadOnly &&
-                                  handleSelectExistingChannel(ch, "reply")
-                                }
-                                className={`text-sm p-3 border rounded cursor-pointer transition-colors ${
-                                  isSelected
-                                    ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-700"
-                                    : "bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] hover:bg-gray-100 dark:hover:bg-[#21262D]"
-                                } ${
-                                  isReadOnly
-                                    ? "cursor-not-allowed opacity-60"
-                                    : ""
-                                }`}
-                              >
-                                <div className="font-mono text-gray-800 dark:text-[#E6EDF3] font-medium">
-                                  {ch.channelName}
-                                </div>
-                                <div className="text-xs text-gray-600 dark:text-[#8B949E] mt-1">
-                                  주소: {ch.channel.address}
-                                </div>
-                                <div className="text-xs text-gray-600 dark:text-[#8B949E] mt-1">
-                                  메시지:{" "}
-                                  {channelMessageNames.join(", ") || "없음"}
-                                </div>
-                                {isSelected && (
-                                  <div className="text-xs text-emerald-600 dark:text-emerald-400 mt-2 font-medium">
-                                    ✓ 선택됨
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="text-center py-6 border border-gray-200 dark:border-[#2D333B] rounded-md bg-gray-50 dark:bg-[#0D1117]">
-                          <p className="text-sm text-gray-500 dark:text-[#8B949E]">
-                            기존 채널이 없습니다
-                          </p>
-                          <p className="text-xs text-gray-400 dark:text-[#6E7681] mt-1">
-                            "새 채널 생성"을 선택하여 채널을 생성하세요
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
                   {/* 새 채널 생성 모드 */}
                   {replyChannelMode === "create" && (
                     <>
