@@ -16,8 +16,8 @@ export function ConfirmModal({
   onConfirm,
   title,
   message,
-  confirmText = "확인",
-  cancelText = "취소",
+  confirmText = "Confirm",
+  cancelText = "Cancel",
   variant = "info",
   isLoading = false,
 }: ConfirmModalProps) {
@@ -77,7 +77,7 @@ export function ConfirmModal({
                 <button
                   onClick={onClose}
                   className="flex-shrink-0 p-1.5 -mt-1 -mr-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#21262D] rounded-md transition-colors"
-                  aria-label="닫기"
+                  aria-label="Close"
                 >
                   <svg
                     className="w-5 h-5"
@@ -140,7 +140,7 @@ export function ConfirmModal({
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     ></path>
                   </svg>
-                  처리 중...
+                  Processing...
                 </span>
               ) : (
                 confirmText

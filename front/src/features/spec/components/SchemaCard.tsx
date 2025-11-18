@@ -120,9 +120,7 @@ export function SchemaCard({
       setSchemas(response.data);
     } catch (err) {
       console.error("스키마 로드 실패:", err);
-      setError(
-        err instanceof Error ? err.message : "스키마를 불러오는데 실패했습니다."
-      );
+      setError(err instanceof Error ? err.message : "Failed to load schema.");
     } finally {
       setIsLoading(false);
     }
@@ -165,8 +163,8 @@ export function SchemaCard({
   const handleDeleteSchema = (schemaName: string) => {
     setConfirmModal({
       isOpen: true,
-      title: "스키마 삭제",
-      message: `"${schemaName}" 스키마를 삭제하시겠습니까?`,
+      title: "Delete Schema",
+      message: `Are you sure you want to delete the schema "${schemaName}"?`,
       variant: "danger",
       onConfirm: async () => {
         setConfirmModal((prev) => ({ ...prev, isOpen: false }));
@@ -190,17 +188,17 @@ export function SchemaCard({
 
           setAlertModal({
             isOpen: true,
-            title: "삭제 완료",
-            message: `"${schemaName}" 스키마가 삭제되었습니다.`,
+            title: "Deleted",
+            message: `Schema "${schemaName}" has been deleted successfully.`,
             variant: "success",
           });
         } catch (err) {
           console.error("스키마 삭제 실패:", err);
           setAlertModal({
             isOpen: true,
-            title: "삭제 실패",
-            message: `스키마 삭제에 실패했습니다: ${
-              err instanceof Error ? err.message : "알 수 없는 오류"
+            title: "Delete Failed",
+            message: `Failed to delete schema: ${
+              err instanceof Error ? err.message : "Unknown error"
             }`,
             variant: "error",
           });
@@ -214,8 +212,8 @@ export function SchemaCard({
     if (!currentSchemaName.trim()) {
       setAlertModal({
         isOpen: true,
-        title: "입력 오류",
-        message: "스키마 이름을 입력해주세요.",
+        title: "Input Error",
+        message: "Please enter a schema name.",
         variant: "warning",
       });
       return;
@@ -225,8 +223,8 @@ export function SchemaCard({
     if (schemaFields.length === 0) {
       setAlertModal({
         isOpen: true,
-        title: "입력 오류",
-        message: "최소 하나의 필드를 추가해주세요.",
+        title: "Input Error",
+        message: "Please add at least one field.",
         variant: "warning",
       });
       return;
@@ -255,7 +253,8 @@ export function SchemaCard({
         type: "object",
         title: `${currentSchemaName} Schema`,
         description:
-          currentSchemaDescription.trim() || `${currentSchemaName} 스키마 정의`,
+          currentSchemaDescription.trim() ||
+          `${currentSchemaName} schema definition`,
         properties,
         required: required.length > 0 ? required : undefined,
         orders: schemaFields.map((f) => f.key),
@@ -284,8 +283,8 @@ export function SchemaCard({
         }
         setAlertModal({
           isOpen: true,
-          title: "수정 완료",
-          message: `"${originalSchemaName}" 스키마가 수정되었습니다.`,
+          title: "Updated",
+          message: `Schema "${originalSchemaName}" has been updated successfully.`,
           variant: "success",
         });
       } else {
@@ -297,8 +296,8 @@ export function SchemaCard({
         }
         setAlertModal({
           isOpen: true,
-          title: "생성 완료",
-          message: `"${currentSchemaName}" 스키마가 생성되었습니다.`,
+          title: "Created",
+          message: `Schema "${currentSchemaName}" has been created successfully.`,
           variant: "success",
         });
       }
@@ -319,8 +318,8 @@ export function SchemaCard({
       const errorMessage = getErrorMessage(err);
       setAlertModal({
         isOpen: true,
-        title: "저장 실패",
-        message: `스키마 저장에 실패했습니다: ${errorMessage}`,
+        title: "Save Failed",
+        message: `Failed to save schema: ${errorMessage}`,
         variant: "error",
       });
     } finally {
@@ -399,7 +398,7 @@ export function SchemaCard({
               onClick={loadSchemas}
               disabled={isLoading}
               className="px-2 py-1 text-xs text-gray-600 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 font-medium border border-gray-300 dark:border-[#2D333B] rounded-md hover:bg-gray-50 dark:hover:bg-[#161B22] disabled:opacity-50"
-              title="새로고침"
+              title="Refresh"
             >
               <svg
                 className="w-4 h-4"
@@ -444,11 +443,11 @@ export function SchemaCard({
         <div className="flex-1 overflow-y-auto p-2">
           {isLoading && schemas.length === 0 ? (
             <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
-              로딩 중...
+              Loading...
             </div>
           ) : schemas.length === 0 ? (
             <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
-              <p>저장된 스키마가 없습니다.</p>
+              <p>No schemas saved.</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -491,7 +490,7 @@ export function SchemaCard({
                           handleDeleteSchema(schema.schemaName);
                         }}
                         className="p-1 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 flex-shrink-0"
-                        title="삭제"
+                        title="Delete"
                       >
                         <svg
                           className="w-4 h-4"
@@ -554,8 +553,8 @@ export function SchemaCard({
               />
               {originalSchemaName !== null && (
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  편집 모드: "{originalSchemaName}" 스키마를 편집 중입니다.
-                  이름은 변경할 수 없습니다.
+                  editing mode: "{originalSchemaName}" schema is being edited.
+                  The name cannot be changed.
                 </p>
               )}
             </div>
@@ -586,7 +585,7 @@ export function SchemaCard({
                     Schema Fields
                     {originalSchemaName && (
                       <span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">
-                        (편집 모드)
+                        (editing mode)
                       </span>
                     )}
                   </h4>
@@ -668,8 +667,8 @@ export function SchemaCard({
           } else {
             setAlertModal({
               isOpen: true,
-              title: "타입 오류",
-              message: "스키마는 object 타입만 지원됩니다.",
+              title: "Type Error",
+              message: "Only object type schemas are supported.",
               variant: "warning",
             });
           }

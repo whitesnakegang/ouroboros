@@ -58,7 +58,6 @@ interface ApiRequestCardProps {
   queryParams: KeyValuePair[];
   setQueryParams: (params: KeyValuePair[]) => void;
   pathParams?: KeyValuePair[];
-  setPathParams?: (params: KeyValuePair[]) => void;
   requestHeaders: KeyValuePair[];
   setRequestHeaders: (headers: KeyValuePair[]) => void;
   requestBody: RequestBody;
@@ -73,7 +72,6 @@ export function ApiRequestCard({
   queryParams,
   setQueryParams,
   pathParams = [],
-  setPathParams,
   requestHeaders,
   setRequestHeaders,
   requestBody,

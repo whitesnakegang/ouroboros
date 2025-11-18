@@ -45,31 +45,31 @@ export function StatusFilter({
           >
             <div className="bg-white dark:bg-[#161B22] border border-gray-300 dark:border-[#2D333B] rounded-md px-3 py-2 shadow-lg min-w-[200px]">
               <div className="text-xs font-semibold text-gray-900 dark:text-[#E6EDF3] mb-2">
-                뱃지 색상별 상태
+                Badge Status
               </div>
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-[#8B949E] flex-shrink-0"></div>
                   <span className="text-xs text-gray-600 dark:text-[#8B949E]">
-                    회색: 미구현
+                    Gray: Not Implemented
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-[#EAB308] flex-shrink-0"></div>
                   <span className="text-xs text-gray-600 dark:text-[#8B949E]">
-                    노란색: 구현중
+                    Yellow: In Progress
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-[#F97316] flex-shrink-0"></div>
                   <span className="text-xs text-gray-600 dark:text-[#8B949E]">
-                    주황색: 수정중
+                    Orange: Modifying
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-[#10B981] flex-shrink-0"></div>
                   <span className="text-xs text-gray-600 dark:text-[#8B949E]">
-                    초록색: 완료
+                    Green: Completed
                   </span>
                 </div>
               </div>

@@ -182,7 +182,7 @@ export function Sidebar({ onAddNew }: SidebarProps) {
       <div className={`flex-1 overflow-y-auto ${protocol === "REST" ? "bg-white dark:bg-[#0D1117]" : ""}`}>
         {isLoading ? (
           <div className="p-4 text-center text-gray-500 dark:text-[#8B949E] text-sm">
-            로딩 중...
+            Loading...
           </div>
         ) : Object.keys(filteredEndpoints).length > 0 ? (
           Object.entries(filteredEndpoints).map(([groupName, endpoints]) => (
@@ -198,7 +198,7 @@ export function Sidebar({ onAddNew }: SidebarProps) {
           ))
         ) : (
           <div className="p-4 text-center text-gray-500 dark:text-[#8B949E] text-sm">
-            엔드포인트가 없습니다
+            No endpoints found
           </div>
         )}
       </div>

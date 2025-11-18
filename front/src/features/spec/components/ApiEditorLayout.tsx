@@ -249,7 +249,7 @@ export function ApiEditorLayout() {
         lowerMessage.includes("network request failed") ||
         message.trim() === ""
       ) {
-        return "서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.";
+        return "Unable to connect to server. Please check if the server is running.";
       }
 
       // localhost 주소 및 관련 텍스트 제거 (다양한 형식 대응)
@@ -266,7 +266,7 @@ export function ApiEditorLayout() {
       message = message.replace(/\s+/g, " ").trim();
       // 빈 메시지인 경우 기본 메시지 반환
       if (!message) {
-        return "서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.";
+        return "Unable to connect to server. Please check if the server is running.";
       }
       return message;
     }
@@ -1130,7 +1130,7 @@ export function ApiEditorLayout() {
       console.error("WebSocket Operation 로드 실패:", error);
       alert(
         `Operation을 불러오는데 실패했습니다: ${
-          error instanceof Error ? error.message : "알 수 없는 오류"
+          error instanceof Error ? error.message : "Unknown error"
         }`
       );
     }
@@ -1593,8 +1593,8 @@ export function ApiEditorLayout() {
           if (!receives && !replies) {
             setAlertModal({
               isOpen: true,
-              title: "입력 오류",
-              message: "Receiver 또는 Reply 중 하나는 반드시 입력해야 합니다.",
+              title: "Input Error",
+              message: "At least one of Receiver or Reply must be provided.",
               variant: "warning",
             });
             return;
@@ -1615,8 +1615,8 @@ export function ApiEditorLayout() {
           });
           setAlertModal({
             isOpen: true,
-            title: "수정 완료",
-            message: "WebSocket Operation이 수정되었습니다.",
+            title: "Updated",
+            message: "WebSocket Operation has been updated successfully.",
             variant: "success",
           });
 
@@ -1732,8 +1732,8 @@ export function ApiEditorLayout() {
 
             setAlertModal({
               isOpen: true,
-              title: "생성 완료",
-              message: "WebSocket Operation이 생성되었습니다.",
+              title: "Created",
+              message: "WebSocket Operation has been created successfully.",
               variant: "success",
             });
 
@@ -1768,8 +1768,8 @@ export function ApiEditorLayout() {
           } else {
             setAlertModal({
               isOpen: true,
-              title: "생성 완료",
-              message: "WebSocket Operation이 생성되었습니다.",
+              title: "Created",
+              message: "WebSocket Operation has been created successfully.",
               variant: "success",
             });
             // 사이드바 목록 다시 로드
@@ -1782,8 +1782,8 @@ export function ApiEditorLayout() {
         console.error("WebSocket Operation 저장 실패:", error);
         setAlertModal({
           isOpen: true,
-          title: "저장 실패",
-          message: error.message || "WebSocket Operation 저장에 실패했습니다.",
+          title: "Save Failed",
+          message: error.message || "Failed to save WebSocket Operation.",
           variant: "error",
         });
       }
@@ -1796,8 +1796,8 @@ export function ApiEditorLayout() {
     if (protocol === "REST" && (!method || !url || !url.trim())) {
       setAlertModal({
         isOpen: true,
-        title: "입력 오류",
-        message: "Method와 URL을 입력해주세요.",
+        title: "Input Error",
+        message: "Please enter Method and URL.",
         variant: "warning",
       });
       return;
@@ -1828,8 +1828,8 @@ export function ApiEditorLayout() {
 
         setAlertModal({
           isOpen: true,
-          title: "수정 완료",
-          message: "API 스펙이 수정되었습니다.",
+          title: "Updated",
+          message: "API spec has been updated successfully.",
           variant: "success",
         });
         setIsEditMode(false);
@@ -1891,8 +1891,8 @@ export function ApiEditorLayout() {
         addEndpoint(newEndpoint, group);
         setAlertModal({
           isOpen: true,
-          title: "생성 완료",
-          message: `${method} ${url} API가 생성되었습니다.`,
+          title: "Created",
+          message: `API ${method} ${url} has been created successfully.`,
           variant: "success",
         });
 
@@ -1912,8 +1912,8 @@ export function ApiEditorLayout() {
       const errorMessage = getErrorMessage(error);
       setAlertModal({
         isOpen: true,
-        title: "저장 실패",
-        message: `API 저장에 실패했습니다: ${errorMessage}`,
+        title: "Save Failed",
+        message: `Failed to save API: ${errorMessage}`,
         variant: "error",
       });
     }
@@ -1926,15 +1926,15 @@ export function ApiEditorLayout() {
     if (protocol === "WebSocket") {
       setConfirmModal({
         isOpen: true,
-        title: "WebSocket Operation 삭제",
-        message: "이 WebSocket Operation을 삭제하시겠습니까?",
+        title: "Delete WebSocket Operation",
+        message: "Are you sure you want to delete this WebSocket Operation?",
         variant: "danger",
         onConfirm: () => {
           setConfirmModal((prev) => ({ ...prev, isOpen: false }));
           setAlertModal({
             isOpen: true,
-            title: "준비 중",
-            message: "WebSocket Operation 삭제 기능은 준비 중입니다.",
+            title: "Coming Soon",
+            message: "WebSocket Operation deletion feature is coming soon.",
             variant: "info",
           });
           // TODO: Implement WebSocket Operation delete logic
@@ -1948,8 +1948,8 @@ export function ApiEditorLayout() {
     if (isCompleted) {
       setAlertModal({
         isOpen: true,
-        title: "삭제 불가",
-        message: "이미 완료(completed)된 API는 삭제할 수 없습니다.",
+        title: "Cannot Delete",
+        message: "Completed APIs cannot be deleted.",
         variant: "warning",
       });
       return;
@@ -1957,8 +1957,8 @@ export function ApiEditorLayout() {
 
     setConfirmModal({
       isOpen: true,
-      title: "엔드포인트 삭제",
-      message: "이 엔드포인트를 삭제하시겠습니까?",
+      title: "Delete Endpoint",
+      message: "Are you sure you want to delete this endpoint?",
       variant: "danger",
       onConfirm: async () => {
         setConfirmModal((prev) => ({ ...prev, isOpen: false }));
@@ -1967,8 +1967,8 @@ export function ApiEditorLayout() {
           deleteEndpoint(selectedEndpoint.id);
           setAlertModal({
             isOpen: true,
-            title: "삭제 완료",
-            message: "엔드포인트가 삭제되었습니다.",
+            title: "Deleted",
+            message: "Endpoint has been deleted successfully.",
             variant: "success",
           });
 
@@ -1986,8 +1986,8 @@ export function ApiEditorLayout() {
           const errorMessage = getErrorMessage(error);
           setAlertModal({
             isOpen: true,
-            title: "삭제 실패",
-            message: `API 삭제에 실패했습니다: ${errorMessage}`,
+            title: "Delete Failed",
+            message: `Failed to delete API: ${errorMessage}`,
             variant: "error",
           });
         }
@@ -2000,8 +2000,8 @@ export function ApiEditorLayout() {
     if (isCompleted) {
       setAlertModal({
         isOpen: true,
-        title: "수정 불가",
-        message: "이미 완료(completed)된 API는 수정할 수 없습니다.",
+        title: "Cannot Edit",
+        message: "Completed APIs cannot be edited.",
         variant: "warning",
       });
       return;
@@ -2048,8 +2048,8 @@ export function ApiEditorLayout() {
   const handleReset = () => {
     setConfirmModal({
       isOpen: true,
-      title: "초기화 확인",
-      message: "작성 중인 내용을 초기화하시겠습니까?",
+      title: "Reset Confirmation",
+      message: "Are you sure you want to reset the current content?",
       variant: "warning",
       onConfirm: () => {
         setConfirmModal((prev) => ({ ...prev, isOpen: false }));
@@ -2156,8 +2156,8 @@ export function ApiEditorLayout() {
       if (!fileName.endsWith(".yml") && !fileName.endsWith(".yaml")) {
         setAlertModal({
           isOpen: true,
-          title: "파일 형식 오류",
-          message: "YAML 파일(.yml 또는 .yaml)만 업로드 가능합니다.",
+          title: "File Format Error",
+          message: "Only YAML files (.yml or .yaml) can be uploaded.",
           variant: "warning",
         });
         return;
@@ -2174,8 +2174,8 @@ export function ApiEditorLayout() {
           } else {
             setAlertModal({
               isOpen: true,
-              title: "Import 완료",
-              message: "WebSocket YAML Import가 완료되었습니다.",
+              title: "Import Completed",
+              message: "WebSocket YAML import has been completed successfully.",
               variant: "success",
             });
           }
@@ -2192,8 +2192,8 @@ export function ApiEditorLayout() {
         const errorMsg = getErrorMessage(error);
         setAlertModal({
           isOpen: true,
-          title: "Import 실패",
-          message: `YAML Import 실패\n\n${errorMsg}`,
+          title: "Import Failed",
+          message: `YAML import failed\n\n${errorMsg}`,
           variant: "error",
         });
       }
@@ -2227,8 +2227,8 @@ export function ApiEditorLayout() {
       const errorMsg = getErrorMessage(e);
       setAlertModal({
         isOpen: true,
-        title: "Export 실패",
-        message: `Markdown 내보내기에 실패했습니다.\n오류: ${errorMsg}`,
+        title: "Export Failed",
+        message: `Failed to export Markdown.\nError: ${errorMsg}`,
         variant: "error",
       });
       setIsExportModalOpen(false);
@@ -2247,8 +2247,8 @@ export function ApiEditorLayout() {
       );
       setAlertModal({
         isOpen: true,
-        title: "다운로드 완료",
-        message: "YAML 파일이 다운로드되었습니다.",
+        title: "Download Completed",
+        message: "YAML file has been downloaded successfully.",
         variant: "success",
       });
       setIsExportModalOpen(false);
@@ -2257,8 +2257,8 @@ export function ApiEditorLayout() {
       const errorMsg = getErrorMessage(e);
       setAlertModal({
         isOpen: true,
-        title: "Export 실패",
-        message: `YAML 내보내기에 실패했습니다.\n오류: ${errorMsg}`,
+        title: "Export Failed",
+        message: `Failed to export YAML.\nError: ${errorMsg}`,
         variant: "error",
       });
       setIsExportModalOpen(false);
@@ -2272,7 +2272,7 @@ export function ApiEditorLayout() {
 
     if (
       confirm(
-        "실제 구현의 내용을 명세에 자동으로 반영하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다."
+        "Do you want to automatically reflect the actual implementation into the spec?\n\nThis operation cannot be undone."
       )
     ) {
       try {
@@ -2714,7 +2714,7 @@ export function ApiEditorLayout() {
                   selectedEndpoint.method?.toLowerCase() === "send") && (
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-gray-600 dark:text-[#8B949E] font-medium">
-                      작업 완료:
+                      pregress completed:
                     </span>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input
@@ -2788,11 +2788,11 @@ export function ApiEditorLayout() {
                             );
                             setAlertModal({
                               isOpen: true,
-                              title: "업데이트 실패",
-                              message: `Progress 업데이트에 실패했습니다: ${
+                              title: "Update Failed",
+                              message: `Failed to update progress: ${
                                 error instanceof Error
                                   ? error.message
-                                  : "알 수 없는 오류"
+                                  : "Unknown error"
                               }`,
                               variant: "error",
                             });
@@ -3281,7 +3281,7 @@ export function ApiEditorLayout() {
                         {hasDiff && (
                           <div
                             className="flex items-center gap-1 text-amber-500"
-                            title="명세와 실제 구현이 일치하지 않습니다"
+                            title="Spec and actual implementation do not match"
                           >
                             <svg
                               className="w-4 h-4"
@@ -3387,7 +3387,9 @@ export function ApiEditorLayout() {
                                 setUrl(value);
                                 // 한글 검증
                                 if (hasKorean(value)) {
-                                  setUrlError("한글로 생성할 수 없습니다");
+                                  setUrlError(
+                                    "Cannot create with Korean characters"
+                                  );
                                 } else {
                                   setUrlError("");
                                 }
@@ -3421,7 +3423,7 @@ export function ApiEditorLayout() {
                             {hasDiff && !urlError && (
                               <div
                                 className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"
-                                title="명세와 실제 구현이 일치하지 않습니다"
+                                title="Spec and actual implementation do not match"
                               >
                                 <svg
                                   className="w-4 h-4 text-amber-500"
@@ -3492,7 +3494,7 @@ export function ApiEditorLayout() {
                               type="text"
                               value={summary}
                               onChange={(e) => setSummary(e.target.value)}
-                              placeholder="홍길동"
+                              placeholder="John Doe"
                               disabled={!!(selectedEndpoint && !isEditMode)}
                               className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                                 selectedEndpoint && !isEditMode
@@ -3512,7 +3514,7 @@ export function ApiEditorLayout() {
                             type="text"
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
-                            placeholder="사용자 로그인"
+                            placeholder="User login process"
                             disabled={!!(selectedEndpoint && !isEditMode)}
                             className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                               selectedEndpoint && !isEditMode
@@ -3576,7 +3578,6 @@ export function ApiEditorLayout() {
                         queryParams={queryParams}
                         setQueryParams={setQueryParams}
                         pathParams={pathParams}
-                        setPathParams={setPathParams}
                         requestHeaders={requestHeaders}
                         setRequestHeaders={setRequestHeaders}
                         requestBody={requestBody}
