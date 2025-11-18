@@ -123,6 +123,26 @@ public class InMemoryTraceStorage implements TraceStorage {
     }
     
     /**
+     * Deletes trace data for the given tryId.
+     * <p>
+     * Removes the trace data from both the traces map and the traceIdToTryId mapping.
+     *
+     * @param tryId The try ID to delete
+     * @return true if trace was found and deleted, false otherwise
+     */
+    public boolean deleteTraceByTryId(String tryId) {
+        TraceData traceData = traces.remove(tryId);
+        if (traceData != null) {
+            String traceId = traceData.getTraceId();
+            traceIdToTryId.remove(traceId);
+            log.info("Deleted trace from in-memory storage: tryId={}, traceId={}", tryId, traceId);
+            return true;
+        }
+        log.debug("Trace not found for deletion: tryId={}", tryId);
+        return false;
+    }
+    
+    /**
      * Clears all stored traces (useful for testing or cleanup).
      */
     public void clear() {

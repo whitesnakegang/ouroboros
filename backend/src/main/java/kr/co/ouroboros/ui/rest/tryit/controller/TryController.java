@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -36,6 +37,7 @@ import java.util.UUID;
  *   <li>GET /ouro/tries/{tryId}/methods - Retrieves paginated method list</li>
  *   <li>GET /ouro/tries/{tryId}/trace - Retrieves full call trace</li>
  *   <li>GET /ouro/tries/{tryId}/issues - Retrieves detected issues</li>
+ *   <li>DELETE /ouro/tries/{tryId} - Deletes trace data for the given tryId</li>
  * </ul>
  * <p>
  * Exceptions are handled by {@link kr.co.ouroboros.core.rest.tryit.exception.TryExceptionHandler}.
@@ -156,6 +158,40 @@ public class TryController {
                 "Try issues retrieved successfully"
         );
         return ResponseEntity.ok(response);
+    }
+    
+    /**
+     * Deletes trace data for the given tryId from trace storage.
+     * <p>
+     * This endpoint removes the trace data stored in the trace storage (e.g., in-memory storage)
+     * for the specified tryId. This is useful for cleaning up trace data to prevent memory leaks
+     * when using in-memory storage.
+     *
+     * @param tryIdStr the Try session ID; must be a valid UUID
+     * @return a GlobalApiResponse indicating whether the trace was successfully deleted
+     * @throws InvalidTryIdException if the provided tryIdStr is not a valid UUID
+     */
+    @DeleteMapping("/{tryId}")
+    public ResponseEntity<GlobalApiResponse<Void>> deleteTrace(
+            @PathVariable("tryId") String tryIdStr) {
+        // Validate tryId format
+        validateTryId(tryIdStr);
+        
+        boolean deleted = tryTraceService.deleteTrace(tryIdStr);
+        
+        if (deleted) {
+            GlobalApiResponse<Void> response = GlobalApiResponse.success(
+                    null,
+                    "Trace deleted successfully for tryId: " + tryIdStr
+            );
+            return ResponseEntity.ok(response);
+        } else {
+            GlobalApiResponse<Void> response = GlobalApiResponse.success(
+                    null,
+                    "Trace not found for tryId: " + tryIdStr
+            );
+            return ResponseEntity.ok(response);
+        }
     }
     
     /**
