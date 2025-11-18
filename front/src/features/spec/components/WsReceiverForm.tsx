@@ -125,7 +125,7 @@ export function WsReceiverForm({
             onClick={onRemove}
             className="text-red-500 hover:text-red-700 text-sm font-medium"
           >
-            삭제
+            Delete
           </button>
         )}
       </div>
@@ -139,7 +139,7 @@ export function WsReceiverForm({
           type="text"
           value={address}
           onChange={(e) => setAddress(e.target.value)}
-                placeholder="/chat/message"
+          placeholder="/chat/message"
           disabled={isReadOnly}
           className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
             isReadOnly ? "opacity-60 cursor-not-allowed" : ""
@@ -209,7 +209,7 @@ export function WsReceiverForm({
           ))}
           {headers.length === 0 && (
             <p className="text-xs text-gray-500 dark:text-gray-400 text-center py-2">
-              Header가 없습니다. "+ Add Header"를 클릭하여 추가하세요.
+              No headers. Click "+ Add Header" to add one.
             </p>
           )}
         </div>

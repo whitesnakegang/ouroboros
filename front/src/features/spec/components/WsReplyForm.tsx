@@ -3,9 +3,7 @@ import { SchemaFieldEditor } from "./SchemaFieldEditor";
 import { SchemaModal } from "./SchemaModal";
 import { getAllSchemas, type SchemaResponse } from "../services/api";
 import type { SchemaField, RequestBody } from "../types/schema.types";
-import {
-  createDefaultField,
-} from "../types/schema.types";
+import { createDefaultField } from "../types/schema.types";
 
 interface WsReplyFormProps {
   address: string;
@@ -94,7 +92,7 @@ export function WsReplyForm({
             onClick={onRemove}
             className="text-red-500 hover:text-red-700 text-sm font-medium"
           >
-            삭제
+            Delete
           </button>
         )}
       </div>
@@ -179,7 +177,8 @@ export function WsReplyForm({
             ))
           ) : (
             <p className="text-xs text-gray-500 dark:text-gray-400 text-center py-2">
-              Schema 필드가 없습니다. "+ Add Field"를 클릭하여 추가하거나 Schema를 선택하세요.
+              Schema 필드가 없습니다. "+ Add Field"를 클릭하여 추가하거나
+              Schema를 선택하세요.
             </p>
           )}
         </div>
@@ -196,4 +195,3 @@ export function WsReplyForm({
     </div>
   );
 }
-
