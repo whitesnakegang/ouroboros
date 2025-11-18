@@ -47,6 +47,9 @@ public class WebSocketPrefixProperties {
 
     /**
      * Automatically detect prefixes from Spring WebSocket configuration after bean initialization.
+     * <p>
+     * All detected prefixes are normalized by removing trailing slashes to ensure consistent
+     * comparison in {@code hasKnownPrefix} and {@code ensurePrefix} methods.
      */
     @PostConstruct
     public void detectPrefixes() {
@@ -56,6 +59,8 @@ public class WebSocketPrefixProperties {
             if (detectedPrefixes != null && !detectedPrefixes.isEmpty()) {
                 // Use the first prefix as the primary one
                 applicationDestinationPrefix = detectedPrefixes.iterator().next();
+                // Normalize: remove trailing slash for consistent comparison
+                applicationDestinationPrefix = normalizePrefix(applicationDestinationPrefix);
                 log.info("Detected application destination prefix from WebSocket config: {}", applicationDestinationPrefix);
             } else {
                 log.warn("No application destination prefix detected, using default: {}", applicationDestinationPrefix);
@@ -64,8 +69,32 @@ public class WebSocketPrefixProperties {
             log.warn("SimpAnnotationMethodMessageHandler not found, using default application prefix: {}", applicationDestinationPrefix);
         }
 
+        // Normalize broker prefixes (remove trailing slashes)
+        brokerPrefixes = brokerPrefixes.stream()
+                .map(this::normalizePrefix)
+                .collect(Collectors.toList());
+
         // Detect broker prefixes (from messaging template's user destination prefix pattern)
         // Note: Broker prefixes are harder to detect, keeping defaults for now
         log.info("Using broker prefixes: {}", brokerPrefixes);
+    }
+
+    /**
+     * Normalizes a prefix by removing trailing slash if present.
+     * <p>
+     * Ensures consistent prefix format for comparison in {@code hasKnownPrefix}.
+     *
+     * @param prefix the prefix to normalize
+     * @return normalized prefix without trailing slash
+     */
+    private String normalizePrefix(String prefix) {
+        if (prefix == null || prefix.isEmpty()) {
+            return prefix;
+        }
+        // Remove single trailing slash if present
+        if (prefix.endsWith("/")) {
+            return prefix.substring(0, prefix.length() - 1);
+        }
+        return prefix;
     }
 }
