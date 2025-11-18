@@ -58,6 +58,20 @@ export function WsTestRequestPanel() {
     return domain.charAt(0).toUpperCase() + domain.slice(1).toLowerCase();
   };
 
+  // CONNECT 버튼 활성화 여부 계산 (초록색 배지 조건)
+  const isConnectEnabled = useMemo(() => {
+    if (!selectedEndpoint || selectedEndpoint.protocol !== "WebSocket") {
+      return false;
+    }
+    const normalizedProgress = selectedEndpoint.progress?.toLowerCase();
+    const normalizedTag = selectedEndpoint.tag?.toLowerCase();
+    return (
+      normalizedProgress === "completed" ||
+      normalizedProgress === "complete" ||
+      (normalizedTag === "receive" && normalizedProgress === "receive")
+    );
+  }, [selectedEndpoint]);
+
   // 도메인별 구독 경로 계산
   const domainSubscriptionPaths = useMemo(() => {
     if (!selectedEndpoint || selectedEndpoint.protocol !== "WebSocket") {
@@ -611,13 +625,9 @@ export function WsTestRequestPanel() {
             {wsConnectionStatus === "disconnected" ? (
               <button
                 onClick={handleConnect}
-                disabled={
-                  !selectedEndpoint ||
-                  selectedEndpoint.progress?.toLowerCase() !== "completed"
-                }
+                disabled={!isConnectEnabled}
                 className={`flex-1 px-4 py-2 rounded-md transition-all text-sm font-semibold active:translate-y-[1px] focus:outline-none focus-visible:outline-none md:flex-none md:w-auto w-full ${
-                  !selectedEndpoint ||
-                  selectedEndpoint.progress?.toLowerCase() !== "completed"
+                  !isConnectEnabled
                     ? "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
                     : "bg-[#2563EB] hover:bg-[#1E40AF] text-white"
                 }`}

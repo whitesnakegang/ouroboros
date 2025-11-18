@@ -42,11 +42,11 @@ Try 기능은 요청에 헤더를 추가하는 것만으로 API 실행 트레이
 
 ```gradle
 dependencies {
-    implementation 'io.github.whitesnakegang:ouroboros:1.0.1'
+    implementation 'io.github.whitesnakegang:ouroboros:1.0.3'
 }
 ```
 
-> **참고**: Ouroboros SDK 버전은 최신 버전으로 확인하여 업데이트해야 합니다.
+> **⚠️ 버전 경고**: 1.0.2 버전은 에러가 발생하므로 사용하지 마세요. 반드시 1.0.3 버전을 사용해주세요.
 
 ### 2.2. 애플리케이션 설정
 
