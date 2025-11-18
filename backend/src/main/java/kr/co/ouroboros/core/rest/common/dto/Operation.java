@@ -43,4 +43,10 @@ public class Operation {
 
     @JsonProperty("x-ouroboros-response")
     private String xOuroborosResponse;
+    
+    @JsonProperty("x-ouroboros-req-log")
+    private String xOuroborosReqLog;
+
+    @JsonProperty("x-ouroboros-res-log")
+    private String xOuroborosResLog;
 }

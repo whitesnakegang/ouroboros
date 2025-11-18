@@ -112,6 +112,150 @@ export function downloadMarkdown(
   URL.revokeObjectURL(url);
 }
 
+/**
+ * Convert AsyncAPI (WebSocket) YAML content to Markdown
+ * Formats channels, operations (send/receive), and messages.
+ */
+export function convertWsYamlToMarkdown(yamlContent: string): string {
+  let md = `# WebSocket API Documentation\n\n`;
+
+  try {
+    const doc = parseSimpleYaml(yamlContent);
+    if (!doc) return md + "No AsyncAPI content.\n";
+
+    // Header info
+    const info = doc.info || {};
+    if (info.title) md += `**Title**: ${info.title}\n`;
+    if (info.version) md += `**Version**: ${info.version}\n`;
+    md += `\n---\n\n`;
+
+    // Channels overview table
+    const channels = doc.channels || {};
+    const messages = (doc.components && doc.components.messages) || {};
+
+    if (Object.keys(channels).length > 0) {
+      md += `## Channels\n\n`;
+      md += `| Channel | Address | Messages |\n`;
+      md += `|---|---|---|\n`;
+      Object.entries(channels).forEach(([channelName, ch]: [string, any]) => {
+        const address = (ch as any).address || "-";
+        const msgRefs: string[] = [];
+        const collectMessageRefs = (val: any) => {
+          if (!val) return;
+          if (Array.isArray(val)) {
+            val.forEach(collectMessageRefs);
+            return;
+          }
+          if (val && val["$ref"]) {
+            msgRefs.push(val["$ref"].replace("#/components/messages/", ""));
+          }
+        };
+        // Messages can be referenced in channel-level bindings/messages or via operations
+        if ((ch as any).messages) {
+          Object.values((ch as any).messages).forEach(collectMessageRefs);
+        }
+        md += `| \`${channelName}\` | ${address} | ${msgRefs.length ? msgRefs.join(", ") : "-"} |\n`;
+      });
+      md += `\n---\n\n`;
+    }
+
+    // Operations (from x-ouroboros metadata if present)
+    // Some specs put operations under custom fields; also reflect simple pattern:
+    // For each channel, show typical send/receive using messages if available.
+    md += `## Operations\n\n`;
+    if (Object.keys(channels).length === 0) {
+      md += "No channels defined.\n\n";
+    } else {
+      Object.entries(channels).forEach(([channelName, ch]: [string, any]) => {
+        const address = (ch as any).address || channelName;
+        md += `### Channel \`${channelName}\`\n\n`;
+        md += `**Address**: \`${address}\`\n\n`;
+
+        const opBlocks: Array<{ kind: "send" | "receive"; title: string; refs: string[] }> = [];
+
+        // Try to infer operations using conventional fields used in this project:
+        // receives/messages and replies/messages via $ref arrays if present
+        const collectRefs = (arr: any): string[] => {
+          if (!arr) return [];
+          const refs: string[] = [];
+          const each = Array.isArray(arr) ? arr : [arr];
+          each.forEach((m: any) => {
+            if (m && m["$ref"]) {
+              refs.push(m["$ref"].replace("#/components/messages/", ""));
+            }
+          });
+          return refs;
+        };
+
+        // Common: channel.messages (used as receive)
+        const receiveRefs = ch?.messages ? Object.values(ch.messages).map((m: any) => m?.["$ref"]?.replace("#/components/messages/", "")).filter(Boolean) : [];
+        if (receiveRefs.length > 0) {
+          opBlocks.push({ kind: "receive", title: "Receive", refs: receiveRefs as string[] });
+        }
+
+        // Optional: reply/messages (send)
+        const replyRefs = ch?.reply?.messages ? collectRefs(ch.reply.messages) : [];
+        if (replyRefs.length > 0) {
+          opBlocks.push({ kind: "send", title: "Send (Reply)", refs: replyRefs });
+        }
+
+        if (opBlocks.length === 0) {
+          md += `No explicit operations defined.\n\n`;
+        } else {
+          opBlocks.forEach((block) => {
+            md += `#### ${block.title}\n\n`;
+            if (block.refs.length === 0) {
+              md += `No messages.\n\n`;
+            } else {
+              block.refs.forEach((msgName) => {
+                md += `- Message: \`${msgName}\`\n`;
+              });
+              md += `\n`;
+            }
+          });
+        }
+
+        md += `---\n\n`;
+      });
+    }
+
+    // Messages detail
+    md += `## Messages\n\n`;
+    if (Object.keys(messages).length === 0) {
+      md += "No messages defined.\n\n";
+    } else {
+      Object.entries(messages).forEach(([messageName, message]: [string, any]) => {
+        md += `### \`${messageName}\`\n\n`;
+        if (message?.name) md += `**Name**: ${message.name}\n\n`;
+        if (message?.title) md += `**Title**: ${message.title}\n\n`;
+        if (message?.summary) md += `**Summary**: ${message.summary}\n\n`;
+        if (message?.description) md += `${message.description}\n\n`;
+
+        // Headers
+        if (message?.headers) {
+          md += `#### Headers\n\n`;
+          md += formatSchemaForMarkdown(message.headers, (doc.components && doc.components.schemas) || {});
+        }
+
+        // Payload
+        if (message?.payload) {
+          md += `#### Payload\n\n`;
+          md += formatSchemaForMarkdown(message.payload, (doc.components && doc.components.schemas) || {});
+        }
+
+        md += `---\n\n`;
+      });
+    }
+
+    md += `\n*Generated by Ouroboros* — ${new Date().toLocaleDateString("en-US")}\n`;
+  } catch (error) {
+    console.error("Error converting WS YAML to Markdown:", error);
+    md += `\nError: Failed to parse AsyncAPI YAML.\n`;
+  }
+
+  return md;
+}
+
 // Aggregate export for all endpoints (Notion/블로그 친화 포맷)
 type RestApiSpec = {
   id: string;

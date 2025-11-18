@@ -87,7 +87,7 @@ export function TestRequestPanel() {
               detectedContentType
             );
             if (parsed) {
-              // schemaRef가 있으면 스키마를 조회해서 fields 채우기 (모든 contentType에 대해 동일하게 처리)
+              // schemaRef가 있으면 스키마를 조회해서 fields 채우기 (form-data 등)
               if (
                 parsed.schemaRef &&
                 (!parsed.fields || parsed.fields.length === 0)
@@ -120,6 +120,53 @@ export function TestRequestPanel() {
                 } catch (error) {
                   // 스키마 조회 실패 시 무시
                 }
+              }
+
+              // rootSchemaType이 ref인 경우 스키마를 조회해서 fields 채우기 (json/xml 타입)
+              if (
+                parsed.rootSchemaType &&
+                isRefSchema(parsed.rootSchemaType) &&
+                (!parsed.fields || parsed.fields.length === 0)
+              ) {
+                try {
+                  const schemaResponse = await getSchema(parsed.rootSchemaType.schemaName);
+                  const schemaData = schemaResponse.data;
+
+                  if (schemaData.properties) {
+                    const fields = Object.entries(schemaData.properties).map(
+                      ([key, propSchema]: [string, any]) => {
+                        return parseOpenAPISchemaToSchemaField(key, propSchema);
+                      }
+                    );
+
+                    // required 필드 설정
+                    if (
+                      schemaData.required &&
+                      Array.isArray(schemaData.required)
+                    ) {
+                      fields.forEach((field) => {
+                        if (schemaData.required!.includes(field.key)) {
+                          field.required = true;
+                        }
+                      });
+                    }
+
+                    parsed.fields = fields;
+                  }
+                } catch (error) {
+                  // 스키마 조회 실패 시 무시
+                }
+              }
+
+              // rootSchemaType이 object이고 properties가 있지만 fields가 없는 경우 (하위 호환성)
+              if (
+                parsed.rootSchemaType &&
+                parsed.rootSchemaType.kind === "object" &&
+                parsed.rootSchemaType.properties &&
+                parsed.rootSchemaType.properties.length > 0 &&
+                (!parsed.fields || parsed.fields.length === 0)
+              ) {
+                parsed.fields = parsed.rootSchemaType.properties;
               }
 
               // rootSchemaType이 array이고 items가 ref인 경우 스키마 조회
@@ -229,7 +276,7 @@ export function TestRequestPanel() {
             <select
               value={request.method}
               onChange={(e) => setRequest({ method: e.target.value })}
-              className="w-full px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm font-medium"
+              className="w-full px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm font-medium"
             >
               {methods.map((m) => (
                 <option key={m} value={m}>
@@ -247,7 +294,7 @@ export function TestRequestPanel() {
               value={request.url}
               onChange={(e) => setRequest({ url: e.target.value })}
               placeholder="/api/endpoint"
-              className="w-full px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm font-mono"
+              className="w-full px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm font-mono"
             />
           </div>
         </div>
@@ -260,8 +307,8 @@ export function TestRequestPanel() {
             type="text"
             value={request.description}
             onChange={(e) => setRequest({ description: e.target.value })}
-            placeholder="API 설명"
-            className="w-full px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm"
+            placeholder="Description"
+            className="w-full px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
           />
         </div>
       </div>
@@ -272,7 +319,7 @@ export function TestRequestPanel() {
           <label className="text-xs font-medium text-[#8B949E]">Headers</label>
           <button
             onClick={addRequestHeader}
-            className="text-xs px-2 py-1 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-colors"
+            className="text-xs px-2 py-1 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none"
           >
             + Add
           </button>
@@ -287,7 +334,7 @@ export function TestRequestPanel() {
                   updateRequestHeader(index, e.target.value, header.value)
                 }
                 placeholder="Key"
-                className="flex-1 px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm"
+                className="flex-1 px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
               />
               <input
                 type="text"
@@ -296,7 +343,7 @@ export function TestRequestPanel() {
                   updateRequestHeader(index, header.key, e.target.value)
                 }
                 placeholder="Value"
-                className="flex-1 px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm"
+                className="flex-1 px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
               />
               <button
                 onClick={() => removeRequestHeader(index)}
@@ -330,7 +377,7 @@ export function TestRequestPanel() {
             </label>
             <button
               onClick={addQueryParam}
-              className="text-xs px-2 py-1 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-colors"
+              className="text-xs px-2 py-1 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none"
             >
               + Add
             </button>
@@ -345,7 +392,7 @@ export function TestRequestPanel() {
                     updateQueryParam(index, e.target.value, param.value)
                   }
                   placeholder="Key"
-                  className="flex-1 px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm"
+                  className="flex-1 px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
                 />
                 <input
                   type="text"
@@ -354,7 +401,7 @@ export function TestRequestPanel() {
                     updateQueryParam(index, param.key, e.target.value)
                   }
                   placeholder="Value"
-                  className="flex-1 px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] text-sm"
+                  className="flex-1 px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
                 />
                 <button
                   onClick={() => removeQueryParam(index)}
@@ -381,40 +428,33 @@ export function TestRequestPanel() {
       )}
 
       {/* Request Body */}
-      {request.method !== "GET" && (
+      {requestBody && requestBody.type !== "none" && (
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="block text-xs font-medium text-[#8B949E]">
               Request body
-              {requestBody?.required && (
+              {requestBody.required && (
                 <span className="text-red-500 ml-1">required</span>
               )}
             </label>
-            {requestBody && requestBody.type !== "none" && (
-              <span className="text-xs text-[#8B949E]">
-                {requestBody.type === "json" && "application/json"}
-                {requestBody.type === "form-data" && "multipart/form-data"}
-                {requestBody.type === "x-www-form-urlencoded" &&
-                  "application/x-www-form-urlencoded"}
-                {requestBody.type === "xml" &&
-                  (contentType.includes("text/xml")
-                    ? "text/xml"
-                    : "application/xml")}
-              </span>
-            )}
-            {(!requestBody || requestBody.type === "none") && (
-              <span className="text-xs text-[#8B949E]">application/json</span>
-            )}
+            <span className="text-xs text-[#8B949E]">
+              {requestBody.type === "json" && "application/json"}
+              {requestBody.type === "form-data" && "multipart/form-data"}
+              {requestBody.type === "x-www-form-urlencoded" &&
+                "application/x-www-form-urlencoded"}
+              {requestBody.type === "xml" &&
+                (contentType.includes("text/xml")
+                  ? "text/xml"
+                  : "application/xml")}
+            </span>
           </div>
-          {requestBody?.description && (
+          {requestBody.description && (
             <p className="text-xs text-[#8B949E] mb-2">
               {requestBody.description}
             </p>
           )}
           <RequestBodyForm
-            requestBody={
-              requestBody || { type: "json", required: false, fields: [] }
-            }
+            requestBody={requestBody}
             contentType={contentType}
             value={request.body}
             onChange={handleBodyChange}

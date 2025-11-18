@@ -44,7 +44,6 @@ export function TestResponseTabs() {
         setMethodList(response.data.methods);
         setTotalDurationMs(response.data.totalDurationMs);
       } catch (error) {
-        console.error("Try 메서드 리스트 로드 실패:", error);
         setMethodList(null);
         setTotalDurationMs(null);
       } finally {
@@ -98,7 +97,7 @@ export function TestResponseTabs() {
               />
             </svg>
           </div>
-          <p className="text-sm">RUN 버튼을 눌러 테스트를 실행하세요</p>
+          <p className="text-sm">Click the RUN button to execute the test</p>
         </div>
       </div>
     );
@@ -117,9 +116,9 @@ export function TestResponseTabs() {
       <div className="flex border-b border-gray-200 dark:border-[#2D333B]">
         <button
           onClick={() => setActiveTab("response")}
-          className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+          className={`flex-1 px-4 py-3 text-sm font-medium transition-colors focus:outline-none focus:ring-0 ${
             activeTab === "response"
-              ? "text-[#2563EB] border-b-2 border-[#2563EB] bg-blue-50 dark:bg-blue-900/20"
+              ? "text-gray-900 dark:text-[#E6EDF3] border-b-2 border-gray-900 dark:border-[#E6EDF3] bg-gray-50 dark:bg-[#0D1117]"
               : "text-gray-600 dark:text-[#8B949E] hover:text-gray-900 dark:hover:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#0D1117]"
           }`}
         >
@@ -127,9 +126,9 @@ export function TestResponseTabs() {
         </button>
         <button
           onClick={() => setActiveTab("test")}
-          className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+          className={`flex-1 px-4 py-3 text-sm font-medium transition-colors focus:outline-none focus:ring-0 ${
             activeTab === "test"
-              ? "text-[#2563EB] border-b-2 border-[#2563EB] bg-blue-50 dark:bg-blue-900/20"
+              ? "text-gray-900 dark:text-[#E6EDF3] border-b-2 border-gray-900 dark:border-[#E6EDF3] bg-gray-50 dark:bg-[#0D1117]"
               : "text-gray-600 dark:text-[#8B949E] hover:text-gray-900 dark:hover:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#0D1117]"
           }`}
         >
@@ -160,7 +159,6 @@ export function TestResponseTabs() {
                 const response = await getTryTrace(tryId);
                 setTraceData(response.data);
               } catch (error) {
-                console.error("Trace 조회 실패:", error);
                 setTraceData(null);
               } finally {
                 setIsLoadingTrace(false);
@@ -315,11 +313,11 @@ function TestContent({
           </svg>
         </div>
         <p className="text-sm">
-          Mock 엔드포인트는 메서드 실행 정보를 제공하지 않습니다
+          Mock Endpoint does not provide method execution information.
         </p>
         <p className="text-xs mt-1 text-gray-500 dark:text-[#6B7280]">
-          실제 구현된 엔드포인트(completed)에서만 메서드별 실행 시간을 확인할 수
-          있습니다
+          You can only check method execution time in actual implemented
+          endpoints (completed).
         </p>
       </div>
     );
@@ -351,11 +349,11 @@ function TestContent({
           </svg>
         </div>
         <p className="text-sm">
-          메서드 실행 정보를 불러오려면 먼저 API를 실행하세요
+          To load method execution information, first run the API.
         </p>
         <p className="text-xs mt-1 text-gray-500 dark:text-[#6B7280]">
-          RUN 버튼을 눌러 테스트를 실행하면 메서드별 실행 시간을 확인할 수
-          있습니다
+          By clicking the RUN button, you can check the execution time for each
+          method.
         </p>
       </div>
     );
@@ -387,7 +385,7 @@ function TestContent({
             />
           </svg>
         </div>
-        <p className="text-sm">메서드 실행 정보를 불러오는 중...</p>
+        <p className="text-sm">Loading method execution information...</p>
       </div>
     );
   }
@@ -410,9 +408,10 @@ function TestContent({
             />
           </svg>
         </div>
-        <p className="text-sm">메서드 실행 정보가 없습니다</p>
+        <p className="text-sm">No method execution information found.</p>
         <p className="text-xs mt-1 text-gray-500 dark:text-[#6B7280]">
-          Trace 모드로 실행하면 메서드별 실행 시간을 확인할 수 있습니다
+          By running in Trace mode, you can check the execution time for each
+          method.
         </p>
       </div>
     );
@@ -426,7 +425,7 @@ function TestContent({
           <div className="flex items-center justify-between">
             <div>
               <div className="text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-1">
-                전체 소요 시간
+                Total Duration
               </div>
               <div className="text-2xl font-bold text-gray-900 dark:text-[#E6EDF3]">
                 {totalDurationMs.toLocaleString()}ms
@@ -436,7 +435,7 @@ function TestContent({
               <button
                 onClick={() => onShowTrace()}
                 disabled={isLoadingTrace || !tryId}
-                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-[#2D333B] disabled:text-gray-500 dark:disabled:text-[#8B949E] text-white rounded-md transition-colors text-sm font-medium flex items-center gap-2 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-300 dark:disabled:bg-[#2D333B] disabled:text-gray-500 dark:disabled:text-[#8B949E] text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none focus:ring-0 text-sm font-medium flex items-center gap-2 disabled:cursor-not-allowed"
               >
                 {isLoadingTrace ? (
                   <>
@@ -460,7 +459,7 @@ function TestContent({
                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                       />
                     </svg>
-                    로딩 중...
+                    Loading...
                   </>
                 ) : (
                   <>
@@ -477,7 +476,7 @@ function TestContent({
                         d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
                       />
                     </svg>
-                    Call Trace 보기
+                    Call Trace View
                   </>
                 )}
               </button>
@@ -489,14 +488,14 @@ function TestContent({
       {/* Method List */}
       <div>
         <div className="text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-3">
-          메서드별 실행 시간 ({methodList.length}개)
+          Method Execution Time ({methodList.length} methods)
         </div>
         <div className="space-y-2">
           {methodList.map((method: TryMethod, index: number) => (
             <div
               key={method.spanId || index}
               onClick={() => onShowTrace(method.spanId)}
-              className="p-4 bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] rounded-md hover:border-blue-300 dark:hover:border-blue-700 transition-colors cursor-pointer"
+              className="p-4 bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] rounded-md hover:border-gray-400 dark:hover:border-gray-600 transition-colors cursor-pointer focus:outline-none focus:ring-0"
             >
               <div className="flex items-start justify-between mb-2">
                 <div className="flex-1">

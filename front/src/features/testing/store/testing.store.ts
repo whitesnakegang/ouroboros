@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { TryMethod } from "@/features/spec/services/api";
 
-export type Protocol = "REST" | "WebSocket" | "GraphQL";
+export type Protocol = "REST" | "WebSocket";
 
 export interface TestRequest {
   method: string;
@@ -18,6 +18,27 @@ export interface TestResponse {
   headers: Record<string, string>;
   body: string;
   responseTime: number; // 응답 시간 (ms)
+}
+
+export type WebSocketConnectionStatus =
+  | "disconnected"
+  | "connecting"
+  | "connected";
+
+export interface WebSocketMessage {
+  id: string;
+  timestamp: number;
+  direction: "sent" | "received";
+  address: string;
+  content: string;
+  tryId?: string;
+}
+
+export interface WebSocketStats {
+  totalSent: number;
+  totalReceived: number;
+  averageResponseTime: number | null; // Receiver → Reply 평균 응답 시간
+  connectionDuration: number | null; // 연결 지속 시간 (ms)
 }
 
 interface TestingState {
@@ -51,10 +72,21 @@ interface TestingState {
   setMethodList: (methods: TryMethod[] | null) => void;
   totalDurationMs: number | null;
   setTotalDurationMs: (duration: number | null) => void;
-  
+
   // Try ID State
   tryId: string | null;
   setTryId: (tryId: string | null) => void;
+
+  // WebSocket State
+  wsConnectionStatus: WebSocketConnectionStatus;
+  setWsConnectionStatus: (status: WebSocketConnectionStatus) => void;
+  wsMessages: WebSocketMessage[];
+  addWsMessage: (message: WebSocketMessage) => void;
+  clearWsMessages: () => void;
+  wsStats: WebSocketStats;
+  updateWsStats: (updater: Partial<WebSocketStats> | ((prev: WebSocketStats) => Partial<WebSocketStats>)) => void;
+  wsConnectionStartTime: number | null;
+  setWsConnectionStartTime: (time: number | null) => void;
 }
 
 export const useTestingStore = create<TestingState>((set) => ({
@@ -133,8 +165,32 @@ export const useTestingStore = create<TestingState>((set) => ({
   setMethodList: (methods) => set({ methodList: methods }),
   totalDurationMs: null,
   setTotalDurationMs: (duration) => set({ totalDurationMs: duration }),
-  
+
   tryId: null,
   setTryId: (tryId) => set({ tryId }),
-}));
 
+  // WebSocket State
+  wsConnectionStatus: "disconnected",
+  setWsConnectionStatus: (status) => set({ wsConnectionStatus: status }),
+  wsMessages: [],
+  addWsMessage: (message) =>
+    set((state) => ({
+      wsMessages: [...state.wsMessages, message],
+    })),
+  clearWsMessages: () => set({ wsMessages: [] }),
+  wsStats: {
+    totalSent: 0,
+    totalReceived: 0,
+    averageResponseTime: null,
+    connectionDuration: null,
+  },
+  updateWsStats: (updater) =>
+    set((state) => ({
+      wsStats:
+        typeof updater === "function"
+          ? { ...state.wsStats, ...updater(state.wsStats) }
+          : { ...state.wsStats, ...updater },
+    })),
+  wsConnectionStartTime: null,
+  setWsConnectionStartTime: (time) => set({ wsConnectionStartTime: time }),
+}));

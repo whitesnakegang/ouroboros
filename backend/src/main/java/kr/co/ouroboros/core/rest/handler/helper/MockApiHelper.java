@@ -1,0 +1,54 @@
+package kr.co.ouroboros.core.rest.handler.helper;
+
+import kr.co.ouroboros.core.rest.common.dto.Operation;
+import kr.co.ouroboros.core.rest.common.dto.PathItem;
+import kr.co.ouroboros.core.rest.handler.helper.RequestDiffHelper.HttpMethod;
+
+public final class MockApiHelper {
+
+    /**
+     * Prevents instantiation of this utility class.
+     */
+    private MockApiHelper() {
+
+    }
+
+    /**
+     * Marks the file operation as a mock and copies its mock tag when the scanned operation indicates mock progress.
+     *
+     * If the scanned operation's XOuroborosProgress equals "mock" (case-insensitive), this method sets
+     * fileOp's XOuroborosProgress to "mock" and copies XOuroborosTag from scanOp to fileOp.
+     *
+     * @param fileOp the operation from the file to update when mock status applies
+     * @param scanOp the scanned operation whose mock metadata is the source of truth
+     * @return true if scanOp's XOuroborosProgress equals "mock" (case-insensitive), false otherwise
+     */
+    public static boolean isMockApi(Operation fileOp, Operation scanOp) {
+        String xOuroborosProgress = scanOp.getXOuroborosProgress();
+        if (xOuroborosProgress.equalsIgnoreCase("mock")) {
+            fileOp.setXOuroborosProgress("mock");
+            fileOp.setXOuroborosTag(scanOp.getXOuroborosTag());
+            return true;
+        }
+
+        return false;
+    }
+
+
+    /**
+     * Selects the Operation from a PathItem that corresponds to the given HTTP method.
+     *
+     * @param item the PathItem containing operations for various HTTP methods
+     * @param httpMethod the HTTP method whose Operation should be returned
+     * @return the Operation for the specified method, or `null` if that method is not defined on the PathItem
+     */
+    private static Operation getOperationByMethod(PathItem item, HttpMethod httpMethod) {
+        return switch (httpMethod) {
+            case GET -> item.getGet();
+            case POST -> item.getPost();
+            case PUT -> item.getPut();
+            case PATCH -> item.getPatch();
+            case DELETE -> item.getDelete();
+        };
+    }
+}

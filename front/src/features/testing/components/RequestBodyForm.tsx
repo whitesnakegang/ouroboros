@@ -69,7 +69,7 @@ function getDefaultValue(schemaType: SchemaType): any {
   return null;
 }
 
-// JSON Body Form (기존 textarea)
+// JSON Body Form
 function JsonBodyForm({
   requestBody,
   value,
@@ -97,7 +97,23 @@ function JsonBodyForm({
 
   // 초기값 설정
   useEffect(() => {
-    // rootSchemaType이 있으면 우선 사용
+    // fields가 있으면 fields를 우선 사용 (스키마 참조로부터 로드된 fields 포함)
+    if (requestBody?.fields && requestBody.fields.length > 0) {
+      const fieldsKey = JSON.stringify(requestBody.fields.map((f) => f.key));
+
+      if (fieldsKey !== initializedRef.current) {
+        initializedRef.current = fieldsKey;
+
+        // fields가 있으면 기본 JSON 생성
+        if (!value || value.trim() === "" || value === "{}") {
+          const defaultJson = generateDefaultJson(requestBody.fields);
+          onChange(defaultJson);
+        }
+      }
+      return;
+    }
+
+    // rootSchemaType이 있고 fields가 없는 경우
     if (requestBody?.rootSchemaType) {
       const rootKey = JSON.stringify(requestBody.rootSchemaType);
 
@@ -119,7 +135,7 @@ function JsonBodyForm({
             onChange(defaultJson);
           }
         } else {
-          // Ref 타입이면 빈 값
+          // Ref 타입이고 fields도 없으면 빈 값
           if (value && value.trim() !== "") {
             onChange("");
           }
@@ -128,31 +144,17 @@ function JsonBodyForm({
       return;
     }
 
-    // 기존 방식: fields 사용
-    const fieldsKey = requestBody?.fields
-      ? JSON.stringify(requestBody.fields.map((f) => f.key))
-      : "";
-
-    // requestBody가 변경되었거나 fields가 없어졌으면 초기화
-    if (fieldsKey !== initializedRef.current) {
-      initializedRef.current = fieldsKey;
-
-      if (requestBody?.fields && requestBody.fields.length > 0) {
-        // fields가 있으면 기본 JSON 생성
-        if (!value || value.trim() === "" || value === "{}") {
-          const defaultJson = generateDefaultJson(requestBody.fields);
-          onChange(defaultJson);
-        }
-      } else {
-        // fields가 없으면 빈 값으로 설정 (이전 API의 값 제거)
-        if (value && value.trim() !== "") {
-          onChange("");
-        }
+    // fields도 없고 rootSchemaType도 없으면 빈 값으로 설정 (이전 API의 값 제거)
+    if (initializedRef.current !== "") {
+      initializedRef.current = "";
+      if (value && value.trim() !== "") {
+        onChange("");
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestBody?.rootSchemaType, requestBody?.fields]);
 
+  // JSON 타입은 항상 JSON 에디터로 표시 (form-data처럼 필드별로 표시하지 않음)
   return (
     <div>
       <JsonEditor
@@ -728,7 +730,7 @@ function XmlBodyForm({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder='<?xml version="1.0" encoding="UTF-8"?>\n<root>\n  <key>value</key>\n</root>'
-        className="w-full h-40 px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] font-mono text-sm"
+        className="w-full h-40 px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 font-mono text-sm"
       />
     </div>
   );

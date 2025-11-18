@@ -18,7 +18,7 @@ interface StatusCode {
 }
 
 interface SpecFormProps {
-  protocol: "REST" | "GraphQL" | "WebSocket";
+  protocol: "REST" | "WebSocket";
 }
 
 export function SpecForm({ protocol }: SpecFormProps) {

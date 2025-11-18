@@ -1,9 +1,16 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { getAllRestApiSpecs } from "@/features/spec/services/api";
-import type { RestApiSpecResponse } from "@/features/spec/services/api";
+import {
+  getAllRestApiSpecs,
+  getAllWebSocketOperations,
+  getAllWebSocketChannels,
+} from "@/features/spec/services/api";
+import type {
+  RestApiSpecResponse,
+  OperationResponse,
+} from "@/features/spec/services/api";
 
-interface Endpoint {
+export interface Endpoint {
   id: string;
   method: string;
   path: string;
@@ -14,11 +21,17 @@ interface Endpoint {
   progress?: string;
   tag?: string;
   diff?: string;
+  protocol?: Protocol; // 프로토콜 정보 추가
+  operationName?: string; // WebSocket operation name (조회용)
+  entrypoint?: string; // WebSocket entrypoint (pathname)
+  wsProtocol?: "ws" | "wss" | null; // WebSocket protocol (ws/wss/null)
 }
 
 export interface EndpointData {
   [group: string]: Endpoint[];
 }
+
+export type Protocol = "REST" | "WebSocket" | null;
 
 interface SidebarState {
   isOpen: boolean;
@@ -36,6 +49,8 @@ interface SidebarState {
   setTriggerNewForm: (trigger: boolean) => void;
   loadEndpoints: () => Promise<void>;
   isLoading: boolean;
+  protocol: Protocol;
+  setProtocol: (protocol: Protocol) => void;
 }
 
 // 백엔드 스펙을 프론트엔드 엔드포인트 형태로 변환
@@ -68,6 +83,117 @@ function convertSpecToEndpoint(spec: RestApiSpecResponse): Endpoint {
     progress: spec.progress,
     tag: spec.tag,
     diff: spec.diff,
+    protocol: "REST", // 현재는 REST API만 지원하므로 기본값은 REST
+  };
+}
+
+// WebSocket Operation을 프론트엔드 엔드포인트 형태로 변환
+function convertOperationToEndpoint(
+  operationResponse: OperationResponse,
+  channelMap: Map<string, string>
+): Endpoint {
+  const { operationName, operation, tag: _tag } = operationResponse;
+  const tag = _tag;
+
+  // tag 매핑: receive, duplicate, sendto에 따라 상태 설정
+  const mapTagToStatus = (
+    _tag?: string,
+    progress?: string
+  ): Endpoint["implementationStatus"] => {
+    if (progress?.toLowerCase() === "completed") return undefined;
+    // progress가 "mock"이면 in-progress로 표시
+    if (progress?.toLowerCase() === "mock") return "in-progress";
+    // progress가 "none"이면 not-implemented로 표시
+    return "not-implemented";
+  };
+
+  // tag에 따라 method 표시
+  let method = "RECEIVE";
+  if (tag === "duplicate") {
+    method = "DUPLEX";
+  } else if (tag === "receive") {
+    method = "RECEIVE";
+  } else if (tag === "sendto") {
+    method = "SEND";
+  }
+
+  // receiver address 추출
+  const channelRef = operation.channel?.ref || "";
+  const channelName = channelRef.replace("#/channels/", "");
+  const receiverAddress =
+    channelMap.get(channelName) || channelName || "/unknown";
+
+  // reply address 추출 (있는 경우)
+  let replyAddress = "";
+  if (operation.reply && operation.reply.channel) {
+    const replyChannelRef = operation.reply.channel.ref || "";
+    const replyChannelName = replyChannelRef.replace("#/channels/", "");
+    replyAddress =
+      channelMap.get(replyChannelName) || replyChannelName || "/unknown";
+  }
+
+  // Path 생성: "receive address - reply address" 형태
+  let path = receiverAddress;
+  if (replyAddress) {
+    path = `${receiverAddress} - ${replyAddress}`;
+  }
+
+  // Summary 생성 (operation name을 읽기 쉽게)
+  let summary = operationName
+    .replace(/^_/, "")
+    .replace(/_to_/g, " → ")
+    .replace(/_/g, " ")
+    .replace(/\./g, ".");
+
+  // tags 결정: WebSocket의 경우 tags는 [{name: "TAG_NAME"}] 형태
+  const operationTags = (operation as any).tags;
+  let tags: string[] | undefined = undefined;
+
+  if (
+    operationTags &&
+    Array.isArray(operationTags) &&
+    operationTags.length > 0
+  ) {
+    // WebSocket tags는 객체 배열 형태 [{name: "TAG_NAME"}]이므로 name 값만 추출
+    tags = operationTags
+      .map((tag: any) => {
+        if (typeof tag === "string") {
+          return tag; // 이미 문자열인 경우 (호환성)
+        } else if (tag && typeof tag === "object" && tag.name) {
+          return tag.name; // {name: "TAG_NAME"} 형태에서 name 추출
+        }
+        return null;
+      })
+      .filter((tag: string | null): tag is string => tag !== null);
+
+    // 유효한 tag가 없으면 undefined
+    if (tags.length === 0) {
+      tags = undefined;
+    }
+  }
+
+  // entrypoint 추출 (operation.entrypoint 또는 기본값)
+  const entrypoint = (operation as any).entrypoint || "/ws";
+
+  // protocol 추출 (operationResponse.protocol 또는 기본값 "ws")
+  const wsProtocol = operationResponse.protocol || "ws";
+
+  return {
+    id: operation.id || operationName,
+    method: method,
+    path: path,
+    description: summary, // summary로 사용
+    implementationStatus: mapTagToStatus(tag, operation.progress),
+    hasSpecError:
+      operation.diff && operation.diff !== "none" ? true : undefined,
+    tags: tags,
+    progress: operation.progress,
+    tag: tag,
+    diff: operation.diff,
+    protocol: "WebSocket",
+    operationName: operationName,
+    entrypoint: entrypoint, // WebSocket entrypoint 저장
+    wsProtocol: wsProtocol, // WebSocket protocol 저장 (ws/wss/null)
   };
 }
 
@@ -120,16 +246,19 @@ export const useSidebarStore = create<SidebarState>()(
       triggerNewForm: false,
       setTriggerNewForm: (trigger) => set({ triggerNewForm: trigger }),
       isLoading: false,
+      protocol: null,
+      setProtocol: (protocol) => set({ protocol }),
       loadEndpoints: async () => {
         set({ isLoading: true });
         try {
-          const response = await getAllRestApiSpecs();
-          const specs = response.data;
+          // REST API 스펙 로드
+          const restResponse = await getAllRestApiSpecs();
+          const restSpecs = restResponse.data;
 
           // 스펙을 그룹별로 분류
           const grouped: EndpointData = {};
 
-          specs.forEach((spec) => {
+          restSpecs.forEach((spec) => {
             // tags를 그룹 키로 사용 (첫 번째 태그 또는 기본값)
             const group =
               spec.tags && spec.tags.length > 0 ? spec.tags[0] : "OTHERS";
@@ -141,9 +270,54 @@ export const useSidebarStore = create<SidebarState>()(
             grouped[group].push(convertSpecToEndpoint(spec));
           });
 
+          // WebSocket Operations 로드
+          try {
+            // 1. Channels 로드하여 channel name → address 매핑 생성
+            const channelMap = new Map<string, string>();
+            try {
+              const channelsResponse = await getAllWebSocketChannels();
+              channelsResponse.data.forEach((channelResponse) => {
+                // ChannelResponse: { channelName, channel: { address, ... } }
+                const channelName = channelResponse.channelName;
+                const address = channelResponse.channel?.address;
+                if (channelName && address) {
+                  channelMap.set(channelName, address);
+                }
+              });
+            } catch {
+              // Channel 로드 실패 시 추정 값 사용
+            }
+
+            // 2. Operations 로드
+            const wsResponse = await getAllWebSocketOperations();
+            const wsOperations = wsResponse.data;
+
+            // 3. WebSocket Operations를 그룹화
+            // tags의 name 값으로 그룹화, 없으면 "OTHERS"
+            wsOperations.forEach((operation) => {
+              const endpoint = convertOperationToEndpoint(
+                operation,
+                channelMap
+              );
+
+              // 그룹 결정: tags의 첫 번째 name 값 사용, 없으면 "OTHERS"
+              const group =
+                endpoint.tags && endpoint.tags.length > 0
+                  ? endpoint.tags[0] // tags의 첫 번째 값 사용
+                  : "OTHERS"; // tags가 없으면 "OTHERS"
+
+              if (!grouped[group]) {
+                grouped[group] = [];
+              }
+              grouped[group].push(endpoint);
+            });
+          } catch {
+            // WebSocket Operations 로드 실패 시 무시
+          }
+
           set({ endpoints: grouped, isLoading: false });
-        } catch (error) {
-          console.error("API 목록 로드 실패:", error);
+        } catch {
+          // API 목록 로드 실패
           set({ isLoading: false });
           // 에러 발생 시 빈 객체로 설정
           set({ endpoints: {} });

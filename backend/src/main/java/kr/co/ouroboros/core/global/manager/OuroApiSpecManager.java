@@ -16,6 +16,7 @@ import kr.co.ouroboros.core.global.Protocol;
 import kr.co.ouroboros.core.global.handler.OuroProtocolHandler;
 import kr.co.ouroboros.core.global.spec.OuroApiSpec;
 import kr.co.ouroboros.core.rest.common.dto.OuroRestApiSpec;
+import kr.co.ouroboros.core.websocket.common.dto.OuroWebSocketApiSpec;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
@@ -71,9 +72,20 @@ public class OuroApiSpecManager {
         // 2. 코드 스캔
         OuroApiSpec scannedSpec = handler.scanCurrentState();
 
+        // Early return if both file and scanned specs are empty (avoid unnecessary validation)
+        // This prevents NPE in synchronize() when fileSpec is null
         if (scannedSpec instanceof OuroRestApiSpec restApiSpec) {
-            if (fileSpec == null && restApiSpec.getPaths()
-                    .isEmpty()) {
+            if (fileSpec == null && restApiSpec.getPaths().isEmpty()) {
+                // Cache empty scanned spec to prevent computeIfAbsent from being triggered
+                apiCache.put(protocol, scannedSpec);
+                return;
+            }
+        }
+
+        if (scannedSpec instanceof OuroWebSocketApiSpec wsApiSpec) {
+            if (fileSpec == null && (wsApiSpec.getOperations() == null || wsApiSpec.getOperations().isEmpty())) {
+                // Cache empty scanned spec to prevent computeIfAbsent from being triggered
+                apiCache.put(protocol, scannedSpec);
                 return;
             }
         }
@@ -81,11 +93,8 @@ public class OuroApiSpecManager {
         // 3. 불일치 검증
         // 비교 후, 최종적으로 저장할 ApiSpec 반환
         OuroApiSpec validationResult = handler.synchronize(fileSpec, scannedSpec);
-        
-        // 4. 스캔한 최신 스펙을 YAML로 직렬화하고 파일에 저장
-        handler.saveYaml(validationResult);
 
-        // 5. 캐시 최신화 (validationResult 사용 - 파일+코드 동기화 결과)
+        // 4. 캐시 최신화 (validationResult 사용 - 파일+코드 동기화 결과)
         apiCache.put(protocol, validationResult);
     }
 
@@ -165,11 +174,15 @@ public class OuroApiSpecManager {
     }
 
     /**
-     * Load spec from file, synchronize with scanned state, and cache the result.
+     * Load spec from file, synchronize with scanned state, and return the result.
      * This is called when cache is empty and needs to be populated on-demand.
+     * <p>
+     * IMPORTANT: This method is invoked inside computeIfAbsent(), so it must NOT
+     * call apiCache.put() to avoid "Recursive update" exceptions. The returned
+     * value will be automatically cached by computeIfAbsent().
      *
      * @param protocol the protocol identifier used to select the protocol handler
-     * @return the synchronized OuroApiSpec that was stored in the cache
+     * @return the synchronized OuroApiSpec (will be cached by computeIfAbsent)
      */
     private OuroApiSpec findAndCacheSpecOnDemand(Protocol protocol) {
         OuroProtocolHandler handler = getHandler(protocol);
@@ -179,15 +192,14 @@ public class OuroApiSpecManager {
         String yamlContent = loadYamlFromResources(filePath);
 
         if (yamlContent != null && !yamlContent.isEmpty()) {
-            // File exists - process and cache (includes validation)
-            processAndCacheSpec(protocol, yamlContent);
-            return apiCache.get(protocol);
+            // File exists - process spec without caching (computeIfAbsent will cache the return value)
+            OuroApiSpec fileSpec = handler.loadFromFile(yamlContent);
+            OuroApiSpec scannedSpec = handler.scanCurrentState();
+            return handler.synchronize(fileSpec, scannedSpec);
         }
 
-        // File doesn't exist - scan only and cache
-        OuroApiSpec scannedSpec = handler.scanCurrentState();
-        apiCache.put(protocol, scannedSpec);
-        return scannedSpec;
+        // File doesn't exist - return scanned spec (computeIfAbsent will cache the return value)
+        return handler.scanCurrentState();
     }
 
     /**

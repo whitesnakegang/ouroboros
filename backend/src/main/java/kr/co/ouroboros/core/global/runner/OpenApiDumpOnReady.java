@@ -6,6 +6,7 @@ import java.util.Map;
 import kr.co.ouroboros.core.global.handler.OuroProtocolHandler;
 import kr.co.ouroboros.core.global.manager.OuroApiSpecManager;
 import kr.co.ouroboros.core.rest.spec.validator.OurorestYamlValidator;
+import kr.co.ouroboros.core.websocket.spec.validator.OurowebsocketYamlValidator;
 import kr.co.ouroboros.core.rest.mock.model.EndpointMeta;
 import kr.co.ouroboros.core.rest.mock.registry.RestMockRegistry;
 import kr.co.ouroboros.core.rest.mock.service.RestMockLoaderService;
@@ -24,7 +25,8 @@ public class OpenApiDumpOnReady {
     private final List<OuroProtocolHandler> handlers;
     private final RestMockLoaderService mockLoaderService;
     private final RestMockRegistry mockRegistry;
-    private final OurorestYamlValidator validator;
+    private final OurorestYamlValidator ourorestValidator;
+    private final OurowebsocketYamlValidator ourowebsocketValidator;
 
     /**
      * Initializes API specifications and protocol handlers once the application is ready.
@@ -32,6 +34,7 @@ public class OpenApiDumpOnReady {
      * Execution order:
      * <ol>
      *   <li>Validate and enrich ourorest.yml (non-blocking)</li>
+     *   <li>Validate and enrich ourowebsocket.yml (non-blocking)</li>
      *   <li>Fetch OpenAPI JSON from /v3/api-docs</li>
      *   <li>Initialize each protocol handler</li>
      * </ol>
@@ -42,9 +45,17 @@ public class OpenApiDumpOnReady {
     public void onReady() {
         // Step 1: Validate and enrich ourorest.yml
         try {
-            validator.validateAndEnrich();
+            ourorestValidator.validateAndEnrich();
         } catch (Exception e) {
             log.error("❌ ourorest.yml validation failed: {}", e.getMessage(), e);
+            log.error("⚠️  Continuing with application startup...");
+        }
+
+        // Step 1.5: Validate and enrich ourowebsocket.yml
+        try {
+            ourowebsocketValidator.validateAndEnrich();
+        } catch (Exception e) {
+            log.error("❌ ourowebsocket.yml validation failed: {}", e.getMessage(), e);
             log.error("⚠️  Continuing with application startup...");
         }
 

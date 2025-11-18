@@ -9,14 +9,14 @@ plugins {
 }
 
 group = 'io.github.whitesnakegang'   // ← 실제 groupId 반영
-version = '1.0.1'                    // ← 스냅샷이면 0.1.1-SNAPSHOT 등으로
+version = '1.0.2'                    // ← 스냅샷이면 0.1.1-SNAPSHOT 등으로
 
 description = 'Open Source Project'
 
 java {
 	toolchain {
 		languageVersion = JavaLanguageVersion.of(17)
-	}
+}
 }
 
 configurations {
@@ -40,8 +40,17 @@ dependencyManagement {
 dependencies {
 	implementation "org.springdoc:springdoc-openapi-starter-webmvc-api:2.8.13"
 
+	// Springwolf (optional - users must add to their project if they want to use WebSocket code scanning)
+	implementation 'io.github.springwolf:springwolf-stomp:1.17.0'
+	runtimeOnly 'io.github.springwolf:springwolf-ui:1.17.0'
+
+	// WebSocket
+	compileOnly 'org.springframework.boot:spring-boot-starter-websocket'
+
 	// 사용자 앱 쪽 Boot 버전에 '기생'하고 싶다면 compileOnly 유지 (라이브러리 자체는 Boot에 종속 X)
 	compileOnly "org.springframework.boot:spring-boot-starter-web"
+	compileOnly "org.springframework:spring-messaging"
+	compileOnly "org.springframework:spring-websocket"
     compileOnly 'org.springframework.boot:spring-boot-autoconfigure'
 
 	// YAML

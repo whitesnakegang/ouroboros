@@ -63,4 +63,9 @@ public class SchemaResponse {
      * XML root element name
      */
     private String xmlName;
+
+    /**
+     * Array item schema (for type="array")
+     */
+    private Property items;
 }

@@ -29,7 +29,9 @@ export function MockExpressionModal({
   onSelect,
   initialValue = "",
 }: MockExpressionModalProps) {
-  const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
+  const [selectedProvider, setSelectedProvider] = useState<Provider | null>(
+    null
+  );
   const [selectedMethod, setSelectedMethod] = useState<Method | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [options, setOptions] = useState({
@@ -48,24 +50,26 @@ export function MockExpressionModal({
       if (match) {
         const expressionWithParams = match[1];
         // 파라미터가 있는 경우 제거 (예: "lorem.fixedString(10)" → "lorem.fixedString")
-        const expression = expressionWithParams.split('(')[0].trim();
-        
+        const expression = expressionWithParams.split("(")[0].trim();
+
         // 모든 provider의 methods에서 expression과 일치하는 것 찾기
         for (const provider of providers) {
-          const method = provider.methods.find((m) => m.expression === expression);
-          
+          const method = provider.methods.find(
+            (m) => m.expression === expression
+          );
+
           if (method) {
             setSelectedProvider(provider);
             setSelectedMethod(method);
-            
+
             // 파라미터 추출 (있는 경우)
             const paramMatch = expressionWithParams.match(/\((.+)\)/);
             if (paramMatch && method.hasParams) {
-              const params = paramMatch[1].split(',').map(p => p.trim());
-              setOptions({ 
-                length: params[0] || "", 
-                min: params[1] || "", 
-                max: params[2] || "" 
+              const params = paramMatch[1].split(",").map((p) => p.trim());
+              setOptions({
+                length: params[0] || "",
+                min: params[1] || "",
+                max: params[2] || "",
               });
             }
             break;
@@ -89,25 +93,25 @@ export function MockExpressionModal({
   // 최종 표현식 생성 - JSON의 expression 값을 직접 사용
   const generateExpression = () => {
     if (!selectedMethod || !selectedProvider) return "";
-    
+
     // JSON의 expression 값을 직접 사용 (예: "name.fullName", "lorem.fixedString")
     let expr = selectedMethod.expression;
-    
+
     // 파라미터가 있는 메소드의 경우
     if (selectedMethod.hasParams) {
       const params = [];
       if (options.length) params.push(options.length);
       if (options.min) params.push(options.min);
       if (options.max) params.push(options.max);
-      
+
       if (params.length > 0) {
         expr += `(${params.join(", ")})`;
       }
     }
-    
+
     // expressionFormat 적용 ({{$%s}})
     const format = dataFakerMethods.expressionFormat || "{{$%s}}";
-    return format.replace('%s', expr);
+    return format.replace("%s", expr);
   };
 
   const handleConfirm = () => {
@@ -135,18 +139,25 @@ export function MockExpressionModal({
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-[#30363D]">
           <div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-[#E6EDF3]">
-              DataFaker Mock 표현식 선택
+              Select DataFaker Mock Expression
             </h2>
-            <p className="text-sm text-gray-500 dark:text-[#8B949E] mt-1">
-              Provider와 메소드를 선택하여 Mock 데이터 표현식을 생성하세요
-            </p>
           </div>
           <button
             onClick={handleClose}
             className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#30363D] transition-colors"
           >
-            <svg className="w-6 h-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <svg
+              className="w-6 h-6 text-gray-500"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -172,9 +183,9 @@ export function MockExpressionModal({
                     setSelectedProvider(provider);
                     setSelectedMethod(null);
                   }}
-                  className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
+                  className={`w-full text-left px-4 py-3 rounded-lg transition-all focus:outline-none focus:ring-0 ${
                     selectedProvider?.name === provider.name
-                      ? "bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-500"
+                      ? "bg-gray-100 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600"
                       : "hover:bg-gray-100 dark:hover:bg-[#161B22] border-2 border-transparent"
                   }`}
                 >
@@ -205,9 +216,9 @@ export function MockExpressionModal({
                   <button
                     key={method.name}
                     onClick={() => setSelectedMethod(method)}
-                    className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
+                    className={`w-full text-left px-4 py-3 rounded-lg transition-all focus:outline-none focus:ring-0 ${
                       selectedMethod?.name === method.name
-                        ? "bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-500"
+                        ? "bg-gray-100 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600"
                         : "hover:bg-gray-100 dark:hover:bg-[#161B22] border-2 border-transparent"
                     }`}
                   >
@@ -223,7 +234,7 @@ export function MockExpressionModal({
                       {method.description}
                     </div>
                     <div className="text-xs text-gray-400 dark:text-[#6E7681] mt-1 font-mono">
-                      예: {method.example}
+                      Example: {method.example}
                     </div>
                   </button>
                 ))}
@@ -244,7 +255,7 @@ export function MockExpressionModal({
                       d="M9 5l7 7-7 7"
                     />
                   </svg>
-                  <p>Provider를 선택하세요</p>
+                  <p>Select a Provider</p>
                 </div>
               </div>
             )}
@@ -256,7 +267,7 @@ export function MockExpressionModal({
               <div className="p-4 space-y-4">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-700 dark:text-[#8B949E] mb-2">
-                    선택된 메소드
+                    Selected Method
                   </h3>
                   <div className="bg-white dark:bg-[#0D1117] p-4 rounded-lg border border-gray-200 dark:border-[#30363D]">
                     <div className="flex items-center gap-2 mb-2">
@@ -278,7 +289,7 @@ export function MockExpressionModal({
                 {selectedMethod.hasParams && (
                   <div>
                     <h3 className="text-sm font-semibold text-gray-700 dark:text-[#8B949E] mb-2">
-                      옵션 (선택사항)
+                      Options (optional)
                     </h3>
                     <div className="space-y-2">
                       <div>
@@ -288,7 +299,9 @@ export function MockExpressionModal({
                         <input
                           type="number"
                           value={options.length}
-                          onChange={(e) => setOptions({ ...options, length: e.target.value })}
+                          onChange={(e) =>
+                            setOptions({ ...options, length: e.target.value })
+                          }
                           placeholder="10"
                           className="w-full px-3 py-2 border border-gray-300 dark:border-[#30363D] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3]"
                         />
@@ -300,7 +313,9 @@ export function MockExpressionModal({
                         <input
                           type="number"
                           value={options.min}
-                          onChange={(e) => setOptions({ ...options, min: e.target.value })}
+                          onChange={(e) =>
+                            setOptions({ ...options, min: e.target.value })
+                          }
                           placeholder="1"
                           className="w-full px-3 py-2 border border-gray-300 dark:border-[#30363D] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3]"
                         />
@@ -312,7 +327,9 @@ export function MockExpressionModal({
                         <input
                           type="number"
                           value={options.max}
-                          onChange={(e) => setOptions({ ...options, max: e.target.value })}
+                          onChange={(e) =>
+                            setOptions({ ...options, max: e.target.value })
+                          }
                           placeholder="100"
                           className="w-full px-3 py-2 border border-gray-300 dark:border-[#30363D] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3]"
                         />
@@ -324,15 +341,16 @@ export function MockExpressionModal({
                 {/* Preview */}
                 <div>
                   <h3 className="text-sm font-semibold text-gray-700 dark:text-[#8B949E] mb-2">
-                    미리보기
+                    Preview
                   </h3>
                   <div className="bg-gray-900 dark:bg-black p-4 rounded-lg border border-gray-700">
                     <div className="font-mono text-sm text-green-400">
-                      {generateExpression() || '{{$provider.method}}'}
+                      {generateExpression() || "{{$provider.method}}"}
                     </div>
                   </div>
                   <p className="text-xs text-gray-500 dark:text-[#8B949E] mt-2">
-                    이 표현식은 백엔드에서 DataFaker로 Mock 데이터를 생성합니다.
+                    This expression creates mock data using DataFaker in the
+                    backend.
                   </p>
                 </div>
               </div>
@@ -352,7 +370,7 @@ export function MockExpressionModal({
                       d="M9 5l7 7-7 7"
                     />
                   </svg>
-                  <p>메소드를 선택하세요</p>
+                  <p>Select a method</p>
                 </div>
               </div>
             )}
@@ -363,9 +381,7 @@ export function MockExpressionModal({
         <div className="flex items-center justify-between p-6 border-t border-gray-200 dark:border-[#30363D] bg-gray-50 dark:bg-[#161B22]">
           <div className="text-sm text-gray-500 dark:text-[#8B949E]">
             {selectedMethod && selectedProvider && (
-              <span className="font-mono text-xs">
-                {generateExpression()}
-              </span>
+              <span className="font-mono text-xs">{generateExpression()}</span>
             )}
           </div>
           <div className="flex gap-3">
@@ -373,14 +389,14 @@ export function MockExpressionModal({
               onClick={handleClose}
               className="px-6 py-2 border border-gray-300 dark:border-[#30363D] rounded-lg hover:bg-gray-100 dark:hover:bg-[#30363D] transition-colors text-gray-700 dark:text-[#E6EDF3]"
             >
-              취소
+              Cancel
             </button>
             <button
               onClick={handleConfirm}
               disabled={!selectedMethod || !selectedProvider}
               className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed transition-colors"
             >
-              선택
+              Select
             </button>
           </div>
         </div>
@@ -388,4 +404,3 @@ export function MockExpressionModal({
     </div>
   );
 }
-

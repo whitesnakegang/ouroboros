@@ -23,6 +23,7 @@
 - [Features](#-features)
 - [Architecture](#-architecture)
 - [Quick Start](#-quick-start)
+- [User Interface](#️-user-interface)
 - [Usage](#-usage)
 - [Documentation](#-documentation)
 - [Contributing](#-contributing)
@@ -42,6 +43,8 @@
 - **Automatic Validation**: Automatically verify consistency between implementation and specification
 - **Developer-Friendly**: Intuitive web UI and RESTful API
 - **Lightweight Library**: Simply add to existing Spring Boot applications
+
+> 🎬 **New to Ouroboros?** Check out our [User Guide](./docs/USER_GUIDE.md) with animated GIFs showing key workflows!
 
 ---
 
@@ -71,10 +74,24 @@
 ### 🔍 Validation & QA
 - ✅ **Spec Validation**: Verify OpenAPI standard compliance
 - ✅ **Implementation Comparison**: Sync code and specs with `@ApiState` annotation
+  - ⚠️ **Only methods with `@ApiState` are scanned and validated** - methods without this annotation are excluded from validation
 - ✅ **Automatic Enrichment**: Automatically add missing Ouroboros extension fields
 - ✅ **Error Reporting**: Detailed validation error messages
 - ✅ **Try Feature**: API execution tracking and analysis with **in-memory storage by default** (📖 [Setup Guide](./OUROBOROS_TRY_SETUP.md))
   - **Default**: In-memory trace storage (no setup required)
+
+### 🌐 WebSocket/STOMP API Management
+- ✅ **AsyncAPI 3.0.0 Support**: Full support for WebSocket/STOMP API specifications
+- ✅ **Channel Management**: Create and manage STOMP destinations (channels)
+- ✅ **Operation Management**: Define send/receive operations with reply configurations
+- ✅ **Message Components**: Reusable message definitions for WebSocket communications
+- ✅ **Schema Management**: Shared schemas for WebSocket message payloads
+- ✅ **Code Scanning**: Automatic code scanning via Springwolf (optional)
+- ✅ **WebSocket Try**: Performance tracing for WebSocket/STOMP messages
+
+> **⚠️ Important for WebSocket Code Scanning**:
+> - **Channel address must include prefix**: When writing WebSocket specifications, the channel address must include the application destination prefix. For example, if your `@MessageMapping` is `/chat/send` and your prefix is `/app`, write the full address as `/app/chat/send` in the specification.
+> - **Annotations required**: Only methods annotated with `@MessageMapping` and `@SendTo` are scanned. Methods without these annotations will not be included in code scanning.
 
 ---
 
@@ -119,10 +136,15 @@
 
 #### Backend (Spring Boot Library)
 - **`core/global`**: Auto-configuration, response format, exception handling
-- **`core/rest/spec`**: API specification CRUD services
+- **`core/rest/spec`**: REST API specification CRUD services
 - **`core/rest/mock`**: Mock server filter and registry
 - **`core/rest/validation`**: OpenAPI validation and enrichment
-- **`ui/controller`**: REST API endpoints
+- **`core/rest/tryit`**: Internal method call tracing for try requests
+- **`core/websocket/spec`**: WebSocket/STOMP API specification CRUD services
+- **`core/websocket/handler`**: WebSocket protocol handlers (with/without Springwolf)
+- **`core/websocket/tryit`**: WebSocket message tracing for try requests
+- **`ui/rest/controller`**: REST API endpoints
+- **`ui/websocket/controller`**: WebSocket API endpoints
 
 #### Frontend (React + TypeScript)
 - **`features/spec`**: API specification editor and viewer
@@ -131,8 +153,10 @@
 - **`store`**: Zustand state management
 
 #### Data Storage
-- **`ourorest.yml`**: Single OpenAPI file containing all API specifications
-- **Location**: `{project}/src/main/resources/ouroboros/rest/ourorest.yml`
+- **`ourorest.yml`**: Single OpenAPI file containing all REST API specifications
+  - **Location**: `{project}/src/main/resources/ouroboros/rest/ourorest.yml`
+- **`ourowebsocket.yml`**: Single AsyncAPI file containing all WebSocket/STOMP API specifications
+  - **Location**: `{project}/src/main/resources/ouroboros/websocket/ourowebsocket.yml`
 
 ---
 
@@ -148,8 +172,13 @@
 #### Gradle
 ```gradle
 dependencies {
-    implementation 'io.github.whitesnakegang:ouroboros:1.0.1'
+    implementation 'io.github.whitesnakegang:ouroboros:1.0.2'
     implementation 'org.springframework.boot:spring-boot-starter-web'
+    
+    // Optional: For WebSocket code scanning and spec comparison
+    // Only add if you need automatic code scanning for WebSocket APIs
+    implementation 'io.github.springwolf:springwolf-stomp:1.17.0'
+    runtimeOnly 'io.github.springwolf:springwolf-ui:1.17.0'
 }
 ```
 
@@ -158,15 +187,31 @@ dependencies {
 <dependency>
     <groupId>io.github.whitesnakegang</groupId>
     <artifactId>ouroboros</artifactId>
-    <version>1.0.1</version>
+    <version>1.0.2</version>
+</dependency>
+
+<!-- Optional: For WebSocket code scanning and spec comparison -->
+<!-- Only add if you need automatic code scanning for WebSocket APIs -->
+<dependency>
+    <groupId>io.github.springwolf</groupId>
+    <artifactId>springwolf-stomp</artifactId>
+    <version>1.17.0</version>
+</dependency>
+<dependency>
+    <groupId>io.github.springwolf</groupId>
+    <artifactId>springwolf-ui</artifactId>
+    <version>1.17.0</version>
+    <scope>runtime</scope>
 </dependency>
 ```
 
-> **Note**: If you rely on Lombok annotations, make sure your build includes <code>annotationProcessor 'org.projectlombok:lombok'</code>. Without it, <code>@ApiState</code> metadata is not generated and automatic scanning will be skipped.
+> **⚠️ Important**: 
+> - If you rely on Lombok annotations, make sure your build includes <code>annotationProcessor 'org.projectlombok:lombok'</code>. Without it, <code>@ApiState</code> metadata is not generated and automatic scanning will be skipped.
+> - **`@ApiState` annotation is required for code scanning and validation**: Only controller methods annotated with `@ApiState` are included in code scanning. Methods without this annotation will **not be scanned** and **will not be validated** against the specification. If you want Ouroboros to track and validate your API implementation, you must add `@ApiState` to all controller methods.
 
 ### Configuration (Optional)
 
-> **Method Tracing**: Internal method tracing is **disabled by default**. If you need internal method tracing in the Try feature, you must add the `method-tracing` configuration and set `management.tracing.sampling.probability=1.0` to capture all method traces.
+> **Method Tracing**: Internal method tracing is **disabled by default**. If you need internal method tracing in the Try feature, you must add the `method-tracing` configuration.
 
 `application.yml`:
 ```yaml
@@ -176,16 +221,30 @@ ouroboros:
     url: http://localhost:8080
     description: Local Development Server
   # Method Tracing configuration (required for internal method tracing in Try feature)
+  # Internal method tracing is disabled by default
   method-tracing:
     enabled: true
     allowed-packages: your.package.name  # Specify package paths to trace
 
-# Micrometer Tracing (Required for Method Tracing)
-# Set sampling probability to 1.0 to capture all traces
-management:
-  tracing:
-    sampling:
-      probability: 1.0
+# WebSocket Configuration (Optional)
+# If you only want to write WebSocket specs without code scanning/comparison:
+springwolf:
+  enabled: false  # Disable Springwolf (spec writing only)
+
+# If you want WebSocket code scanning, spec comparison, and testing:
+springwolf:
+  enabled: true
+  docket:
+    info:
+      title: WebSocket API
+      version: 1.0.0
+      description: WebSocket API Description
+    servers:
+      websocket:
+        host: localhost:8080
+        protocol: ws
+        description: WebSocket Server
+    base-package: com.yourpackage  # Package to scan for @MessageMapping annotations
 ```
 
 ### Getting Started
@@ -209,6 +268,8 @@ management:
    - ✅ Import/Export OpenAPI YAML files
    - ✅ Generate code snippets (cURL, JavaScript, Python, etc.)
 
+   > 🎬 **Learn the workflows**: See our [User Guide](./docs/USER_GUIDE.md) with step-by-step animated GIFs!
+
 3. **Create Your First API Specification**
    
    Using the web UI:
@@ -229,14 +290,163 @@ management:
 
 ---
 
+## 🖥️ User Interface
+
+Ouroboros provides an intuitive web-based interface for managing API specifications. All operations can be performed through the GUI without writing code.
+
+### Overview
+
+The complete GUI allows you to write and review specifications through a visual interface. The interface is divided into three main areas: the sidebar for navigation, the main content area for viewing and editing specifications, and the action panels for testing and validation.
+
+![Complete GUI](./docs/images/scrennshots/complete-gui.png)
+
+**Key Areas**:
+- **Left Sidebar**: Navigate through all API endpoints, schemas, and WebSocket operations
+- **Main Content Area**: View and edit API specifications, schemas, and messages
+- **Action Panels**: Test APIs, view validation results, and analyze performance
+
+### Sidebar with Status Badges
+
+The sidebar displays all API endpoints with status badges, allowing you to quickly identify development status at a glance. You can filter endpoints by status and easily navigate to any API specification.
+
+![Sidebar with Badges](./docs/images/scrennshots/sidebar-badges.png)
+
+**Status Badges**:
+- 🟢 **Completed**: API is fully implemented and tested
+- 🟡 **Implementing**: API is currently being developed
+- 🔴 **Mock**: API exists only as a specification (not yet implemented)
+- 🟠 **Bugfix**: API is under bug fixing
+
+**Features**:
+- Click on any endpoint to view its details
+- Filter endpoints by status using the status filter buttons
+- Group endpoints by tags or paths for better organization
+- Quick access to create new APIs, schemas, or operations
+
+### API Detail Page
+
+The detail page provides comprehensive information about each API specification, including request/response schemas, parameters, and metadata. All information is organized in tabs for easy navigation.
+
+![API Detail Page](./docs/images/scrennshots/api-detail-page.png)
+
+**Features**:
+- **Overview Tab**: View complete API specification including path, method, summary, description, and tags
+- **Request Tab**: Configure request parameters, headers, query parameters, and request body schemas
+- **Response Tab**: Define response schemas for different status codes (200, 201, 400, 404, etc.)
+- **Test Tab**: Execute API tests and view responses
+- **Validation Tab**: Check validation status and discrepancies between spec and implementation
+- **Code Snippets**: Generate code examples in various languages (cURL, JavaScript, Python, etc.)
+- **Export**: Export API documentation in Markdown or OpenAPI YAML format
+
+**Quick Actions**:
+- Edit API details directly in the page
+- Reference reusable schemas for request/response bodies
+- Set development progress and tags
+- View validation status and apply changes
+
+### Specification Editor
+
+Create and edit API specifications through an intuitive form-based editor. The editor provides a step-by-step workflow to define all aspects of your API.
+
+![Specification Editor](./docs/images/scrennshots/spec-editor.png)
+
+**Editor Sections**:
+- **Basic Information**: Define path, HTTP method (GET, POST, PUT, DELETE, etc.), summary, and description
+- **Request Configuration**: 
+  - Add path parameters, query parameters, and headers
+  - Define request body schema (reference existing schemas or create inline)
+  - Set content types (application/json, application/xml, etc.)
+- **Response Configuration**:
+  - Add response definitions for each status code
+  - Define response headers and body schemas
+  - Set response content types
+- **Metadata**: Set development progress (mock/completed), tags (none/implementing/bugfix), and validation status
+
+**Capabilities**:
+- Reference reusable schemas using `{"ref": "SchemaName"}`
+- Auto-complete for schema names and field paths
+- Real-time validation of OpenAPI 3.1.0 compliance
+- Preview generated OpenAPI specification
+
+### Validation Screen
+
+The validation screen shows discrepancies between your specification and actual implementation, allowing you to review and apply changes. This helps maintain consistency between your API documentation and actual code.
+
+![Validation Screen](./docs/images/scrennshots/validation-screen.png)
+
+**Validation Types**:
+- **Request Validation**: Compare request parameters, headers, and body schemas
+- **Response Validation**: Compare response status codes, headers, and body schemas
+- **Endpoint Validation**: Check if path and method match between spec and implementation
+- **Both**: When both request and response differ from the specification
+
+**Features**:
+- **Visual Diff Display**: See exactly what differs between spec and implementation
+- **One-Click Sync**: Apply changes from code to specification with a single click
+- **Validation Status Badge**: Each endpoint shows its validation status (Valid/Invalid/Diff detected)
+- **Detailed Reports**: View comprehensive validation reports for all endpoints
+- **Filter by Status**: Filter endpoints by validation status for quick review
+
+**Workflow**:
+1. View validation results after code scanning
+2. Review discrepancies highlighted in the interface
+3. Apply changes to synchronize spec with code
+4. Track validation status for each endpoint
+
+### Testing Screen
+
+The testing screen allows you to test APIs and view both mock and actual responses, along with method-level performance tracking. Configure authentication, set request parameters, and analyze performance all in one place.
+
+![Testing Setting](./docs/images/scrennshots/testing-setting.png)
+
+**Test Configuration**:
+- **Request Setup**: Configure path parameters, query parameters, headers, and request body
+- **Authentication**: Set up Bearer tokens, API keys, or custom headers for authenticated requests
+- **Environment**: Switch between different environments (development, staging, production)
+
+![Test Response](./docs/images/scrennshots/test-response.png)
+
+**Response Viewing**:
+- **Mock Response**: Test against mock data generated from specifications (useful for frontend development)
+- **Actual Response**: Test against real backend implementation
+- **Side-by-Side Comparison**: Compare mock vs actual responses to verify implementation correctness
+- **Response Details**: View status code, headers, and formatted response body (JSON, XML, etc.)
+
+![Method Tracing](./docs/images/scrennshots/method-tracing-simple.png)
+
+**Method Performance Tracking**:
+- **Simple View**: See total request execution time and key method timings at a glance
+- **Detailed View**: Dive deep into method-level execution times and call hierarchies
+
+![Method Tracing Detail](./docs/images/scrennshots/method-tracing-detail.png)
+
+**Performance Analysis**:
+- **Execution Timeline**: Visual timeline showing when each method was called
+- **Method Hierarchy**: Tree view showing method call relationships
+- **Performance Metrics**: 
+  - Total request execution time
+  - Individual method execution times
+  - Database query durations (if applicable)
+  - External API call times (if applicable)
+- **Bottleneck Identification**: Automatically highlight slow methods and potential performance issues
+- **N+1 Detection**: Identify N+1 query problems in database operations
+
+**Features**:
+- **TEST Tab**: Navigate to the TEST tab to view detailed method traces
+- **Request History**: View and replay previous test requests
+- **Export Results**: Export test results and performance metrics
+
+> 📖 **For step-by-step workflows with animated GIFs, see [User Guide](./docs/USER_GUIDE.md)**
+
+---
+
 ## 📚 Usage
 
 ### Basic Workflow (Using Web UI)
 
 #### Step 1: Define Reusable Schema
 1. Navigate to **"Schemas"** tab in the web UI
-2. Click **"New Schema"** button
-3. Fill in the schema form:
+2. Fill in the schema form:
    - **Name**: `User`
    - **Type**: `object`
    - Add properties:
@@ -244,7 +454,7 @@ management:
      - `name` (string) - Mock: `{{name.fullName}}`
      - `email` (string) - Mock: `{{internet.emailAddress}}`
    - Mark `id` and `name` as required
-4. Click **"Save"**
+3. Click **"Save"**
 
 #### Step 2: Create API Specification
 1. Navigate to **"APIs"** tab
@@ -293,7 +503,14 @@ public class UserController {
 }
 ```
 
-On application startup, Ouroboros automatically validates your implementation against the spec.
+> **⚠️ Critical**: **Only methods with `@ApiState` annotation are scanned and validated**. If you don't add `@ApiState` to a controller method:
+> - ❌ The method will **not be included** in code scanning
+> - ❌ The method will **not be validated** against the specification
+> - ❌ Specification-implementation comparison will **not work** for that endpoint
+> 
+> To enable automatic validation, you **must** add `@ApiState` to all controller methods you want to track.
+
+On application startup, Ouroboros automatically validates your implementation against the spec for all methods annotated with `@ApiState`.
 
 #### Step 5: Update Status
 Once implementation is complete, update the status in the web UI:
@@ -326,7 +543,17 @@ Ouroboros will automatically:
 - [Complete API Endpoints](./backend/docs/endpoints/README.md)
 - [REST API Specification Management](./backend/docs/endpoints/01-create-rest-api-spec.md)
 - [Schema Management](./backend/docs/endpoints/06-create-schema.md)
+- [WebSocket Operation Management](./backend/docs/endpoints/12-create-websocket-operation.md)
+- [WebSocket Schema & Message Management](./backend/docs/endpoints/README.md#websocket-스키마-관리)
 - [YAML Import](./backend/docs/endpoints/11-import-yaml.md)
+
+### User Guides
+- 🎬 **[User Guide with Animated Workflows](./docs/USER_GUIDE.md)** - Step-by-step workflows with GIFs showing how to:
+  - Create and use schemas in REST APIs
+  - Set up authentication for testing
+  - View method-level performance results
+  - Create WebSocket/STOMP specifications
+- [한국어 사용자 가이드](./docs/ko/USER_GUIDE.md) - GIF가 포함된 단계별 워크플로우
 
 ### Developer Guide
 - [Project Documentation](./backend/PROJECT_DOCUMENTATION.md)

@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -75,9 +76,14 @@ public class TraceTreeBuilder {
         }
         
         // Find root spans (spans with no parent or parent not in trace)
+        // Sort by startTimeNanos to preserve call order
         List<TraceSpanInfo> rootSpans = spans.stream()
                 .filter(s -> s.getParentSpanId() == null || s.getParentSpanId().isEmpty() || 
                            s.getParentSpanId().equals("0") || !spanMap.containsKey(s.getParentSpanId()))
+                .sorted(Comparator.comparing(
+                    (TraceSpanInfo s) -> s.getStartTimeNanos() != null ? s.getStartTimeNanos() : Long.MAX_VALUE,
+                    Comparator.nullsLast(Comparator.naturalOrder())
+                ))
                 .collect(Collectors.toList());
         
         // Build tree recursively
@@ -112,10 +118,14 @@ public class TraceTreeBuilder {
         // Parse class name and method signature
         SpanMethodInfo methodInfo = spanMethodParser.parse(span);
         
-        // Get children
+        // Get children and sort by startTimeNanos to preserve call order
         List<SpanNode> children = new ArrayList<>();
         if (childrenMap.containsKey(span.getSpanId())) {
             children = childrenMap.get(span.getSpanId()).stream()
+                    .sorted(Comparator.comparing(
+                        (TraceSpanInfo s) -> s.getStartTimeNanos() != null ? s.getStartTimeNanos() : Long.MAX_VALUE,
+                        Comparator.nullsLast(Comparator.naturalOrder())
+                    ))
                     .map(child -> buildSpanNode(child, spanMap, childrenMap, totalDurationMs))
                     .collect(Collectors.toList());
         }
@@ -175,14 +185,31 @@ public class TraceTreeBuilder {
      * @return Display name for the span
      */
     private String buildDisplayName(TraceSpanInfo span, SpanMethodInfo methodInfo) {
-        if ("HTTP".equals(methodInfo.getClassName())) {
+        // Extract simple class name for comparison (handles FQCN)
+        String simpleClassName = extractSimpleClassName(methodInfo.getClassName());
+        if ("HTTP".equals(simpleClassName)) {
             return formatHttpDisplayName(span, methodInfo);
         } else if (methodInfo.getClassName() != null && !methodInfo.getClassName().isEmpty()
                 && methodInfo.getMethodName() != null && !methodInfo.getMethodName().isEmpty()) {
-            return methodInfo.getClassName() + "." + methodInfo.getMethodName();
+            // Use simple class name (without package path) for display name
+            return simpleClassName + "." + methodInfo.getMethodName();
         } else {
             return span.getName();
         }
+    }
+    
+    /**
+     * Returns the simple class name extracted from a fully qualified class name.
+     *
+     * @param fqcn the fully qualified class name (may be null or empty), e.g. "kr.co.ouroboros.service.DataProcessingService"
+     * @return the simple class name (e.g. "DataProcessingService"), or the original {@code fqcn} if it is null or empty
+     */
+    private String extractSimpleClassName(String fqcn) {
+        if (fqcn == null || fqcn.isEmpty()) {
+            return fqcn;
+        }
+        int lastDot = fqcn.lastIndexOf('.');
+        return lastDot >= 0 ? fqcn.substring(lastDot + 1) : fqcn;
     }
     
     /**

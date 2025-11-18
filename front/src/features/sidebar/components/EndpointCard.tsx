@@ -1,20 +1,10 @@
+import { useState, useRef, useLayoutEffect } from "react";
 import { useSidebarStore } from "../store/sidebar.store";
-
-interface Endpoint {
-  id: string;
-  method: string;
-  path: string;
-  description: string;
-  implementationStatus?: "not-implemented" | "in-progress" | "modifying";
-  hasSpecError?: boolean;
-  progress?: string;
-  tag?: string;
-  diff?: string;
-}
+import type { Endpoint } from "../store/sidebar.store";
 
 interface EndpointCardProps {
   endpoint: Endpoint;
-  filterType: "mock" | "completed";
+  filterType: "mock" | "completed" | "all";
 }
 
 // HTTP Method 색상 (텍스트 컬러만)
@@ -24,17 +14,74 @@ const methodTextColors = {
   PUT: "text-[#F59E0B]",
   PATCH: "text-[#F59E0B]",
   DELETE: "text-red-500",
+  RECEIVE: "text-[#8B5CF6]", // 보라색
+  SEND: "text-[#06B6D4]", // 청록색
+  DUPLEX: "text-[#EC4899]", // 핑크색 (양방향)
 };
 
-// Mock 상태 표시 색상
+// Mock 상태 표시 색상 (육안으로 확실히 구분 가능한 색상)
 const mockStatusColors = {
-  "not-implemented": "bg-[#8B949E]",
-  "in-progress": "bg-blue-500",
-  modifying: "bg-orange-500",
+  "not-implemented": "bg-[#8B949E]", // 회색
+  "in-progress": "bg-[#EAB308]", // 노란색 (주의)
+  modifying: "bg-[#F97316]", // 주황색 (주의)
+};
+
+// Completed 상태 표시 색상 (육안으로 확실히 구분 가능한 색상)
+const completedStatusColor = "bg-[#10B981]"; // 초록색
+
+// WebSocket 상태별 색상 및 라벨 결정 함수
+const getWebSocketStatus = (tag?: string, progress?: string) => {
+  const normalizedProgress = progress?.toLowerCase();
+  const normalizedTag = tag?.toLowerCase();
+
+  // tag: receive인 경우
+  if (normalizedTag === "receive") {
+    if (normalizedProgress === "none" || !normalizedProgress) {
+      return {
+        color: "bg-[#8B949E]", // 회색
+        label: "Not Implemented",
+      };
+    } else if (normalizedProgress === "receive") {
+      return {
+        color: "bg-[#10B981]", // 초록색
+        label: "Completed",
+      };
+    }
+  }
+
+  // tag: duplicate인 경우
+  if (normalizedTag === "duplicate") {
+    if (normalizedProgress === "none" || !normalizedProgress) {
+      return {
+        color: "bg-[#8B949E]", // 회색
+        label: "Not Implemented",
+      };
+    } else if (normalizedProgress === "receive") {
+      return {
+        color: "bg-[#F97316]", // 주황색
+        label: "Receive Only Verified",
+};
+    } else if (normalizedProgress === "complete" || normalizedProgress === "completed") {
+      return {
+        color: "bg-[#10B981]", // 초록색
+        label: "Completed",
+      };
+    }
+  }
+
+  // 기본값 (기타 경우)
+  return {
+    color: "bg-[#8B949E]", // 회색
+    label: "미구현",
+  };
 };
 
 export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
   const { setSelectedEndpoint, selectedEndpoint } = useSidebarStore();
+  const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
+  const [showTooltip, setShowTooltip] = useState(false);
+  const badgeRef = useRef<HTMLDivElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
 
   const handleClick = () => {
     setSelectedEndpoint(endpoint);
@@ -45,6 +92,41 @@ export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
     "text-[#8B949E]";
 
   const isSelected = selectedEndpoint?.id === endpoint.id;
+  const isWebSocket = endpoint.protocol === "WebSocket";
+
+  // 툴팁 위치 계산
+  useLayoutEffect(() => {
+    if (showTooltip && badgeRef.current && tooltipRef.current) {
+      const badgeRect = badgeRef.current.getBoundingClientRect();
+      const tooltipRect = tooltipRef.current.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const viewportWidth = window.innerWidth;
+      
+      // 위쪽에 공간이 충분한지 확인
+      const spaceAbove = badgeRect.top;
+      const spaceBelow = viewportHeight - badgeRect.bottom;
+      
+      let top = badgeRect.top - tooltipRect.height - 8;
+      let left = badgeRect.left;
+      
+      // 위쪽 공간이 부족하면 아래쪽에 표시
+      if (spaceAbove < tooltipRect.height + 8 && spaceBelow > tooltipRect.height + 8) {
+        top = badgeRect.bottom + 8;
+      }
+      
+      // 오른쪽 경계 체크
+      if (left + tooltipRect.width > viewportWidth) {
+        left = viewportWidth - tooltipRect.width - 16;
+      }
+      
+      // 왼쪽 경계 체크
+      if (left < 16) {
+        left = 16;
+      }
+      
+      setTooltipPosition({ top, left });
+    }
+  }, [showTooltip]);
 
   return (
     <div
@@ -56,20 +138,105 @@ export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
       }`}
     >
       <div className="flex items-start gap-3">
-        {/* Mock 탭: 구현 상태 표시 점 (왼쪽) - 항상 표시 */}
-        {filterType === "mock" && endpoint.implementationStatus && (
+        {/* REST: Mock 탭에서만 구현 상태 표시 점 */}
+        {!isWebSocket && filterType === "mock" && endpoint.implementationStatus && (
           <div
             className={`w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0 ${
               mockStatusColors[endpoint.implementationStatus]
             }`}
             title={
               endpoint.implementationStatus === "not-implemented"
-                ? "미구현"
+                ? "Not Implemented"
                 : endpoint.implementationStatus === "in-progress"
-                ? "구현중"
-                : "수정중"
+                ? "In Progress"
+                : "Modifying"
             }
           />
+        )}
+
+        {/* REST: All 탭에서 mock 상태의 tag와 completed 상태를 배지로 표시 */}
+        {!isWebSocket && filterType === "all" && (
+          <>
+            {/* Mock 상태: tag 상태에 따른 배지 */}
+            {(endpoint as { progress?: string }).progress?.toLowerCase() !== "completed" && endpoint.implementationStatus && (
+              <div
+                className={`w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0 ${
+                  mockStatusColors[endpoint.implementationStatus]
+                }`}
+                title={
+                  endpoint.implementationStatus === "not-implemented"
+                    ? "미구현"
+                    : endpoint.implementationStatus === "in-progress"
+                    ? "구현중"
+                    : "수정중"
+                }
+              />
+            )}
+            {/* Completed 상태: 초록색 배지 */}
+            {(endpoint as { progress?: string }).progress?.toLowerCase() === "completed" && (
+              <div
+                className={`w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0 ${completedStatusColor}`}
+                title="Completed"
+              />
+            )}
+          </>
+        )}
+
+        {/* WebSocket: tag와 progress 조합에 따른 상태 표시 점 */}
+        {isWebSocket && (
+          (() => {
+            const wsStatus = getWebSocketStatus(endpoint.tag, endpoint.progress);
+            return (
+              <>
+                <div
+                  ref={badgeRef}
+                  className={`w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0 ${wsStatus.color} cursor-pointer`}
+                  title={wsStatus.label}
+                  onMouseEnter={() => setShowTooltip(true)}
+                  onMouseLeave={() => setShowTooltip(false)}
+                />
+                {/* 플로팅 툴팁 */}
+                {showTooltip && (
+                  <div
+                    ref={tooltipRef}
+                    className="fixed z-[9999] pointer-events-none"
+                    style={{
+                      top: `${tooltipPosition.top}px`,
+                      left: `${tooltipPosition.left}px`,
+                    }}
+                  >
+                    <div className="bg-white dark:bg-[#161B22] border border-gray-300 dark:border-[#2D333B] rounded-md px-3 py-2 shadow-lg min-w-[200px]">
+                      <div className="text-xs font-semibold text-gray-900 dark:text-[#E6EDF3] mb-2">
+                        Badge Status
+                      </div>
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-[#8B949E] flex-shrink-0"></div>
+                          <span className="text-xs text-gray-600 dark:text-[#8B949E]">
+                            Gray: Not Implemented
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-[#F97316] flex-shrink-0"></div>
+                          <span className="text-xs text-gray-600 dark:text-[#8B949E]">
+                            Orange: Receive Only Verified
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-[#10B981] flex-shrink-0"></div>
+                          <span className="text-xs text-gray-600 dark:text-[#8B949E]">
+                            Green: Completed
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    {/* 화살표 */}
+                    <div className="absolute left-4 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-300 dark:border-t-[#2D333B]"></div>
+                  </div>
+                )}
+              </>
+            );
+          })()
         )}
 
         <div className="flex-1 min-w-0">
@@ -83,9 +250,10 @@ export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
             <span className="text-sm text-gray-900 dark:text-[#E6EDF3] truncate font-mono flex-1 min-w-0">
               {endpoint.path}
             </span>
-            {/* Diff 주의 표시 아이콘 (Path 우측) - Mock 및 Completed 탭 모두 */}
+            
+            {/* Diff 주의 표시 아이콘 */}
             {(endpoint.diff && endpoint.diff !== "none") || endpoint.hasSpecError ? (
-              <div className="flex-shrink-0 ml-1" title="명세와 구현이 일치하지 않습니다">
+              <div className="flex-shrink-0 ml-1" title="Spec and implementation do not match">
                 <svg
                   className="w-3.5 h-3.5 text-amber-500"
                   fill="none"
@@ -103,10 +271,7 @@ export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
             ) : null}
           </div>
 
-          {/* Description */}
-          <p className="text-xs text-gray-600 dark:text-[#8B949E] line-clamp-1">
-            {endpoint.description}
-          </p>
+          {/* Owner (두 번째 줄) */}
         </div>
       </div>
     </div>
