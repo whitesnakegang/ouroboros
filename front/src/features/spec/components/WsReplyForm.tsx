@@ -84,7 +84,7 @@ export function WsReplyForm({
   };
 
   return (
-    <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm mb-4">
+    <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm mb-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
           Reply
@@ -117,7 +117,7 @@ export function WsReplyForm({
       </div>
 
       {/* Schema */}
-      <div>
+      <div className="mt-4">
         <div className="flex items-center justify-between mb-2">
           <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E]">
             Schema

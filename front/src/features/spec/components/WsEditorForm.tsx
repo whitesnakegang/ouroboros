@@ -177,9 +177,6 @@ export function WsEditorForm({
     string | null
   >(null);
 
-  // Progress 토글 로컬 상태 (즉시 UI 반영용)
-  const [localProgress, setLocalProgress] = useState<string | null>(null);
-
   // Protocol state (entryPoint에서 분리)
   const [internalProtocol, setInternalProtocol] = useState<"ws" | "wss">("ws");
   const protocol = externalProtocol ?? internalProtocol;
@@ -278,15 +275,6 @@ export function WsEditorForm({
   useEffect(() => {
     loadSchemas();
   }, []);
-
-  // operationInfo.progress 변경 시 로컬 상태 동기화
-  useEffect(() => {
-    if (operationInfo?.progress) {
-      setLocalProgress(operationInfo.progress.toLowerCase());
-    } else {
-      setLocalProgress(null);
-    }
-  }, [operationInfo?.progress]);
 
   // Receiver 초기화
   const initializeReceiver = () => {
@@ -1104,88 +1092,13 @@ export function WsEditorForm({
     };
 
     return (
-      <div className="w-full max-w-6xl mx-auto px-6 py-8">
+      <div className="w-full">
         {/* Diff 알림 */}
         {renderDiffNotification()}
 
-        {/* Progress 수동 관리 토글 (읽기 전용 모드에서만 표시, DUPLEX나 SEND인 경우만) */}
-        <div className="mb-4 flex items-center justify-end gap-2 h-6">
-          {isReadOnly &&
-          operationInfo &&
-          (operationInfo.tag === "duplex" || operationInfo.tag === "send") &&
-          onProgressUpdate && (
-            <>
-              <span className="text-xs text-gray-600 dark:text-[#8B949E] font-medium">
-                작업 완료:
-              </span>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={
-                    localProgress !== null
-                      ? localProgress === "completed"
-                      : operationInfo.progress?.toLowerCase() === "completed"
-                  }
-                  onChange={async (e) => {
-                    const newProgress = e.target.checked ? "completed" : "none";
-                    // 즉시 로컬 상태 업데이트
-                    setLocalProgress(newProgress);
-                    try {
-                      await onProgressUpdate(
-                        newProgress as "none" | "completed"
-                      );
-                      // 성공 시 로컬 상태 유지 (operationInfo가 업데이트되면 자동으로 동기화됨)
-                    } catch (error) {
-                      console.error("Progress 업데이트 실패:", error);
-                      // 에러 발생 시 이전 상태로 되돌리기
-                      setLocalProgress(
-                        operationInfo.progress?.toLowerCase() || "none"
-                      );
-                      setAlertModal({
-                        isOpen: true,
-                        title: "업데이트 실패",
-                        message: `Progress 업데이트에 실패했습니다: ${
-                          error instanceof Error
-                            ? error.message
-                            : "알 수 없는 오류"
-                        }`,
-                        variant: "error",
-                      });
-                    }
-                  }}
-                  className="sr-only"
-                />
-                <div
-                  className={`w-10 h-5 rounded-full transition-colors duration-200 ease-in-out ${
-                    localProgress !== null
-                      ? localProgress === "completed"
-                        ? "bg-[#2563EB]"
-                        : "bg-gray-300 dark:bg-gray-600"
-                      : operationInfo.progress?.toLowerCase() === "completed"
-                      ? "bg-[#2563EB]"
-                      : "bg-gray-300 dark:bg-gray-600"
-                  }`}
-                >
-                  <div
-                    className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform duration-200 ease-in-out ${
-                      localProgress !== null
-                        ? localProgress === "completed"
-                          ? "translate-x-5"
-                          : "translate-x-0.5"
-                        : operationInfo.progress?.toLowerCase() === "completed"
-                        ? "translate-x-5"
-                        : "translate-x-0.5"
-                    } translate-y-0.5`}
-                  ></div>
-                </div>
-              </label>
-            </>
-          )}
-        </div>
-
         {/* Protocol & Entrypoint */}
-        <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] shadow-sm overflow-hidden mb-4">
-          <div className="p-4 bg-white dark:bg-[#161B22]">
+        <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm overflow-hidden mb-6">
+          <div className="bg-white dark:bg-[#161B22]">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <svg
@@ -1281,9 +1194,9 @@ export function WsEditorForm({
 
         {/* Receiver & Reply 섹션 (탭 전환) */}
         {(receiver || reply) && (
-          <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] shadow-sm overflow-hidden">
+          <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm overflow-hidden">
             {/* 탭 헤더 */}
-            <div className="bg-gray-50 dark:bg-[#0D1117] border-b border-gray-200 dark:border-[#2D333B] px-4 pt-2">
+            <div className="bg-gray-50 dark:bg-[#0D1117] border-b border-gray-200 dark:border-[#2D333B] -mx-4 -mt-4 px-4 pt-2">
               <div className="flex gap-0.5 -mb-px">
                 <button
                   onClick={() => setWsSpecTab("receiver")}
@@ -1309,7 +1222,7 @@ export function WsEditorForm({
             </div>
 
             {/* 탭 내용 */}
-            <div className="p-4 bg-white dark:bg-[#161B22]">
+            <div className="bg-white dark:bg-[#161B22] -mx-4 -mb-4 px-4 pt-4 pb-4">
               {wsSpecTab === "receiver" ? (
                 receiver ? (
                   renderMessages(receiver, "Receiver")
@@ -1344,7 +1257,7 @@ export function WsEditorForm({
   }
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-6 py-8">
+    <div className="w-full">
       {/* Diff 알림 */}
       {renderDiffNotification()}
 
@@ -1509,78 +1422,10 @@ export function WsEditorForm({
         </div>
       </div>
 
-      {/* Progress 수동 관리 토글 (읽기 전용 모드에서만 표시, DUPLEX나 SEND인 경우만) */}
-      {isReadOnly &&
-        operationInfo &&
-        (operationInfo.tag === "duplex" || operationInfo.tag === "send") &&
-        onProgressUpdate && (
-          <div className="mb-4 flex items-center justify-end gap-2">
-            <span className="text-xs text-gray-600 dark:text-[#8B949E] font-medium">
-              작업 완료:
-              </span>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={
-                  localProgress !== null
-                    ? localProgress === "completed"
-                    : operationInfo.progress?.toLowerCase() === "completed"
-                }
-                onChange={async (e) => {
-                  const newProgress = e.target.checked ? "completed" : "none";
-                  // 즉시 로컬 상태 업데이트
-                  setLocalProgress(newProgress);
-                  try {
-                    await onProgressUpdate(newProgress as "none" | "completed");
-                    // 성공 시 로컬 상태 유지 (operationInfo가 업데이트되면 자동으로 동기화됨)
-                  } catch (error) {
-                    console.error("Progress 업데이트 실패:", error);
-                    // 에러 발생 시 이전 상태로 되돌리기
-                    setLocalProgress(
-                      operationInfo.progress?.toLowerCase() || "none"
-                    );
-                    alert(
-                      `Progress 업데이트에 실패했습니다: ${
-                        error instanceof Error
-                          ? error.message
-                          : "알 수 없는 오류"
-                      }`
-                    );
-                  }
-                }}
-                className="sr-only peer"
-              />
-              <div
-                className={`w-10 h-5 rounded-full transition-colors duration-200 ease-in-out ${
-                  localProgress !== null
-                    ? localProgress === "completed"
-                      ? "bg-[#2563EB]"
-                      : "bg-gray-300 dark:bg-gray-600"
-                    : operationInfo.progress?.toLowerCase() === "completed"
-                    ? "bg-[#2563EB]"
-                    : "bg-gray-300 dark:bg-gray-600"
-                }`}
-              >
-                <div
-                  className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform duration-200 ease-in-out ${
-                    localProgress !== null
-                      ? localProgress === "completed"
-                        ? "translate-x-5"
-                        : "translate-x-0.5"
-                      : operationInfo.progress?.toLowerCase() === "completed"
-                      ? "translate-x-5"
-                      : "translate-x-0.5"
-                  } translate-y-0.5`}
-                ></div>
-            </div>
-            </label>
-        </div>
-      )}
-
       {/* 통합 탭 박스 */}
-      <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] shadow-sm mb-6 overflow-hidden">
+      <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm mb-6 overflow-hidden">
         {/* 탭 헤더 */}
-        <div className="bg-gray-50 dark:bg-[#0D1117] border-b border-gray-200 dark:border-[#2D333B] px-4 pt-2">
+        <div className="bg-gray-50 dark:bg-[#0D1117] border-b border-gray-200 dark:border-[#2D333B] -mx-4 -mt-4 px-4 pt-2">
           <div className="flex gap-0.5 -mb-px">
             <button
               onClick={() => setWsTab("receiver")}
@@ -1626,7 +1471,7 @@ export function WsEditorForm({
         </div>
 
         {/* 탭 내용 */}
-        <div className="p-4 bg-white dark:bg-[#161B22]">
+        <div className="bg-white dark:bg-[#161B22] -mx-4 -mb-4 px-4 pt-4 pb-4">
           {wsTab === "receiver" && (
             <div>
               <div className="flex items-center justify-between mb-4">
@@ -1820,7 +1665,7 @@ export function WsEditorForm({
                       </div>
 
                       {/* Messages */}
-                      <div>
+                      <div className="mt-4">
                         <div className="flex items-center justify-between mb-2">
                           <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E]">
                             📨 Messages{" "}
@@ -2090,7 +1935,7 @@ export function WsEditorForm({
                       </div>
 
                       {/* Messages */}
-                      <div>
+                      <div className="mt-4">
                         <div className="flex items-center justify-between mb-2">
                           <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E]">
                             📨 Messages{" "}

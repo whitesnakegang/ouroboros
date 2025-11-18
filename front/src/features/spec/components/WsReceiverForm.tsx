@@ -3,9 +3,7 @@ import { SchemaFieldEditor } from "./SchemaFieldEditor";
 import { SchemaModal } from "./SchemaModal";
 import { getAllSchemas, type SchemaResponse } from "../services/api";
 import type { SchemaField, RequestBody } from "../types/schema.types";
-import {
-  createDefaultField,
-} from "../types/schema.types";
+import { createDefaultField } from "../types/schema.types";
 
 interface KeyValuePair {
   key: string;
@@ -117,7 +115,7 @@ export function WsReceiverForm({
   };
 
   return (
-    <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm mb-4">
+    <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm mb-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
           Receiver
@@ -218,7 +216,7 @@ export function WsReceiverForm({
       </div>
 
       {/* Schema */}
-      <div>
+      <div className="mt-4">
         <div className="flex items-center justify-between mb-2">
           <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E]">
             Schema
@@ -280,7 +278,8 @@ export function WsReceiverForm({
             ))
           ) : (
             <p className="text-xs text-gray-500 dark:text-gray-400 text-center py-2">
-              Schema 필드가 없습니다. "+ Add Field"를 클릭하여 추가하거나 Schema를 선택하세요.
+              Schema 필드가 없습니다. "+ Add Field"를 클릭하여 추가하거나
+              Schema를 선택하세요.
             </p>
           )}
         </div>
@@ -297,4 +296,3 @@ export function WsReceiverForm({
     </div>
   );
 }
-

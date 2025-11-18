@@ -444,7 +444,7 @@ export function ApiRequestCard({
 
         {activeTab === "body" && (
           <div>
-            <div className="flex gap-1 mb-3 border-b border-gray-200 dark:border-[#2D333B]">
+            <div className="flex gap-1 mb-3 mt-4 border-b border-gray-200 dark:border-[#2D333B]">
               {bodyTypes.map((type) => (
                 <button
                   key={type}

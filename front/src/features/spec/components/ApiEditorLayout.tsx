@@ -119,10 +119,22 @@ export function ApiEditorLayout() {
       const defaultTab = getDefaultWsSpecTab(selectedEndpoint);
       setWsSpecTab(defaultTab);
     }
-  }, [selectedEndpoint?.id, selectedEndpoint?.method, selectedEndpoint?.tag]);
+  }, [selectedEndpoint]);
   const [isCodeSnippetOpen, setIsCodeSnippetOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isNewFormMode, setIsNewFormMode] = useState(false);
+  // Progress 토글 로컬 상태 (즉시 UI 반영용)
+  const [localProgress, setLocalProgress] = useState<string | null>(null);
+
+  // selectedEndpoint.progress 변경 시 로컬 상태 동기화
+  useEffect(() => {
+    if (selectedEndpoint?.progress) {
+      setLocalProgress(selectedEndpoint.progress.toLowerCase());
+    } else {
+      setLocalProgress(null);
+    }
+  }, [selectedEndpoint]);
+
   const [importResult, setImportResult] = useState<ImportYamlResponse | null>(
     null
   );
@@ -2695,6 +2707,113 @@ export function ApiEditorLayout() {
           {/* Right: Actions - 조건부 표시 */}
           {activeTab === "form" ? (
             <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4 lg:gap-6">
+              {/* 작업 완료 토글 (WebSocket만, DUPLEX/SEND일 때만) */}
+              {protocol === "WebSocket" &&
+                selectedEndpoint &&
+                !isEditMode &&
+                (selectedEndpoint.method?.toLowerCase() === "duplex" ||
+                  selectedEndpoint.method?.toLowerCase() === "send") && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-600 dark:text-[#8B949E] font-medium">
+                      작업 완료:
+                    </span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={
+                          localProgress !== null
+                            ? localProgress === "completed"
+                            : selectedEndpoint.progress?.toLowerCase() ===
+                              "completed"
+                        }
+                        onChange={async (e) => {
+                          const newProgress = e.target.checked
+                            ? "completed"
+                            : "none";
+                          // 즉시 로컬 상태 업데이트
+                          setLocalProgress(newProgress);
+                          try {
+                            const currentEndpoint = selectedEndpointRef.current;
+                            if (!currentEndpoint || !isMountedRef.current) {
+                              return;
+                            }
+                            const endpointId = currentEndpoint.id;
+
+                            // 언마운트 체크 후 비동기 작업 수행
+                            if (!isMountedRef.current) return;
+                            await updateWebSocketOperation(endpointId, {
+                              progress: newProgress as "none" | "completed",
+                            });
+
+                            // 언마운트 체크 후 Operation 데이터 다시 로드
+                            if (!isMountedRef.current) return;
+                            await loadWebSocketOperationData(endpointId);
+
+                            // 언마운트 체크 후 사이드바 목록도 다시 로드
+                            if (!isMountedRef.current) return;
+                            await loadEndpoints();
+
+                            // 언마운트 체크 후 selectedEndpoint 업데이트
+                            if (!isMountedRef.current) return;
+                            const latestEndpoint = selectedEndpointRef.current;
+                            if (
+                              latestEndpoint &&
+                              latestEndpoint.id === endpointId
+                            ) {
+                              setSelectedEndpoint({
+                                ...latestEndpoint,
+                                progress: newProgress,
+                              });
+                            }
+                          } catch (error) {
+                            console.error("Progress 업데이트 실패:", error);
+                            // 에러 발생 시 이전 상태로 되돌리기
+                            setLocalProgress(
+                              selectedEndpoint.progress?.toLowerCase() || "none"
+                            );
+                            setAlertModal({
+                              isOpen: true,
+                              title: "업데이트 실패",
+                              message: `Progress 업데이트에 실패했습니다: ${
+                                error instanceof Error
+                                  ? error.message
+                                  : "알 수 없는 오류"
+                              }`,
+                              variant: "error",
+                            });
+                          }
+                        }}
+                        className="sr-only peer"
+                      />
+                      <div
+                        className={`w-10 h-5 rounded-full transition-colors duration-200 ease-in-out ${
+                          localProgress !== null
+                            ? localProgress === "completed"
+                              ? "bg-[#2563EB]"
+                              : "bg-gray-300 dark:bg-gray-600"
+                            : selectedEndpoint.progress?.toLowerCase() ===
+                              "completed"
+                            ? "bg-[#2563EB]"
+                            : "bg-gray-300 dark:bg-gray-600"
+                        }`}
+                      >
+                        <div
+                          className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform duration-200 ease-in-out ${
+                            localProgress !== null
+                              ? localProgress === "completed"
+                                ? "translate-x-5"
+                                : "translate-x-0.5"
+                              : selectedEndpoint.progress?.toLowerCase() ===
+                                "completed"
+                              ? "translate-x-5"
+                              : "translate-x-0.5"
+                          } translate-y-0.5`}
+                        ></div>
+                      </div>
+                    </label>
+                  </div>
+                )}
+
               {/* Action Buttons */}
               <div className="flex flex-wrap items-center gap-2">
                 <button
@@ -3405,9 +3524,9 @@ export function ApiEditorLayout() {
             {/* Request/Response/Schema 탭 */}
             {protocol === "REST" &&
               (selectedEndpoint !== null || isNewFormMode) && (
-                <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] shadow-sm mb-6 overflow-hidden">
+                <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] p-4 shadow-sm mb-6 overflow-hidden">
                   {/* 탭 헤더 - 폴더 느낌으로 통합 */}
-                  <div className="bg-gray-50 dark:bg-[#0D1117] border-b border-gray-200 dark:border-[#2D333B] px-4 pt-2">
+                  <div className="bg-gray-50 dark:bg-[#0D1117] border-b border-gray-200 dark:border-[#2D333B] -mx-4 -mt-4 px-4 pt-2">
                     <div className="flex gap-0.5 -mb-px">
                       <button
                         onClick={() => setSpecTab("request")}
@@ -3445,7 +3564,7 @@ export function ApiEditorLayout() {
                   </div>
 
                   {/* 탭 내용 */}
-                  <div className="p-4 bg-white dark:bg-[#161B22]">
+                  <div className="bg-white dark:bg-[#161B22] -mx-4 -mb-4 px-4 pt-4 pb-4">
                     {specTab === "request" && (
                       <ApiRequestCard
                         queryParams={queryParams}
