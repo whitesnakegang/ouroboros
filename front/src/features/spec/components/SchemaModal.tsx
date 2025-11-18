@@ -68,8 +68,8 @@ export function SchemaModal({
   const handleDeleteSchema = (schemaName: string) => {
     setConfirmModal({
       isOpen: true,
-      title: "스키마 삭제",
-      message: `"${schemaName}" 스키마를 삭제하시겠습니까?`,
+      title: "Delete Schema",
+      message: `Are you sure you want to delete the schema "${schemaName}"?`,
       variant: "danger",
       onConfirm: async () => {
         setConfirmModal((prev) => ({ ...prev, isOpen: false }));
@@ -82,17 +82,17 @@ export function SchemaModal({
           setSchemas(schemas.filter((s) => s.schemaName !== schemaName));
           setAlertModal({
             isOpen: true,
-            title: "삭제 완료",
-            message: `"${schemaName}" 스키마가 삭제되었습니다.`,
+            title: "Deleted",
+            message: `Schema "${schemaName}" has been deleted successfully.`,
             variant: "success",
           });
         } catch (err) {
           console.error("스키마 삭제 실패:", err);
           setAlertModal({
             isOpen: true,
-            title: "삭제 실패",
-            message: `스키마 삭제에 실패했습니다: ${
-              err instanceof Error ? err.message : "알 수 없는 오류"
+            title: "Delete Failed",
+            message: `Failed to delete schema: ${
+              err instanceof Error ? err.message : "Unknown error"
             }`,
             variant: "error",
           });

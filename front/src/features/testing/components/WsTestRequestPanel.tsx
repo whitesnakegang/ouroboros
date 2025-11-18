@@ -139,7 +139,7 @@ export function WsTestRequestPanel() {
 
   const handleConnect = async () => {
     if (!entryPoint) {
-      alert("Entry Point를 입력해주세요.");
+      alert("Please enter an Entry Point.");
       return;
     }
 
@@ -280,9 +280,9 @@ export function WsTestRequestPanel() {
           setWsConnectionStatus("disconnected");
           setWsConnectionStartTime(null);
           updateWsStats({ connectionDuration: null });
-          const errorMessage = error.message || "알 수 없는 오류";
+          const errorMessage = error.message || "Unknown error";
           alert(
-            `STOMP 연결 중 오류가 발생했습니다:\n\n${errorMessage}\n\nURL: ${entryPoint}`
+            `An error occurred during STOMP connection:\n\n${errorMessage}\n\nURL: ${entryPoint}`
           );
 
           // 에러 메시지도 로그에 추가
@@ -302,7 +302,7 @@ export function WsTestRequestPanel() {
       );
     } catch (error) {
       setWsConnectionStatus("disconnected");
-      alert("연결에 실패했습니다.");
+      alert("Connection failed.");
     }
   };
 
@@ -322,12 +322,12 @@ export function WsTestRequestPanel() {
     const destination = topic || newTopic.trim();
 
     if (!destination) {
-      alert("Topic을 입력해주세요.");
+      alert("Please enter a Topic.");
       return;
     }
 
     if (!stompClientRef.current || !stompClientRef.current.isConnected()) {
-      alert("먼저 연결을 시도해주세요.");
+      alert("Please connect first.");
       return;
     }
 
@@ -400,7 +400,7 @@ export function WsTestRequestPanel() {
       };
       addWsMessage(message);
     } catch (error) {
-      alert("구독에 실패했습니다.");
+      alert("Subscription failed.");
     }
   };
 
@@ -444,28 +444,28 @@ export function WsTestRequestPanel() {
   // 간단한 모드 메시지 전송
   const handleSimpleSend = () => {
     if (wsConnectionStatus !== "connected") {
-      alert("먼저 연결을 시도해주세요.");
+      alert("Please connect first.");
       return;
     }
 
     if (!stompClientRef.current) {
-      alert("STOMP 클라이언트가 초기화되지 않았습니다.");
+      alert("STOMP client is not initialized.");
       return;
     }
 
     if (!stompClientRef.current.isConnected()) {
-      alert("연결이 끊어진 것 같습니다. 다시 연결해주세요.");
+      alert("Connection appears to be lost. Please reconnect.");
       setWsConnectionStatus("disconnected");
       return;
     }
 
     if (!roomId || roomId.trim() === "") {
-      alert("Room ID를 입력해주세요.");
+      alert("Please enter a Room ID.");
       return;
     }
 
     if (!content || content.trim() === "") {
-      alert("메시지 내용을 입력해주세요.");
+      alert("Please enter a message.");
       return;
     }
 
@@ -507,8 +507,8 @@ export function WsTestRequestPanel() {
       setContent("");
     } catch (error) {
       const errorMessage =
-        error instanceof Error ? error.message : "알 수 없는 오류";
-      alert(`메시지 전송에 실패했습니다:\n\n${errorMessage}`);
+        error instanceof Error ? error.message : "Unknown error";
+      alert(`Failed to send message:\n\n${errorMessage}`);
     }
   };
 
@@ -576,7 +576,7 @@ export function WsTestRequestPanel() {
         {/* 연결 설정 Section */}
         <div className="mb-6 space-y-4">
           <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
-            연결 설정
+            Connection settings
           </h3>
 
           <div>
@@ -640,7 +640,7 @@ export function WsTestRequestPanel() {
           <div className="mb-4 border border-gray-200 dark:border-[#2D333B] rounded-md p-3">
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs font-medium text-gray-600 dark:text-[#8B949E]">
-                STOMP CONNECT Headers (선택사항)
+                STOMP CONNECT Headers (optional)
               </label>
               <button
                 onClick={addConnectHeader}
@@ -651,7 +651,7 @@ export function WsTestRequestPanel() {
             </div>
             {connectHeaders.length === 0 ? (
               <p className="text-xs text-gray-500 dark:text-[#8B949E] text-center py-2">
-                기본 설정으로 연결합니다. 필요시 헤더를 추가하세요.
+                Connect with default settings. Add headers if needed.
               </p>
             ) : (
               <div className="space-y-2">
@@ -772,7 +772,7 @@ export function WsTestRequestPanel() {
                 X-Ouroboros-Try
               </label>
               <span className="text-xs text-gray-500 dark:text-[#8B949E]">
-                추적 헤더 추가
+                Add trace header
               </span>
             </div>
 

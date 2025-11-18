@@ -97,7 +97,7 @@ export function TestResponseTabs() {
               />
             </svg>
           </div>
-          <p className="text-sm">RUN 버튼을 눌러 테스트를 실행하세요</p>
+          <p className="text-sm">Click the RUN button to execute the test</p>
         </div>
       </div>
     );

@@ -39,18 +39,22 @@ export function ApiResponseCard({
   isDocumentView = false,
 }: ApiResponseCardProps) {
   const statusCodeTemplates: StatusCode[] = [
-    { code: "200", type: "Success", message: "요청이 성공적으로 처리됨" },
-    { code: "201", type: "Success", message: "리소스가 성공적으로 생성됨" },
-    { code: "204", type: "Success", message: "요청 성공 (응답 본문 없음)" },
-    { code: "400", type: "Error", message: "잘못된 요청 형식" },
-    { code: "401", type: "Error", message: "인증 실패 (유효하지 않은 토큰)" },
-    { code: "403", type: "Error", message: "접근 권한이 없음" },
-    { code: "404", type: "Error", message: "리소스를 찾을 수 없음" },
-    { code: "409", type: "Error", message: "리소스 충돌" },
-    { code: "422", type: "Error", message: "유효성 검사 실패" },
-    { code: "500", type: "Error", message: "서버 내부 오류" },
-    { code: "502", type: "Error", message: "게이트웨이 오류" },
-    { code: "503", type: "Error", message: "서비스 사용 불가" },
+    { code: "200", type: "Success", message: "Successfully processed request" },
+    { code: "201", type: "Success", message: "Successfully created resource" },
+    { code: "204", type: "Success", message: "Success (no response body)" },
+    { code: "400", type: "Error", message: "Bad request format" },
+    {
+      code: "401",
+      type: "Error",
+      message: "Authentication failed (invalid token)",
+    },
+    { code: "403", type: "Error", message: "Access denied" },
+    { code: "404", type: "Error", message: "Resource not found" },
+    { code: "409", type: "Error", message: "Resource conflict" },
+    { code: "422", type: "Error", message: "Validation failed" },
+    { code: "500", type: "Error", message: "Internal server error" },
+    { code: "502", type: "Error", message: "Gateway error" },
+    { code: "503", type: "Error", message: "Service unavailable" },
   ];
 
   const addStatusCode = (template?: StatusCode) => {
@@ -99,7 +103,7 @@ export function ApiResponseCard({
       const response = await getAllSchemas();
       setSchemas(response.data);
     } catch (err) {
-      console.error("스키마 로드 실패:", err);
+      console.error("Failed to load schemas:", err);
     }
   };
 
@@ -386,7 +390,7 @@ export function ApiResponseCard({
                           onChange={(e) =>
                             updateStatusCode(index, "message", e.target.value)
                           }
-                          placeholder="예: 요청이 성공적으로 처리됨"
+                          placeholder="e.g. Successfully processed request"
                           disabled={isReadOnly}
                           className={`w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 ${
                             isReadOnly ? "opacity-60 cursor-not-allowed" : ""

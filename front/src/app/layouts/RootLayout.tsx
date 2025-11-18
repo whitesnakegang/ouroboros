@@ -132,7 +132,7 @@ export function RootLayout() {
           <button
             onClick={toggleDarkMode}
             className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-[#161B22] transition-colors"
-            title={isDarkMode ? "라이트 모드로 전환" : "다크 모드로 전환"}
+            title={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
           >
             {isDarkMode ? (
               <svg

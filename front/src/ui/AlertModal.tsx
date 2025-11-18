@@ -13,7 +13,7 @@ export function AlertModal({
   title,
   message,
   variant = "info",
-  confirmText = "확인",
+  confirmText = "OK",
 }: AlertModalProps) {
   if (!isOpen) return null;
 
@@ -66,7 +66,7 @@ export function AlertModal({
               <button
                 onClick={onClose}
                 className="flex-shrink-0 p-1.5 -mt-1 -mr-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#21262D] rounded-md transition-colors"
-                aria-label="닫기"
+                aria-label="Close"
               >
                 <svg
                   className="w-5 h-5"

@@ -222,7 +222,7 @@ export function WsEditorForm({
     }
     // entryPoint 변경 시 한글 검증
     if (entryPoint && hasKorean(entryPoint)) {
-      setEntryPointError("한글로 생성할 수 없습니다");
+      setEntryPointError("Cannot create with Korean characters");
     } else {
       setEntryPointError("");
     }
@@ -395,8 +395,8 @@ export function WsEditorForm({
     if (!messageName.trim()) {
       setAlertModal({
         isOpen: true,
-        title: "입력 오류",
-        message: "메시지 이름을 입력해주세요.",
+        title: "Input Error",
+        message: "Please enter a message name.",
         variant: "warning",
       });
       return;
@@ -450,8 +450,8 @@ export function WsEditorForm({
       await createWebSocketMessage(request);
       setAlertModal({
         isOpen: true,
-        title: "생성 완료",
-        message: "메시지가 생성되었습니다.",
+        title: "Created",
+        message: "Message has been created successfully.",
         variant: "success",
       });
 
@@ -468,9 +468,9 @@ export function WsEditorForm({
     } catch (error) {
       setAlertModal({
         isOpen: true,
-        title: "생성 실패",
-        message: `메시지 생성 실패: ${
-          error instanceof Error ? error.message : "알 수 없는 오류"
+        title: "Creation Failed",
+        message: `Failed to create message: ${
+          error instanceof Error ? error.message : "Unknown error"
         }`,
         variant: "error",
       });
@@ -554,8 +554,8 @@ export function WsEditorForm({
     } else {
       setAlertModal({
         isOpen: true,
-        title: "타입 오류",
-        message: "스키마는 object 타입만 지원됩니다.",
+        title: "Type Error",
+        message: "Only object type schemas are supported.",
         variant: "warning",
       });
     }
@@ -580,8 +580,8 @@ export function WsEditorForm({
     } else {
       setAlertModal({
         isOpen: true,
-        title: "타입 오류",
-        message: "스키마는 object 타입만 지원됩니다.",
+        title: "Type Error",
+        message: "Only object type schemas are supported.",
         variant: "warning",
       });
     }
@@ -599,8 +599,8 @@ export function WsEditorForm({
     } else {
       setAlertModal({
         isOpen: true,
-        title: "타입 오류",
-        message: "스키마는 object 타입만 지원됩니다.",
+        title: "Type Error",
+        message: "Only object type schemas are supported.",
         variant: "warning",
       });
     }
@@ -1261,7 +1261,7 @@ export function WsEditorForm({
                   setEntryPoint(newPathname);
                   // 한글 검증
                   if (hasKorean(newPathname)) {
-                    setEntryPointError("한글로 생성할 수 없습니다");
+                    setEntryPointError("Cannot create with Korean characters");
                   } else {
                     setEntryPointError("");
                   }
@@ -1321,7 +1321,7 @@ export function WsEditorForm({
                 type="text"
                 value={summary}
                 onChange={(e) => setSummary(e.target.value)}
-                placeholder="Owner"
+                placeholder="John Doe"
                 disabled={isReadOnly}
                 className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                   isReadOnly ? "opacity-60 cursor-not-allowed" : ""
@@ -1339,7 +1339,7 @@ export function WsEditorForm({
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Description"
+              placeholder="hat room test process"
               disabled={isReadOnly}
               className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                 isReadOnly ? "opacity-60 cursor-not-allowed" : ""
@@ -1414,7 +1414,7 @@ export function WsEditorForm({
                         onClick={() => setReceiver(null)}
                         className="text-red-500 hover:text-red-700 text-sm font-medium"
                       >
-                        제거
+                        Remove
                       </button>
                     ) : (
                       <button
@@ -1434,7 +1434,7 @@ export function WsEditorForm({
                             d="M12 4v16m8-8H4"
                           />
                         </svg>
-                        추가
+                        Add
                       </button>
                     )}
                   </div>
@@ -1479,7 +1479,7 @@ export function WsEditorForm({
                             <button
                               onClick={loadMessages}
                               className="text-[#2563EB] hover:text-[#1E40AF] text-xs"
-                              title="새로고침"
+                              title="Refresh"
                             >
                               ↻
                             </button>
@@ -1537,10 +1537,10 @@ export function WsEditorForm({
                           ) : (
                             <div className="text-center py-6">
                               <p className="text-sm text-gray-500 dark:text-[#8B949E] mb-2">
-                                사용 가능한 메시지가 없습니다
+                                No available messages.
                               </p>
                               <p className="text-xs text-gray-400 dark:text-[#6E7681]">
-                                Message 탭에서 먼저 메시지를 생성해주세요
+                                Please create messages in the Message tab first.
                               </p>
                             </div>
                           )}
@@ -1634,7 +1634,7 @@ export function WsEditorForm({
                             <button
                               onClick={loadMessages}
                               className="text-[#2563EB] hover:text-[#1E40AF] text-xs"
-                              title="새로고침"
+                              title="Refresh"
                             >
                               ↻
                             </button>
@@ -1713,7 +1713,11 @@ export function WsEditorForm({
           )}
 
           {wsTab === "schema" && (
-            <SchemaCard isReadOnly={isReadOnly} protocol="WebSocket" />
+            <SchemaCard
+              isReadOnly={isReadOnly}
+              protocol="WebSocket"
+              onSchemaChange={loadSchemas}
+            />
           )}
 
           {wsTab === "message" && (
@@ -1773,7 +1777,7 @@ export function WsEditorForm({
                         : "bg-gray-100 dark:bg-[#21262D] text-gray-700 dark:text-[#C9D1D9] hover:bg-gray-200 dark:hover:bg-[#30363D]"
                     } ${isReadOnly ? "opacity-60 cursor-not-allowed" : ""}`}
                   >
-                    Name
+                    None
                   </button>
                   <button
                     onClick={() => setMessageType("header")}
@@ -1933,8 +1937,8 @@ export function WsEditorForm({
                         ))
                       ) : (
                         <p className="text-xs text-gray-500 dark:text-gray-400 text-center py-2">
-                          Schema 필드가 없습니다. "+ Add Field"를 클릭하여
-                          추가하거나 Schema를 선택하세요.
+                          No schema fields. Click "+ Add Field" to add or select
+                          a schema.
                         </p>
                       )}
                     </div>
@@ -1983,7 +1987,7 @@ export function WsEditorForm({
                   ) : (
                     <div className="text-center py-6">
                       <p className="text-sm text-gray-500 dark:text-[#8B949E]">
-                        생성된 메시지가 없습니다
+                        No created messages.
                       </p>
                     </div>
                   )}
