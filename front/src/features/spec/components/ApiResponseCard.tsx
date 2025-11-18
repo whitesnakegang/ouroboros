@@ -269,16 +269,13 @@ export function ApiResponseCard({
         </svg>
         <span>Response</span>
       </div>
-      <p className="text-xs text-gray-600 dark:text-[#8B949E] mb-4">
-        응답 바디, 헤더 및 상태 코드 설정
-      </p>
 
       {/* Content */}
       <div className="space-y-4">
         <div>
           <div className="flex items-center justify-between mb-4">
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              HTTP 상태 코드 관리
+              HTTP Status Code Management
             </p>
             {!isReadOnly && (
               <div className="flex gap-2">
@@ -297,7 +294,7 @@ export function ApiResponseCard({
                   }}
                   className="px-3 py-1 text-sm border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500"
                 >
-                  <option value="">템플릿 선택...</option>
+                  <option value="">Select Template</option>
                   <optgroup label="Success">
                     {statusCodeTemplates
                       .filter((t) => t.type === "Success")

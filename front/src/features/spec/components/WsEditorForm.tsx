@@ -7,11 +7,9 @@ import { AlertModal } from "@/ui/AlertModal";
 import {
   getAllWebSocketSchemas,
   getAllWebSocketMessages,
-  getAllWebSocketChannels,
   createWebSocketMessage,
   type SchemaResponse,
   type MessageResponse,
-  type ChannelResponse,
   type CreateMessageRequest,
 } from "../services/api";
 import type {
@@ -98,11 +96,10 @@ export function WsEditorForm({
   diff,
   operationInfo,
   onSyncToActual,
-  onProgressUpdate,
+  onProgressUpdate: _onProgressUpdate,
 }: WsEditorFormProps) {
   const [schemas, setSchemas] = useState<SchemaResponse[]>([]);
   const [messages, setMessages] = useState<MessageResponse[]>([]);
-  const [channels, setChannels] = useState<ChannelResponse[]>([]);
   const [isReceiverSchemaModalOpen, setIsReceiverSchemaModalOpen] =
     useState(false);
   const [isReplySchemaModalOpen, setIsReplySchemaModalOpen] = useState(false);
@@ -132,7 +129,7 @@ export function WsEditorForm({
   const [internalWsSpecTab, setInternalWsSpecTab] = useState<
     "receiver" | "reply"
   >(getDefaultTab());
-  
+
   // operationInfo.tag가 변경될 때 기본 탭 업데이트 (초기 로드 및 변경 시)
   useEffect(() => {
     if (!externalWsSpecTab && operationInfo?.tag) {
@@ -141,7 +138,7 @@ export function WsEditorForm({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [operationInfo?.tag, externalWsSpecTab]);
-  
+
   const wsSpecTab = externalWsSpecTab ?? internalWsSpecTab;
   // setWsSpecTab는 외부(ApiEditorLayout)에서 탭 전환 시 사용되므로 유지
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -203,14 +200,14 @@ export function WsEditorForm({
     if (externalProtocol && setExternalProtocol) {
       setExternalProtocol(externalProtocol);
     }
-    
+
     if (entryPoint && entryPoint.includes("://")) {
       // ws://localhost:8080/ws 형태 파싱 (외부 protocol이 없을 때만)
       if (!externalProtocol) {
-      const match = entryPoint.match(/^(ws|wss):\/\/[^/]+(\/.*)?$/);
-      if (match) {
-        setProtocol(match[1] as "ws" | "wss");
-        setPathname(match[2] || "/ws");
+        const match = entryPoint.match(/^(ws|wss):\/\/[^/]+(\/.*)?$/);
+        if (match) {
+          setProtocol(match[1] as "ws" | "wss");
+          setPathname(match[2] || "/ws");
         }
       } else {
         // 외부 protocol이 있으면 pathname만 추출
@@ -242,19 +239,19 @@ export function WsEditorForm({
     }
   };
 
-  // Channels 목록 로드
-  const loadChannels = async () => {
-    try {
-      const response = await getAllWebSocketChannels();
-      setChannels(response.data);
-    } catch {
-      // 채널 로드 실패 시 무시
-    }
-  };
+  // Channels 목록 로드 (현재 사용하지 않음 - 기존 채널 선택 기능 제거됨)
+  // const loadChannels = async () => {
+  //   try {
+  //     const response = await getAllWebSocketChannels();
+  //     setChannels(response.data);
+  //   } catch {
+  //     // 채널 로드 실패 시 무시
+  //   }
+  // };
 
   useEffect(() => {
     loadMessages();
-    loadChannels();
+    // loadChannels(); // 기존 채널 선택 기능 제거됨
   }, []);
 
   // 스키마 목록 로드 함수 (WebSocket 전용)
@@ -284,7 +281,6 @@ export function WsEditorForm({
       },
       messages: [],
     });
-    setReceiverChannelMode("select");
   };
 
   // Reply 초기화
@@ -298,7 +294,6 @@ export function WsEditorForm({
       },
       messages: [],
     });
-    setReplyChannelMode("select");
   };
 
   // Receiver 헤더 관리 (현재 사용하지 않음 - Header 섹션 제거됨)
@@ -482,81 +477,11 @@ export function WsEditorForm({
     }
   };
 
-  // 기존 채널 선택 핸들러 (토글 방식 - 선택/선택해제)
-  const handleSelectExistingChannel = (
-    channel: ChannelResponse,
-    type: "receiver" | "reply"
-  ) => {
-    const channelMessageNames = Object.keys(channel.channel.messages || {});
-
-    if (type === "receiver") {
-      // 이미 선택된 채널인지 확인 (토글)
-      const isAlreadySelected =
-        receiver &&
-        receiver.address === channel.channel.address &&
-        receiver.messages?.length === channelMessageNames.length &&
-        receiver.messages.every((msg) => channelMessageNames.includes(msg));
-
-      if (isAlreadySelected) {
-        // 선택 해제
-        setReceiver({
-          address: "",
-          headers: [],
-          schema: {
-            type: "json",
-            fields: [],
-          },
-          messages: [],
-        });
-      } else {
-        // 선택
-        if (!receiver) {
-          initializeReceiver();
-        }
-        setReceiver({
-          address: channel.channel.address,
-          headers: [],
-          schema: {
-            type: "json",
-            fields: [],
-          },
-          messages: channelMessageNames,
-        });
-      }
-    } else if (type === "reply") {
-      // 이미 선택된 채널인지 확인 (토글)
-      const isAlreadySelected =
-        reply &&
-        reply.address === channel.channel.address &&
-        reply.messages?.length === channelMessageNames.length &&
-        reply.messages.every((msg) => channelMessageNames.includes(msg));
-
-      if (isAlreadySelected) {
-        // 선택 해제
-        setReply({
-          address: "",
-          schema: {
-            type: "json",
-            fields: [],
-          },
-          messages: [],
-        });
-      } else {
-        // 선택
-        if (!reply) {
-          initializeReply();
-        }
-        setReply({
-          address: channel.channel.address,
-          schema: {
-            type: "json",
-            fields: [],
-          },
-          messages: channelMessageNames,
-        });
-      }
-    }
-  };
+  // 기존 채널 선택 핸들러 (현재 사용하지 않음 - 기존 채널 선택 기능 제거됨)
+  // const handleSelectExistingChannel = (
+  //   channel: ChannelResponse,
+  //   type: "receiver" | "reply"
+  // ) => { ... }
 
   // 채널 선택 또는 생성 (현재 사용하지 않음 - 채널 선택 모드로 대체됨)
   // const handleChannelSelect = async (
@@ -896,7 +821,10 @@ export function WsEditorForm({
   // 문서 형식 뷰 - REST 스타일로 재구성
   if (isDocumentView) {
     // 메시지 표시 헬퍼 함수
-    const renderMessages = (channel: Receiver | Reply | null, channelType: string) => {
+    const renderMessages = (
+      channel: Receiver | Reply | null,
+      channelType: string
+    ) => {
       if (!channel) {
         return (
           <div className="text-sm text-gray-500 dark:text-[#8B949E] italic">
@@ -997,72 +925,78 @@ export function WsEditorForm({
                           )}
 
                         {/* Payload */}
-                        {messageInfo?.payload && (() => {
-                          // payload가 schema로 감싸져 있으면 사용하고, 아니면 payload 자체를 schema로 사용
-                          const schema = messageInfo.payload.schema ?? messageInfo.payload;
-                          
-                          return (
-                            <div>
-                              <span className="text-xs font-semibold text-gray-600 dark:text-[#8B949E]">
-                                Payload:
-                              </span>
-                              <div className="mt-2">
-                                {schema?.$ref ? (
-                                  <MessagePayloadSchemaViewer
-                                    schemaRef={schema.$ref}
-                                  />
-                                ) : schema?.ref ? (
-                                  <MessagePayloadSchemaViewer
-                                    schemaRef={schema.ref}
-                                  />
-                                ) : schema?.type ? (
-                                  <div>
-                                    <span className="text-sm text-gray-900 dark:text-[#E6EDF3]">
-                                      type: {schema.type}
+                        {messageInfo?.payload &&
+                          (() => {
+                            // payload가 schema로 감싸져 있으면 사용하고, 아니면 payload 자체를 schema로 사용
+                            const schema =
+                              messageInfo.payload.schema ?? messageInfo.payload;
+
+                            return (
+                              <div>
+                                <span className="text-xs font-semibold text-gray-600 dark:text-[#8B949E]">
+                                  Payload:
+                                </span>
+                                <div className="mt-2">
+                                  {schema?.$ref ? (
+                                    <MessagePayloadSchemaViewer
+                                      schemaRef={schema.$ref}
+                                    />
+                                  ) : schema?.ref ? (
+                                    <MessagePayloadSchemaViewer
+                                      schemaRef={schema.ref}
+                                    />
+                                  ) : schema?.type ? (
+                                    <div>
+                                      <span className="text-sm text-gray-900 dark:text-[#E6EDF3]">
+                                        type: {schema.type}
+                                      </span>
+                                      {schema.properties && (
+                                        <div className="mt-2">
+                                          <SchemaViewer
+                                            schemaType={{
+                                              kind: "object",
+                                              properties: Object.entries(
+                                                schema.properties
+                                              ).map(
+                                                ([key, prop]: [
+                                                  string,
+                                                  unknown
+                                                ]) => {
+                                                  const propObj = prop as {
+                                                    description?: string;
+                                                    type?: string;
+                                                    [key: string]: unknown;
+                                                  };
+                                                  return {
+                                                    key,
+                                                    description:
+                                                      propObj.description,
+                                                    required:
+                                                      schema.required?.includes(
+                                                        key
+                                                      ) || false,
+                                                    schemaType:
+                                                      parseOpenAPISchemaToSchemaType(
+                                                        propObj
+                                                      ),
+                                                  };
+                                                }
+                                              ),
+                                            }}
+                                            contentType="application/json"
+                                          />
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <span className="text-sm text-gray-500 dark:text-[#8B949E] italic">
+                                      (schema 정보 없음)
                                     </span>
-                                    {schema.properties && (
-                                      <div className="mt-2">
-                                        <SchemaViewer
-                                          schemaType={{
-                                            kind: "object",
-                                            properties: Object.entries(
-                                              schema.properties
-                                            ).map(
-                                              ([key, prop]: [string, unknown]) => {
-                                                const propObj = prop as {
-                                                  description?: string;
-                                                  type?: string;
-                                                  [key: string]: unknown;
-                                                };
-                                                return {
-                                                  key,
-                                                  description: propObj.description,
-                                                  required:
-                                                    schema.required?.includes(
-                                                      key
-                                                    ) || false,
-                                                  schemaType:
-                                                    parseOpenAPISchemaToSchemaType(
-                                                      propObj
-                                                    ),
-                                                };
-                                              }
-                                            ),
-                                          }}
-                                          contentType="application/json"
-                                        />
-                                      </div>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <span className="text-sm text-gray-500 dark:text-[#8B949E] italic">
-                                    (schema 정보 없음)
-                                  </span>
-                                )}
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })()}
+                            );
+                          })()}
 
                         {/* 메시지 정보가 없는 경우 */}
                         {!messageInfo && (
@@ -1117,9 +1051,7 @@ export function WsEditorForm({
             <div className="flex items-center gap-2">
               <span
                 className={`inline-flex items-center rounded-[4px] border border-gray-300 dark:border-[#2D333B] bg-white dark:bg-[#0D1117] px-2 py-[2px] text-[10px] font-mono font-semibold ${
-                  protocol === "wss"
-                    ? "text-[#10B981]"
-                    : "text-[#2563EB]"
+                  protocol === "wss" ? "text-[#10B981]" : "text-[#2563EB]"
                 }`}
               >
                 {protocol?.toUpperCase() || "WS"}
@@ -1273,9 +1205,6 @@ export function WsEditorForm({
           </svg>
           <span>Protocol & Pathname</span>
         </div>
-        <p className="text-xs text-gray-600 dark:text-[#8B949E] mb-4">
-          WebSocket 프로토콜과 엔드포인트 경로를 입력하세요
-        </p>
 
         {/* Operation 정보 (읽기 전용 모드) */}
         {isReadOnly && operationInfo && (
@@ -1340,7 +1269,7 @@ export function WsEditorForm({
                     e.preventDefault();
                   }
                 }}
-                placeholder="예: /ws, /websocket, /chat"
+                placeholder="/ws"
                 disabled={isReadOnly}
                 className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border ${
                   entryPointError
@@ -1373,7 +1302,7 @@ export function WsEditorForm({
                 type="text"
                 value={tags}
                 onChange={(e) => setTags(e.target.value)}
-                placeholder="예: CHAT, NOTIFICATION, REALTIME"
+                placeholder="CHAT"
                 disabled={isReadOnly}
                 className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                   isReadOnly ? "opacity-60 cursor-not-allowed" : ""
@@ -1388,7 +1317,7 @@ export function WsEditorForm({
                 type="text"
                 value={summary}
                 onChange={(e) => setSummary(e.target.value)}
-                placeholder="예: 홍길동"
+                placeholder="Owner"
                 disabled={isReadOnly}
                 className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                   isReadOnly ? "opacity-60 cursor-not-allowed" : ""
@@ -1406,7 +1335,7 @@ export function WsEditorForm({
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="예: 실시간 메시지 송수신을 위한 WebSocket 연결 엔드포인트"
+              placeholder="Description"
               disabled={isReadOnly}
               className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                 isReadOnly ? "opacity-60 cursor-not-allowed" : ""
@@ -1473,9 +1402,6 @@ export function WsEditorForm({
                   <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
                     Receiver
                   </h3>
-                  <p className="text-xs text-gray-600 dark:text-[#8B949E] mt-1">
-                    메시지와 주소를 입력하면 채널을 생성합니다.
-                  </p>
                 </div>
                 {!isReadOnly && (
                   <div className="flex gap-2">
@@ -1519,7 +1445,7 @@ export function WsEditorForm({
                       {/* 주소 */}
                       <div>
                         <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                          주소 <span className="text-red-500">*</span>
+                          Address <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="text"
@@ -1530,7 +1456,7 @@ export function WsEditorForm({
                               address: e.target.value,
                             })
                           }
-                          placeholder="예: /chat/{roomId}"
+                          placeholder="/chat/{roomId}"
                           disabled={isReadOnly}
                           className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                             isReadOnly ? "opacity-60 cursor-not-allowed" : ""
@@ -1634,9 +1560,6 @@ export function WsEditorForm({
                   <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
                     Reply
                   </h3>
-                  <p className="text-xs text-gray-600 dark:text-[#8B949E] mt-1">
-                    메시지와 주소를 입력하면 채널을 생성합니다.
-                  </p>
                 </div>
                 {!isReadOnly && (
                   <div className="flex gap-2">
@@ -1680,7 +1603,7 @@ export function WsEditorForm({
                       {/* 주소 */}
                       <div>
                         <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                          주소 <span className="text-red-500">*</span>
+                          Address <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="text"
@@ -1688,7 +1611,7 @@ export function WsEditorForm({
                           onChange={(e) =>
                             setReply({ ...reply, address: e.target.value })
                           }
-                          placeholder="예: /chat/{roomId}"
+                          placeholder="/chat/{roomId}"
                           disabled={isReadOnly}
                           className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                             isReadOnly ? "opacity-60 cursor-not-allowed" : ""
@@ -1793,20 +1716,20 @@ export function WsEditorForm({
             <div className="space-y-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
-                  메시지 작성
+                  Message
                 </h3>
               </div>
 
               {/* 메시지 이름 */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                  메시지 이름 <span className="text-red-500">*</span>
+                  Message Name <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={messageName}
                   onChange={(e) => setMessageName(e.target.value)}
-                  placeholder="예: ChatMessage, NotificationMessage"
+                  placeholder="ChatMessage"
                   disabled={isReadOnly}
                   className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                     isReadOnly ? "opacity-60 cursor-not-allowed" : ""
@@ -1817,13 +1740,13 @@ export function WsEditorForm({
               {/* 메시지 설명 */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                  설명
+                  Description
                 </label>
                 <input
                   type="text"
                   value={messageDescription}
                   onChange={(e) => setMessageDescription(e.target.value)}
-                  placeholder="메시지에 대한 설명을 입력하세요"
+                  placeholder="Description"
                   disabled={isReadOnly}
                   className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                     isReadOnly ? "opacity-60 cursor-not-allowed" : ""
@@ -1834,7 +1757,7 @@ export function WsEditorForm({
               {/* 메시지 타입 선택 */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                  메시지 타입 선택
+                  Message Type
                 </label>
                 <div className="flex gap-2">
                   <button
@@ -1898,7 +1821,7 @@ export function WsEditorForm({
                           onChange={(e) =>
                             updateMessageHeader(index, "key", e.target.value)
                           }
-                          placeholder="Header 이름"
+                          placeholder="Header Name"
                           disabled={isReadOnly}
                           className={`flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                             isReadOnly ? "opacity-60 cursor-not-allowed" : ""
@@ -1910,7 +1833,7 @@ export function WsEditorForm({
                           onChange={(e) =>
                             updateMessageHeader(index, "value", e.target.value)
                           }
-                          placeholder="Header 값"
+                          placeholder="Header Value"
                           disabled={isReadOnly}
                           className={`flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                             isReadOnly ? "opacity-60 cursor-not-allowed" : ""
@@ -2022,7 +1945,7 @@ export function WsEditorForm({
                     onClick={handleCreateMessage}
                     className="w-full px-4 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md text-sm font-medium transition-colors"
                   >
-                    메시지 생성
+                    Create Message
                   </button>
                 </div>
               )}
@@ -2030,7 +1953,7 @@ export function WsEditorForm({
               {/* 생성된 메시지 목록 */}
               <div className="mt-6">
                 <h4 className="text-xs font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">
-                  생성된 메시지 목록 ({messages.length})
+                  Messages ({messages.length})
                 </h4>
                 <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-200 dark:border-[#2D333B] rounded-md p-3 bg-gray-50 dark:bg-[#0D1117]">
                   {messages.length > 0 ? (

@@ -2676,7 +2676,7 @@ export function ApiEditorLayout() {
                   : "text-gray-500 dark:text-[#8B949E] hover:text-gray-900 dark:hover:text-[#E6EDF3]"
               }`}
             >
-              <span className="relative z-10">API 생성 폼</span>
+              <span className="relative z-10">API Spec</span>
               {activeTab === "form" && (
                 <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#2563EB] dark:bg-[#58A6FF] rounded-t-full" />
               )}
@@ -2695,11 +2695,8 @@ export function ApiEditorLayout() {
                   ? "text-[#2563EB] dark:text-[#58A6FF]"
                   : "text-gray-500 dark:text-[#8B949E] hover:text-gray-900 dark:hover:text-[#E6EDF3]"
               } ${!selectedEndpoint ? "opacity-50 cursor-not-allowed" : ""}`}
-              title={
-                !selectedEndpoint ? "먼저 API를 생성하거나 선택해주세요" : ""
-              }
             >
-              <span className="relative z-10">테스트 폼</span>
+              <span className="relative z-10">API Test</span>
               {activeTab === "test" && (
                 <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#2563EB] dark:bg-[#58A6FF] rounded-t-full" />
               )}
@@ -3198,10 +3195,6 @@ export function ApiEditorLayout() {
                     <p className="text-gray-600 dark:text-[#8B949E] mb-4">
                       현재는 REST API와 WebSocket만 지원합니다.
                     </p>
-                    <p className="text-sm text-gray-500 dark:text-[#8B949E]">
-                      프로토콜 탭을 클릭하여 REST 또는 WebSocket으로 전환할 수
-                      있습니다.
-                    </p>
                   </div>
                 </div>
               )}
@@ -3350,10 +3343,6 @@ export function ApiEditorLayout() {
                   ) : (
                     /* 편집 모드: 입력 필드 표시 */
                     <>
-                      <p className="text-xs text-gray-600 dark:text-[#8B949E] mb-4">
-                        HTTP 메서드와 엔드포인트 URL을 입력하세요
-                      </p>
-
                       <div className="space-y-4">
                         <div className="flex flex-col sm:flex-row gap-4">
                           <div className="relative sm:w-auto w-full">
@@ -3410,7 +3399,7 @@ export function ApiEditorLayout() {
                                   e.preventDefault();
                                 }
                               }}
-                              placeholder="예: /api/users, /api/auth/login"
+                              placeholder="/api/users"
                               disabled={!!(selectedEndpoint && !isEditMode)}
                               className={`w-full px-3 py-2 ${
                                 hasDiff ? "pr-10" : ""
@@ -3460,9 +3449,6 @@ export function ApiEditorLayout() {
 
                         {/* Method Badge */}
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-600 dark:text-[#8B949E]">
-                            Method:
-                          </span>
                           <span
                             className={`inline-flex items-center rounded-[4px] border border-gray-300 dark:border-[#2D333B] bg-white dark:bg-[#0D1117] px-2 py-[2px] text-[10px] font-mono font-semibold ${
                               method === "GET"
@@ -3489,7 +3475,7 @@ export function ApiEditorLayout() {
                               type="text"
                               value={tags}
                               onChange={(e) => setTags(e.target.value)}
-                              placeholder="예: AUTH, USER, PRODUCT, ORDER"
+                              placeholder="AUTH"
                               disabled={!!(selectedEndpoint && !isEditMode)}
                               className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                                 selectedEndpoint && !isEditMode
@@ -3506,7 +3492,7 @@ export function ApiEditorLayout() {
                               type="text"
                               value={summary}
                               onChange={(e) => setSummary(e.target.value)}
-                              placeholder="예: 홍길동"
+                              placeholder="홍길동"
                               disabled={!!(selectedEndpoint && !isEditMode)}
                               className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                                 selectedEndpoint && !isEditMode
@@ -3526,7 +3512,7 @@ export function ApiEditorLayout() {
                             type="text"
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
-                            placeholder="예: 사용자 로그인, 상품 목록 조회, 주문 생성"
+                            placeholder="사용자 로그인"
                             disabled={!!(selectedEndpoint && !isEditMode)}
                             className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                               selectedEndpoint && !isEditMode
@@ -3675,7 +3661,7 @@ export function ApiEditorLayout() {
                   }`}
                   title={isCompleted ? "완료된 API는 수정할 수 없습니다" : ""}
                 >
-                  수정
+                  Edit
                 </button>
                 <button
                   onClick={handleDelete}
@@ -3687,7 +3673,7 @@ export function ApiEditorLayout() {
                   }`}
                   title={isCompleted ? "완료된 API는 삭제할 수 없습니다" : ""}
                 >
-                  삭제
+                  Delete
                 </button>
               </>
             )}
@@ -3702,7 +3688,7 @@ export function ApiEditorLayout() {
               onClick={handleReset}
               className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0"
             >
-              초기화
+              Back
             </button>
             <button
               onClick={handleSave}
@@ -3713,7 +3699,7 @@ export function ApiEditorLayout() {
                   : "bg-[#2563EB] hover:bg-[#1E40AF] text-white"
               }`}
             >
-              생성
+              Create
             </button>
           </div>
         </div>

@@ -59,7 +59,7 @@ const getWebSocketStatus = (tag?: string, progress?: string) => {
       return {
         color: "bg-[#F97316]", // 주황색
         label: "receive만 검증 완료",
-      };
+};
     } else if (normalizedProgress === "complete" || normalizedProgress === "completed") {
       return {
         color: "bg-[#10B981]", // 초록색
@@ -148,10 +148,10 @@ export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
           (() => {
             const wsStatus = getWebSocketStatus(endpoint.tag, endpoint.progress);
             return (
-              <div
+          <div
                 className={`w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0 ${wsStatus.color}`}
                 title={wsStatus.label}
-              />
+          />
             );
           })()
         )}

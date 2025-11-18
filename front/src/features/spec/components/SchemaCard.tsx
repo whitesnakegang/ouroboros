@@ -393,7 +393,7 @@ export function SchemaCard({
         <div className="p-4 border-b border-gray-200 dark:border-[#2D333B]">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
-              스키마 목록
+              Schema List
             </h3>
             <button
               onClick={loadSchemas}
@@ -436,7 +436,7 @@ export function SchemaCard({
                 d="M12 4v16m8-8H4"
               />
             </svg>
-            새로 만들기
+            New Schema
           </button>
         </div>
 
@@ -529,7 +529,7 @@ export function SchemaCard({
           <div className="space-y-2 mb-4 flex-shrink-0">
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                Schema 이름
+                Schema Name
               </label>
               <input
                 type="text"
@@ -544,7 +544,7 @@ export function SchemaCard({
                     setCurrentSchemaDescription("");
                   }
                 }}
-                placeholder="Schema 이름을 입력하세요 (예: UserInfo, ProductData)"
+                placeholder="Schema Name"
                 disabled={isReadOnly || originalSchemaName !== null}
                 className={`w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 ${
                   isReadOnly || originalSchemaName !== null
@@ -562,12 +562,12 @@ export function SchemaCard({
 
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                Schema 설명
+                Schema Description
               </label>
               <textarea
                 value={currentSchemaDescription}
                 onChange={(e) => setCurrentSchemaDescription(e.target.value)}
-                placeholder="Schema에 대한 설명을 입력하세요 (선택사항)"
+                placeholder="Description (optional)"
                 rows={2}
                 disabled={isReadOnly}
                 className={`w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 resize-none ${
@@ -590,9 +590,6 @@ export function SchemaCard({
                       </span>
                     )}
                   </h4>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    재귀적 스키마 구조 지원 (Object, Array, Reference)
-                  </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -618,10 +615,10 @@ export function SchemaCard({
                     }`}
                   >
                     {isLoading
-                      ? "저장 중..."
+                      ? "Saving..."
                       : originalSchemaName
-                      ? "수정 저장"
-                      : "생성 저장"}
+                      ? "Save Changes"
+                      : "Create Schema"}
                   </button>
                 </div>
               </div>

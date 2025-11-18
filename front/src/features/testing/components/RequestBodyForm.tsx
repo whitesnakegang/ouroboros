@@ -80,25 +80,6 @@ function JsonBodyForm({
   onChange: (value: string) => void;
 }) {
   const initializedRef = useRef<string>("");
-  const [jsonData, setJsonData] = useState<Record<string, any>>({});
-  const prevValueRef = useRef<string>("");
-
-  // value prop이 변경될 때만 jsonData 업데이트 (외부에서 변경된 경우)
-  useEffect(() => {
-    if (value !== prevValueRef.current) {
-      prevValueRef.current = value;
-      if (value) {
-        try {
-          const parsed = JSON.parse(value);
-          setJsonData(typeof parsed === "object" && parsed !== null ? parsed : {});
-        } catch {
-          setJsonData({});
-        }
-      } else {
-        setJsonData({});
-      }
-    }
-  }, [value]);
 
   // rootSchemaType을 기반으로 기본값 생성
   const generateDefaultFromRootSchema = (rootSchemaType: SchemaType): any => {

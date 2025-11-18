@@ -663,7 +663,7 @@ export function WsTestRequestPanel() {
                       onChange={(e) =>
                         updateConnectHeader(index, e.target.value, header.value)
                       }
-                      placeholder="Key (예: accept-version)"
+                      placeholder="Key"
                       className="flex-1 px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
                     />
                     <input
@@ -672,7 +672,7 @@ export function WsTestRequestPanel() {
                       onChange={(e) =>
                         updateConnectHeader(index, header.key, e.target.value)
                       }
-                      placeholder="Value (예: 1.1,1.2)"
+                      placeholder="Value"
                       className="flex-1 px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
                     />
                     <button
@@ -730,7 +730,7 @@ export function WsTestRequestPanel() {
                 type="text"
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                placeholder="메시지 내용을 입력하세요"
+                placeholder="Message"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     handleSimpleSend();

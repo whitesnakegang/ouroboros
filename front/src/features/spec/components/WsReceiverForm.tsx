@@ -133,13 +133,13 @@ export function WsReceiverForm({
       {/* 주소 */}
       <div className="mb-4">
         <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-          주소
+          Address
         </label>
         <input
           type="text"
           value={address}
           onChange={(e) => setAddress(e.target.value)}
-          placeholder="예: /chat/message"
+                placeholder="/chat/message"
           disabled={isReadOnly}
           className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
             isReadOnly ? "opacity-60 cursor-not-allowed" : ""
@@ -169,7 +169,7 @@ export function WsReceiverForm({
                 type="text"
                 value={header.key}
                 onChange={(e) => updateHeader(index, "key", e.target.value)}
-                placeholder="Header 이름"
+                placeholder="Header Name"
                 disabled={isReadOnly}
                 className={`flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                   isReadOnly ? "opacity-60 cursor-not-allowed" : ""
@@ -179,7 +179,7 @@ export function WsReceiverForm({
                 type="text"
                 value={header.value}
                 onChange={(e) => updateHeader(index, "value", e.target.value)}
-                placeholder="Header 값"
+                placeholder="Header Value"
                 disabled={isReadOnly}
                 className={`flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                   isReadOnly ? "opacity-60 cursor-not-allowed" : ""

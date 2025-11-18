@@ -102,7 +102,7 @@ export function WsReplyForm({
       {/* 주소 */}
       <div className="mb-4">
         <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-          주소
+          Address
         </label>
         <input
           type="text"
