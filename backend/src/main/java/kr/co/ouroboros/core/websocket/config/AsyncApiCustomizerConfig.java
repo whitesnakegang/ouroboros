@@ -6,9 +6,27 @@ import java.lang.reflect.Method;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import kr.co.ouroboros.core.global.annotation.ApiState;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+/**
+ * Springwolf OperationCustomizer that adds Ouroboros custom fields to AsyncAPI operations.
+ * <p>
+ * This component is only active when:
+ * <ul>
+ *   <li>Springwolf is available on the classpath</li>
+ *   <li>Springwolf is enabled via {@code springwolf.enabled=true}</li>
+ * </ul>
+ * <p>
+ * If Springwolf is not configured, users should set {@code springwolf.enabled=false}
+ * to prevent Springwolf auto-initialization errors.
+ *
+ * @since 0.1.0
+ */
 @Component
+@ConditionalOnClass(name = "io.github.springwolf.core.asyncapi.scanners.operations.annotations.OperationCustomizer")
+@ConditionalOnProperty(prefix = "springwolf", name = "enabled", havingValue = "true", matchIfMissing = false)
 public class AsyncApiCustomizerConfig implements OperationCustomizer {
 
     /**

@@ -2,10 +2,12 @@ package kr.co.ouroboros.ui.websocket.spec.controller;
 
 import kr.co.ouroboros.core.global.response.GlobalApiResponse;
 import kr.co.ouroboros.core.websocket.spec.service.WebSocketOperationService;
+import kr.co.ouroboros.core.websocket.spec.service.WebSocketStatusService;
 import kr.co.ouroboros.core.websocket.spec.validator.ImportWebSocketYamlValidator;
 import kr.co.ouroboros.ui.websocket.spec.dto.ImportValidationErrorData;
 import kr.co.ouroboros.ui.websocket.spec.dto.ImportYamlResponse;
 import kr.co.ouroboros.ui.websocket.spec.dto.ValidationError;
+import kr.co.ouroboros.ui.websocket.spec.dto.WebSocketStatusResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -19,7 +21,8 @@ import java.util.List;
 /**
  * REST controller for managing WebSocket/STOMP API specifications.
  * <p>
- * Provides import and export operations for AsyncAPI 3.0.0 YAML files.
+ * Provides import and export operations for AsyncAPI 3.0.0 YAML files,
+ * as well as status information about the WebSocket handler.
  * All endpoints are prefixed with {@code /ouro/websocket-specs}.
  * All responses follow the standard {@link GlobalApiResponse} format.
  *
@@ -33,6 +36,7 @@ public class WebSocketSpecController {
 
     private final WebSocketOperationService operationService;
     private final ImportWebSocketYamlValidator importWebSocketYamlValidator;
+    private final WebSocketStatusService statusService;
 
     /**
      * Imports external AsyncAPI 3.0.0 YAML file and merges into ourowebsocket.yml.
@@ -137,5 +141,50 @@ public class WebSocketSpecController {
                 .header("Content-Type", "text/yaml; charset=UTF-8")
                 .header("Content-Disposition", "attachment; filename=\"ourowebsocket.yml\"")
                 .body(yamlContent);
+    }
+
+    /**
+     * Retrieves the current status of the WebSocket protocol handler.
+     * <p>
+     * Provides information about whether Springwolf-based code scanning is active.
+     * This endpoint helps the frontend determine which features are available:
+     * <ul>
+     *   <li>If {@code active} is {@code true}: Code scanning from @MessageMapping
+     *       annotations is available</li>
+     *   <li>If {@code active} is {@code false}: Only manual CRUD operations
+     *       are available via the REST API</li>
+     * </ul>
+     * <p>
+     * Example response when Springwolf is enabled:
+     * <pre>
+     * {
+     *   "status": 200,
+     *   "data": {
+     *     "active": true
+     *   },
+     *   "message": "WebSocket status retrieved successfully"
+     * }
+     * </pre>
+     * <p>
+     * Example response when Springwolf is disabled:
+     * <pre>
+     * {
+     *   "status": 200,
+     *   "data": {
+     *     "active": false
+     *   },
+     *   "message": "WebSocket status retrieved successfully"
+     * }
+     * </pre>
+     *
+     * @return status information with active flag indicating code scanning availability
+     */
+    @GetMapping("/status")
+    public ResponseEntity<GlobalApiResponse<WebSocketStatusResponse>> getStatus() {
+        WebSocketStatusResponse status = statusService.getStatus();
+        return ResponseEntity.ok(GlobalApiResponse.success(
+                status,
+                "WebSocket status retrieved successfully"
+        ));
     }
 }

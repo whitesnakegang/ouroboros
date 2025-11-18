@@ -40,7 +40,7 @@ dependencyManagement {
 dependencies {
 	implementation "org.springdoc:springdoc-openapi-starter-webmvc-api:2.8.13"
 
-	// spring wolf
+	// Springwolf (optional - users must add to their project if they want to use WebSocket code scanning)
 	implementation 'io.github.springwolf:springwolf-stomp:1.17.0'
 	runtimeOnly 'io.github.springwolf:springwolf-ui:1.17.0'
 
