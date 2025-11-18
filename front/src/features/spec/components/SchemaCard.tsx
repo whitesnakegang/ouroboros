@@ -475,7 +475,7 @@ export function SchemaCard({
                           {schema.properties
                             ? Object.keys(schema.properties).length
                             : 0}
-                          개 필드
+                          fields
                         </span>
                       </div>
                       {schema.description && (

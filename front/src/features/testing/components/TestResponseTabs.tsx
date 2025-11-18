@@ -43,8 +43,8 @@ export function TestResponseTabs() {
         const response = await getTryMethodList(tryId);
         setMethodList(response.data.methods);
         setTotalDurationMs(response.data.totalDurationMs);
-        } catch (error) {
-          setMethodList(null);
+      } catch (error) {
+        setMethodList(null);
         setTotalDurationMs(null);
       } finally {
         setIsLoadingMethods(false);
@@ -158,8 +158,8 @@ export function TestResponseTabs() {
               try {
                 const response = await getTryTrace(tryId);
                 setTraceData(response.data);
-                } catch (error) {
-                  setTraceData(null);
+              } catch (error) {
+                setTraceData(null);
               } finally {
                 setIsLoadingTrace(false);
               }
@@ -313,11 +313,11 @@ function TestContent({
           </svg>
         </div>
         <p className="text-sm">
-          Mock 엔드포인트는 메서드 실행 정보를 제공하지 않습니다
+          Mock Endpoint does not provide method execution information.
         </p>
         <p className="text-xs mt-1 text-gray-500 dark:text-[#6B7280]">
-          실제 구현된 엔드포인트(completed)에서만 메서드별 실행 시간을 확인할 수
-          있습니다
+          You can only check method execution time in actual implemented
+          endpoints (completed).
         </p>
       </div>
     );
@@ -349,11 +349,11 @@ function TestContent({
           </svg>
         </div>
         <p className="text-sm">
-          메서드 실행 정보를 불러오려면 먼저 API를 실행하세요
+          To load method execution information, first run the API.
         </p>
         <p className="text-xs mt-1 text-gray-500 dark:text-[#6B7280]">
-          RUN 버튼을 눌러 테스트를 실행하면 메서드별 실행 시간을 확인할 수
-          있습니다
+          By clicking the RUN button, you can check the execution time for each
+          method.
         </p>
       </div>
     );
@@ -385,7 +385,7 @@ function TestContent({
             />
           </svg>
         </div>
-        <p className="text-sm">메서드 실행 정보를 불러오는 중...</p>
+        <p className="text-sm">Loading method execution information...</p>
       </div>
     );
   }
@@ -408,9 +408,10 @@ function TestContent({
             />
           </svg>
         </div>
-        <p className="text-sm">메서드 실행 정보가 없습니다</p>
+        <p className="text-sm">No method execution information found.</p>
         <p className="text-xs mt-1 text-gray-500 dark:text-[#6B7280]">
-          Trace 모드로 실행하면 메서드별 실행 시간을 확인할 수 있습니다
+          By running in Trace mode, you can check the execution time for each
+          method.
         </p>
       </div>
     );
@@ -424,7 +425,7 @@ function TestContent({
           <div className="flex items-center justify-between">
             <div>
               <div className="text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-1">
-                전체 소요 시간
+                Total Duration
               </div>
               <div className="text-2xl font-bold text-gray-900 dark:text-[#E6EDF3]">
                 {totalDurationMs.toLocaleString()}ms
@@ -458,7 +459,7 @@ function TestContent({
                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                       />
                     </svg>
-                    로딩 중...
+                    Loading...
                   </>
                 ) : (
                   <>
@@ -475,7 +476,7 @@ function TestContent({
                         d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
                       />
                     </svg>
-                    Call Trace 보기
+                    Call Trace View
                   </>
                 )}
               </button>
@@ -487,7 +488,7 @@ function TestContent({
       {/* Method List */}
       <div>
         <div className="text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-3">
-          메서드별 실행 시간 ({methodList.length}개)
+          Method Execution Time ({methodList.length} methods)
         </div>
         <div className="space-y-2">
           {methodList.map((method: TryMethod, index: number) => (

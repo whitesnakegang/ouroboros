@@ -4,7 +4,14 @@ import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
 import { useEffect, useLayoutEffect, useMemo } from "react";
 
 export function RootLayout() {
-  const { isDarkMode, isOpen, toggle, setTriggerNewForm, toggleDarkMode, endpoints } = useSidebarStore();
+  const {
+    isDarkMode,
+    isOpen,
+    toggle,
+    setTriggerNewForm,
+    toggleDarkMode,
+    endpoints,
+  } = useSidebarStore();
 
   const handleNewApiForm = () => {
     // 새 API 폼 트리거
@@ -14,30 +21,34 @@ export function RootLayout() {
   };
 
   // 전체 진행률 계산 (REST + WS)
-  const { totalEndpoints, completedEndpoints, progressPercentage } = useMemo(() => {
-    let total = 0;
-    let completed = 0;
+  const { totalEndpoints, completedEndpoints, progressPercentage } =
+    useMemo(() => {
+      let total = 0;
+      let completed = 0;
 
-    Object.values(endpoints).forEach((groupEndpoints) => {
-      groupEndpoints.forEach((endpoint) => {
-        // REST와 WebSocket만 카운트
-        if (endpoint.protocol === "REST" || endpoint.protocol === "WebSocket") {
-          total++;
-          if (endpoint.progress?.toLowerCase() === "completed") {
-            completed++;
+      Object.values(endpoints).forEach((groupEndpoints) => {
+        groupEndpoints.forEach((endpoint) => {
+          // REST와 WebSocket만 카운트
+          if (
+            endpoint.protocol === "REST" ||
+            endpoint.protocol === "WebSocket"
+          ) {
+            total++;
+            if (endpoint.progress?.toLowerCase() === "completed") {
+              completed++;
+            }
           }
-        }
+        });
       });
-    });
 
-    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+      const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-    return {
-      totalEndpoints: total,
-      completedEndpoints: completed,
-      progressPercentage: percentage,
-    };
-  }, [endpoints]);
+      return {
+        totalEndpoints: total,
+        completedEndpoints: completed,
+        progressPercentage: percentage,
+      };
+    }, [endpoints]);
 
   // 다크 모드 설정 적용 (초기 로드 시 즉시 적용 및 변경 시)
   useLayoutEffect(() => {
@@ -80,7 +91,7 @@ export function RootLayout() {
           <button
             onClick={toggle}
             className="lg:hidden p-2 rounded-md hover:bg-gray-100 dark:hover:bg-[#161B22] transition-colors"
-            aria-label="메뉴 토글"
+            aria-label="Toggle Menu"
           >
             <svg
               className="w-6 h-6 text-gray-600 dark:text-[#8B949E]"
@@ -105,7 +116,7 @@ export function RootLayout() {
           <div className="flex items-center gap-3">
             <div className="text-right">
               <div className="text-xs text-gray-600 dark:text-[#8B949E]">
-                {completedEndpoints}/{totalEndpoints} 완료
+                {completedEndpoints}/{totalEndpoints} Completed
               </div>
             </div>
             <div className="w-24 h-2 bg-gray-200 dark:bg-[#161B22] border border-gray-300 dark:border-[#2D333B] rounded-md overflow-hidden">

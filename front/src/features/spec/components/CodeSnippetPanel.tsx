@@ -78,17 +78,17 @@ export function CodeSnippetPanel({
             .map((s: any) => s.id)
             .join(", ");
           setSnippet(
-            `// ${selectedLanguage} 언어는 아직 지원되지 않습니다.\n// 사용 가능한 언어: ${
-              availableLanguages || "없음"
+            `// ${selectedLanguage} is not supported yet.\n// Available languages: ${
+              availableLanguages || "none"
             }`
           );
         }
       } catch (error) {
-        console.error("스니펫 생성 실패:", error);
+        console.error("Failed to generate snippet:", error);
         const errorMessage =
           error instanceof Error ? error.message : String(error);
         setSnippet(
-          `// ${errorMessage}\n// 실제 명세에 반영 후 다시 시도해주세요.`
+          `// ${errorMessage}\n// try again after updating the spec to the actual implementation.`
         );
       } finally {
         setLoading(false);
@@ -184,13 +184,13 @@ export function CodeSnippetPanel({
                 disabled={loading || !snippet}
                 className="px-3 py-1 text-sm bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {copied ? "복사됨" : "복사"}
+                {copied ? "Copied" : "Copy"}
               </button>
             </div>
             <div className="bg-[#0D1117] dark:bg-[#010409] p-4 rounded-md max-h-[calc(100vh-250px)] overflow-y-auto">
               {loading ? (
                 <div className="text-sm text-[#E6EDF3] text-center py-8">
-                  스니펫 생성 중...
+                  Generating Snippet...
                 </div>
               ) : (
                 <pre className="text-sm text-[#E6EDF3] whitespace-pre-wrap overflow-x-auto font-mono">

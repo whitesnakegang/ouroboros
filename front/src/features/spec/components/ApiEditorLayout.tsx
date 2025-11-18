@@ -3032,10 +3032,10 @@ export function ApiEditorLayout() {
                     }`}
                   >
                     {executionStatus === "running"
-                      ? "실행 중..."
+                      ? "Running..."
                       : executionStatus === "completed"
-                      ? "완료됨"
-                      : "에러 발생"}
+                      ? "Completed"
+                      : "Error"}
                   </div>
                 </div>
               </div>
@@ -3067,10 +3067,10 @@ export function ApiEditorLayout() {
                     </svg>
                   </div>
                   <h3 className="text-xl font-semibold text-gray-900 dark:text-[#E6EDF3] mb-2">
-                    프로토콜을 선택해주세요
+                    Select Protocol
                   </h3>
                   <p className="text-gray-600 dark:text-[#8B949E]">
-                    사이드바에서 프로토콜을 선택한 후 Add 버튼을 클릭하세요.
+                    Select Protocol in Sidebar and click Add button.
                   </p>
                 </div>
               </div>
@@ -3236,7 +3236,7 @@ export function ApiEditorLayout() {
                       <button
                         onClick={() => setIsCodeSnippetOpen(true)}
                         className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0"
-                        title="Code Snippet 보기"
+                        title="View Code Snippet"
                       >
                         <svg
                           className="w-4 h-4"

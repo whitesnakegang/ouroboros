@@ -307,7 +307,7 @@ export function TestRequestPanel() {
             type="text"
             value={request.description}
             onChange={(e) => setRequest({ description: e.target.value })}
-            placeholder="API 설명"
+            placeholder="Description"
             className="w-full px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
           />
         </div>

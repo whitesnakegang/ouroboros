@@ -616,23 +616,25 @@ export function WsEditorForm({
     if (lowerDiff === "channel") {
       return {
         type: "channel" as const,
-        label: "Channel 불일치",
-        description: "Channel 정보가 명세와 실제 구현이 다릅니다.",
+        label: "Channel Diff",
+        description:
+          "Channel information is different from the spec and the actual implementation.",
         canSync: true,
       };
     } else if (lowerDiff === "payload") {
       return {
         type: "payload" as const,
-        label: "Payload 불일치",
-        description: "메시지 Payload 구조가 명세와 실제 구현이 다릅니다.",
+        label: "Payload Diff",
+        description:
+          "Message Payload structure is different from the spec and the actual implementation.",
         canSync: false,
       };
     }
 
     return {
       type: "other" as const,
-      label: "불일치",
-      description: "명세와 실제 구현이 일치하지 않습니다.",
+      label: "Diff",
+      description: "The spec and the actual implementation are different.",
       canSync: false,
     };
   };
@@ -668,7 +670,7 @@ export function WsEditorForm({
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
                 <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-                  명세와 실제 구현의 불일치
+                  Diff Notification
                 </h3>
                 <span className="px-2 py-0.5 bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200 text-xs font-medium rounded">
                   {details.label}
@@ -679,9 +681,10 @@ export function WsEditorForm({
               </p>
               <p className="text-xs text-amber-600 dark:text-amber-500 mt-2">
                 {isCompleted
-                  ? "이 Operation은 completed 상태로 실제 구현이 완료되었습니다."
-                  : "이 Operation은 진행 중입니다."}
-                {details.canSync && " 아래 버튼으로 명세를 갱신할 수 있습니다."}
+                  ? "This Operation is completed and the actual implementation is complete."
+                  : "This Operation is in progress."}
+                {details.canSync &&
+                  " You can update the spec by clicking the button below."}
               </p>
             </div>
           </div>
@@ -704,7 +707,7 @@ export function WsEditorForm({
                   d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
               </svg>
-              안내사항
+              Instructions
             </h4>
             <ul className="space-y-2">
               <li className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
@@ -722,11 +725,11 @@ export function WsEditorForm({
                   />
                 </svg>
                 <span>
-                  백엔드에서{" "}
+                  Backend uses{" "}
                   <code className="px-1 py-0.5 bg-amber-100 dark:bg-amber-900 border border-amber-300 dark:border-amber-700 rounded text-[10px] font-mono text-amber-900 dark:text-amber-200">
                     x-ouroboros-diff
                   </code>{" "}
-                  필드를 통해 불일치가 감지되었습니다.
+                  field to detect the difference.
                 </span>
               </li>
               {details.type === "channel" && (
@@ -745,8 +748,9 @@ export function WsEditorForm({
                     />
                   </svg>
                   <span>
-                    실제 구현에 존재하지만 명세에 없는 Channel이 있다면, 아래
-                    버튼을 클릭하여 명세에 자동으로 추가할 수 있습니다.
+                    If there is a Channel that exists in the actual
+                    implementation but not in the spec, you can click the button
+                    below to automatically add it to the spec.
                   </span>
                 </li>
               )}
@@ -771,7 +775,7 @@ export function WsEditorForm({
                   d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                 />
               </svg>
-              실제 구현을 명세에 반영
+              Sync to Spec
             </button>
           )}
         </div>
@@ -800,7 +804,7 @@ export function WsEditorForm({
     if (!schemaName) {
       return (
         <span className="text-sm text-gray-500 dark:text-[#8B949E] italic">
-          (schema 정보 없음)
+          (no schema information)
         </span>
       );
     }
@@ -1547,7 +1551,7 @@ export function WsEditorForm({
                 </div>
               ) : (
                 <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
-                  <p>Receiver가 없습니다. "추가" 버튼을 클릭하여 추가하세요.</p>
+                  <p>No Receiver. Click the "Add" button to add.</p>
                 </div>
               )}
             </div>
@@ -1568,7 +1572,7 @@ export function WsEditorForm({
                         onClick={() => setReply(null)}
                         className="text-red-500 hover:text-red-700 text-sm font-medium"
                       >
-                        제거
+                        Remove
                       </button>
                     ) : (
                       <button
@@ -1588,7 +1592,7 @@ export function WsEditorForm({
                             d="M12 4v16m8-8H4"
                           />
                         </svg>
-                        추가
+                        Add
                       </button>
                     )}
                   </div>
@@ -1688,10 +1692,10 @@ export function WsEditorForm({
                           ) : (
                             <div className="text-center py-6">
                               <p className="text-sm text-gray-500 dark:text-[#8B949E] mb-2">
-                                사용 가능한 메시지가 없습니다
+                                No available messages.
                               </p>
                               <p className="text-xs text-gray-400 dark:text-[#6E7681]">
-                                Message 탭에서 먼저 메시지를 생성해주세요
+                                Create messages in the Message tab first.
                               </p>
                             </div>
                           )}
@@ -1702,7 +1706,7 @@ export function WsEditorForm({
                 </div>
               ) : (
                 <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
-                  <p>Reply가 없습니다. "추가" 버튼을 클릭하여 추가하세요.</p>
+                  <p>No Reply. Click the "Add" button to add.</p>
                 </div>
               )}
             </div>

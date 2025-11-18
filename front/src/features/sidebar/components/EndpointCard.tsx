@@ -1,3 +1,4 @@
+import { useState, useRef, useLayoutEffect } from "react";
 import { useSidebarStore } from "../store/sidebar.store";
 import type { Endpoint } from "../store/sidebar.store";
 
@@ -77,6 +78,10 @@ const getWebSocketStatus = (tag?: string, progress?: string) => {
 
 export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
   const { setSelectedEndpoint, selectedEndpoint } = useSidebarStore();
+  const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
+  const [showTooltip, setShowTooltip] = useState(false);
+  const badgeRef = useRef<HTMLDivElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
 
   const handleClick = () => {
     setSelectedEndpoint(endpoint);
@@ -88,6 +93,40 @@ export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
 
   const isSelected = selectedEndpoint?.id === endpoint.id;
   const isWebSocket = endpoint.protocol === "WebSocket";
+
+  // 툴팁 위치 계산
+  useLayoutEffect(() => {
+    if (showTooltip && badgeRef.current && tooltipRef.current) {
+      const badgeRect = badgeRef.current.getBoundingClientRect();
+      const tooltipRect = tooltipRef.current.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const viewportWidth = window.innerWidth;
+      
+      // 위쪽에 공간이 충분한지 확인
+      const spaceAbove = badgeRect.top;
+      const spaceBelow = viewportHeight - badgeRect.bottom;
+      
+      let top = badgeRect.top - tooltipRect.height - 8;
+      let left = badgeRect.left;
+      
+      // 위쪽 공간이 부족하면 아래쪽에 표시
+      if (spaceAbove < tooltipRect.height + 8 && spaceBelow > tooltipRect.height + 8) {
+        top = badgeRect.bottom + 8;
+      }
+      
+      // 오른쪽 경계 체크
+      if (left + tooltipRect.width > viewportWidth) {
+        left = viewportWidth - tooltipRect.width - 16;
+      }
+      
+      // 왼쪽 경계 체크
+      if (left < 16) {
+        left = 16;
+      }
+      
+      setTooltipPosition({ top, left });
+    }
+  }, [showTooltip]);
 
   return (
     <div
@@ -148,10 +187,54 @@ export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
           (() => {
             const wsStatus = getWebSocketStatus(endpoint.tag, endpoint.progress);
             return (
-          <div
-                className={`w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0 ${wsStatus.color}`}
-                title={wsStatus.label}
-          />
+              <>
+                <div
+                  ref={badgeRef}
+                  className={`w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0 ${wsStatus.color} cursor-pointer`}
+                  title={wsStatus.label}
+                  onMouseEnter={() => setShowTooltip(true)}
+                  onMouseLeave={() => setShowTooltip(false)}
+                />
+                {/* 플로팅 툴팁 */}
+                {showTooltip && (
+                  <div
+                    ref={tooltipRef}
+                    className="fixed z-[9999] pointer-events-none"
+                    style={{
+                      top: `${tooltipPosition.top}px`,
+                      left: `${tooltipPosition.left}px`,
+                    }}
+                  >
+                    <div className="bg-white dark:bg-[#161B22] border border-gray-300 dark:border-[#2D333B] rounded-md px-3 py-2 shadow-lg min-w-[200px]">
+                      <div className="text-xs font-semibold text-gray-900 dark:text-[#E6EDF3] mb-2">
+                        뱃지 색상별 상태
+                      </div>
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-[#8B949E] flex-shrink-0"></div>
+                          <span className="text-xs text-gray-600 dark:text-[#8B949E]">
+                            회색: 미구현
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-[#F97316] flex-shrink-0"></div>
+                          <span className="text-xs text-gray-600 dark:text-[#8B949E]">
+                            주황색: receive만 검증 완료
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-[#10B981] flex-shrink-0"></div>
+                          <span className="text-xs text-gray-600 dark:text-[#8B949E]">
+                            초록색: 완료
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    {/* 화살표 */}
+                    <div className="absolute left-4 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-300 dark:border-t-[#2D333B]"></div>
+                  </div>
+                )}
+              </>
             );
           })()
         )}

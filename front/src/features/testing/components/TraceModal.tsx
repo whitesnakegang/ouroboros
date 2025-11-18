@@ -13,14 +13,27 @@ interface TraceModalProps {
   initialExpandedSpanId?: string | null;
 }
 
-export function TraceModal({ isOpen, onClose, traceData, initialExpandedSpanId }: TraceModalProps) {
+export function TraceModal({
+  isOpen,
+  onClose,
+  traceData,
+  initialExpandedSpanId,
+}: TraceModalProps) {
   const [expandedSpans, setExpandedSpans] = useState<Set<string>>(new Set());
-  const [highlightedSpanId, setHighlightedSpanId] = useState<string | null>(null);
+  const [highlightedSpanId, setHighlightedSpanId] = useState<string | null>(
+    null
+  );
   const highlightedSpanRef = useRef<HTMLDivElement | null>(null);
-  const [visiblePathSet, setVisiblePathSet] = useState<Set<string> | null>(null);
+  const [visiblePathSet, setVisiblePathSet] = useState<Set<string> | null>(
+    null
+  );
 
   // spanId로 span을 찾고, 해당 span까지의 부모 path를 반환하는 함수
-  const findSpanPath = (spans: TryTraceSpan[], targetSpanId: string, path: string[] = []): string[] | null => {
+  const findSpanPath = (
+    spans: TryTraceSpan[],
+    targetSpanId: string,
+    path: string[] = []
+  ): string[] | null => {
     for (const span of spans) {
       const currentPath = [...path, span.spanId];
       if (span.spanId === targetSpanId) {
@@ -54,10 +67,10 @@ export function TraceModal({ isOpen, onClose, traceData, initialExpandedSpanId }
         setExpandedSpans(parentOnly);
         // 화면에 보일 경로(부모 + 타겟)만 허용
         setVisiblePathSet(new Set(path));
-        
+
         // 해당 span을 하이라이트
         setHighlightedSpanId(initialExpandedSpanId);
-        
+
         // 하이라이트된 span으로 스크롤 (약간의 지연을 두어 DOM 업데이트 후 실행)
         setTimeout(() => {
           if (highlightedSpanRef.current) {
@@ -67,12 +80,12 @@ export function TraceModal({ isOpen, onClose, traceData, initialExpandedSpanId }
             });
           }
         }, 100);
-        
+
         // 3초 후 하이라이트 제거
         const timer = setTimeout(() => {
           setHighlightedSpanId(null);
         }, 3000);
-        
+
         return () => clearTimeout(timer);
       }
     } else {
@@ -105,12 +118,22 @@ export function TraceModal({ isOpen, onClose, traceData, initialExpandedSpanId }
     return (
       <div key={span.spanId} className="mb-2">
         <div
-          ref={isHighlighted ? (el) => { highlightedSpanRef.current = el; } : null}
+          ref={
+            isHighlighted
+              ? (el) => {
+                  highlightedSpanRef.current = el;
+                }
+              : null
+          }
           className={`flex items-start gap-2 p-3 rounded-md border transition-all ${
             isHighlighted
               ? "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 shadow-lg ring-2 ring-blue-400 dark:ring-blue-600 ring-opacity-50"
               : "bg-gray-50 dark:bg-[#0D1117] border-gray-200 dark:border-[#2D333B]"
-          } ${hasChildren ? "cursor-pointer hover:bg-gray-100 dark:hover:bg-[#161B22] transition-colors" : ""}`}
+          } ${
+            hasChildren
+              ? "cursor-pointer hover:bg-gray-100 dark:hover:bg-[#161B22] transition-colors"
+              : ""
+          }`}
           style={{ marginLeft: `${depth * 24}px` }}
           onClick={hasChildren ? () => toggleSpan(span.spanId) : undefined}
         >
@@ -177,10 +200,11 @@ export function TraceModal({ isOpen, onClose, traceData, initialExpandedSpanId }
                   {span.durationMs.toLocaleString()}ms
                 </div>
                 <div className="text-xs text-gray-600 dark:text-[#8B949E]">
-                  (자체: {span.selfDurationMs.toLocaleString()}ms)
+                  (Self: {span.selfDurationMs.toLocaleString()}ms)
                 </div>
                 <div className="text-xs text-gray-500 dark:text-[#6B7280] mt-1">
-                  {span.percentage.toFixed(1)}% / {span.selfPercentage.toFixed(1)}%
+                  {span.percentage.toFixed(1)}% /{" "}
+                  {span.selfPercentage.toFixed(1)}%
                 </div>
               </div>
             </div>
@@ -241,11 +265,21 @@ export function TraceModal({ isOpen, onClose, traceData, initialExpandedSpanId }
                 Call Trace
               </h2>
               <div className="mt-2 flex items-center gap-4 text-sm text-gray-600 dark:text-[#8B949E]">
-                <span>Try ID: <span className="font-mono">{traceData.tryId}</span></span>
+                <span>
+                  Try ID: <span className="font-mono">{traceData.tryId}</span>
+                </span>
                 {traceData.traceId && (
-                  <span>Trace ID: <span className="font-mono">{traceData.traceId}</span></span>
+                  <span>
+                    Trace ID:{" "}
+                    <span className="font-mono">{traceData.traceId}</span>
+                  </span>
                 )}
-                <span>전체 시간: <span className="font-bold">{traceData.totalDurationMs.toLocaleString()}ms</span></span>
+                <span>
+                  Total Duration:{" "}
+                  <span className="font-bold">
+                    {traceData.totalDurationMs.toLocaleString()}ms
+                  </span>
+                </span>
               </div>
             </div>
             <button
@@ -272,9 +306,9 @@ export function TraceModal({ isOpen, onClose, traceData, initialExpandedSpanId }
           <div className="flex-1 overflow-auto p-6">
             {traceData.spans.length === 0 ? (
               <div className="text-center py-12 text-gray-600 dark:text-[#8B949E]">
-                <p className="text-sm">Trace 데이터가 없습니다</p>
+                <p className="text-sm">No trace data found.</p>
                 <p className="text-xs mt-1 text-gray-500 dark:text-[#6B7280]">
-                  Tempo가 비활성화되었거나 trace를 찾지 못한 경우입니다
+                  Tempo is disabled or trace not found.
                 </p>
               </div>
             ) : (
@@ -288,4 +322,3 @@ export function TraceModal({ isOpen, onClose, traceData, initialExpandedSpanId }
     </>
   );
 }
-
