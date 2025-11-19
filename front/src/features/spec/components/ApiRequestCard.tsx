@@ -614,6 +614,8 @@ export function ApiRequestCard({
                       {isObjectSchema(requestBody.rootSchemaType) &&
                         (() => {
                           const objectSchema = requestBody.rootSchemaType;
+                          // properties가 undefined일 수 있으므로 빈 배열로 초기화
+                          const properties = objectSchema.properties || [];
                           // schemaRef가 있으면 필드 편집 불가 (form-data와 동일한 동작)
                           const hasSchemaRef = !!requestBody.schemaRef;
                           return (
@@ -676,7 +678,7 @@ export function ApiRequestCard({
                                       rootSchemaType: {
                                         ...objectSchema,
                                         properties: [
-                                          ...objectSchema.properties,
+                                          ...properties,
                                           createDefaultField(),
                                         ],
                                       },
@@ -706,14 +708,12 @@ export function ApiRequestCard({
                                 </button>
                               </div>
                               <div className="space-y-2">
-                                {objectSchema.properties.map((field, index) => (
+                                {properties.map((field, index) => (
                                   <SchemaFieldEditor
                                     key={index}
                                     field={field}
                                     onChange={(newField) => {
-                                      const updated = [
-                                        ...objectSchema.properties,
-                                      ];
+                                      const updated = [...properties];
                                       updated[index] = newField;
                                       setRequestBody({
                                         ...requestBody,
@@ -724,10 +724,9 @@ export function ApiRequestCard({
                                       });
                                     }}
                                     onRemove={() => {
-                                      const updated =
-                                        objectSchema.properties.filter(
-                                          (_, i) => i !== index
-                                        );
+                                      const updated = properties.filter(
+                                        (_, i) => i !== index
+                                      );
                                       setRequestBody({
                                         ...requestBody,
                                         rootSchemaType: {
@@ -741,8 +740,7 @@ export function ApiRequestCard({
                                   />
                                 ))}
                               </div>
-                              {(!objectSchema.properties ||
-                                objectSchema.properties.length === 0) &&
+                              {(properties.length === 0) &&
                                 !hasSchemaRef && (
                                   <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
                                     <p>

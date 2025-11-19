@@ -2091,7 +2091,7 @@ export function ApiEditorLayout() {
     setAuth({ type: "none" });
     setRequestHeaders([]);
     setRequestBody({
-      type: "json",
+      type: "none",
       fields: [],
     });
     setStatusCodes([]);
