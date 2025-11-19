@@ -26,44 +26,54 @@ export function exportToMarkdown(data: MarkdownExportData): string {
   // 헤더: 간결하고 노션/블로그 친화적 형식
   let markdown = `## ${method.toUpperCase()} \`${url}\`\n\n`;
   if (description) markdown += `${description}\n\n`;
+  
+  // Tags and Owner 정보를 명확하게 표시
   if (tags || owner) {
-    markdown += `- Tags: ${tags || "-"}\n`;
-    if (owner) markdown += `- Owner: ${owner}\n`;
+    if (tags) {
+      markdown += `**Tags**: ${tags}\n`;
+    }
+    if (owner) {
+      markdown += `**Owner**: ${owner}\n`;
+    }
     markdown += `\n`;
   }
 
-  // Request Headers
-  if (headers && headers.length > 0) {
+  // Request Section
+  const hasRequest = (headers && headers.length > 0) || (requestBody && requestBody.type !== "none");
+  if (hasRequest) {
     markdown += `### Request\n\n`;
-    markdown += `#### Headers\n\n`;
 
-    headers.forEach((header) => {
-      markdown += `**${header.key}**\n`;
-      markdown += `\`\`\`\n${header.value}\n\`\`\`\n\n`;
-    });
-  }
+    // Request Headers
+    if (headers && headers.length > 0) {
+      markdown += `#### Headers\n\n`;
+      headers.forEach((header) => {
+        markdown += `**${header.key}**\n`;
+        markdown += `\`\`\`\n${header.value}\n\`\`\`\n\n`;
+      });
+    }
 
-  // Request Body
-  if (requestBody && requestBody.type !== "none") {
-    markdown += `#### Body\n\n`;
-    markdown += `Content-Type: \`${
-      requestBody.contentType || requestBody.type
-    }\`\n\n`;
+    // Request Body
+    if (requestBody && requestBody.type !== "none") {
+      markdown += `#### Body\n\n`;
+      markdown += `Content-Type: \`${
+        requestBody.contentType || requestBody.type
+      }\`\n\n`;
 
-    if (
-      requestBody.type === "json" ||
-      requestBody.type === "form-data" ||
-      requestBody.type === "x-www-form-urlencoded"
-    ) {
-      if (requestBody.fields && requestBody.fields.length > 0) {
-        markdown += `| Field | Type | Value | Description |\n`;
-        markdown += `|---|---|---|---|\n`;
-        requestBody.fields.forEach((field: { key: string; type: string; value?: string; description?: string }) => {
-          markdown += `| ${field.key} | ${field.type} | ${
-            field.value || "-"
-          } | ${field.description || "-"} |\n`;
-        });
-        markdown += `\n`;
+      if (
+        requestBody.type === "json" ||
+        requestBody.type === "form-data" ||
+        requestBody.type === "x-www-form-urlencoded"
+      ) {
+        if (requestBody.fields && requestBody.fields.length > 0) {
+          markdown += `| Field | Type | Value | Description |\n`;
+          markdown += `|---|---|---|---|\n`;
+          requestBody.fields.forEach((field: { key: string; type: string; value?: string; description?: string }) => {
+            markdown += `| ${field.key} | ${field.type} | ${
+              field.value || "-"
+            } | ${field.description || "-"} |\n`;
+          });
+          markdown += `\n`;
+        }
       }
     }
   }
@@ -114,7 +124,7 @@ export function downloadMarkdown(
 
 /**
  * Convert AsyncAPI (WebSocket) YAML content to Markdown
- * Formats channels, operations (send/receive), and messages.
+ * Formats channels, operations (send/receive), and messages with full details.
  */
 export function convertWsYamlToMarkdown(yamlContent: string): string {
   let md = `# WebSocket API Documentation\n\n`;
@@ -127,41 +137,72 @@ export function convertWsYamlToMarkdown(yamlContent: string): string {
     const info = doc.info || {};
     if (info.title) md += `**Title**: ${info.title}\n`;
     if (info.version) md += `**Version**: ${info.version}\n`;
+    
+    // Owner (from x-ouroboros-summary or info.summary)
+    const owner = doc["x-ouroboros-summary"] || info.summary;
+    if (owner) {
+      md += `**Owner**: ${owner}\n`;
+    }
+    
+    // Entry Point and Protocol (from x-ouroboros metadata or default)
+    const entryPoint = doc["x-ouroboros-entrypoint"] || doc.servers?.[0]?.url || "/ws";
+    const protocol = doc["x-ouroboros-protocol"] || (entryPoint.startsWith("wss://") ? "wss" : "ws");
+    md += `**Entry Point**: \`${entryPoint}\`\n`;
+    md += `**Protocol**: \`${protocol.toUpperCase()}\`\n`;
+    
     md += `\n---\n\n`;
 
     // Channels overview table
     const channels = doc.channels || {};
     const messages = (doc.components && doc.components.messages) || {};
+    const schemas = (doc.components && doc.components.schemas) || {};
 
     if (Object.keys(channels).length > 0) {
-      md += `## Channels\n\n`;
-      md += `| Channel | Address | Messages |\n`;
-      md += `|---|---|---|\n`;
+      md += `## Channels Overview\n\n`;
+      md += `| Channel | Address | Receiver Messages | Reply Messages |\n`;
+      md += `|---|---|---|---|\n`;
       Object.entries(channels).forEach(([channelName, ch]: [string, any]) => {
         const address = (ch as any).address || "-";
-        const msgRefs: string[] = [];
-        const collectMessageRefs = (val: any) => {
+        
+        // Collect receiver messages
+        const receiverRefs: string[] = [];
+        const collectReceiverRefs = (val: any) => {
           if (!val) return;
           if (Array.isArray(val)) {
-            val.forEach(collectMessageRefs);
+            val.forEach(collectReceiverRefs);
             return;
           }
           if (val && val["$ref"]) {
-            msgRefs.push(val["$ref"].replace("#/components/messages/", ""));
+            receiverRefs.push(val["$ref"].replace("#/components/messages/", ""));
           }
         };
-        // Messages can be referenced in channel-level bindings/messages or via operations
         if ((ch as any).messages) {
-          Object.values((ch as any).messages).forEach(collectMessageRefs);
+          Object.values((ch as any).messages).forEach(collectReceiverRefs);
         }
-        md += `| \`${channelName}\` | ${address} | ${msgRefs.length ? msgRefs.join(", ") : "-"} |\n`;
+        
+        // Collect reply messages
+        const replyRefs: string[] = [];
+        if (ch?.reply?.messages) {
+          const collectReplyRefs = (val: any) => {
+            if (!val) return;
+            if (Array.isArray(val)) {
+              val.forEach(collectReplyRefs);
+              return;
+            }
+            if (val && val["$ref"]) {
+              replyRefs.push(val["$ref"].replace("#/components/messages/", ""));
+            }
+          };
+          const replyMsgs = Array.isArray(ch.reply.messages) ? ch.reply.messages : [ch.reply.messages];
+          replyMsgs.forEach(collectReplyRefs);
+        }
+        
+        md += `| \`${channelName}\` | \`${address}\` | ${receiverRefs.length ? receiverRefs.join(", ") : "-"} | ${replyRefs.length ? replyRefs.join(", ") : "-"} |\n`;
       });
       md += `\n---\n\n`;
     }
 
-    // Operations (from x-ouroboros metadata if present)
-    // Some specs put operations under custom fields; also reflect simple pattern:
-    // For each channel, show typical send/receive using messages if available.
+    // Operations (from AsyncAPI operations or x-ouroboros metadata)
     md += `## Operations\n\n`;
     if (Object.keys(channels).length === 0) {
       md += "No channels defined.\n\n";
@@ -171,48 +212,88 @@ export function convertWsYamlToMarkdown(yamlContent: string): string {
         md += `### Channel \`${channelName}\`\n\n`;
         md += `**Address**: \`${address}\`\n\n`;
 
-        const opBlocks: Array<{ kind: "send" | "receive"; title: string; refs: string[] }> = [];
+        // Check for AsyncAPI standard operations
+        const operations = ch.operations || {};
+        const hasStandardOps = Object.keys(operations).length > 0;
 
-        // Try to infer operations using conventional fields used in this project:
-        // receives/messages and replies/messages via $ref arrays if present
-        const collectRefs = (arr: any): string[] => {
-          if (!arr) return [];
-          const refs: string[] = [];
-          const each = Array.isArray(arr) ? arr : [arr];
-          each.forEach((m: any) => {
-            if (m && m["$ref"]) {
-              refs.push(m["$ref"].replace("#/components/messages/", ""));
-            }
-          });
-          return refs;
+        // Receiver section
+        const receiverRefs: string[] = [];
+        const collectReceiverRefs = (val: any) => {
+          if (!val) return;
+          if (Array.isArray(val)) {
+            val.forEach(collectReceiverRefs);
+            return;
+          }
+          if (val && val["$ref"]) {
+            receiverRefs.push(val["$ref"].replace("#/components/messages/", ""));
+          }
         };
-
-        // Common: channel.messages (used as receive)
-        const receiveRefs = ch?.messages ? Object.values(ch.messages).map((m: any) => m?.["$ref"]?.replace("#/components/messages/", "")).filter(Boolean) : [];
-        if (receiveRefs.length > 0) {
-          opBlocks.push({ kind: "receive", title: "Receive", refs: receiveRefs as string[] });
+        if ((ch as any).messages) {
+          Object.values((ch as any).messages).forEach(collectReceiverRefs);
         }
 
-        // Optional: reply/messages (send)
-        const replyRefs = ch?.reply?.messages ? collectRefs(ch.reply.messages) : [];
+        // Reply section
+        const replyRefs: string[] = [];
+        if (ch?.reply?.messages) {
+          const collectReplyRefs = (val: any) => {
+            if (!val) return;
+            if (Array.isArray(val)) {
+              val.forEach(collectReplyRefs);
+              return;
+            }
+            if (val && val["$ref"]) {
+              replyRefs.push(val["$ref"].replace("#/components/messages/", ""));
+            }
+          };
+          const replyMsgs = Array.isArray(ch.reply.messages) ? ch.reply.messages : [ch.reply.messages];
+          replyMsgs.forEach(collectReplyRefs);
+        }
+
+        // Display Receiver
+        if (receiverRefs.length > 0) {
+          md += `#### Receiver\n\n`;
+          md += `**Address**: \`${address}\`\n\n`;
+          md += `**Messages**:\n`;
+          receiverRefs.forEach((msgName) => {
+            md += `- \`${msgName}\`\n`;
+          });
+          md += `\n`;
+        }
+
+        // Display Reply
         if (replyRefs.length > 0) {
-          opBlocks.push({ kind: "send", title: "Send (Reply)", refs: replyRefs });
+          const replyAddress = ch?.reply?.address || address;
+          md += `#### Reply\n\n`;
+          md += `**Address**: \`${replyAddress}\`\n\n`;
+          md += `**Messages**:\n`;
+          replyRefs.forEach((msgName) => {
+            md += `- \`${msgName}\`\n`;
+          });
+          md += `\n`;
         }
 
-        if (opBlocks.length === 0) {
-          md += `No explicit operations defined.\n\n`;
-        } else {
-          opBlocks.forEach((block) => {
-            md += `#### ${block.title}\n\n`;
-            if (block.refs.length === 0) {
-              md += `No messages.\n\n`;
-            } else {
-              block.refs.forEach((msgName) => {
-                md += `- Message: \`${msgName}\`\n`;
+        // If no receiver or reply found, check standard operations
+        if (receiverRefs.length === 0 && replyRefs.length === 0 && hasStandardOps) {
+          Object.entries(operations).forEach(([opId, op]: [string, any]) => {
+            const action = op.action || "send";
+            const title = action === "send" ? "Send" : action === "receive" ? "Receive" : action;
+            md += `#### ${title}\n\n`;
+            if (op.title) md += `**Title**: ${op.title}\n\n`;
+            if (op.description) md += `${op.description}\n\n`;
+            if (op.messages) {
+              md += `**Messages**:\n`;
+              const opMsgs = Array.isArray(op.messages) ? op.messages : [op.messages];
+              opMsgs.forEach((msg: any) => {
+                const msgRef = msg?.$ref?.replace("#/components/messages/", "") || "Unknown";
+                md += `- \`${msgRef}\`\n`;
               });
               md += `\n`;
             }
           });
+        }
+
+        if (receiverRefs.length === 0 && replyRefs.length === 0 && !hasStandardOps) {
+          md += `No explicit operations defined.\n\n`;
         }
 
         md += `---\n\n`;
@@ -226,6 +307,8 @@ export function convertWsYamlToMarkdown(yamlContent: string): string {
     } else {
       Object.entries(messages).forEach(([messageName, message]: [string, any]) => {
         md += `### \`${messageName}\`\n\n`;
+        
+        // Basic message info
         if (message?.name) md += `**Name**: ${message.name}\n\n`;
         if (message?.title) md += `**Title**: ${message.title}\n\n`;
         if (message?.summary) md += `**Summary**: ${message.summary}\n\n`;
@@ -234,13 +317,20 @@ export function convertWsYamlToMarkdown(yamlContent: string): string {
         // Headers
         if (message?.headers) {
           md += `#### Headers\n\n`;
-          md += formatSchemaForMarkdown(message.headers, (doc.components && doc.components.schemas) || {});
+          const headerSchema = message.headers.schema || message.headers;
+          md += formatSchemaForMarkdown(headerSchema, schemas);
         }
 
         // Payload
         if (message?.payload) {
           md += `#### Payload\n\n`;
-          md += formatSchemaForMarkdown(message.payload, (doc.components && doc.components.schemas) || {});
+          const payloadSchema = message.payload.schema || message.payload;
+          md += formatSchemaForMarkdown(payloadSchema, schemas);
+        }
+
+        // If no headers or payload, indicate that
+        if (!message?.headers && !message?.payload) {
+          md += `*No headers or payload defined.*\n\n`;
         }
 
         md += `---\n\n`;
@@ -384,6 +474,12 @@ export function convertYamlToMarkdown(yamlContent: string): string {
         md += `**HTTP Method**: \`${method}\`\n`;
         md += `**Endpoint**: \`${path}\`\n`;
         
+        // Owner (from x-ouroboros-summary or operation.summary)
+        const owner = operation["x-ouroboros-summary"] || operation.summary;
+        if (owner) {
+          md += `**Owner**: ${owner}\n`;
+        }
+        
         // Authentication check
         const authInfo = getAuthenticationInfo(operation, json.security);
         md += `**Authentication**: ${authInfo}\n`;
@@ -393,11 +489,8 @@ export function convertYamlToMarkdown(yamlContent: string): string {
         }
         md += `\n---\n\n`;
 
-        // Summary/Description
-        if (operation.summary) {
-          md += `${operation.summary}\n\n`;
-        }
-        if (operation.description) {
+        // Description (summary는 Owner로 표시했으므로 description만 표시)
+        if (operation.description && operation.description !== owner) {
           md += `${operation.description}\n\n`;
         }
 
