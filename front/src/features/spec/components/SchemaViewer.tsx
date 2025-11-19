@@ -13,6 +13,7 @@ interface SchemaViewerProps {
   schemaType?: SchemaType;
   fields?: SchemaField[];
   schemaRef?: string;
+  schemaName?: string | null; // 스키마 이름 (표시용)
   description?: string;
   contentType?: string;
 }
@@ -21,6 +22,7 @@ export function SchemaViewer({
   schemaType,
   fields,
   schemaRef,
+  schemaName,
   description,
   contentType = "application/json",
 }: SchemaViewerProps) {
@@ -31,33 +33,33 @@ export function SchemaViewer({
   useEffect(() => {
     const loadSchemaFields = async () => {
       // schemaRef가 있으면 사용
-      let schemaName: string | undefined = schemaRef;
-      
+      let schemaNameToLoad: string | undefined = schemaRef;
+
       // schemaRef가 없고 rootSchemaType이 ref인 경우 사용
-      if (!schemaName && schemaType && isRefSchema(schemaType)) {
-        schemaName = schemaType.schemaName;
+      if (!schemaNameToLoad && schemaType && isRefSchema(schemaType)) {
+        schemaNameToLoad = schemaType.schemaName;
       }
 
-      if (!schemaName) {
+      if (!schemaNameToLoad) {
         setLoadedFields([]);
         return;
       }
 
       setIsLoadingSchema(true);
       try {
-        const response = await getSchema(schemaName);
+        const response = await getSchema(schemaNameToLoad);
         const schemaData = response.data;
 
         if (schemaData.properties) {
           const requiredFields = schemaData.required || [];
-          const schemaFields: SchemaField[] = Object.entries(schemaData.properties).map(
-            ([key, propSchema]: [string, unknown]) => {
-              const field = parseOpenAPISchemaToSchemaField(key, propSchema);
-              // required 필드 설정
-              field.required = requiredFields.includes(key);
-              return field;
-            }
-          );
+          const schemaFields: SchemaField[] = Object.entries(
+            schemaData.properties
+          ).map(([key, propSchema]: [string, unknown]) => {
+            const field = parseOpenAPISchemaToSchemaField(key, propSchema);
+            // required 필드 설정
+            field.required = requiredFields.includes(key);
+            return field;
+          });
           setLoadedFields(schemaFields);
         } else {
           setLoadedFields([]);
@@ -73,7 +75,10 @@ export function SchemaViewer({
     loadSchemaFields();
   }, [schemaRef, schemaType]);
   // SchemaField를 재귀적으로 렌더링하는 함수
-  const renderField = (field: SchemaField, depth: number = 0): React.ReactElement => {
+  const renderField = (
+    field: SchemaField,
+    depth: number = 0
+  ): React.ReactElement => {
     const getTypeString = (schemaType: SchemaType): string => {
       if (isPrimitiveSchema(schemaType)) {
         return schemaType.type;
@@ -94,12 +99,15 @@ export function SchemaViewer({
       <div key={field.key} className="relative">
         <div className="flex items-start py-2">
           {/* 트리 세로선 및 들여쓰기 */}
-          <div className="flex-shrink-0 relative" style={{ width: `${depth * 20 + 20}px` }}>
+          <div
+            className="flex-shrink-0 relative"
+            style={{ width: `${depth * 20 + 20}px` }}
+          >
             {/* 왼쪽 세로선 (전체 높이) */}
             <div className="absolute left-0 top-0 bottom-0 w-px bg-gray-300 dark:bg-[#2D333B]" />
             {/* 각 depth의 가로선 */}
             {depth > 0 && (
-              <div 
+              <div
                 className="absolute top-3 w-4 h-px bg-gray-300 dark:bg-[#2D333B]"
                 style={{ left: `${depth * 20}px` }}
               />
@@ -189,7 +197,11 @@ export function SchemaViewer({
 
   const displayFields = getFieldsFromSchemaType();
 
-  if (!schemaRef && !schemaType && (!displayFields || displayFields.length === 0)) {
+  if (
+    !schemaRef &&
+    !schemaType &&
+    (!displayFields || displayFields.length === 0)
+  ) {
     return null;
   }
 
@@ -213,12 +225,16 @@ export function SchemaViewer({
       </div>
 
       {/* Schema Reference */}
-      {schemaRef && (
+      {(schemaRef || (schemaType && isRefSchema(schemaType))) && (
         <div className="p-3 bg-gray-50 dark:bg-[#0D1117] border border-gray-200 dark:border-[#2D333B] rounded-md">
           <div className="text-sm text-gray-600 dark:text-[#8B949E]">
             <span className="font-medium">Schema Reference:</span>{" "}
             <span className="font-mono text-gray-900 dark:text-[#E6EDF3]">
-              {schemaRef}
+              {schemaName ||
+                (schemaType && isRefSchema(schemaType)
+                  ? schemaType.schemaName
+                  : null) ||
+                schemaRef}
             </span>
             {isLoadingSchema && (
               <span className="ml-2 text-xs text-gray-500 dark:text-[#8B949E]">
@@ -238,9 +254,7 @@ export function SchemaViewer({
         </div>
       ) : displayFields.length > 0 ? (
         <div className="px-6 py-4 relative">
-          {displayFields.map((field) => 
-            renderField(field, 0)
-          )}
+          {displayFields.map((field) => renderField(field, 0))}
         </div>
       ) : schemaRef ? (
         <div className="px-6 py-4">
@@ -263,22 +277,23 @@ export function SchemaViewer({
       )}
 
       {/* Array of primitive */}
-      {schemaType && isArraySchema(schemaType) && isPrimitiveSchema(schemaType.items) && (
-        <div className="px-6 py-4">
-          <div className="text-sm text-gray-600 dark:text-[#8B949E]">
-            <span className="font-medium">Type:</span>{" "}
-            <span className="font-mono text-gray-900 dark:text-[#E6EDF3]">
-              {schemaType.items.type}[]
-            </span>
-          </div>
-          {schemaType.itemsDescription && (
-            <div className="mt-2 text-sm text-gray-600 dark:text-[#8B949E]">
-              {schemaType.itemsDescription}
+      {schemaType &&
+        isArraySchema(schemaType) &&
+        isPrimitiveSchema(schemaType.items) && (
+          <div className="px-6 py-4">
+            <div className="text-sm text-gray-600 dark:text-[#8B949E]">
+              <span className="font-medium">Type:</span>{" "}
+              <span className="font-mono text-gray-900 dark:text-[#E6EDF3]">
+                {schemaType.items.type}[]
+              </span>
             </div>
-          )}
-        </div>
-      )}
+            {schemaType.itemsDescription && (
+              <div className="mt-2 text-sm text-gray-600 dark:text-[#8B949E]">
+                {schemaType.itemsDescription}
+              </div>
+            )}
+          </div>
+        )}
     </div>
   );
 }
-

@@ -169,12 +169,12 @@
 
 ### Installation
 
-> **⚠️ Version Warning**: Do not use version 1.0.2 as it causes errors. Please use version 1.0.3.
+> **⚠️ Version Warning**: Do not use version 1.0.2 as it causes errors. Please use version 1.0.4.
 
 #### Gradle
 ```gradle
 dependencies {
-    implementation 'io.github.whitesnakegang:ouroboros:1.0.3'
+    implementation 'io.github.whitesnakegang:ouroboros:1.0.4'
     implementation 'org.springframework.boot:spring-boot-starter-web'
     
     // Optional: For WebSocket code scanning and spec comparison
@@ -189,7 +189,7 @@ dependencies {
 <dependency>
     <groupId>io.github.whitesnakegang</groupId>
     <artifactId>ouroboros</artifactId>
-    <version>1.0.3</version>
+    <version>1.0.4</version>
 </dependency>
 
 <!-- Optional: For WebSocket code scanning and spec comparison -->

@@ -96,6 +96,7 @@ export function WsEditorForm({
   diff,
   operationInfo,
   onSyncToActual,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   onProgressUpdate: _onProgressUpdate,
 }: WsEditorFormProps) {
   const [schemas, setSchemas] = useState<SchemaResponse[]>([]);
@@ -141,22 +142,19 @@ export function WsEditorForm({
 
   const wsSpecTab = externalWsSpecTab ?? internalWsSpecTab;
   // setWsSpecTab는 외부(ApiEditorLayout)에서 탭 전환 시 사용되므로 유지
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const setWsSpecTab = setExternalWsSpecTab ?? setInternalWsSpecTab;
 
   // 통합 탭 (편집 모드용)
   const [wsTab, setWsTab] = useState<
-    "receiver" | "reply" | "schema" | "message"
+    "receiver" | "reply" | "message" | "schema"
   >("receiver");
 
   // 채널 선택 모드 (새 채널 생성만 허용)
-  const receiverChannelMode: "create" = "create";
-  const replyChannelMode: "create" = "create";
-
-  // 메시지 작성 상태
+  const receiverChannelMode = "create" as const;
+  const replyChannelMode = "create" as const;
   const [messageName, setMessageName] = useState("");
   const [messageDescription, setMessageDescription] = useState("");
-  const [messageType, setMessageType] = useState<"header" | "schema" | "name">(
+  const [messageType, setMessageType] = useState<"name" | "header" | "schema">(
     "name"
   );
   const [messageHeaders, setMessageHeaders] = useState<KeyValuePair[]>([]);
@@ -1375,16 +1373,6 @@ export function WsEditorForm({
               Reply
             </button>
             <button
-              onClick={() => setWsTab("schema")}
-              className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ${
-                wsTab === "schema"
-                  ? "text-gray-900 dark:text-[#E6EDF3] bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] border-b-white dark:border-b-[#161B22] relative z-10"
-                  : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
-              }`}
-            >
-              Schema
-            </button>
-            <button
               onClick={() => setWsTab("message")}
               className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ${
                 wsTab === "message"
@@ -1393,6 +1381,16 @@ export function WsEditorForm({
               }`}
             >
               Message
+            </button>
+            <button
+              onClick={() => setWsTab("schema")}
+              className={`px-4 py-2 text-sm font-medium transition-all rounded-t-md rounded-b-none border border-b-0 focus:outline-none focus-visible:outline-none ${
+                wsTab === "schema"
+                  ? "text-gray-900 dark:text-[#E6EDF3] bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2D333B] border-b-white dark:border-b-[#161B22] relative z-10"
+                  : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
+              }`}
+            >
+              Schema
             </button>
           </div>
         </div>
@@ -1615,7 +1613,7 @@ export function WsEditorForm({
                           onChange={(e) =>
                             setReply({ ...reply, address: e.target.value })
                           }
-                          placeholder="/app/chat/{roomId}"
+                          placeholder="/topic/chat/{roomId}"
                           disabled={isReadOnly}
                           className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                             isReadOnly ? "opacity-60 cursor-not-allowed" : ""

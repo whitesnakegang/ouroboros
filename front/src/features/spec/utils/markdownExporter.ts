@@ -1,4 +1,8 @@
-import yaml from 'js-yaml';
+import yaml from "js-yaml";
+import { getSchema } from "../services/api";
+import { parseOpenAPISchemaToSchemaField } from "./schemaConverter";
+import type { SchemaField } from "../types/schema.types";
+import { isRefSchema, isObjectSchema } from "../types/schema.types";
 
 interface MarkdownExportData {
   method: string;
@@ -8,10 +12,71 @@ interface MarkdownExportData {
   owner?: string;
   headers?: Array<{ key: string; value: string }>;
   requestBody?: any;
-  statusCodes?: Array<{ code: string; type: string; message: string }>;
+  statusCodes?: Array<{
+    code: string;
+    type: string;
+    message: string;
+    schema?: any;
+  }>;
 }
 
-export function exportToMarkdown(data: MarkdownExportData): string {
+// Helper function to get fields from schema
+async function getSchemaFields(schemaRef: string): Promise<SchemaField[]> {
+  if (!schemaRef) {
+    return [];
+  }
+
+  try {
+    const response = await getSchema(schemaRef);
+    const schemaData = response?.data;
+
+    if (schemaData?.properties) {
+      const requiredFields = schemaData.required || [];
+      return Object.entries(schemaData.properties)
+        .map(([key, propSchema]: [string, any]) => {
+          try {
+            const field = parseOpenAPISchemaToSchemaField(key, propSchema);
+            field.required = requiredFields.includes(key);
+            return field;
+          } catch (err) {
+            console.error(`Failed to parse field ${key}:`, err);
+            return null;
+          }
+        })
+        .filter((field): field is SchemaField => field !== null);
+    }
+    return [];
+  } catch (error) {
+    console.error(`Failed to load schema fields for ${schemaRef}:`, error);
+    return [];
+  }
+}
+
+// Helper function to format field type
+function getFieldTypeString(field: SchemaField): string {
+  if (field.schemaType.kind === "primitive") {
+    return field.schemaType.type;
+  } else if (field.schemaType.kind === "object") {
+    return "object";
+  } else if (field.schemaType.kind === "array") {
+    const itemType =
+      field.schemaType.items.kind === "primitive"
+        ? field.schemaType.items.type
+        : field.schemaType.items.kind === "object"
+        ? "object"
+        : field.schemaType.items.kind === "ref"
+        ? field.schemaType.items.schemaName
+        : "unknown";
+    return `${itemType}[]`;
+  } else if (field.schemaType.kind === "ref") {
+    return field.schemaType.schemaName;
+  }
+  return "string";
+}
+
+export async function exportToMarkdown(
+  data: MarkdownExportData
+): Promise<string> {
   const {
     method,
     url,
@@ -26,44 +91,124 @@ export function exportToMarkdown(data: MarkdownExportData): string {
   // 헤더: 간결하고 노션/블로그 친화적 형식
   let markdown = `## ${method.toUpperCase()} \`${url}\`\n\n`;
   if (description) markdown += `${description}\n\n`;
+
+  // Tags and Owner 정보를 명확하게 표시
   if (tags || owner) {
-    markdown += `- Tags: ${tags || "-"}\n`;
-    if (owner) markdown += `- Owner: ${owner}\n`;
+    if (tags) {
+      markdown += `**Tags**: ${tags}\n`;
+    }
+    if (owner) {
+      markdown += `**Owner**: ${owner}\n`;
+    }
     markdown += `\n`;
   }
 
-  // Request Headers
-  if (headers && headers.length > 0) {
+  // Request Section
+  const hasRequest =
+    (headers && headers.length > 0) ||
+    (requestBody && requestBody.type !== "none");
+  if (hasRequest) {
     markdown += `### Request\n\n`;
-    markdown += `#### Headers\n\n`;
 
-    headers.forEach((header) => {
-      markdown += `**${header.key}**\n`;
-      markdown += `\`\`\`\n${header.value}\n\`\`\`\n\n`;
-    });
-  }
+    // Request Headers
+    if (headers && headers.length > 0) {
+      markdown += `#### Headers\n\n`;
+      headers.forEach((header) => {
+        markdown += `**${header.key}**\n`;
+        markdown += `\`\`\`\n${header.value}\n\`\`\`\n\n`;
+      });
+    }
 
-  // Request Body
-  if (requestBody && requestBody.type !== "none") {
-    markdown += `#### Body\n\n`;
-    markdown += `Content-Type: \`${
-      requestBody.contentType || requestBody.type
-    }\`\n\n`;
+    // Request Body
+    if (requestBody && requestBody.type !== "none") {
+      markdown += `#### Body\n\n`;
+      markdown += `Content-Type: \`${
+        requestBody.contentType || requestBody.type
+      }\`\n\n`;
 
-    if (
-      requestBody.type === "json" ||
-      requestBody.type === "form-data" ||
-      requestBody.type === "x-www-form-urlencoded"
-    ) {
-      if (requestBody.fields && requestBody.fields.length > 0) {
-        markdown += `| Field | Type | Value | Description |\n`;
-        markdown += `|---|---|---|---|\n`;
-        requestBody.fields.forEach((field: { key: string; type: string; value?: string; description?: string }) => {
-          markdown += `| ${field.key} | ${field.type} | ${
-            field.value || "-"
-          } | ${field.description || "-"} |\n`;
-        });
-        markdown += `\n`;
+      if (
+        requestBody.type === "json" ||
+        requestBody.type === "form-data" ||
+        requestBody.type === "x-www-form-urlencoded"
+      ) {
+        let fieldsToDisplay: Array<{
+          key: string;
+          type: string;
+          value?: string;
+          description?: string;
+          required?: boolean;
+        }> = [];
+
+        // Check for schema reference
+        if (requestBody.schemaRef) {
+          const schemaFields = await getSchemaFields(requestBody.schemaRef);
+          fieldsToDisplay = schemaFields.map((field) => ({
+            key: field.key,
+            type: getFieldTypeString(field),
+            description: field.description || undefined,
+            required: field.required,
+          }));
+        } else if (requestBody.rootSchemaType) {
+          // Check if rootSchemaType is ref
+          if (
+            isRefSchema(requestBody.rootSchemaType) &&
+            requestBody.rootSchemaType.schemaName
+          ) {
+            const schemaFields = await getSchemaFields(
+              requestBody.rootSchemaType.schemaName
+            );
+            fieldsToDisplay = schemaFields.map((field) => ({
+              key: field.key,
+              type: getFieldTypeString(field),
+              description: field.description || undefined,
+              required: field.required,
+            }));
+          } else if (
+            isObjectSchema(requestBody.rootSchemaType) &&
+            requestBody.rootSchemaType.properties
+          ) {
+            // Object schema with properties
+            fieldsToDisplay = requestBody.rootSchemaType.properties.map(
+              (field: SchemaField) => ({
+                key: field.key,
+                type: getFieldTypeString(field),
+                description: field.description || undefined,
+                required: field.required,
+              })
+            );
+          }
+        } else if (requestBody.fields && requestBody.fields.length > 0) {
+          // Use existing fields
+          fieldsToDisplay = requestBody.fields.map(
+            (field: {
+              key: string;
+              type?: string;
+              description?: string;
+              required?: boolean;
+              schemaType?: any;
+            }) => ({
+              key: field.key,
+              type:
+                field.type ||
+                (field.schemaType
+                  ? getFieldTypeString(field as SchemaField)
+                  : "string"),
+              description: field.description || undefined,
+              required: field.required,
+            })
+          );
+        }
+
+        if (fieldsToDisplay.length > 0) {
+          markdown += `| Field | Type | Required | Description |\n`;
+          markdown += `|---|---|---|---|\n`;
+          fieldsToDisplay.forEach((field) => {
+            markdown += `| ${field.key} | ${field.type} | ${
+              field.required ? "Required" : "Optional"
+            } | ${field.description || "-"} |\n`;
+          });
+          markdown += `\n`;
+        }
       }
     }
   }
@@ -71,26 +216,69 @@ export function exportToMarkdown(data: MarkdownExportData): string {
   // Response
   if (statusCodes && statusCodes.length > 0) {
     markdown += `### Response\n\n`;
-    markdown += `#### Status Codes\n\n`;
 
-    // Success codes
-    const successCodes = statusCodes.filter((s) => s.type === "Success");
-    if (successCodes.length > 0) {
-      markdown += `- Success\n\n`;
-      successCodes.forEach((statusCode) => {
-        markdown += `  - ${statusCode.code}: ${statusCode.message}\n`;
-      });
-      markdown += `\n`;
-    }
+    // Process each status code
+    for (const statusCode of statusCodes) {
+      markdown += `#### Status Code: \`${statusCode.code}\` (${statusCode.type})\n\n`;
+      markdown += `${statusCode.message}\n\n`;
 
-    // Error codes
-    const errorCodes = statusCodes.filter((s) => s.type === "Error");
-    if (errorCodes.length > 0) {
-      markdown += `- Error\n\n`;
-      errorCodes.forEach((statusCode) => {
-        markdown += `  - ${statusCode.code}: ${statusCode.message}\n`;
-      });
-      markdown += `\n`;
+      // Check for schema in status code
+      if (statusCode.schema) {
+        let fieldsToDisplay: Array<{
+          key: string;
+          type: string;
+          description?: string;
+          required?: boolean;
+        }> = [];
+
+        // Check if schema has ref
+        if (statusCode.schema.ref) {
+          const schemaFields = await getSchemaFields(statusCode.schema.ref);
+          fieldsToDisplay = schemaFields.map((field) => ({
+            key: field.key,
+            type: getFieldTypeString(field),
+            description: field.description || undefined,
+            required: field.required,
+          }));
+        } else if (statusCode.schema.isArray && statusCode.schema.ref) {
+          // Array of schema reference
+          const schemaFields = await getSchemaFields(statusCode.schema.ref);
+          fieldsToDisplay = schemaFields.map((field) => ({
+            key: field.key,
+            type: getFieldTypeString(field),
+            description: field.description || undefined,
+            required: field.required,
+          }));
+          markdown += `**Type**: \`array\`\n\n`;
+        } else if (statusCode.schema.properties) {
+          // Inline schema properties
+          const requiredFields = statusCode.schema.required || [];
+          fieldsToDisplay = Object.entries(statusCode.schema.properties).map(
+            ([key, prop]: [string, any]) => ({
+              key,
+              type: prop.type || "string",
+              description: prop.description || undefined,
+              required: requiredFields.includes(key),
+            })
+          );
+        }
+
+        if (fieldsToDisplay.length > 0) {
+          markdown += `**Schema Fields**:\n\n`;
+          markdown += `| Field | Type | Required | Description |\n`;
+          markdown += `|---|---|---|---|\n`;
+          fieldsToDisplay.forEach((field) => {
+            markdown += `| ${field.key} | ${field.type} | ${
+              field.required ? "Required" : "Optional"
+            } | ${field.description || "-"} |\n`;
+          });
+          markdown += `\n`;
+        } else if (statusCode.schema.ref) {
+          markdown += `**Schema Reference**: \`${statusCode.schema.ref}\`\n\n`;
+        }
+      }
+
+      markdown += `---\n\n`;
     }
   }
 
@@ -114,7 +302,7 @@ export function downloadMarkdown(
 
 /**
  * Convert AsyncAPI (WebSocket) YAML content to Markdown
- * Formats channels, operations (send/receive), and messages.
+ * Formats channels, operations (send/receive), and messages with full details.
  */
 export function convertWsYamlToMarkdown(yamlContent: string): string {
   let md = `# WebSocket API Documentation\n\n`;
@@ -127,41 +315,81 @@ export function convertWsYamlToMarkdown(yamlContent: string): string {
     const info = doc.info || {};
     if (info.title) md += `**Title**: ${info.title}\n`;
     if (info.version) md += `**Version**: ${info.version}\n`;
+
+    // Owner (from x-ouroboros-summary or info.summary)
+    const owner = doc["x-ouroboros-summary"] || info.summary;
+    if (owner) {
+      md += `**Owner**: ${owner}\n`;
+    }
+
+    // Entry Point and Protocol (from x-ouroboros metadata or default)
+    const entryPoint =
+      doc["x-ouroboros-entrypoint"] || doc.servers?.[0]?.url || "/ws";
+    const protocol =
+      doc["x-ouroboros-protocol"] ||
+      (entryPoint.startsWith("wss://") ? "wss" : "ws");
+    md += `**Entry Point**: \`${entryPoint}\`\n`;
+    md += `**Protocol**: \`${protocol.toUpperCase()}\`\n`;
+
     md += `\n---\n\n`;
 
     // Channels overview table
     const channels = doc.channels || {};
     const messages = (doc.components && doc.components.messages) || {};
+    const schemas = (doc.components && doc.components.schemas) || {};
 
     if (Object.keys(channels).length > 0) {
-      md += `## Channels\n\n`;
-      md += `| Channel | Address | Messages |\n`;
-      md += `|---|---|---|\n`;
+      md += `## Channels Overview\n\n`;
+      md += `| Channel | Address | Receiver Messages | Reply Messages |\n`;
+      md += `|---|---|---|---|\n`;
       Object.entries(channels).forEach(([channelName, ch]: [string, any]) => {
         const address = (ch as any).address || "-";
-        const msgRefs: string[] = [];
-        const collectMessageRefs = (val: any) => {
+
+        // Collect receiver messages
+        const receiverRefs: string[] = [];
+        const collectReceiverRefs = (val: any) => {
           if (!val) return;
           if (Array.isArray(val)) {
-            val.forEach(collectMessageRefs);
+            val.forEach(collectReceiverRefs);
             return;
           }
           if (val && val["$ref"]) {
-            msgRefs.push(val["$ref"].replace("#/components/messages/", ""));
+            receiverRefs.push(
+              val["$ref"].replace("#/components/messages/", "")
+            );
           }
         };
-        // Messages can be referenced in channel-level bindings/messages or via operations
         if ((ch as any).messages) {
-          Object.values((ch as any).messages).forEach(collectMessageRefs);
+          Object.values((ch as any).messages).forEach(collectReceiverRefs);
         }
-        md += `| \`${channelName}\` | ${address} | ${msgRefs.length ? msgRefs.join(", ") : "-"} |\n`;
+
+        // Collect reply messages
+        const replyRefs: string[] = [];
+        if (ch?.reply?.messages) {
+          const collectReplyRefs = (val: any) => {
+            if (!val) return;
+            if (Array.isArray(val)) {
+              val.forEach(collectReplyRefs);
+              return;
+            }
+            if (val && val["$ref"]) {
+              replyRefs.push(val["$ref"].replace("#/components/messages/", ""));
+            }
+          };
+          const replyMsgs = Array.isArray(ch.reply.messages)
+            ? ch.reply.messages
+            : [ch.reply.messages];
+          replyMsgs.forEach(collectReplyRefs);
+        }
+
+        md += `| \`${channelName}\` | \`${address}\` | ${
+          receiverRefs.length ? receiverRefs.join(", ") : "-"
+        } | ${replyRefs.length ? replyRefs.join(", ") : "-"} |\n`;
       });
       md += `\n---\n\n`;
     }
 
-    // Operations (from x-ouroboros metadata if present)
-    // Some specs put operations under custom fields; also reflect simple pattern:
-    // For each channel, show typical send/receive using messages if available.
+    // Operations (from AsyncAPI operations or x-ouroboros metadata)
     md += `## Operations\n\n`;
     if (Object.keys(channels).length === 0) {
       md += "No channels defined.\n\n";
@@ -171,48 +399,108 @@ export function convertWsYamlToMarkdown(yamlContent: string): string {
         md += `### Channel \`${channelName}\`\n\n`;
         md += `**Address**: \`${address}\`\n\n`;
 
-        const opBlocks: Array<{ kind: "send" | "receive"; title: string; refs: string[] }> = [];
+        // Check for AsyncAPI standard operations
+        const operations = ch.operations || {};
+        const hasStandardOps = Object.keys(operations).length > 0;
 
-        // Try to infer operations using conventional fields used in this project:
-        // receives/messages and replies/messages via $ref arrays if present
-        const collectRefs = (arr: any): string[] => {
-          if (!arr) return [];
-          const refs: string[] = [];
-          const each = Array.isArray(arr) ? arr : [arr];
-          each.forEach((m: any) => {
-            if (m && m["$ref"]) {
-              refs.push(m["$ref"].replace("#/components/messages/", ""));
-            }
-          });
-          return refs;
+        // Receiver section
+        const receiverRefs: string[] = [];
+        const collectReceiverRefs = (val: any) => {
+          if (!val) return;
+          if (Array.isArray(val)) {
+            val.forEach(collectReceiverRefs);
+            return;
+          }
+          if (val && val["$ref"]) {
+            receiverRefs.push(
+              val["$ref"].replace("#/components/messages/", "")
+            );
+          }
         };
-
-        // Common: channel.messages (used as receive)
-        const receiveRefs = ch?.messages ? Object.values(ch.messages).map((m: any) => m?.["$ref"]?.replace("#/components/messages/", "")).filter(Boolean) : [];
-        if (receiveRefs.length > 0) {
-          opBlocks.push({ kind: "receive", title: "Receive", refs: receiveRefs as string[] });
+        if ((ch as any).messages) {
+          Object.values((ch as any).messages).forEach(collectReceiverRefs);
         }
 
-        // Optional: reply/messages (send)
-        const replyRefs = ch?.reply?.messages ? collectRefs(ch.reply.messages) : [];
+        // Reply section
+        const replyRefs: string[] = [];
+        if (ch?.reply?.messages) {
+          const collectReplyRefs = (val: any) => {
+            if (!val) return;
+            if (Array.isArray(val)) {
+              val.forEach(collectReplyRefs);
+              return;
+            }
+            if (val && val["$ref"]) {
+              replyRefs.push(val["$ref"].replace("#/components/messages/", ""));
+            }
+          };
+          const replyMsgs = Array.isArray(ch.reply.messages)
+            ? ch.reply.messages
+            : [ch.reply.messages];
+          replyMsgs.forEach(collectReplyRefs);
+        }
+
+        // Display Receiver
+        if (receiverRefs.length > 0) {
+          md += `#### Receiver\n\n`;
+          md += `**Address**: \`${address}\`\n\n`;
+          md += `**Messages**:\n`;
+          receiverRefs.forEach((msgName) => {
+            md += `- \`${msgName}\`\n`;
+          });
+          md += `\n`;
+        }
+
+        // Display Reply
         if (replyRefs.length > 0) {
-          opBlocks.push({ kind: "send", title: "Send (Reply)", refs: replyRefs });
+          const replyAddress = ch?.reply?.address || address;
+          md += `#### Reply\n\n`;
+          md += `**Address**: \`${replyAddress}\`\n\n`;
+          md += `**Messages**:\n`;
+          replyRefs.forEach((msgName) => {
+            md += `- \`${msgName}\`\n`;
+          });
+          md += `\n`;
         }
 
-        if (opBlocks.length === 0) {
-          md += `No explicit operations defined.\n\n`;
-        } else {
-          opBlocks.forEach((block) => {
-            md += `#### ${block.title}\n\n`;
-            if (block.refs.length === 0) {
-              md += `No messages.\n\n`;
-            } else {
-              block.refs.forEach((msgName) => {
-                md += `- Message: \`${msgName}\`\n`;
+        // If no receiver or reply found, check standard operations
+        if (
+          receiverRefs.length === 0 &&
+          replyRefs.length === 0 &&
+          hasStandardOps
+        ) {
+          Object.entries(operations).forEach(([_opId, op]: [string, any]) => {
+            const action = op.action || "send";
+            const title =
+              action === "send"
+                ? "Send"
+                : action === "receive"
+                ? "Receive"
+                : action;
+            md += `#### ${title}\n\n`;
+            if (op.title) md += `**Title**: ${op.title}\n\n`;
+            if (op.description) md += `${op.description}\n\n`;
+            if (op.messages) {
+              md += `**Messages**:\n`;
+              const opMsgs = Array.isArray(op.messages)
+                ? op.messages
+                : [op.messages];
+              opMsgs.forEach((msg: any) => {
+                const msgRef =
+                  msg?.$ref?.replace("#/components/messages/", "") || "Unknown";
+                md += `- \`${msgRef}\`\n`;
               });
               md += `\n`;
             }
           });
+        }
+
+        if (
+          receiverRefs.length === 0 &&
+          replyRefs.length === 0 &&
+          !hasStandardOps
+        ) {
+          md += `No explicit operations defined.\n\n`;
         }
 
         md += `---\n\n`;
@@ -224,30 +512,43 @@ export function convertWsYamlToMarkdown(yamlContent: string): string {
     if (Object.keys(messages).length === 0) {
       md += "No messages defined.\n\n";
     } else {
-      Object.entries(messages).forEach(([messageName, message]: [string, any]) => {
-        md += `### \`${messageName}\`\n\n`;
-        if (message?.name) md += `**Name**: ${message.name}\n\n`;
-        if (message?.title) md += `**Title**: ${message.title}\n\n`;
-        if (message?.summary) md += `**Summary**: ${message.summary}\n\n`;
-        if (message?.description) md += `${message.description}\n\n`;
+      Object.entries(messages).forEach(
+        ([messageName, message]: [string, any]) => {
+          md += `### \`${messageName}\`\n\n`;
 
-        // Headers
-        if (message?.headers) {
-          md += `#### Headers\n\n`;
-          md += formatSchemaForMarkdown(message.headers, (doc.components && doc.components.schemas) || {});
+          // Basic message info
+          if (message?.name) md += `**Name**: ${message.name}\n\n`;
+          if (message?.title) md += `**Title**: ${message.title}\n\n`;
+          if (message?.summary) md += `**Summary**: ${message.summary}\n\n`;
+          if (message?.description) md += `${message.description}\n\n`;
+
+          // Headers
+          if (message?.headers) {
+            md += `#### Headers\n\n`;
+            const headerSchema = message.headers.schema || message.headers;
+            md += formatSchemaForMarkdown(headerSchema, schemas);
+          }
+
+          // Payload
+          if (message?.payload) {
+            md += `#### Payload\n\n`;
+            const payloadSchema = message.payload.schema || message.payload;
+            md += formatSchemaForMarkdown(payloadSchema, schemas);
+          }
+
+          // If no headers or payload, indicate that
+          if (!message?.headers && !message?.payload) {
+            md += `*No headers or payload defined.*\n\n`;
+          }
+
+          md += `---\n\n`;
         }
-
-        // Payload
-        if (message?.payload) {
-          md += `#### Payload\n\n`;
-          md += formatSchemaForMarkdown(message.payload, (doc.components && doc.components.schemas) || {});
-        }
-
-        md += `---\n\n`;
-      });
+      );
     }
 
-    md += `\n*Generated by Ouroboros* — ${new Date().toLocaleDateString("en-US")}\n`;
+    md += `\n*Generated by Ouroboros* — ${new Date().toLocaleDateString(
+      "en-US"
+    )}\n`;
   } catch (error) {
     console.error("Error converting WS YAML to Markdown:", error);
     md += `\nError: Failed to parse AsyncAPI YAML.\n`;
@@ -283,11 +584,18 @@ export function exportAllToMarkdown(specs: RestApiSpec[]): string {
     if (s.responses && Object.keys(s.responses).length > 0) {
       const pairs = Object.entries(s.responses).map(([code, val]) => {
         const v = val as any;
-        return `${code}${v?.description ? `: ${String(v.description).replace(/\n/g, ' ')}` : ''}`;
+        return `${code}${
+          v?.description ? `: ${String(v.description).replace(/\n/g, " ")}` : ""
+        }`;
       });
       resp = pairs.join("<br>");
     }
-    md += `| ${s.method.toUpperCase()} | ` + "`" + `${s.path}` + "`" + ` | ${summary} | ${tags} | ${resp} |\n`;
+    md +=
+      `| ${s.method.toUpperCase()} | ` +
+      "`" +
+      `${s.path}` +
+      "`" +
+      ` | ${summary} | ${tags} | ${resp} |\n`;
   });
 
   // 그룹별 상세 표 (선택적으로 더 자세히 보고 싶을 때)
@@ -308,33 +616,46 @@ export function exportAllToMarkdown(specs: RestApiSpec[]): string {
       if (s.responses && Object.keys(s.responses).length > 0) {
         const pairs = Object.entries(s.responses).map(([code, val]) => {
           const v = val as any;
-          return `${code}${v?.description ? `: ${String(v.description).replace(/\n/g, ' ')}` : ''}`;
+          return `${code}${
+            v?.description
+              ? `: ${String(v.description).replace(/\n/g, " ")}`
+              : ""
+          }`;
         });
         resp = pairs.join("<br>");
       }
-      md += `| ${s.method.toUpperCase()} | ` + "`" + `${s.path}` + "`" + ` | ${summary} | ${resp} |\n`;
+      md +=
+        `| ${s.method.toUpperCase()} | ` +
+        "`" +
+        `${s.path}` +
+        "`" +
+        ` | ${summary} | ${resp} |\n`;
     });
     md += `\n`;
   });
 
-  md += `\n*Generated by Ouroboros* — ${new Date().toLocaleDateString("ko-KR")}\n`;
+  md += `\n*Generated by Ouroboros* — ${new Date().toLocaleDateString(
+    "ko-KR"
+  )}\n`;
   return md;
 }
 
 /**
  * Convert YAML content to Markdown documentation (English, following docs format)
  * Parses OpenAPI YAML and generates documentation similar to backend/docs/endpoints/*.md
- * 
- * Note: This function requires YAML parsing. For full OpenAPI support, 
+ *
+ * Note: This function requires YAML parsing. For full OpenAPI support,
  * install js-yaml: npm install js-yaml @types/js-yaml
  */
-export function convertYamlToMarkdown(yamlContent: string): string {
+export async function convertYamlToMarkdown(
+  yamlContent: string
+): Promise<string> {
   let md = `# API Documentation\n\n`;
-  
+
   try {
     // Parse YAML to JSON using js-yaml
     const json = parseSimpleYaml(yamlContent);
-    
+
     if (!json || !json.paths) {
       return md + "No API endpoints found in YAML.\n";
     }
@@ -351,18 +672,29 @@ export function convertYamlToMarkdown(yamlContent: string): string {
       operation: any;
     }> = [];
 
-    Object.entries(json.paths || {}).forEach(([path, pathItem]: [string, any]) => {
-      const methods = ["get", "post", "put", "delete", "patch", "options", "head", "trace"];
-      methods.forEach((method) => {
-        if (pathItem[method]) {
-          operations.push({
-            path,
-            method: method.toUpperCase(),
-            operation: pathItem[method],
-          });
-        }
-      });
-    });
+    Object.entries(json.paths || {}).forEach(
+      ([path, pathItem]: [string, any]) => {
+        const methods = [
+          "get",
+          "post",
+          "put",
+          "delete",
+          "patch",
+          "options",
+          "head",
+          "trace",
+        ];
+        methods.forEach((method) => {
+          if (pathItem[method]) {
+            operations.push({
+              path,
+              method: method.toUpperCase(),
+              operation: pathItem[method],
+            });
+          }
+        });
+      }
+    );
 
     // Group by tags
     const grouped: Record<string, typeof operations> = {};
@@ -374,30 +706,33 @@ export function convertYamlToMarkdown(yamlContent: string): string {
     });
 
     // Generate documentation for each endpoint
-    Object.entries(grouped).forEach(([tag, ops]) => {
+    for (const [tag, ops] of Object.entries(grouped)) {
       md += `## ${tag}\n\n`;
-      
-      ops.forEach(({ path, method, operation }) => {
+
+      for (const { path, method, operation } of ops) {
         md += `### ${method} \`${path}\`\n\n`;
-        
+
         // Basic Information
         md += `**HTTP Method**: \`${method}\`\n`;
         md += `**Endpoint**: \`${path}\`\n`;
-        
+
+        // Owner (from x-ouroboros-summary or operation.summary)
+        const owner = operation["x-ouroboros-summary"] || operation.summary;
+        if (owner) {
+          md += `**Owner**: ${owner}\n`;
+        }
+
         // Authentication check
         const authInfo = getAuthenticationInfo(operation, json.security);
         md += `**Authentication**: ${authInfo}\n`;
-        
+
         if (operation.deprecated) {
           md += `**Status**: ⚠️ Deprecated\n`;
         }
         md += `\n---\n\n`;
 
-        // Summary/Description
-        if (operation.summary) {
-          md += `${operation.summary}\n\n`;
-        }
-        if (operation.description) {
+        // Description (summary는 Owner로 표시했으므로 description만 표시)
+        if (operation.description && operation.description !== owner) {
           md += `${operation.description}\n\n`;
         }
 
@@ -411,8 +746,9 @@ export function convertYamlToMarkdown(yamlContent: string): string {
             paramsByLocation[location].push(param);
           });
 
-            Object.entries(paramsByLocation).forEach(([location, params]) => {
-            const locationName = location.charAt(0).toUpperCase() + location.slice(1);
+          Object.entries(paramsByLocation).forEach(([location, params]) => {
+            const locationName =
+              location.charAt(0).toUpperCase() + location.slice(1);
             md += `#### ${locationName} Parameters\n\n`;
             md += `| Parameter | Type | Required | Description |\n`;
             md += `|---|---|---|---|\n`;
@@ -424,7 +760,9 @@ export function convertYamlToMarkdown(yamlContent: string): string {
               } else if (param.schema?.format) {
                 typeDesc = `${param.schema.type} (${param.schema.format})`;
               }
-              md += `| \`${param.name}\` | ${typeDesc} | ${param.required ? "Required" : "Optional"} | ${param.description || "-"} |\n`;
+              md += `| \`${param.name}\` | ${typeDesc} | ${
+                param.required ? "Required" : "Optional"
+              } | ${param.description || "-"} |\n`;
             });
             md += `\n`;
           });
@@ -437,66 +775,84 @@ export function convertYamlToMarkdown(yamlContent: string): string {
             md += `${operation.requestBody.description}\n\n`;
           }
           if (operation.requestBody.content) {
-            Object.entries(operation.requestBody.content).forEach(([contentType, content]: [string, any]) => {
+            for (const [contentType, content] of Object.entries(
+              operation.requestBody.content
+            ) as [string, any][]) {
               md += `**Content-Type**: \`${contentType}\`\n\n`;
               if (content.schema) {
-                const schemaMarkdown = formatSchemaForMarkdown(content.schema, json.components?.schemas || {});
+                const schemaMarkdown = await formatSchemaForMarkdown(
+                  content.schema,
+                  json.components?.schemas || {}
+                );
                 md += schemaMarkdown;
               }
-            });
+            }
           }
         }
 
         // Responses
         if (operation.responses) {
           md += `#### Response\n\n`;
-          Object.entries(operation.responses).forEach(([code, response]: [string, any]) => {
+          for (const [code, response] of Object.entries(
+            operation.responses
+          ) as [string, any][]) {
             md += `##### Status Code: \`${code}\`\n\n`;
-            
+
             const desc = (response as any).description || "-";
             md += `${desc}\n\n`;
-            
+
             // Response headers
             if (response.headers && Object.keys(response.headers).length > 0) {
               md += `**Headers**:\n\n`;
               md += `| Header | Type | Required | Description |\n`;
               md += `|---|---|---|---|\n`;
-              Object.entries(response.headers).forEach(([headerName, header]: [string, any]) => {
-                const headerType = header.schema?.type || "string";
-                md += `| \`${headerName}\` | ${headerType} | ${header.required ? "Required" : "Optional"} | ${header.description || "-"} |\n`;
-              });
+              Object.entries(response.headers).forEach(
+                ([headerName, header]: [string, any]) => {
+                  const headerType = header.schema?.type || "string";
+                  md += `| \`${headerName}\` | ${headerType} | ${
+                    header.required ? "Required" : "Optional"
+                  } | ${header.description || "-"} |\n`;
+                }
+              );
               md += `\n`;
             }
-            
+
             // Response schema
             if (response.content) {
-              Object.entries(response.content).forEach(([contentType, content]: [string, any]) => {
+              for (const [contentType, content] of Object.entries(
+                response.content
+              ) as [string, any][]) {
                 md += `**Content-Type**: \`${contentType}\`\n\n`;
-                
+
                 if (content.schema) {
-                  const schemaMarkdown = formatSchemaForMarkdown(content.schema, json.components?.schemas || {});
+                  const schemaMarkdown = await formatSchemaForMarkdown(
+                    content.schema,
+                    json.components?.schemas || {}
+                  );
                   md += schemaMarkdown;
                 } else {
                   md += `No schema defined.\n\n`;
                 }
-              });
+              }
             } else {
               md += `No response content defined.\n\n`;
             }
-            
+
             md += `---\n\n`;
-          });
+          }
         }
 
         // Example (cURL)
         md += `#### Example\n\n`;
         md += `\`\`\`bash\ncurl -X ${method} http://localhost:8080${path}\n\`\`\`\n\n`;
-        
-        md += `---\n\n`;
-      });
-    });
 
-    md += `\n*Generated by Ouroboros* — ${new Date().toLocaleDateString("en-US")}\n`;
+        md += `---\n\n`;
+      }
+    }
+
+    md += `\n*Generated by Ouroboros* — ${new Date().toLocaleDateString(
+      "en-US"
+    )}\n`;
   } catch (error) {
     console.error("Error converting YAML to Markdown:", error);
     md += `\nError: Failed to parse YAML content.\n`;
@@ -514,7 +870,11 @@ function parseSimpleYaml(yamlContent: string): any {
     return yaml.load(yamlContent);
   } catch (error) {
     console.error("Failed to parse YAML:", error);
-    throw new Error(`YAML parsing failed: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `YAML parsing failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
   }
 }
 
@@ -531,13 +891,13 @@ function getAuthenticationInfo(operation: any, globalSecurity?: any[]): string {
     if (Array.isArray(operation.security) && operation.security.length === 0) {
       return "Not required";
     }
-    
+
     // Has security requirements
     if (Array.isArray(operation.security) && operation.security.length > 0) {
       const schemes: string[] = [];
       operation.security.forEach((req: any) => {
-        if (typeof req === 'object' && req !== null) {
-          Object.keys(req).forEach(schemeName => {
+        if (typeof req === "object" && req !== null) {
+          Object.keys(req).forEach((schemeName) => {
             schemes.push(schemeName);
           });
         }
@@ -547,13 +907,17 @@ function getAuthenticationInfo(operation: any, globalSecurity?: any[]): string {
       }
     }
   }
-  
+
   // Fall back to global security
-  if (globalSecurity && Array.isArray(globalSecurity) && globalSecurity.length > 0) {
+  if (
+    globalSecurity &&
+    Array.isArray(globalSecurity) &&
+    globalSecurity.length > 0
+  ) {
     const schemes: string[] = [];
     globalSecurity.forEach((req: any) => {
-      if (typeof req === 'object' && req !== null) {
-        Object.keys(req).forEach(schemeName => {
+      if (typeof req === "object" && req !== null) {
+        Object.keys(req).forEach((schemeName) => {
           schemes.push(schemeName);
         });
       }
@@ -562,7 +926,7 @@ function getAuthenticationInfo(operation: any, globalSecurity?: any[]): string {
       return `Required (${schemes.join(", ")}) - Global`;
     }
   }
-  
+
   // No security defined
   return "Not required";
 }
@@ -574,37 +938,137 @@ function resolveSchemaRef(ref: string, schemas: Record<string, any>): any {
   if (!ref || !ref.startsWith("#/components/schemas/")) {
     return null;
   }
-  
+
   const schemaName = ref.replace("#/components/schemas/", "");
   return schemas[schemaName] || null;
 }
 
 /**
  * Format schema for markdown documentation
- * Handles $ref references by resolving them from components.schemas
+ * Handles $ref references by resolving them from components.schemas or API
  * @param schema - Schema to format
  * @param allSchemas - All available schemas for resolving references
  * @param depth - Recursion depth (for nested schemas)
  */
-function formatSchemaForMarkdown(
-  schema: any, 
-  allSchemas: Record<string, any>, 
+async function formatSchemaForMarkdown(
+  schema: any,
+  allSchemas: Record<string, any>,
   depth: number = 0
-): string {
+): Promise<string> {
   if (!schema) return "";
-  
+
   let md = "";
-  
+
   // Handle $ref reference
   if (schema.$ref || schema.ref) {
     const ref = schema.$ref || schema.ref;
-    const resolvedSchema = resolveSchemaRef(ref, allSchemas);
-    
+    const schemaName = ref.replace("#/components/schemas/", "");
+
+    // Try to resolve from YAML first
+    let resolvedSchema = resolveSchemaRef(ref, allSchemas);
+
+    // If not found in YAML, try to fetch from API
+    if (!resolvedSchema && schemaName) {
+      try {
+        const schemaResponse = await getSchema(schemaName);
+        resolvedSchema = schemaResponse?.data;
+      } catch (error) {
+        console.error(`Failed to load schema ${schemaName}:`, error);
+        // Continue with just the reference name
+      }
+    }
+
     if (resolvedSchema) {
-      const schemaName = ref.replace("#/components/schemas/", "");
       md += `**Schema Reference**: \`${schemaName}\`\n\n`;
-      // Recursively format the resolved schema
-      md += formatSchemaForMarkdown(resolvedSchema, allSchemas, depth);
+      // If resolved schema has properties, ensure it's treated as object
+      if (resolvedSchema.properties && !resolvedSchema.type) {
+        resolvedSchema = { ...resolvedSchema, type: "object" };
+      }
+      // Always try to display properties if they exist, before recursive call
+      // This ensures properties are shown even if the schema structure is complex
+
+      if (
+        resolvedSchema.properties &&
+        Object.keys(resolvedSchema.properties).length > 0
+      ) {
+        // Display properties table directly
+        const required = resolvedSchema.required || [];
+        md += `| Field | Type | Required | Description |\n`;
+        md += `|---|---|---|---|\n`;
+
+        const order =
+          resolvedSchema["x-ouroboros-orders"] ||
+          Object.keys(resolvedSchema.properties);
+        const orderedProps = order
+          .filter((key: string) => resolvedSchema.properties[key])
+          .concat(
+            Object.keys(resolvedSchema.properties).filter(
+              (key: string) => !order.includes(key)
+            )
+          );
+
+        for (const propName of orderedProps) {
+          const prop = resolvedSchema.properties[propName];
+          const isRequired = required.includes(propName);
+
+          // Get type description - handle API SchemaField format (name, type) and OpenAPI format
+          let typeDesc = "object";
+          let description = "-";
+
+          // Check if prop is in frontend SchemaField format (has schemaType)
+          if (prop.schemaType) {
+            // Frontend SchemaField format - use getFieldTypeString helper
+            try {
+              const field = prop as SchemaField;
+              typeDesc = getFieldTypeString(field);
+              description = field.description || "-";
+            } catch (err) {
+              console.error(`Failed to format field ${propName}:`, err);
+              typeDesc = "unknown";
+            }
+          }
+          // API SchemaField format: { name, type, description, mockExpression, ref }
+          // or OpenAPI format: { type, description, $ref, items, format, ... }
+          else {
+            typeDesc = prop.type || "object";
+            description = prop.description || "-";
+
+            // Handle ref (API SchemaField format uses 'ref', OpenAPI uses '$ref')
+            if (prop.ref && !prop.$ref) {
+              // API SchemaField format
+              typeDesc = `ref: ${prop.ref.replace(
+                "#/components/schemas/",
+                ""
+              )}`;
+            } else if (prop.$ref || prop.ref) {
+              // OpenAPI format
+              const propRef = prop.$ref || prop.ref;
+              typeDesc = `ref: ${propRef.replace("#/components/schemas/", "")}`;
+            } else if (prop.type === "array" && prop.items) {
+              const itemType =
+                prop.items.$ref || prop.items.ref
+                  ? `ref: ${(prop.items.$ref || prop.items.ref).replace(
+                      "#/components/schemas/",
+                      ""
+                    )}`
+                  : prop.items.type || "any";
+              typeDesc = `array<${itemType}>`;
+            } else if (prop.format) {
+              typeDesc = `${prop.type} (${prop.format})`;
+            }
+          }
+
+          md += `| \`${propName}\` | ${typeDesc} | ${
+            isRequired ? "Required" : "Optional"
+          } | ${description} |\n`;
+        }
+        md += `\n`;
+        return md;
+      }
+
+      // If no properties, recursively format the resolved schema
+      // This handles cases where the schema might have nested structures
+      md += await formatSchemaForMarkdown(resolvedSchema, allSchemas, depth);
       return md;
     } else {
       // Reference not found, show the ref
@@ -612,56 +1076,67 @@ function formatSchemaForMarkdown(
       return md;
     }
   }
-  
+
   // Handle array type
   if (schema.type === "array") {
     md += `**Type**: \`array\`\n\n`;
     if (schema.items) {
       md += `**Items**:\n\n`;
-      md += formatSchemaForMarkdown(schema.items, allSchemas, depth + 1);
+      md += await formatSchemaForMarkdown(schema.items, allSchemas, depth + 1);
     }
     return md;
   }
-  
-  // Handle object type with properties
-  if (schema.type === "object" && schema.properties) {
+
+  // Handle object type with properties (or just properties without explicit type)
+  if (schema.properties && (schema.type === "object" || !schema.type)) {
     const required = schema.required || [];
-    
+
     md += `| Field | Type | Required | Description |\n`;
     md += `|---|---|---|---|\n`;
-    
+
     // Sort properties by x-ouroboros-orders if available
-    const order = schema["x-ouroboros-orders"] || Object.keys(schema.properties);
+    const order =
+      schema["x-ouroboros-orders"] || Object.keys(schema.properties);
     const orderedProps = order
       .filter((key: string) => schema.properties[key])
-      .concat(Object.keys(schema.properties).filter((key: string) => !order.includes(key)));
-    
+      .concat(
+        Object.keys(schema.properties).filter(
+          (key: string) => !order.includes(key)
+        )
+      );
+
     orderedProps.forEach((propName: string) => {
       const prop = schema.properties[propName];
       const isRequired = required.includes(propName);
-      
+
       // Get type description
       let typeDesc = prop.type || "object";
       if (prop.$ref || prop.ref) {
         const ref = prop.$ref || prop.ref;
         typeDesc = `ref: ${ref.replace("#/components/schemas/", "")}`;
       } else if (prop.type === "array" && prop.items) {
-        const itemType = prop.items.$ref || prop.items.ref
-          ? `ref: ${(prop.items.$ref || prop.items.ref).replace("#/components/schemas/", "")}`
-          : prop.items.type || "any";
+        const itemType =
+          prop.items.$ref || prop.items.ref
+            ? `ref: ${(prop.items.$ref || prop.items.ref).replace(
+                "#/components/schemas/",
+                ""
+              )}`
+            : prop.items.type || "any";
         typeDesc = `array<${itemType}>`;
       } else if (prop.format) {
         typeDesc = `${prop.type} (${prop.format})`;
       }
-      
+
       const description = prop.description || "-";
-      md += `| \`${propName}\` | ${typeDesc} | ${isRequired ? "Required" : "Optional"} | ${description} |\n`;
+      md += `| \`${propName}\` | ${typeDesc} | ${
+        isRequired ? "Required" : "Optional"
+      } | ${description} |\n`;
     });
-    
+
     md += `\n`;
     return md;
   }
-  
+
   // Handle primitive types
   if (schema.type) {
     md += `**Type**: \`${schema.type}\`\n`;
@@ -674,7 +1149,7 @@ function formatSchemaForMarkdown(
     md += `\n`;
     return md;
   }
-  
+
   // Fallback: show as JSON
   md += `\`\`\`json\n${JSON.stringify(schema, null, 2)}\n\`\`\`\n\n`;
   return md;

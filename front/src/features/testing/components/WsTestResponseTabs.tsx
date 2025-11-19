@@ -106,7 +106,7 @@ const JsonHighlighter = ({
             parts.push(
               <span
                 key={`bool-${lineIndex}`}
-                className={isSent ? "text-purple-300" : "text-purple-400"}
+                className={isSent ? "text-green-300" : "text-green-400"}
               >
                 {boolMatch[0]}
               </span>
@@ -137,8 +137,8 @@ const JsonHighlighter = ({
   return (
     <pre
       tabIndex={0}
-      className={`p-3 text-sm ${fontClass} ${wrapClass} overflow-x-auto rounded ${
-        isSent ? "bg-black/20 text-white" : "bg-[#1e1e1e] text-[#d4d4d4]"
+      className={`p-3 text-sm ${fontClass} ${wrapClass} overflow-x-auto rounded-lg ${
+        isSent ? "bg-black/30 text-white" : "bg-black/20 text-white/90"
       } focus-visible:outline-none focus-visible:ring-0`}
     >
       <code>{highlightJson(code)}</code>
@@ -414,7 +414,9 @@ function createGroupHeader(
     >
       <span
         className={`text-[11px] font-semibold ${
-          message.direction === "sent"
+          message.tryId
+            ? "text-green-700 dark:text-green-400"
+            : message.direction === "sent"
             ? "text-blue-700 dark:text-blue-400"
             : "text-green-700 dark:text-green-400"
         }`}
@@ -752,7 +754,7 @@ function ResponseContent({
           )}
         </div>
       ) : (
-        <div className="space-y-3 max-h-[600px] overflow-y-auto">
+        <div className="space-y-2 max-h-[600px] overflow-y-auto px-2">
           {buildMessageRows(
             allMessages,
             formatTimestamp,
@@ -787,6 +789,7 @@ function MessageBubble({
   onClick?: () => void;
 }) {
   const isSent = message.direction === "sent";
+  const isTryMessage = !!message.tryId; // tryId가 있으면 Try 메시지로 구분
   const isJson = (() => {
     try {
       JSON.parse(message.content);
@@ -808,8 +811,14 @@ function MessageBubble({
     );
   })();
 
+  // /queue/ouro/try 또는 /user/queue/ouro/try로 send할 때만 메서드 실행 시간 버튼 표시
+  const showMethodButton = 
+    isSent && 
+    message.tryId && 
+    (message.address === "/queue/ouro/try" || message.address === "/user/queue/ouro/try");
+
   return (
-    <div className="group relative">
+    <div className={`group relative flex ${isSent ? "justify-end" : "justify-start"} mb-3`}>
       <div
         onClick={onClick}
         tabIndex={0}
@@ -819,104 +828,58 @@ function MessageBubble({
             onClick();
           }
         }}
-        className={`flex items-start gap-3 ${
-          compactMode ? "p-3" : "p-4"
-        } rounded-lg border transition-all hover:shadow-md focus-visible:outline-none focus-visible:ring-0 ${
-          onClick ? "cursor-pointer" : ""
+        className={`relative max-w-[85%] ${
+          compactMode ? "px-3 py-2" : "px-4 py-3"
+        } rounded-2xl border transition-all hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${
+          onClick ? "cursor-pointer active:scale-[0.98]" : ""
         } ${
-          isSent
-            ? "bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800/50"
-            : "bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800/50"
+          isTryMessage
+            ? "bg-green-100 dark:bg-green-900/20 border-green-300 dark:border-green-700/50"
+            : isSent
+            ? "bg-blue-100 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700/50"
+            : "bg-green-100 dark:bg-green-900/20 border-green-300 dark:border-green-700/50"
         }`}
       >
-        {/* Direction Icon */}
-        <div
-          className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-            isSent ? "bg-blue-500 text-white" : "bg-green-500 text-white"
-          }`}
-        >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            {isSent ? (
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M7 11l5-5m0 0l5 5m-5-5v12"
-              />
-            ) : (
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M17 13l-5 5m0 0l-5-5m5 5V6"
-              />
-            )}
-          </svg>
-        </div>
-
-        {/* Message Content */}
-        <div className="flex-1 min-w-0">
-          {/* Header */}
-          <div className="flex items-center gap-2 mb-2">
-            <span
-              className={`text-xs font-bold uppercase tracking-wide ${
-                isSent
-                  ? "text-blue-700 dark:text-blue-400"
-                  : "text-green-700 dark:text-green-400"
-              }`}
-            >
-              {isSent ? "Sent" : "Received"}
+        {/* Header - RECEIVE/SEND 배지와 타임스탬프 */}
+        <div className={`flex items-center gap-2 mb-2 ${isSent ? "justify-end" : "justify-start"}`}>
+          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+            isSent 
+              ? "bg-blue-500 text-white"
+              : "bg-green-500 text-white"
+          }`}>
+            {isSent ? "SEND" : "RECEIVE"}
             </span>
-            <span className="text-xs text-gray-600 dark:text-[#C9D1D9]">
+          <span className="text-[10px] font-medium text-gray-600 dark:text-[#8B949E]">
               {formatTimestamp(message.timestamp)}
             </span>
             {relativeBadge}
-            {message.tryId && (
-              <span className="ml-auto text-xs font-mono text-gray-500 dark:text-[#8B949E] opacity-0 group-hover:opacity-100 transition-opacity">
-                #{message.tryId.slice(0, 8)}
-              </span>
+          {showMethodButton && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onClick) onClick();
+              }}
+              className="text-[10px] px-2 py-0.5 rounded bg-purple-500 hover:bg-purple-600 text-white font-medium transition-colors"
+              title="메서드 실행 시간 보기"
+            >
+              ⏱️
+            </button>
             )}
           </div>
 
-          {/* Destination/Address */}
-          <div
-            className={`${
-              compactMode ? "mb-2" : "mb-3"
-            } flex items-center gap-2`}
-          >
-            <svg
-              className="w-3.5 h-3.5 text-gray-400 dark:text-[#C9D1D9]"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-              />
-            </svg>
-            <span className="text-xs font-mono text-gray-700 dark:text-[#E6EDF3]">
+        {/* Destination/Address - 작고 간단하게 */}
+        {message.address && message.address !== "CONNECTED" && message.address !== "ERROR" && message.address !== "WARNING" && message.address !== "INFO" && (
+          <div className={`mb-2 ${isSent ? "text-right" : "text-left"}`}>
+            <span className="text-[10px] font-mono text-gray-600 dark:text-[#8B949E]">
               {message.address}
             </span>
           </div>
+        )}
 
           {/* Body */}
           <div className="relative">
             {isJson && isJsonFormatted ? (
-              <div className="rounded-md overflow-hidden border border-gray-200 dark:border-[#2D333B]">
+            <div className="rounded-lg overflow-hidden bg-white/90 dark:bg-black/40 border border-gray-200 dark:border-[#2D333B]">
                 <JsonHighlighter
                   code={message.content}
                   isSent={isSent}
@@ -927,19 +890,14 @@ function MessageBubble({
             ) : (
               <div
                 className={`${
-                  compactMode ? "text-[12px]" : "text-sm"
-                } font-mono whitespace-pre-wrap break-words bg-white dark:bg-[#0D1117] ${
-                  compactMode ? "p-2" : "p-3"
-                } rounded-md border border-gray-200 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3]`}
+                compactMode ? "text-xs" : "text-sm"
+              } font-mono whitespace-pre-wrap break-words text-gray-900 dark:text-[#E6EDF3]`}
               >
                 {message.content || (
-                  <span className="text-gray-500 dark:text-[#C9D1D9] italic">
-                    (empty)
-                  </span>
+                <span className="text-gray-500 dark:text-[#8B949E] italic">(empty)</span>
                 )}
               </div>
             )}
-          </div>
         </div>
       </div>
     </div>
@@ -1171,12 +1129,12 @@ export function TestContent({
               onClick={() => onShowTrace(method.spanId)}
               className="p-4 bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] rounded-md hover:border-gray-400 dark:hover:border-gray-600 transition-colors cursor-pointer focus:outline-none focus:ring-0"
             >
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex-1">
-                  <div className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3] mb-1">
+              <div className="flex items-start justify-between mb-2 gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3] mb-1 break-words">
                     {method.name}
                   </div>
-                  <div className="text-xs text-gray-600 dark:text-[#8B949E] font-mono">
+                  <div className="text-xs text-gray-600 dark:text-[#8B949E] font-mono break-words">
                     {method.className}
                   </div>
                   {method.parameters && method.parameters.length > 0 && (
@@ -1197,7 +1155,7 @@ export function TestContent({
                     </div>
                   )}
                 </div>
-                <div className="ml-4 text-right">
+                <div className="ml-4 text-right flex-shrink-0 whitespace-nowrap">
                   <div className="text-lg font-bold text-gray-900 dark:text-[#E6EDF3]">
                     {method.selfDurationMs.toLocaleString()}ms
                   </div>
