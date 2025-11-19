@@ -972,18 +972,6 @@ async function formatSchemaForMarkdown(
       try {
         const schemaResponse = await getSchema(schemaName);
         resolvedSchema = schemaResponse?.data;
-        // Debug: log schema structure
-        console.log(`[formatSchemaForMarkdown] Loaded schema ${schemaName}:`, {
-          hasProperties: !!resolvedSchema?.properties,
-          propertiesCount: resolvedSchema?.properties
-            ? Object.keys(resolvedSchema.properties).length
-            : 0,
-          type: resolvedSchema?.type,
-          propertiesKeys: resolvedSchema?.properties
-            ? Object.keys(resolvedSchema.properties)
-            : [],
-          schema: resolvedSchema,
-        });
       } catch (error) {
         console.error(`Failed to load schema ${schemaName}:`, error);
         // Continue with just the reference name
@@ -998,16 +986,6 @@ async function formatSchemaForMarkdown(
       }
       // Always try to display properties if they exist, before recursive call
       // This ensures properties are shown even if the schema structure is complex
-      console.log(
-        `[formatSchemaForMarkdown] Checking properties for ${schemaName}:`,
-        {
-          hasProperties: !!resolvedSchema.properties,
-          propertiesCount: resolvedSchema.properties
-            ? Object.keys(resolvedSchema.properties).length
-            : 0,
-          properties: resolvedSchema.properties,
-        }
-      );
 
       if (
         resolvedSchema.properties &&

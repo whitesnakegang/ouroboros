@@ -5,7 +5,11 @@ import { StompClient, buildWebSocketUrl } from "../utils/stompClient";
 import {
   getWebSocketOperation,
   getWebSocketChannel,
+  getSchema,
 } from "@/features/spec/services/api";
+import type { SchemaField } from "@/features/spec/types/schema.types";
+import { parseOpenAPISchemaToSchemaField } from "@/features/spec/utils/schemaConverter";
+import { isPrimitiveSchema } from "@/features/spec/types/schema.types";
 
 interface Subscription {
   id: string;
@@ -36,12 +40,13 @@ export function WsTestRequestPanel() {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [newTopic, setNewTopic] = useState("");
 
-  // 간단한 모드 상태
-  const [sender, setSender] = useState("tester");
-  const [content, setContent] = useState("");
-  const [messageType, setMessageType] = useState<"TALK" | "ENTER" | "LEAVE">(
-    "TALK"
+  // Schema 기반 메시지 입력 상태
+  const [messageSchemaFields, setMessageSchemaFields] = useState<SchemaField[]>(
+    []
   );
+  const [messageFormData, setMessageFormData] = useState<
+    Record<string, unknown>
+  >({});
   const [enableTryHeader, setEnableTryHeader] = useState(true);
 
   const stompClientRef = useRef<StompClient | null>(null);
@@ -314,6 +319,91 @@ export function WsTestRequestPanel() {
           }
 
           setReplyAddress(replyAddr);
+
+          // Receive operation의 messages에서 schema 로드
+          if (operation.messages && operation.messages.length > 0) {
+            const firstMessage = operation.messages[0];
+            let schemaRef: string | null = null;
+
+            // ref 형태인 경우
+            if (firstMessage.ref) {
+              const refValue = firstMessage.ref;
+              schemaRef = refValue.includes("#/components/schemas/")
+                ? refValue.replace("#/components/schemas/", "")
+                : refValue;
+            }
+
+            // Schema 로드 및 필드 생성
+            if (schemaRef) {
+              try {
+                const schemaResponse = await getSchema(schemaRef);
+                const schemaData = schemaResponse.data;
+
+                if (schemaData.properties) {
+                  const fields = Object.entries(schemaData.properties).map(
+                    ([key, propSchema]: [string, unknown]) => {
+                      return parseOpenAPISchemaToSchemaField(
+                        key,
+                        propSchema as Record<string, unknown>
+                      );
+                    }
+                  );
+
+                  // required 필드 설정
+                  if (
+                    schemaData.required &&
+                    Array.isArray(schemaData.required)
+                  ) {
+                    fields.forEach((field) => {
+                      if (schemaData.required!.includes(field.key)) {
+                        field.required = true;
+                      }
+                    });
+                  }
+
+                  setMessageSchemaFields(fields);
+
+                  // 기본값으로 formData 초기화
+                  const defaultFormData: Record<string, unknown> = {};
+                  fields.forEach((field) => {
+                    // 기본값 생성 로직 (간단한 버전)
+                    if (isPrimitiveSchema(field.schemaType)) {
+                      switch (field.schemaType.type) {
+                        case "string":
+                          defaultFormData[field.key] = "";
+                          break;
+                        case "integer":
+                        case "number":
+                          defaultFormData[field.key] = 0;
+                          break;
+                        case "boolean":
+                          defaultFormData[field.key] = false;
+                          break;
+                        default:
+                          defaultFormData[field.key] = "";
+                      }
+                    } else {
+                      defaultFormData[field.key] = "";
+                    }
+                  });
+                  setMessageFormData(defaultFormData);
+                } else {
+                  setMessageSchemaFields([]);
+                  setMessageFormData({});
+                }
+              } catch (error) {
+                console.error("Schema 로드 실패:", error);
+                setMessageSchemaFields([]);
+                setMessageFormData({});
+              }
+            } else {
+              setMessageSchemaFields([]);
+              setMessageFormData({});
+            }
+          } else {
+            setMessageSchemaFields([]);
+            setMessageFormData({});
+          }
 
           // 패턴 파라미터 초기화 (operation 로드 성공 시)
           const allParams = new Set<string>();
@@ -838,19 +928,37 @@ export function WsTestRequestPanel() {
       useReplyAddress: replyAddress && replyAddress.trim() !== "",
     });
 
-    if (!content || content.trim() === "") {
-      alert("Please enter a message.");
-      return;
+    // Schema 기반 메시지 생성
+    let messageBody: string;
+    if (messageSchemaFields.length > 0) {
+      // Schema 필드가 있으면 formData를 JSON으로 변환
+      const messageData: Record<string, unknown> = {};
+      messageSchemaFields.forEach((field) => {
+        const value = messageFormData[field.key];
+        // undefined나 빈 문자열이 아닌 경우만 포함
+        if (value !== undefined && value !== "") {
+          messageData[field.key] = value;
+        }
+      });
+      messageBody = JSON.stringify(messageData);
+    } else {
+      // Schema 필드가 없으면 기본 형식 사용 (하위 호환성)
+      if (
+        !messageFormData.content ||
+        String(messageFormData.content).trim() === ""
+      ) {
+        alert("Please enter a message.");
+        return;
+      }
+      messageBody = JSON.stringify({
+        sender: messageFormData.sender || "tester",
+        content: messageFormData.content,
+        type: messageFormData.type || "TALK",
+        sentAt: new Date().toISOString(),
+      });
     }
 
     try {
-      const messageBody = JSON.stringify({
-        sender: sender || "tester",
-        content: content,
-        type: messageType,
-        sentAt: new Date().toISOString(),
-      });
-
       const headers: Record<string, string> = {
         "content-type": "application/json",
       };
@@ -875,8 +983,31 @@ export function WsTestRequestPanel() {
         totalSent: (prev?.totalSent || 0) + 1,
       }));
 
-      // Content 초기화
-      setContent("");
+      // FormData 초기화 (기본값으로)
+      if (messageSchemaFields.length > 0) {
+        const defaultFormData: Record<string, unknown> = {};
+        messageSchemaFields.forEach((field) => {
+          if (isPrimitiveSchema(field.schemaType)) {
+            switch (field.schemaType.type) {
+              case "string":
+                defaultFormData[field.key] = "";
+                break;
+              case "integer":
+              case "number":
+                defaultFormData[field.key] = 0;
+                break;
+              case "boolean":
+                defaultFormData[field.key] = false;
+                break;
+              default:
+                defaultFormData[field.key] = "";
+            }
+          } else {
+            defaultFormData[field.key] = "";
+          }
+        });
+        setMessageFormData(defaultFormData);
+      }
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
@@ -1250,60 +1381,182 @@ export function WsTestRequestPanel() {
       </div>
 
       {/* Main Content - Connected State */}
-      {wsConnectionStatus === "connected" && (
+      {wsConnectionStatus === "connected" && operationAction !== "reply" && (
         <div className="border-t border-gray-200 dark:border-[#2D333B] p-4">
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
-              메시지 전송
+              Send Message
             </h3>
 
-            <div>
-              <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                Sender
-              </label>
-              <input
-                type="text"
-                value={sender}
-                onChange={(e) => setSender(e.target.value)}
-                placeholder="tester"
-                className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
-              />
-            </div>
+            {/* Schema 기반 입력 필드 */}
+            {messageSchemaFields.length > 0 ? (
+              <div className="space-y-4">
+                {messageSchemaFields.map((field) => {
+                  const value = messageFormData[field.key] ?? "";
+                  let isBoolean = false;
+                  let isNumber = false;
+                  let primitiveType:
+                    | "string"
+                    | "integer"
+                    | "number"
+                    | "boolean"
+                    | "file"
+                    | null = null;
 
-            <div>
-              <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                Content
-              </label>
-              <input
-                type="text"
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="Message"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    handleSimpleSend();
+                  if (isPrimitiveSchema(field.schemaType)) {
+                    primitiveType = field.schemaType.type;
+                    isBoolean = field.schemaType.type === "boolean";
+                    isNumber =
+                      field.schemaType.type === "integer" ||
+                      field.schemaType.type === "number";
                   }
-                }}
-                className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
-              />
-            </div>
 
-            <div>
-              <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                Type
-              </label>
-              <select
-                value={messageType}
-                onChange={(e) =>
-                  setMessageType(e.target.value as "TALK" | "ENTER" | "LEAVE")
-                }
-                className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
-              >
-                <option value="TALK">TALK</option>
-                <option value="ENTER">ENTER</option>
-                <option value="LEAVE">LEAVE</option>
-              </select>
-            </div>
+                  return (
+                    <div key={field.key}>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
+                        {field.key}
+                        {field.required && (
+                          <span className="text-red-500 ml-1">*</span>
+                        )}
+                        {field.description && (
+                          <span className="text-xs text-gray-500 dark:text-[#8B949E] ml-2">
+                            ({field.description})
+                          </span>
+                        )}
+                      </label>
+                      {isBoolean ? (
+                        <select
+                          value={String(value)}
+                          onChange={(e) => {
+                            setMessageFormData({
+                              ...messageFormData,
+                              [field.key]: e.target.value === "true",
+                            });
+                          }}
+                          className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                        >
+                          <option value="false">false</option>
+                          <option value="true">true</option>
+                        </select>
+                      ) : isNumber && primitiveType ? (
+                        <input
+                          type="number"
+                          value={typeof value === "number" ? value : ""}
+                          onChange={(e) => {
+                            const numValue =
+                              primitiveType === "integer"
+                                ? parseInt(e.target.value) || 0
+                                : parseFloat(e.target.value) || 0;
+                            setMessageFormData({
+                              ...messageFormData,
+                              [field.key]: numValue,
+                            });
+                          }}
+                          placeholder={
+                            primitiveType === "integer" ? "0" : "0.0"
+                          }
+                          className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          value={String(value)}
+                          onChange={(e) => {
+                            setMessageFormData({
+                              ...messageFormData,
+                              [field.key]: e.target.value,
+                            });
+                          }}
+                          placeholder={field.key}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              handleSimpleSend();
+                            }
+                          }}
+                          className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              // Schema 필드가 없을 때 기본 입력 필드 (하위 호환성)
+              <>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
+                    Sender
+                  </label>
+                  <input
+                    type="text"
+                    value={
+                      typeof messageFormData.sender === "string"
+                        ? messageFormData.sender
+                        : ""
+                    }
+                    onChange={(e) => {
+                      setMessageFormData({
+                        ...messageFormData,
+                        sender: e.target.value,
+                      });
+                    }}
+                    placeholder="tester"
+                    className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
+                    Content
+                  </label>
+                  <input
+                    type="text"
+                    value={
+                      typeof messageFormData.content === "string"
+                        ? messageFormData.content
+                        : ""
+                    }
+                    onChange={(e) => {
+                      setMessageFormData({
+                        ...messageFormData,
+                        content: e.target.value,
+                      });
+                    }}
+                    placeholder="Message"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        handleSimpleSend();
+                      }
+                    }}
+                    className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
+                    Type
+                  </label>
+                  <select
+                    value={
+                      typeof messageFormData.type === "string"
+                        ? messageFormData.type
+                        : "TALK"
+                    }
+                    onChange={(e) => {
+                      setMessageFormData({
+                        ...messageFormData,
+                        type: e.target.value,
+                      });
+                    }}
+                    className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                  >
+                    <option value="TALK">TALK</option>
+                    <option value="ENTER">ENTER</option>
+                    <option value="LEAVE">LEAVE</option>
+                  </select>
+                </div>
+              </>
+            )}
 
             <div className="flex items-center gap-2">
               <input

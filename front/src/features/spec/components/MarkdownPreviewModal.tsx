@@ -101,8 +101,17 @@ function markdownToHtml(markdown: string): string {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const isTableRow = /^\|.+\|$/.test(line.trim());
-    const isTableSeparator = /^\|[\s\S]*:?-+:?[\s\S]*\|$/.test(line.trim());
+    const trimmedLine = line.trim();
+
+    // 테이블 구분선 체크 (더 정확한 패턴)
+    const isTableSeparator =
+      /^\|[\s:]*[-:]+[\s:]*(\|[\s:]*[-:]+[\s:]*)*\|$/.test(trimmedLine);
+
+    // 테이블 행 체크 (|로 시작하고 끝나야 함, 최소 2개의 |가 있어야 함)
+    const isTableRow =
+      trimmedLine.startsWith("|") &&
+      trimmedLine.endsWith("|") &&
+      trimmedLine.split("|").length >= 3;
 
     if (isTableRow && !isTableSeparator) {
       if (!inTable) {
@@ -111,28 +120,44 @@ function markdownToHtml(markdown: string): string {
         isFirstTableRow = true;
       }
 
-      const cells = line
-        .split("|")
-        .map((cell) => cell.trim())
-        .filter((cell) => cell);
-      const tag = isFirstTableRow ? "th" : "td";
-      const cellClass = isFirstTableRow
-        ? "px-4 py-2 font-semibold text-gray-900 dark:text-[#E6EDF3] bg-gray-100 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B]"
-        : "px-4 py-2 text-gray-700 dark:text-[#C9D1D9] border border-gray-300 dark:border-[#2D333B]";
+      // 테이블 셀 파싱: 첫 번째와 마지막 빈 요소 제거, 중간 빈 셀은 유지
+      const splitCells = line.split("|");
+      // 첫 번째와 마지막이 빈 문자열이면 제거하고 나머지는 유지
+      const cells: string[] = [];
+      // 첫 번째와 마지막 인덱스는 제외하고 중간 셀만 처리
+      for (let j = 1; j < splitCells.length - 1; j++) {
+        const trimmed = splitCells[j].trim();
+        cells.push(trimmed);
+      }
 
-      tableRows.push(
-        `<tr>${cells
-          .map(
-            (cell) =>
-              `<${tag} class="${cellClass}">${processTableCell(cell)}</${tag}>`
-          )
-          .join("")}</tr>`
-      );
-      isFirstTableRow = false;
+      // 셀이 비어있으면 "-"로 표시
+      if (cells.length > 0) {
+        const tag = isFirstTableRow ? "th" : "td";
+        const cellClass = isFirstTableRow
+          ? "px-4 py-2 font-semibold text-gray-900 dark:text-[#E6EDF3] bg-gray-100 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B]"
+          : "px-4 py-2 text-gray-700 dark:text-[#C9D1D9] border border-gray-300 dark:border-[#2D333B]";
+
+        tableRows.push(
+          `<tr>${cells
+            .map(
+              (cell) =>
+                `<${tag} class="${cellClass}">${processTableCell(
+                  cell || "-"
+                )}</${tag}>`
+            )
+            .join("")}</tr>`
+        );
+        isFirstTableRow = false;
+      }
     } else if (isTableSeparator) {
-      // 헤더 구분선은 무시
+      // 헤더 구분선은 무시하되, 테이블이 시작되었다면 계속 유지
+      if (inTable) {
+        // 구분선 다음부터는 헤더가 아님
+        isFirstTableRow = false;
+      }
       continue;
     } else {
+      // 테이블이 아닌 줄이 나오면 테이블 종료
       if (inTable && tableRows.length > 0) {
         const placeholder = `__TABLE_${tableIndex}__`;
         const tableHtml = `<table class="w-full border-collapse border border-gray-300 dark:border-[#2D333B] my-4">${tableRows.join(
@@ -216,16 +241,6 @@ function markdownToHtml(markdown: string): string {
     }
   );
 
-  // 테이블 placeholder 복원
-  tablePlaceholders.forEach(({ placeholder, content }) => {
-    html = html.replace(placeholder, content);
-  });
-
-  // 코드 블록 복원
-  codeBlocks.forEach(({ placeholder, content }) => {
-    html = html.replace(placeholder, content);
-  });
-
   // 줄바꿈 처리 (이미 HTML 태그가 있는 부분은 제외)
   html = html
     .split("\n")
@@ -235,10 +250,27 @@ function markdownToHtml(markdown: string): string {
       if (trimmed.startsWith("<") || trimmed === "") {
         return line;
       }
+      // placeholder는 그대로 유지
+      if (
+        trimmed.startsWith("__TABLE_") ||
+        trimmed.startsWith("__CODE_BLOCK_")
+      ) {
+        return line;
+      }
       // 일반 텍스트 줄은 문단으로 감싸기
       return `<p class="text-gray-700 dark:text-[#C9D1D9] mb-4">${line}</p>`;
     })
     .join("\n");
+
+  // 테이블 placeholder 복원 (줄바꿈 처리 후)
+  tablePlaceholders.forEach(({ placeholder, content }) => {
+    html = html.replace(placeholder, content);
+  });
+
+  // 코드 블록 복원
+  codeBlocks.forEach(({ placeholder, content }) => {
+    html = html.replace(placeholder, content);
+  });
 
   return html;
 }
@@ -294,7 +326,37 @@ export function MarkdownPreviewModal({
   };
 
   const renderedHtml =
-    viewMode === "preview" ? DOMPurify.sanitize(markdownToHtml(content)) : null;
+    viewMode === "preview"
+      ? DOMPurify.sanitize(markdownToHtml(content), {
+          ALLOWED_TAGS: [
+            "p",
+            "br",
+            "strong",
+            "em",
+            "u",
+            "h1",
+            "h2",
+            "h3",
+            "h4",
+            "h5",
+            "h6",
+            "ul",
+            "ol",
+            "li",
+            "a",
+            "code",
+            "pre",
+            "table",
+            "thead",
+            "tbody",
+            "tr",
+            "th",
+            "td",
+            "hr",
+          ],
+          ALLOWED_ATTR: ["class", "href", "target", "rel"],
+        })
+      : null;
 
   return (
     <>
