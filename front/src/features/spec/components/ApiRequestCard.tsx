@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { SchemaModal } from "./SchemaModal";
 import { SchemaFieldEditor } from "./SchemaFieldEditor";
 import { SchemaViewer } from "./SchemaViewer";
-import { getAllSchemas, type SchemaResponse } from "../services/api";
+import { getAllSchemas, getSchema, type SchemaResponse } from "../services/api";
 import type {
   RequestBody,
   SchemaField,
@@ -116,6 +116,9 @@ export function ApiRequestCard({
   const [activeTab, setActiveTab] = useState("body");
   const [schemas, setSchemas] = useState<SchemaResponse[]>([]);
   const [isSchemaModalOpen, setIsSchemaModalOpen] = useState(false);
+  const [currentSchemaName, setCurrentSchemaName] = useState<string | null>(null);
+  const [refSchemaFields, setRefSchemaFields] = useState<SchemaField[]>([]);
+  const [isExpandedRefSchema, setIsExpandedRefSchema] = useState(false);
 
   // 스키마 목록 로드
   const loadSchemas = async () => {
@@ -139,19 +142,110 @@ export function ApiRequestCard({
     }
   }, [isSchemaModalOpen]);
 
+  // 기존에 선택된 스키마의 이름 및 필드 로드
+  useEffect(() => {
+    const loadSchemaData = async () => {
+      // rootSchemaType이 ref 타입이고 schemaName이 없으면 schemaRef에서 로드
+      if (
+        requestBody.rootSchemaType &&
+        isRefSchema(requestBody.rootSchemaType) &&
+        !requestBody.rootSchemaType.schemaName &&
+        requestBody.schemaRef
+      ) {
+        try {
+          const schemaResponse = await getSchema(requestBody.schemaRef);
+          const schemaData = schemaResponse.data;
+          setCurrentSchemaName(schemaData.schemaName);
+          
+          // 스키마 필드 로드
+          if (schemaData.properties) {
+            const { parseOpenAPISchemaToSchemaField } = await import("../utils/schemaConverter");
+            const requiredFields = schemaData.required || [];
+            const fields: SchemaField[] = Object.entries(schemaData.properties).map(
+              ([key, propSchema]: [string, any]) => {
+                const field = parseOpenAPISchemaToSchemaField(key, propSchema);
+                field.required = requiredFields.includes(key);
+                return field;
+              }
+            );
+            setRefSchemaFields(fields);
+            setIsExpandedRefSchema(true);
+          }
+          
+          // rootSchemaType의 schemaName 업데이트
+          setRequestBody({
+            ...requestBody,
+            rootSchemaType: {
+              ...requestBody.rootSchemaType,
+              schemaName: schemaData.schemaName,
+            },
+          });
+        } catch (error) {
+          console.error("스키마 데이터 로드 실패:", error);
+        }
+      } else if (
+        requestBody.rootSchemaType &&
+        isRefSchema(requestBody.rootSchemaType) &&
+        requestBody.rootSchemaType.schemaName
+      ) {
+        // 이미 schemaName이 있으면 스키마 필드 로드
+        setCurrentSchemaName(requestBody.rootSchemaType.schemaName);
+        try {
+          const schemaResponse = await getSchema(requestBody.rootSchemaType.schemaName);
+          const schemaData = schemaResponse.data;
+          if (schemaData.properties) {
+            const { parseOpenAPISchemaToSchemaField } = await import("../utils/schemaConverter");
+            const requiredFields = schemaData.required || [];
+            const fields: SchemaField[] = Object.entries(schemaData.properties).map(
+              ([key, propSchema]: [string, any]) => {
+                const field = parseOpenAPISchemaToSchemaField(key, propSchema);
+                field.required = requiredFields.includes(key);
+                return field;
+              }
+            );
+            setRefSchemaFields(fields);
+            setIsExpandedRefSchema(true);
+          }
+        } catch (error) {
+          console.error("스키마 필드 로드 실패:", error);
+        }
+      } else if (requestBody.schemaRef && !requestBody.rootSchemaType) {
+        // 기존 방식: schemaRef만 있고 rootSchemaType이 없는 경우
+        try {
+          const schemaResponse = await getSchema(requestBody.schemaRef);
+          setCurrentSchemaName(schemaResponse.data.schemaName);
+        } catch (error) {
+          console.error("스키마 이름 로드 실패:", error);
+        }
+      } else {
+        setCurrentSchemaName(null);
+        setRefSchemaFields([]);
+        setIsExpandedRefSchema(false);
+      }
+    };
+
+    loadSchemaData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestBody.rootSchemaType, requestBody.schemaRef]);
+
   // Schema 선택 핸들러
   const handleSchemaSelect = (schema: {
     name: string;
     fields: SchemaField[];
   }) => {
+    setCurrentSchemaName(schema.name);
+    
     // rootSchemaType이 ref 타입이면 rootSchemaType 업데이트
     if (requestBody.rootSchemaType && isRefSchema(requestBody.rootSchemaType)) {
+      setRefSchemaFields(schema.fields);
+      setIsExpandedRefSchema(true);
       setRequestBody({
         ...requestBody,
         rootSchemaType: {
           kind: "ref",
           schemaName: schema.name,
         },
+        schemaRef: schema.name,
       });
     } else if (
       requestBody.rootSchemaType &&
@@ -280,6 +374,7 @@ export function ApiRequestCard({
               schemaType={requestBody.rootSchemaType}
               fields={requestBody.fields}
               schemaRef={requestBody.schemaRef}
+              schemaName={currentSchemaName}
               description={requestBody.description}
               contentType={
                 requestBody.type === "json"
@@ -510,12 +605,19 @@ export function ApiRequestCard({
                               createObjectField("").schemaType;
                         }
 
+                        setCurrentSchemaName(null);
                         setRequestBody({
                           ...requestBody,
                           rootSchemaType: newRootSchemaType,
                           fields: kind === "object" ? [] : undefined,
                           schemaRef: undefined,
                         });
+                        // ref 타입이 아닐 때 refSchemaFields 초기화
+                        if (kind !== "ref") {
+                          setRefSchemaFields([]);
+                          setIsExpandedRefSchema(false);
+                          setCurrentSchemaName(null);
+                        }
                       }}
                       disabled={isReadOnly}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
@@ -537,10 +639,11 @@ export function ApiRequestCard({
                     requestBody.type !== "xml" && (
                       <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-md">
                         <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
-                          Schema: {requestBody.schemaRef}
+                          Schema: {currentSchemaName || requestBody.schemaRef}
                         </span>
                         <button
                           onClick={() => {
+                            setCurrentSchemaName(null);
                             setRequestBody({
                               ...requestBody,
                               schemaRef: undefined,
@@ -624,10 +727,11 @@ export function ApiRequestCard({
                               {hasSchemaRef && (
                                 <div className="mb-3 flex items-center gap-2 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-md">
                                   <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
-                                    Schema: {requestBody.schemaRef}
+                                    Schema: {currentSchemaName || requestBody.schemaRef}
                                   </span>
                                   <button
                                     onClick={() => {
+                                      setCurrentSchemaName(null);
                                       if (
                                         isObjectSchema(
                                           requestBody.rootSchemaType!
@@ -864,20 +968,158 @@ export function ApiRequestCard({
 
                       {/* Ref 타입 */}
                       {isRefSchema(requestBody.rootSchemaType) && (
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Schema Reference
-                          </label>
-                          <button
-                            onClick={() => setIsSchemaModalOpen(true)}
-                            disabled={isReadOnly}
-                            className={`w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50 text-sm ${
-                              isReadOnly ? "opacity-50 cursor-not-allowed" : ""
-                            }`}
-                          >
-                            {requestBody.rootSchemaType.schemaName ||
-                              "Select Schema..."}
-                          </button>
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                              Schema Reference
+                            </label>
+                            <button
+                              onClick={() => setIsSchemaModalOpen(true)}
+                              disabled={isReadOnly}
+                              className={`w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50 text-sm ${
+                                isReadOnly ? "opacity-50 cursor-not-allowed" : ""
+                              }`}
+                            >
+                              {requestBody.rootSchemaType.schemaName ||
+                                currentSchemaName ||
+                                requestBody.schemaRef ||
+                                "Select Schema..."}
+                            </button>
+                          </div>
+                          
+                          {/* Schema 참조 표시 및 필드 목록 */}
+                          {(requestBody.rootSchemaType.schemaName || currentSchemaName || requestBody.schemaRef) && refSchemaFields.length > 0 && (
+                            <div>
+                              {/* Schema 참조 표시 */}
+                              <div className="mb-3 flex items-center justify-between px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-md">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                                    Schema: {currentSchemaName || requestBody.rootSchemaType.schemaName || requestBody.schemaRef}
+                                  </span>
+                                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                                    ({refSchemaFields.length} fields)
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => {
+                                      if (isReadOnly) return;
+                                      setIsExpandedRefSchema(!isExpandedRefSchema);
+                                    }}
+                                    disabled={isReadOnly}
+                                    className={`flex items-center gap-1.5 px-2 py-1 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] transition-colors ${
+                                      isReadOnly
+                                        ? "opacity-60 cursor-not-allowed"
+                                        : ""
+                                    }`}
+                                    title={
+                                      isExpandedRefSchema
+                                        ? "Hide Schema Fields"
+                                        : "Show Schema Fields"
+                                    }
+                                  >
+                                    <span>
+                                      {isExpandedRefSchema
+                                        ? "Hide Fields"
+                                        : "Show Fields"}
+                                    </span>
+                                    <svg
+                                      className={`w-4 h-4 transition-transform ${
+                                        isExpandedRefSchema
+                                          ? "rotate-180"
+                                          : ""
+                                      }`}
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M19 9l-7 7-7-7"
+                                      />
+                                    </svg>
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      if (isReadOnly) return;
+                                      setCurrentSchemaName(null);
+                                      setRefSchemaFields([]);
+                                      setIsExpandedRefSchema(false);
+                                      setRequestBody({
+                                        ...requestBody,
+                                        rootSchemaType: {
+                                          kind: "ref",
+                                        },
+                                        schemaRef: undefined,
+                                      });
+                                    }}
+                                    disabled={isReadOnly}
+                                    className="text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
+                                    title="Remove Schema"
+                                  >
+                                    <svg
+                                      className="w-4 h-4"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M6 18L18 6M6 6l12 12"
+                                      />
+                                    </svg>
+                                  </button>
+                                </div>
+                              </div>
+                              
+                              {/* 필드 목록 */}
+                              {isExpandedRefSchema && (
+                                <div className="space-y-2 border border-gray-200 dark:border-[#2D333B] rounded-md p-3 bg-gray-50 dark:bg-[#0D1117]">
+                                  {refSchemaFields.map((field, index) => (
+                                    <div
+                                      key={index}
+                                      className="flex items-start gap-3 text-sm py-2 border-b border-gray-200 dark:border-[#2D333B] last:border-b-0"
+                                    >
+                                      <span className="font-mono text-gray-900 dark:text-[#E6EDF3] min-w-[120px]">
+                                        {field.key}
+                                      </span>
+                                      <span className="text-gray-600 dark:text-[#8B949E]">:</span>
+                                      <span className="text-gray-500 dark:text-[#8B949E] text-xs">
+                                        ({(() => {
+                                          if (field.schemaType.kind === "primitive") {
+                                            return field.schemaType.type;
+                                          } else if (field.schemaType.kind === "object") {
+                                            return "object";
+                                          } else if (field.schemaType.kind === "array") {
+                                            const itemType = field.schemaType.items.kind === "primitive" 
+                                              ? field.schemaType.items.type 
+                                              : field.schemaType.items.kind === "object" 
+                                              ? "object" 
+                                              : field.schemaType.items.kind === "ref"
+                                              ? field.schemaType.items.schemaName
+                                              : "unknown";
+                                            return `${itemType}[]`;
+                                          } else if (field.schemaType.kind === "ref") {
+                                            return field.schemaType.schemaName;
+                                          }
+                                          return "string";
+                                        })()})
+                                      </span>
+                                      {field.required && (
+                                        <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-xs rounded">
+                                          Required
+                                        </span>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

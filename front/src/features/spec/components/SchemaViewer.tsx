@@ -13,6 +13,7 @@ interface SchemaViewerProps {
   schemaType?: SchemaType;
   fields?: SchemaField[];
   schemaRef?: string;
+  schemaName?: string | null; // 스키마 이름 (표시용)
   description?: string;
   contentType?: string;
 }
@@ -21,6 +22,7 @@ export function SchemaViewer({
   schemaType,
   fields,
   schemaRef,
+  schemaName,
   description,
   contentType = "application/json",
 }: SchemaViewerProps) {
@@ -31,21 +33,21 @@ export function SchemaViewer({
   useEffect(() => {
     const loadSchemaFields = async () => {
       // schemaRef가 있으면 사용
-      let schemaName: string | undefined = schemaRef;
+      let schemaNameToLoad: string | undefined = schemaRef;
       
       // schemaRef가 없고 rootSchemaType이 ref인 경우 사용
-      if (!schemaName && schemaType && isRefSchema(schemaType)) {
-        schemaName = schemaType.schemaName;
+      if (!schemaNameToLoad && schemaType && isRefSchema(schemaType)) {
+        schemaNameToLoad = schemaType.schemaName;
       }
 
-      if (!schemaName) {
+      if (!schemaNameToLoad) {
         setLoadedFields([]);
         return;
       }
 
       setIsLoadingSchema(true);
       try {
-        const response = await getSchema(schemaName);
+        const response = await getSchema(schemaNameToLoad);
         const schemaData = response.data;
 
         if (schemaData.properties) {
@@ -213,12 +215,14 @@ export function SchemaViewer({
       </div>
 
       {/* Schema Reference */}
-      {schemaRef && (
+      {(schemaRef || (schemaType && isRefSchema(schemaType))) && (
         <div className="p-3 bg-gray-50 dark:bg-[#0D1117] border border-gray-200 dark:border-[#2D333B] rounded-md">
           <div className="text-sm text-gray-600 dark:text-[#8B949E]">
             <span className="font-medium">Schema Reference:</span>{" "}
             <span className="font-mono text-gray-900 dark:text-[#E6EDF3]">
-              {schemaRef}
+              {schemaName || 
+               (schemaType && isRefSchema(schemaType) ? schemaType.schemaName : null) ||
+               schemaRef}
             </span>
             {isLoadingSchema && (
               <span className="ml-2 text-xs text-gray-500 dark:text-[#8B949E]">
