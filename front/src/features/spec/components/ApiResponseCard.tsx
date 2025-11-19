@@ -3,7 +3,9 @@ import { useState, useEffect } from "react";
 import React from "react";
 import { SchemaModal } from "./SchemaModal";
 import { SchemaViewer } from "./SchemaViewer";
-import { getAllSchemas, type SchemaResponse } from "../services/api";
+import { SchemaFieldEditor } from "./SchemaFieldEditor";
+import { getAllSchemas, getSchema, type SchemaResponse } from "../services/api";
+import { parseOpenAPISchemaToSchemaField } from "../utils/schemaConverter";
 import type {
   SchemaField,
   SchemaType,
@@ -97,6 +99,17 @@ export function ApiResponseCard({
     null
   );
 
+  // 스키마 필드 표시 상태
+  const [expandedSchemaIndex, setExpandedSchemaIndex] = useState<number | null>(
+    null
+  );
+  const [schemaFieldsMap, setSchemaFieldsMap] = useState<
+    Record<number, SchemaField[]>
+  >({});
+  const [schemaNamesMap, setSchemaNamesMap] = useState<
+    Record<number, string>
+  >({});
+
   // 스키마 목록 로드
   const loadSchemas = async () => {
     try {
@@ -118,6 +131,62 @@ export function ApiResponseCard({
       loadSchemas();
     }
   }, [isResponseSchemaModalOpen]);
+
+  // 기존에 선택된 스키마의 필드 정보 로드
+  useEffect(() => {
+    const loadExistingSchemaFields = async () => {
+      for (let i = 0; i < statusCodes.length; i++) {
+        const statusCode = statusCodes[i];
+        if (
+          statusCode.schema?.ref &&
+          !schemaFieldsMap[i] &&
+          !schemaNamesMap[i]
+        ) {
+          try {
+            const schemaResponse = await getSchema(statusCode.schema.ref);
+            const schemaData = schemaResponse.data;
+
+            if (schemaData.properties) {
+              const fields = Object.entries(schemaData.properties).map(
+                ([key, propSchema]: [string, any]) => {
+                  const field = parseOpenAPISchemaToSchemaField(
+                    key,
+                    propSchema
+                  );
+                  if (
+                    schemaData.required &&
+                    schemaData.required.includes(key)
+                  ) {
+                    field.required = true;
+                  }
+                  return field;
+                }
+              );
+
+              setSchemaFieldsMap((prev) => ({
+                ...prev,
+                [i]: fields,
+              }));
+              setSchemaNamesMap((prev) => ({
+                ...prev,
+                [i]: statusCode.schema!.ref!,
+              }));
+
+              // 기존 스키마가 있고 필드가 로드되면 자동 확장 (단, 이미 확장된 것이 없을 때만)
+              if (expandedSchemaIndex === null) {
+                setExpandedSchemaIndex(i);
+              }
+            }
+          } catch (error) {
+            console.error("스키마 필드 로드 실패:", error);
+          }
+        }
+      }
+    };
+
+    loadExistingSchemaFields();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusCodes]);
 
   // 문서 형식 뷰
   if (isDocumentView) {
@@ -399,7 +468,8 @@ export function ApiResponseCard({
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-col gap-2">
-                          <div className="flex items-center gap-2">
+                          {/* 첫 번째 줄: Kind 선택, Schema/Primitive 선택, 보조 버튼들 */}
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             {/* Kind 선택 (Schema / Primitive / None) */}
                             <select
                               value={
@@ -410,7 +480,7 @@ export function ApiResponseCard({
                                   ? "primitive"
                                   : "none"
                               }
-                              onChange={(e) => {
+                              onChange={async (e) => {
                                 if (isReadOnly) return;
                                 const updated = [...statusCodes];
                                 const kind = e.target.value;
@@ -419,6 +489,18 @@ export function ApiResponseCard({
                                     ...updated[index],
                                     schema: undefined,
                                   };
+                                  // 필드 정보 제거
+                                  setSchemaFieldsMap((prev) => {
+                                    const newMap = { ...prev };
+                                    delete newMap[index];
+                                    return newMap;
+                                  });
+                                  setSchemaNamesMap((prev) => {
+                                    const newMap = { ...prev };
+                                    delete newMap[index];
+                                    return newMap;
+                                  });
+                                  setExpandedSchemaIndex(null);
                                 } else if (kind === "primitive") {
                                   updated[index] = {
                                     ...updated[index],
@@ -427,6 +509,18 @@ export function ApiResponseCard({
                                       isArray: false,
                                     },
                                   };
+                                  // 필드 정보 제거
+                                  setSchemaFieldsMap((prev) => {
+                                    const newMap = { ...prev };
+                                    delete newMap[index];
+                                    return newMap;
+                                  });
+                                  setSchemaNamesMap((prev) => {
+                                    const newMap = { ...prev };
+                                    delete newMap[index];
+                                    return newMap;
+                                  });
+                                  setExpandedSchemaIndex(null);
                                 } else if (kind === "schema") {
                                   // Schema 선택 시 빈 schema 객체로 설정하고 버튼만 보이게 함
                                   updated[index] = {
@@ -440,7 +534,7 @@ export function ApiResponseCard({
                                 setStatusCodes(updated);
                               }}
                               disabled={isReadOnly}
-                              className={`px-3 py-1.5 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 ${
+                              className={`px-2 py-1.5 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 ${
                                 isReadOnly
                                   ? "opacity-60 cursor-not-allowed"
                                   : ""
@@ -463,13 +557,16 @@ export function ApiResponseCard({
                                     setIsResponseSchemaModalOpen(true);
                                   }}
                                   disabled={isReadOnly}
-                                  className={`px-3 py-1.5 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] transition-colors min-w-[150px] text-left ${
+                                  className={`px-2 py-1.5 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] transition-colors flex-1 min-w-0 text-left truncate ${
                                     isReadOnly
                                       ? "opacity-60 cursor-not-allowed"
                                       : ""
                                   }`}
+                                  title={statusCode.schema?.ref || "Select Schema..."}
                                 >
-                                  {statusCode.schema?.ref || "Select Schema..."}
+                                  <span className="truncate block">
+                                    {statusCode.schema?.ref || "Select Schema..."}
+                                  </span>
                                 </button>
                               )}
 
@@ -492,7 +589,7 @@ export function ApiResponseCard({
                                     setStatusCodes(updated);
                                   }}
                                   disabled={isReadOnly}
-                                  className={`px-3 py-1.5 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 ${
+                                  className={`px-2 py-1.5 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 ${
                                     isReadOnly
                                       ? "opacity-60 cursor-not-allowed"
                                       : ""
@@ -505,15 +602,17 @@ export function ApiResponseCard({
                                 </select>
                               )}
 
-                            {/* Array 체크박스 */}
+                            {/* 보조 버튼 그룹: Array, 필드 목록 토글, X */}
                             {statusCode.schema && (
-                              <>
+                              <div className="flex items-center gap-1 ml-auto">
+                                {/* Array 체크박스 */}
                                 <label
-                                  className={`flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap ${
+                                  className={`flex items-center gap-0.5 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap cursor-pointer ${
                                     isReadOnly
                                       ? "opacity-60 cursor-not-allowed"
                                       : ""
                                   }`}
+                                  title="Array"
                                 >
                                   <input
                                     type="checkbox"
@@ -532,10 +631,11 @@ export function ApiResponseCard({
                                     }}
                                     disabled={isReadOnly}
                                     className="w-3 h-3"
-                                    title="Array"
                                   />
-                                  <span>Array</span>
+                                  <span className="text-[10px]">Arr</span>
                                 </label>
+
+                                {/* X 버튼 */}
                                 <button
                                   onClick={() => {
                                     if (isReadOnly) return;
@@ -545,17 +645,29 @@ export function ApiResponseCard({
                                       schema: undefined,
                                     };
                                     setStatusCodes(updated);
+                                    // 필드 정보 제거
+                                    setSchemaFieldsMap((prev) => {
+                                      const newMap = { ...prev };
+                                      delete newMap[index];
+                                      return newMap;
+                                    });
+                                    setSchemaNamesMap((prev) => {
+                                      const newMap = { ...prev };
+                                      delete newMap[index];
+                                      return newMap;
+                                    });
+                                    setExpandedSchemaIndex(null);
                                   }}
                                   disabled={isReadOnly}
-                                  className={`p-1 text-red-500 hover:text-red-600 ${
+                                  className={`p-1 text-red-500 hover:text-red-600 transition-colors ${
                                     isReadOnly
                                       ? "opacity-50 cursor-not-allowed"
                                       : ""
                                   }`}
-                                  title="Clear"
+                                  title="Clear Schema"
                                 >
                                   <svg
-                                    className="w-4 h-4"
+                                    className="w-3.5 h-3.5"
                                     fill="none"
                                     stroke="currentColor"
                                     viewBox="0 0 24 24"
@@ -568,9 +680,10 @@ export function ApiResponseCard({
                                     />
                                   </svg>
                                 </button>
-                              </>
+                              </div>
                             )}
                           </div>
+
                           {/* Array Items 개수 */}
                           {statusCode.schema?.isArray && (
                             <div className="flex items-center gap-2 text-xs">
@@ -714,6 +827,91 @@ export function ApiResponseCard({
                         </button>
                       </td>
                     </tr>
+                    {/* Schema Fields Row - 스키마가 선택되고 필드가 있을 때 항상 헤더 표시 */}
+                    {statusCode.schema?.ref &&
+                      schemaFieldsMap[index] &&
+                      schemaFieldsMap[index].length > 0 && (
+                        <tr className="bg-gray-50 dark:bg-[#161B22]">
+                          <td colSpan={6} className="px-4 py-3">
+                            <div className="space-y-3">
+                              {/* Schema Header with Toggle */}
+                              <div className="flex items-center justify-between border-b border-gray-200 dark:border-[#2D333B] pb-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="px-3 py-1.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded-md text-sm font-semibold border border-emerald-200 dark:border-emerald-800">
+                                    Schema: {schemaNamesMap[index] || statusCode.schema?.ref}
+                                  </span>
+                                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                                    ({schemaFieldsMap[index].length} fields)
+                                  </span>
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    if (isReadOnly) return;
+                                    setExpandedSchemaIndex(
+                                      expandedSchemaIndex === index
+                                        ? null
+                                        : index
+                                    );
+                                  }}
+                                  disabled={isReadOnly}
+                                  className={`flex items-center gap-1.5 px-2 py-1 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] transition-colors ${
+                                    isReadOnly
+                                      ? "opacity-60 cursor-not-allowed"
+                                      : ""
+                                  }`}
+                                  title={
+                                    expandedSchemaIndex === index
+                                      ? "Hide Schema Fields"
+                                      : "Show Schema Fields"
+                                  }
+                                >
+                                  <span>
+                                    {expandedSchemaIndex === index
+                                      ? "Hide Fields"
+                                      : "Show Fields"}
+                                  </span>
+                                  <svg
+                                    className={`w-4 h-4 transition-transform ${
+                                      expandedSchemaIndex === index
+                                        ? "rotate-180"
+                                        : ""
+                                    }`}
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M19 9l-7 7-7-7"
+                                    />
+                                  </svg>
+                                </button>
+                              </div>
+
+                              {/* Schema Fields - 펼쳐져 있을 때만 표시 */}
+                              {expandedSchemaIndex === index && (
+                                <div className="space-y-2 pt-2">
+                                  {schemaFieldsMap[index].map((field, fieldIndex) => (
+                                    <SchemaFieldEditor
+                                      key={fieldIndex}
+                                      field={field}
+                                      onChange={() => {
+                                        // 읽기 전용이므로 변경 불가
+                                      }}
+                                      isReadOnly={true}
+                                      allowFileType={false}
+                                      allowMockExpression={false}
+                                    />
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+
                     {/* Headers Expandable Row */}
                     {expandedStatusCode === index && statusCode.headers && (
                       <tr className="bg-gray-50 dark:bg-[#161B22]">
@@ -737,7 +935,7 @@ export function ApiResponseCard({
                                   setStatusCodes(updated);
                                 }}
                                 disabled={isReadOnly}
-                                className={`px-3 py-1 text-xs text-blue-600 dark:text-blue-400 border border-blue-600 dark:border-blue-400 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 ${
+                                className={`px-3 py-1.5 text-xs text-blue-600 dark:text-blue-400 border border-blue-600 dark:border-blue-400 rounded-md bg-white dark:bg-[#0D1117] hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors ${
                                   isReadOnly
                                     ? "opacity-50 cursor-not-allowed"
                                     : ""
@@ -746,81 +944,84 @@ export function ApiResponseCard({
                                 + Add Header
                               </button>
                             </div>
-                            {statusCode.headers.map((header, headerIndex) => (
-                              <div
-                                key={headerIndex}
-                                className="flex items-center gap-3"
-                              >
-                                <input
-                                  type="text"
-                                  value={header.key}
-                                  onChange={(e) => {
-                                    if (isReadOnly) return;
-                                    const updated = [...statusCodes];
-                                    updated[index].headers![headerIndex].key =
-                                      e.target.value;
-                                    setStatusCodes(updated);
-                                  }}
-                                  placeholder="Header Key (e.g., Content-Type)"
-                                  disabled={isReadOnly}
-                                  className={`flex-1 px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                                    isReadOnly
-                                      ? "opacity-60 cursor-not-allowed"
-                                      : ""
-                                  }`}
-                                />
-                                <input
-                                  type="text"
-                                  value={header.value}
-                                  onChange={(e) => {
-                                    if (isReadOnly) return;
-                                    const updated = [...statusCodes];
-                                    updated[index].headers![headerIndex].value =
-                                      e.target.value;
-                                    setStatusCodes(updated);
-                                  }}
-                                  placeholder="Header Value (e.g., application/json)"
-                                  disabled={isReadOnly}
-                                  className={`flex-1 px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                                    isReadOnly
-                                      ? "opacity-60 cursor-not-allowed"
-                                      : ""
-                                  }`}
-                                />
-                                <button
-                                  onClick={() => {
-                                    if (isReadOnly) return;
-                                    const updated = [...statusCodes];
-                                    updated[index].headers = updated[
-                                      index
-                                    ].headers!.filter(
-                                      (_, i) => i !== headerIndex
-                                    );
-                                    setStatusCodes(updated);
-                                  }}
-                                  disabled={isReadOnly}
-                                  className={`p-2 text-red-500 hover:text-red-600 ${
-                                    isReadOnly
-                                      ? "opacity-50 cursor-not-allowed"
-                                      : ""
-                                  }`}
+                            <div className="space-y-2">
+                              {statusCode.headers.map((header, headerIndex) => (
+                                <div
+                                  key={headerIndex}
+                                  className="flex items-center gap-2 p-2 border border-gray-200 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117]"
                                 >
-                                  <svg
-                                    className="w-5 h-5"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
+                                  <input
+                                    type="text"
+                                    value={header.key}
+                                    onChange={(e) => {
+                                      if (isReadOnly) return;
+                                      const updated = [...statusCodes];
+                                      updated[index].headers![headerIndex].key =
+                                        e.target.value;
+                                      setStatusCodes(updated);
+                                    }}
+                                    placeholder="Header Key (e.g., Content-Type)"
+                                    disabled={isReadOnly}
+                                    className={`flex-1 px-3 py-1.5 text-sm border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                                      isReadOnly
+                                        ? "opacity-60 cursor-not-allowed"
+                                        : ""
+                                    }`}
+                                  />
+                                  <input
+                                    type="text"
+                                    value={header.value}
+                                    onChange={(e) => {
+                                      if (isReadOnly) return;
+                                      const updated = [...statusCodes];
+                                      updated[index].headers![headerIndex].value =
+                                        e.target.value;
+                                      setStatusCodes(updated);
+                                    }}
+                                    placeholder="Header Value (e.g., application/json)"
+                                    disabled={isReadOnly}
+                                    className={`flex-1 px-3 py-1.5 text-sm border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                                      isReadOnly
+                                        ? "opacity-60 cursor-not-allowed"
+                                        : ""
+                                    }`}
+                                  />
+                                  <button
+                                    onClick={() => {
+                                      if (isReadOnly) return;
+                                      const updated = [...statusCodes];
+                                      updated[index].headers = updated[
+                                        index
+                                      ].headers!.filter(
+                                        (_, i) => i !== headerIndex
+                                      );
+                                      setStatusCodes(updated);
+                                    }}
+                                    disabled={isReadOnly}
+                                    className={`p-1.5 text-red-500 hover:text-red-600 transition-colors ${
+                                      isReadOnly
+                                        ? "opacity-50 cursor-not-allowed"
+                                        : ""
+                                    }`}
+                                    title="Remove Header"
                                   >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M6 18L18 6M6 6l12 12"
-                                    />
-                                  </svg>
-                                </button>
-                              </div>
-                            ))}
+                                    <svg
+                                      className="w-4 h-4"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M6 18L18 6M6 6l12 12"
+                                      />
+                                    </svg>
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         </td>
                       </tr>
@@ -840,7 +1041,7 @@ export function ApiResponseCard({
           setIsResponseSchemaModalOpen(false);
           setSelectedStatusCodeIndex(null);
         }}
-        onSelect={(schema) => {
+        onSelect={async (schema) => {
           if (selectedStatusCodeIndex !== null) {
             const updated = [...statusCodes];
             // Schema를 ref 형태로 저장 (스키마 이름만 저장)
@@ -851,6 +1052,44 @@ export function ApiResponseCard({
               },
             };
             setStatusCodes(updated);
+
+            // 스키마 필드 정보 로드
+            try {
+              const schemaResponse = await getSchema(schema.name);
+              const schemaData = schemaResponse.data;
+
+              if (schemaData.properties) {
+                const fields = Object.entries(schemaData.properties).map(
+                  ([key, propSchema]: [string, any]) => {
+                    const field = parseOpenAPISchemaToSchemaField(
+                      key,
+                      propSchema
+                    );
+                    if (
+                      schemaData.required &&
+                      schemaData.required.includes(key)
+                    ) {
+                      field.required = true;
+                    }
+                    return field;
+                  }
+                );
+
+                setSchemaFieldsMap((prev) => ({
+                  ...prev,
+                  [selectedStatusCodeIndex]: fields,
+                }));
+                setSchemaNamesMap((prev) => ({
+                  ...prev,
+                  [selectedStatusCodeIndex]: schema.name,
+                }));
+
+                // 스키마 선택 시 필드 목록 자동 확장
+                setExpandedSchemaIndex(selectedStatusCodeIndex);
+              }
+            } catch (error) {
+              console.error("스키마 필드 로드 실패:", error);
+            }
           }
           setIsResponseSchemaModalOpen(false);
           setSelectedStatusCodeIndex(null);
