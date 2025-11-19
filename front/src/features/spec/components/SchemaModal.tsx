@@ -130,7 +130,7 @@ export function SchemaModal({
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-            Schema 관리
+            Schema List
           </h2>
           <div className="flex gap-2">
             <button
@@ -212,13 +212,13 @@ export function SchemaModal({
                           onClick={() => handleSelectSchema(schema)}
                           className="px-3 py-1 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
                         >
-                          선택
+                          Select
                         </button>
                         <button
                           onClick={() => handleDeleteSchema(schema.schemaName)}
                           className="px-3 py-1 text-sm text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 font-medium"
                         >
-                          삭제
+                          Delete
                         </button>
                       </div>
                     </div>
