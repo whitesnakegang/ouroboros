@@ -152,12 +152,6 @@
           "example": "https://www.example.com"
         },
         {
-          "name": "avatar",
-          "expression": "internet.avatar",
-          "description": "Avatar image URL",
-          "example": "https://robohash.org/..."
-        },
-        {
           "name": "uuid",
           "expression": "internet.uuid",
           "description": "UUID v4",

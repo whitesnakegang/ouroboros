@@ -106,7 +106,7 @@ const JsonHighlighter = ({
             parts.push(
               <span
                 key={`bool-${lineIndex}`}
-                className={isSent ? "text-purple-300" : "text-purple-400"}
+                className={isSent ? "text-green-300" : "text-green-400"}
               >
                 {boolMatch[0]}
               </span>
@@ -415,7 +415,7 @@ function createGroupHeader(
       <span
         className={`text-[11px] font-semibold ${
           message.tryId
-            ? "text-purple-700 dark:text-purple-400"
+            ? "text-green-700 dark:text-green-400"
             : message.direction === "sent"
             ? "text-blue-700 dark:text-blue-400"
             : "text-green-700 dark:text-green-400"
@@ -828,7 +828,7 @@ function MessageBubble({
           onClick ? "cursor-pointer" : ""
         } ${
           isTryMessage
-            ? "bg-purple-50 dark:bg-purple-900/10 border-purple-200 dark:border-purple-800/50"
+            ? "bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800/50"
             : isSent
             ? "bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800/50"
             : "bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800/50"
@@ -838,7 +838,7 @@ function MessageBubble({
         <div
           className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
             isTryMessage
-              ? "bg-purple-500 text-white"
+              ? "bg-green-500 text-white"
               : isSent
               ? "bg-blue-500 text-white"
               : "bg-green-500 text-white"
@@ -875,7 +875,7 @@ function MessageBubble({
             <span
               className={`text-xs font-bold uppercase tracking-wide ${
                 isTryMessage
-                  ? "text-purple-700 dark:text-purple-400"
+                  ? "text-green-700 dark:text-green-400"
                   : isSent
                   ? "text-blue-700 dark:text-blue-400"
                   : "text-green-700 dark:text-green-400"

@@ -167,6 +167,18 @@ export function WsTestRequestPanel() {
 
   // 엔드포인트 선택 시 Entry Point 및 Receive/Reply Address 로드
   useEffect(() => {
+    // selectedEndpoint가 변경되면 기존 연결 끊기
+    if (wsConnectionStatus === "connected" && stompClientRef.current) {
+      const client = stompClientRef.current;
+      client.disconnect(() => {
+        setWsConnectionStatus("disconnected");
+        setWsConnectionStartTime(null);
+        updateWsStats({ connectionDuration: null });
+        setSubscriptions([]);
+        stompClientRef.current = null;
+      });
+    }
+
     const loadWebSocketInfo = async () => {
       if (selectedEndpoint && selectedEndpoint.protocol === "WebSocket") {
         // WebSocket 엔드포인트의 entrypoint는 entrypoint 필드에 저장되어 있음
@@ -183,7 +195,28 @@ export function WsTestRequestPanel() {
           const operation = operationResponse.data.operation;
 
           // Operation action 저장 (입력창 표시 제어용)
-          setOperationAction(operation.action || null);
+          // progress가 "completed"이고 action이 "receive"인 경우 "duplex"로 처리
+          const normalizedProgress = selectedEndpoint?.progress?.toLowerCase();
+          const isProgressCompleted =
+            normalizedProgress === "completed" ||
+            normalizedProgress === "complete";
+
+          let normalizedAction = operation.action
+            ? String(operation.action).toLowerCase()
+            : null;
+
+          // progress가 "completed"이고 action이 "receive"인 경우 "duplex"로 처리
+          if (isProgressCompleted && normalizedAction === "receive") {
+            normalizedAction = "duplex";
+          }
+
+          setOperationAction(normalizedAction);
+          console.log("Operation Action 설정:", {
+            original: operation.action,
+            normalized: normalizedAction,
+            progress: selectedEndpoint?.progress,
+            isProgressCompleted,
+          });
 
           // Receive address 추출
           let receiveAddr = "";
@@ -347,6 +380,7 @@ export function WsTestRequestPanel() {
     };
 
     loadWebSocketInfo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEndpoint]);
 
   // 연결 상태에 따른 통계 업데이트
@@ -420,124 +454,70 @@ export function WsTestRequestPanel() {
           };
           addWsMessage(message);
 
-          // Receive address가 있으면 자동으로 구독
-          // 주의: /app/ prefix는 클라이언트가 서버로 메시지를 보낼 때 사용하므로 구독하지 않음
-          // /topic/ 또는 /queue/ prefix만 구독 가능
-          if (receiveAddress && receiveAddress.trim() !== "") {
-            // /app/로 시작하는 주소는 구독하지 않음 (클라이언트→서버 전송용)
-            // 대신 /app/를 /topic/으로 변환해서 구독 시도
-            if (receiveAddress.startsWith("/app/")) {
-              console.warn(
-                "Receive Address가 /app/로 시작합니다. /app/를 /topic/으로 변환하여 구독합니다.",
-                { receiveAddress, replyAddress }
-              );
-
-              // 1. replyAddress가 있고 /topic/ 또는 /queue/로 시작하면 그것으로 구독 시도
-              let subscribeAddress = "";
-              if (replyAddress && replyAddress.trim() !== "") {
-                if (
-                  replyAddress.startsWith("/topic/") ||
-                  replyAddress.startsWith("/queue/")
-                ) {
-                  subscribeAddress = replyAddress;
-                }
-              }
-
-              // 2. replyAddress가 없거나 /app/로 시작하면, receiveAddress의 /app/를 /topic/으로 변환
-              if (!subscribeAddress) {
-                subscribeAddress = receiveAddress.replace(
-                  /^\/app\//,
-                  "/topic/"
-                );
-                console.log("Receive Address를 /topic/으로 변환:", {
-                  original: receiveAddress,
-                  converted: subscribeAddress,
-                });
-              }
-
-              if (subscribeAddress) {
-                // 변환된 주소로 구독 (패턴 치환 필요)
-                let actualSubscribeAddress = subscribeAddress;
-                if (hasPathParameter(subscribeAddress)) {
-                  actualSubscribeAddress = replacePathParameters(
-                    subscribeAddress,
-                    pathParameters
-                  );
-                  if (hasPathParameter(actualSubscribeAddress)) {
-                    const missingParams = extractPathParameters(
-                      actualSubscribeAddress
-                    );
-                    addWsMessage({
-                      id: `msg-${Date.now()}-${Math.random()}`,
-                      timestamp: Date.now(),
-                      direction: "received" as const,
-                      address: "WARNING",
-                      content: JSON.stringify({
-                        message: `구독 주소에 패턴이 포함되어 있습니다. Path Parameters를 입력해주세요: ${missingParams.join(
-                          ", "
-                        )}`,
-                        subscribeAddress,
-                        missingParameters: missingParams,
-                      }),
-                    });
-                  } else {
-                    handleSubscribe(actualSubscribeAddress);
-                  }
-                } else {
-                  handleSubscribe(actualSubscribeAddress);
-                }
-              } else {
-                addWsMessage({
-                  id: `msg-${Date.now()}-${Math.random()}`,
-                  timestamp: Date.now(),
-                  direction: "received" as const,
-                  address: "INFO",
-                  content: JSON.stringify({
-                    message:
-                      "Receive Address가 /app/로 시작합니다. /app/는 클라이언트가 서버로 메시지를 보낼 때 사용하므로 구독하지 않습니다. 서버가 메시지를 보낼 주소(/topic/ 또는 /queue/)를 확인해주세요.",
-                    receiveAddress,
-                    replyAddress,
-                  }),
-                });
-              }
-            } else {
-              // 패턴이 포함되어 있으면 실제 값으로 치환
-              let actualReceiveAddress = receiveAddress;
-              if (hasPathParameter(receiveAddress)) {
-                actualReceiveAddress = replacePathParameters(
-                  receiveAddress,
+          // Subscribe는 replyAddress로 구독 (서버가 클라이언트에게 메시지를 보낼 주소)
+          // replyAddress가 /topic/ 또는 /queue/로 시작하는 경우에만 구독
+          if (replyAddress && replyAddress.trim() !== "") {
+            if (
+              replyAddress.startsWith("/topic/") ||
+              replyAddress.startsWith("/queue/")
+            ) {
+              // replyAddress로 구독 (패턴 치환 필요)
+              let actualSubscribeAddress = replyAddress;
+              if (hasPathParameter(replyAddress)) {
+                actualSubscribeAddress = replacePathParameters(
+                  replyAddress,
                   pathParameters
                 );
-                // 패턴이 치환되지 않았으면 구독하지 않음
-                if (hasPathParameter(actualReceiveAddress)) {
-                  const missingParams =
-                    extractPathParameters(actualReceiveAddress);
-                  console.warn(
-                    "Receive Address에 패턴이 포함되어 있지만 파라미터가 입력되지 않아 구독하지 않습니다.",
-                    { receiveAddress, pathParameters, missingParams }
+                if (hasPathParameter(actualSubscribeAddress)) {
+                  const missingParams = extractPathParameters(
+                    actualSubscribeAddress
                   );
-                  // 경고 메시지 추가
                   addWsMessage({
                     id: `msg-${Date.now()}-${Math.random()}`,
                     timestamp: Date.now(),
                     direction: "received" as const,
                     address: "WARNING",
                     content: JSON.stringify({
-                      message: `Receive Address에 패턴이 포함되어 있습니다. Path Parameters를 입력해주세요: ${missingParams.join(
+                      message: `구독 주소에 패턴이 포함되어 있습니다. Path Parameters를 입력해주세요: ${missingParams.join(
                         ", "
                       )}`,
-                      receiveAddress,
+                      replyAddress,
                       missingParameters: missingParams,
                     }),
                   });
                 } else {
-                  // 치환된 주소로 구독
-                  handleSubscribe(actualReceiveAddress);
+                  handleSubscribe(actualSubscribeAddress);
                 }
               } else {
-                // 패턴이 없으면 그대로 구독
-                handleSubscribe(actualReceiveAddress);
+                handleSubscribe(actualSubscribeAddress);
               }
+            } else {
+              addWsMessage({
+                id: `msg-${Date.now()}-${Math.random()}`,
+                timestamp: Date.now(),
+                direction: "received" as const,
+                address: "INFO",
+                content: JSON.stringify({
+                  message:
+                    "Reply Address가 /topic/ 또는 /queue/로 시작하지 않습니다. 구독할 수 없습니다.",
+                  replyAddress,
+                }),
+              });
+            }
+          } else {
+            // replyAddress가 없으면 구독하지 않음
+            if (receiveAddress && receiveAddress.trim() !== "") {
+              addWsMessage({
+                id: `msg-${Date.now()}-${Math.random()}`,
+                timestamp: Date.now(),
+                direction: "received" as const,
+                address: "INFO",
+                content: JSON.stringify({
+                  message:
+                    "Reply Address가 없습니다. 서버가 메시지를 보낼 주소(/topic/ 또는 /queue/)가 필요합니다.",
+                  receiveAddress,
+                }),
+              });
             }
           }
 
@@ -698,11 +678,15 @@ export function WsTestRequestPanel() {
             setTryId(tryIdHeader);
           }
 
+          // 수신된 MESSAGE의 address는 frame.headers.destination을 사용 (서버가 보낸 실제 destination)
+          // 이것은 replyAddress와 일치해야 함 (receiveAddress가 아님)
+          const messageAddress = frame.headers.destination || destination;
+
           const message = {
             id: `msg-${Date.now()}-${Math.random()}`,
             timestamp: Date.now(),
             direction: "received" as const,
-            address: frame.headers.destination || destination,
+            address: messageAddress,
             content: frame.body,
             tryId: tryIdHeader || undefined,
           };
@@ -807,14 +791,14 @@ export function WsTestRequestPanel() {
       return;
     }
 
-    // Reply address가 있으면 reply address로, 없으면 receive address로 전송
-    // receive만 있어도 receiveAddress로 메시지 전송 가능
+    // Send는 receiveAddress로 전송 (클라이언트→서버)
+    // receiveAddress가 없으면 replyAddress로 전송 시도
     let destination = "";
 
-    if (replyAddress && replyAddress.trim() !== "") {
-      destination = replyAddress;
-    } else if (receiveAddress && receiveAddress.trim() !== "") {
+    if (receiveAddress && receiveAddress.trim() !== "") {
       destination = receiveAddress;
+    } else if (replyAddress && replyAddress.trim() !== "") {
+      destination = replyAddress;
     }
 
     if (!destination) {
@@ -1017,7 +1001,7 @@ export function WsTestRequestPanel() {
           {/* Reply Address - duplex 또는 send/sendto일 때만 표시 */}
           {(operationAction === "duplex" ||
             operationAction === "send" ||
-            String(operationAction) === "sendto") && (
+            operationAction === "sendto") && (
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
                 Reply Address
