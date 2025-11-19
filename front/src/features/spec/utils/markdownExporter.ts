@@ -274,7 +274,7 @@ export function convertWsYamlToMarkdown(yamlContent: string): string {
 
         // If no receiver or reply found, check standard operations
         if (receiverRefs.length === 0 && replyRefs.length === 0 && hasStandardOps) {
-          Object.entries(operations).forEach(([opId, op]: [string, any]) => {
+          Object.entries(operations).forEach(([_opId, op]: [string, any]) => {
             const action = op.action || "send";
             const title = action === "send" ? "Send" : action === "receive" ? "Receive" : action;
             md += `#### ${title}\n\n`;

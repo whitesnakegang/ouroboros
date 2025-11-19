@@ -43,7 +43,7 @@ function markdownToHtml(markdown: string): string {
   let codeBlockIndex = 0;
 
   // 코드 블록을 먼저 임시로 치환 (다른 파싱에 영향받지 않도록)
-  html = html.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
+  html = html.replace(/```(\w+)?\n([\s\S]*?)```/g, (_match, lang, code) => {
     const placeholder = `__CODE_BLOCK_${codeBlockIndex}__`;
     const language = lang || "text";
     codeBlocks.push({
