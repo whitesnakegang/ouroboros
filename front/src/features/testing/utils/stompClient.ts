@@ -80,6 +80,7 @@ export class StompClient {
         this.subscriptions.clear();
         if (this.onDisconnectCallback) {
           this.onDisconnectCallback();
+          this.onDisconnectCallback = undefined;
         }
       };
     } catch (error) {
@@ -101,12 +102,30 @@ export class StompClient {
         }
         this.connected = false;
         this.subscriptions.clear();
+        // onclose 이벤트가 발생하지 않을 수 있으므로 여기서도 콜백 호출
+        if (this.onDisconnectCallback) {
+          this.onDisconnectCallback();
+          this.onDisconnectCallback = undefined;
+        }
       }, 100);
     } else if (this.ws) {
       this.ws.close();
       this.ws = null;
       this.connected = false;
       this.subscriptions.clear();
+      // 즉시 콜백 호출
+      if (this.onDisconnectCallback) {
+        this.onDisconnectCallback();
+        this.onDisconnectCallback = undefined;
+      }
+    } else {
+      // WebSocket이 없는 경우에도 콜백 호출
+      this.connected = false;
+      this.subscriptions.clear();
+      if (this.onDisconnectCallback) {
+        this.onDisconnectCallback();
+        this.onDisconnectCallback = undefined;
+      }
     }
   }
 
@@ -168,7 +187,25 @@ export class StompClient {
         this.onConnectCallback();
       }
     } else if (frame.command === "ERROR") {
-      const error = new Error(frame.body || "STOMP Error");
+      const error = new Error(frame.body || frame.headers["message"] || "STOMP Error");
+      
+      // ERROR 발생 시 연결 해제
+      const wasConnected = this.connected;
+      this.connected = false;
+      this.subscriptions.clear();
+      
+      // WebSocket 닫기
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        this.ws.close();
+      }
+      
+      // 연결되어 있었던 경우 disconnect 콜백도 호출
+      if (wasConnected && this.onDisconnectCallback) {
+        this.onDisconnectCallback();
+        this.onDisconnectCallback = undefined;
+      }
+      
+      // Error 콜백 호출
       if (this.onErrorCallback) {
         this.onErrorCallback(error);
       }

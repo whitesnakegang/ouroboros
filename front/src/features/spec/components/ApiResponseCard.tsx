@@ -565,7 +565,7 @@ export function ApiResponseCard({
                                   title={statusCode.schema?.ref || "Select Schema..."}
                                 >
                                   <span className="truncate block">
-                                    {statusCode.schema?.ref || "Select Schema..."}
+                                  {statusCode.schema?.ref || "Select Schema..."}
                                   </span>
                                 </button>
                               )}
@@ -945,82 +945,82 @@ export function ApiResponseCard({
                               </button>
                             </div>
                             <div className="space-y-2">
-                              {statusCode.headers.map((header, headerIndex) => (
-                                <div
-                                  key={headerIndex}
+                            {statusCode.headers.map((header, headerIndex) => (
+                              <div
+                                key={headerIndex}
                                   className="flex items-center gap-2 p-2 border border-gray-200 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117]"
-                                >
-                                  <input
-                                    type="text"
-                                    value={header.key}
-                                    onChange={(e) => {
-                                      if (isReadOnly) return;
-                                      const updated = [...statusCodes];
-                                      updated[index].headers![headerIndex].key =
-                                        e.target.value;
-                                      setStatusCodes(updated);
-                                    }}
-                                    placeholder="Header Key (e.g., Content-Type)"
-                                    disabled={isReadOnly}
+                              >
+                                <input
+                                  type="text"
+                                  value={header.key}
+                                  onChange={(e) => {
+                                    if (isReadOnly) return;
+                                    const updated = [...statusCodes];
+                                    updated[index].headers![headerIndex].key =
+                                      e.target.value;
+                                    setStatusCodes(updated);
+                                  }}
+                                  placeholder="Header Key (e.g., Content-Type)"
+                                  disabled={isReadOnly}
                                     className={`flex-1 px-3 py-1.5 text-sm border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                                      isReadOnly
-                                        ? "opacity-60 cursor-not-allowed"
-                                        : ""
-                                    }`}
-                                  />
-                                  <input
-                                    type="text"
-                                    value={header.value}
-                                    onChange={(e) => {
-                                      if (isReadOnly) return;
-                                      const updated = [...statusCodes];
-                                      updated[index].headers![headerIndex].value =
-                                        e.target.value;
-                                      setStatusCodes(updated);
-                                    }}
-                                    placeholder="Header Value (e.g., application/json)"
-                                    disabled={isReadOnly}
+                                    isReadOnly
+                                      ? "opacity-60 cursor-not-allowed"
+                                      : ""
+                                  }`}
+                                />
+                                <input
+                                  type="text"
+                                  value={header.value}
+                                  onChange={(e) => {
+                                    if (isReadOnly) return;
+                                    const updated = [...statusCodes];
+                                    updated[index].headers![headerIndex].value =
+                                      e.target.value;
+                                    setStatusCodes(updated);
+                                  }}
+                                  placeholder="Header Value (e.g., application/json)"
+                                  disabled={isReadOnly}
                                     className={`flex-1 px-3 py-1.5 text-sm border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                                      isReadOnly
-                                        ? "opacity-60 cursor-not-allowed"
-                                        : ""
-                                    }`}
-                                  />
-                                  <button
-                                    onClick={() => {
-                                      if (isReadOnly) return;
-                                      const updated = [...statusCodes];
-                                      updated[index].headers = updated[
-                                        index
-                                      ].headers!.filter(
-                                        (_, i) => i !== headerIndex
-                                      );
-                                      setStatusCodes(updated);
-                                    }}
-                                    disabled={isReadOnly}
+                                    isReadOnly
+                                      ? "opacity-60 cursor-not-allowed"
+                                      : ""
+                                  }`}
+                                />
+                                <button
+                                  onClick={() => {
+                                    if (isReadOnly) return;
+                                    const updated = [...statusCodes];
+                                    updated[index].headers = updated[
+                                      index
+                                    ].headers!.filter(
+                                      (_, i) => i !== headerIndex
+                                    );
+                                    setStatusCodes(updated);
+                                  }}
+                                  disabled={isReadOnly}
                                     className={`p-1.5 text-red-500 hover:text-red-600 transition-colors ${
-                                      isReadOnly
-                                        ? "opacity-50 cursor-not-allowed"
-                                        : ""
-                                    }`}
+                                    isReadOnly
+                                      ? "opacity-50 cursor-not-allowed"
+                                      : ""
+                                  }`}
                                     title="Remove Header"
-                                  >
-                                    <svg
+                                >
+                                  <svg
                                       className="w-4 h-4"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      viewBox="0 0 24 24"
-                                    >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M6 18L18 6M6 6l12 12"
-                                      />
-                                    </svg>
-                                  </button>
-                                </div>
-                              ))}
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M6 18L18 6M6 6l12 12"
+                                    />
+                                  </svg>
+                                </button>
+                              </div>
+                            ))}
                             </div>
                           </div>
                         </td>

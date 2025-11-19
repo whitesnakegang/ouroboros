@@ -2,6 +2,10 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useTestingStore } from "../store/testing.store";
 import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
 import { StompClient, buildWebSocketUrl } from "../utils/stompClient";
+import {
+  getWebSocketOperation,
+  getWebSocketChannel,
+} from "@/features/spec/services/api";
 
 interface Subscription {
   id: string;
@@ -23,7 +27,8 @@ export function WsTestRequestPanel() {
   const { selectedEndpoint, endpoints } = useSidebarStore();
 
   const [entryPoint, setEntryPoint] = useState("");
-  const [roomId, setRoomId] = useState("room1");
+  const [receiveAddress, setReceiveAddress] = useState("");
+  const [replyAddress, setReplyAddress] = useState("");
   const [connectHeaders, setConnectHeaders] = useState<
     Array<{ key: string; value: string }>
   >([]);
@@ -126,18 +131,89 @@ export function WsTestRequestPanel() {
     return paths;
   }, [selectedEndpoint, endpoints, subscriptions]);
 
-  // 엔드포인트 선택 시 Entry Point 로드
+  // 엔드포인트 선택 시 Entry Point 및 Receive/Reply Address 로드
   useEffect(() => {
-    if (selectedEndpoint && selectedEndpoint.protocol === "WebSocket") {
-      // WebSocket 엔드포인트의 entrypoint는 entrypoint 필드에 저장되어 있음
-      const entrypoint = selectedEndpoint.entrypoint || "/ws";
-      // protocol 정보 사용 (ws/wss/null, null이면 기본값 "ws")
-      const protocol = selectedEndpoint.wsProtocol || "ws";
-      const wsUrl = buildWebSocketUrl(entrypoint, protocol);
-      setEntryPoint(wsUrl);
-    } else {
-      setEntryPoint("");
-    }
+    const loadWebSocketInfo = async () => {
+      if (selectedEndpoint && selectedEndpoint.protocol === "WebSocket") {
+        // WebSocket 엔드포인트의 entrypoint는 entrypoint 필드에 저장되어 있음
+        const entrypoint = selectedEndpoint.entrypoint || "/ws";
+        // protocol 정보 사용 (ws/wss/null, null이면 기본값 "ws")
+        const protocol = selectedEndpoint.wsProtocol || "ws";
+        const wsUrl = buildWebSocketUrl(entrypoint, protocol);
+        setEntryPoint(wsUrl);
+
+        // Operation 정보를 가져와서 receive와 reply address 추출
+        try {
+          const operationId = selectedEndpoint.id;
+          const operationResponse = await getWebSocketOperation(operationId);
+          const operation = operationResponse.data.operation;
+
+          // Receive address 추출
+          let receiveAddr = "";
+          if (operation.action === "receive" && operation.channel) {
+            const channelRef = operation.channel.ref || "";
+            const channelName = channelRef.replace("#/channels/", "");
+
+            // Channel 정보 조회하여 실제 address 사용
+            try {
+              const channelResponse = await getWebSocketChannel(channelName);
+              receiveAddr =
+                channelResponse.data.channel?.address || channelName;
+            } catch {
+              receiveAddr = channelName;
+            }
+          }
+          setReceiveAddress(receiveAddr);
+
+          // Reply address 추출
+          let replyAddr = "";
+          if (operation.reply && operation.reply.channel) {
+            const replyChannelRef = operation.reply.channel.ref || "";
+            const replyChannelName = replyChannelRef.replace("#/channels/", "");
+
+            try {
+              const channelResponse = await getWebSocketChannel(
+                replyChannelName
+              );
+              replyAddr =
+                channelResponse.data.channel?.address || replyChannelName;
+            } catch {
+              replyAddr = replyChannelName;
+            }
+          } else if (operation.action === "send" && operation.channel) {
+            // SEND 타입의 경우 channel을 reply로 사용
+            const channelRef = operation.channel.ref || "";
+            const channelName = channelRef.replace("#/channels/", "");
+
+            try {
+              const channelResponse = await getWebSocketChannel(channelName);
+              replyAddr = channelResponse.data.channel?.address || channelName;
+            } catch {
+              replyAddr = channelName;
+            }
+          }
+          setReplyAddress(replyAddr);
+        } catch (error) {
+          console.error("WebSocket operation 정보 로드 실패:", error);
+          // 실패 시 path에서 파싱 시도
+          if (selectedEndpoint.path) {
+            const pathParts = selectedEndpoint.path.split(" - ");
+            if (pathParts.length > 0) {
+              setReceiveAddress(pathParts[0] || "");
+            }
+            if (pathParts.length > 1) {
+              setReplyAddress(pathParts[1] || "");
+            }
+          }
+        }
+      } else {
+        setEntryPoint("");
+        setReceiveAddress("");
+        setReplyAddress("");
+      }
+    };
+
+    loadWebSocketInfo();
   }, [selectedEndpoint]);
 
   // 연결 상태에 따른 통계 업데이트
@@ -211,10 +287,9 @@ export function WsTestRequestPanel() {
           };
           addWsMessage(message);
 
-          // Room ID가 있으면 자동으로 구독
-          if (roomId && roomId.trim() !== "") {
-            const destination = `/topic/chat/${roomId}`;
-            handleSubscribe(destination);
+          // Receive address가 있으면 자동으로 구독
+          if (receiveAddress && receiveAddress.trim() !== "") {
+            handleSubscribe(receiveAddress);
           }
 
           // Try 알림 구독 (백엔드: /user/queue/ouro/try)
@@ -242,51 +317,54 @@ export function WsTestRequestPanel() {
                     if (typeof dispatchMessage.payload === "string") {
                       try {
                         parsedPayload = JSON.parse(dispatchMessage.payload);
-                      } catch (e) {
+                      } catch {
                         // 파싱 실패 시 원본 문자열 유지
                         parsedPayload = dispatchMessage.payload;
                       }
                     }
 
+                    // address는 headers의 destination을 사용, 없으면 tryNotificationDestination 사용
+                    const destinationAddress =
+                      dispatchMessage.headers?.destination ||
+                      tryNotificationDestination;
+
+                    // content는 payload만 표시
+                    const payloadContent =
+                      typeof parsedPayload === "object"
+                        ? JSON.stringify(parsedPayload, null, 2)
+                        : parsedPayload;
+
                     const tryMessage = {
                       id: `msg-${Date.now()}-${Math.random()}`,
                       timestamp: Date.now(),
-                      direction: "received" as const,
-                      address: tryNotificationDestination,
-                      content: JSON.stringify(
-                        {
-                          tryId: tryIdHeader,
-                          payload: parsedPayload,
-                          headers: dispatchMessage.headers,
-                        },
-                        null,
-                        2
-                      ),
+                      direction: "sent" as const,
+                      address: destinationAddress,
+                      content: payloadContent,
                       tryId: tryIdHeader,
                     };
                     addWsMessage(tryMessage);
                     updateWsStats((prev) => ({
-                      totalReceived: (prev?.totalReceived || 0) + 1,
+                      totalSent: (prev?.totalSent || 0) + 1,
                     }));
-                  } catch (parseError) {
+                  } catch {
                     // 파싱 실패 시 원본 body 그대로 표시
                     const tryMessage = {
                       id: `msg-${Date.now()}-${Math.random()}`,
                       timestamp: Date.now(),
-                      direction: "received" as const,
+                      direction: "sent" as const,
                       address: tryNotificationDestination,
                       content: frame.body,
                       tryId: tryIdHeader,
                     };
                     addWsMessage(tryMessage);
                     updateWsStats((prev) => ({
-                      totalReceived: (prev?.totalReceived || 0) + 1,
+                      totalSent: (prev?.totalSent || 0) + 1,
                     }));
                   }
                 }
               );
             }
-          } catch (error) {
+          } catch {
             // Try 알림 구독 실패
           }
         },
@@ -314,7 +392,7 @@ export function WsTestRequestPanel() {
           addWsMessage(errorMsg);
         }
       );
-    } catch (error) {
+    } catch {
       setWsConnectionStatus("disconnected");
       alert("Connection failed.");
     }
@@ -322,13 +400,20 @@ export function WsTestRequestPanel() {
 
   const handleDisconnect = () => {
     if (stompClientRef.current) {
-      stompClientRef.current.disconnect(() => {
+      const client = stompClientRef.current;
+      client.disconnect(() => {
         setWsConnectionStatus("disconnected");
         setWsConnectionStartTime(null);
         updateWsStats({ connectionDuration: null });
         setSubscriptions([]);
+        stompClientRef.current = null;
       });
-      stompClientRef.current = null;
+    } else {
+      // 클라이언트가 없는 경우에도 상태 초기화
+      setWsConnectionStatus("disconnected");
+      setWsConnectionStartTime(null);
+      updateWsStats({ connectionDuration: null });
+      setSubscriptions([]);
     }
   };
 
@@ -413,7 +498,7 @@ export function WsTestRequestPanel() {
         ),
       };
       addWsMessage(message);
-    } catch (error) {
+    } catch {
       alert("Subscription failed.");
     }
   };
@@ -450,7 +535,7 @@ export function WsTestRequestPanel() {
         ),
       };
       addWsMessage(message);
-    } catch (error) {
+    } catch {
       // 구독 해제 실패
     }
   };
@@ -473,8 +558,16 @@ export function WsTestRequestPanel() {
       return;
     }
 
-    if (!roomId || roomId.trim() === "") {
-      alert("Please enter a Room ID.");
+    // Reply address가 있으면 reply address로, 없으면 receive address로 전송
+    const destination =
+      replyAddress && replyAddress.trim() !== ""
+        ? replyAddress
+        : receiveAddress && receiveAddress.trim() !== ""
+        ? receiveAddress
+        : "";
+
+    if (!destination) {
+      alert("Please set Receive Address or Reply Address.");
       return;
     }
 
@@ -484,9 +577,7 @@ export function WsTestRequestPanel() {
     }
 
     try {
-      const destination = `/app/chat/${roomId}`;
       const messageBody = JSON.stringify({
-        roomId: roomId,
         sender: sender || "tester",
         content: content,
         type: messageType,
@@ -607,15 +698,31 @@ export function WsTestRequestPanel() {
             />
           </div>
 
+          {/* Receive Address */}
           <div>
             <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-              Room ID
+              Receive Address
             </label>
             <input
               type="text"
-              value={roomId}
-              onChange={(e) => setRoomId(e.target.value)}
-              placeholder="room1"
+              value={receiveAddress}
+              onChange={(e) => setReceiveAddress(e.target.value)}
+              placeholder="/topic/chat/room1"
+              disabled={wsConnectionStatus === "connected"}
+              className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            />
+          </div>
+
+          {/* Reply Address */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
+              Reply Address
+            </label>
+            <input
+              type="text"
+              value={replyAddress}
+              onChange={(e) => setReplyAddress(e.target.value)}
+              placeholder="/app/chat/room1"
               disabled={wsConnectionStatus === "connected"}
               className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             />
@@ -849,7 +956,7 @@ export function WsTestRequestPanel() {
       {/* Active Subscriptions */}
       {wsConnectionStatus === "connected" && subscriptions.length > 0 && (
         <div className="border-t border-gray-200 dark:border-[#2D333B] p-4">
-          <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-3 flex items-center gap-2">
+          <label className="flex items-center gap-2 text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-3">
             <svg
               className="w-4 h-4"
               fill="none"

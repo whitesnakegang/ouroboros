@@ -414,7 +414,9 @@ function createGroupHeader(
     >
       <span
         className={`text-[11px] font-semibold ${
-          message.direction === "sent"
+          message.tryId
+            ? "text-purple-700 dark:text-purple-400"
+            : message.direction === "sent"
             ? "text-blue-700 dark:text-blue-400"
             : "text-green-700 dark:text-green-400"
         }`}
@@ -787,6 +789,7 @@ function MessageBubble({
   onClick?: () => void;
 }) {
   const isSent = message.direction === "sent";
+  const isTryMessage = !!message.tryId; // tryId가 있으면 Try 메시지로 구분
   const isJson = (() => {
     try {
       JSON.parse(message.content);
@@ -824,7 +827,9 @@ function MessageBubble({
         } rounded-lg border transition-all hover:shadow-md focus-visible:outline-none focus-visible:ring-0 ${
           onClick ? "cursor-pointer" : ""
         } ${
-          isSent
+          isTryMessage
+            ? "bg-purple-50 dark:bg-purple-900/10 border-purple-200 dark:border-purple-800/50"
+            : isSent
             ? "bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800/50"
             : "bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800/50"
         }`}
@@ -832,7 +837,11 @@ function MessageBubble({
         {/* Direction Icon */}
         <div
           className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-            isSent ? "bg-blue-500 text-white" : "bg-green-500 text-white"
+            isTryMessage
+              ? "bg-purple-500 text-white"
+              : isSent
+              ? "bg-blue-500 text-white"
+              : "bg-green-500 text-white"
           }`}
         >
           <svg
@@ -865,7 +874,9 @@ function MessageBubble({
           <div className="flex items-center gap-2 mb-2">
             <span
               className={`text-xs font-bold uppercase tracking-wide ${
-                isSent
+                isTryMessage
+                  ? "text-purple-700 dark:text-purple-400"
+                  : isSent
                   ? "text-blue-700 dark:text-blue-400"
                   : "text-green-700 dark:text-green-400"
               }`}
