@@ -146,17 +146,13 @@ export function WsEditorForm({
 
   // 통합 탭 (편집 모드용)
   const [wsTab, setWsTab] = useState<
-    "receiver" | "reply" | "schema" | "message"
+    "receiver" | "reply" | "message" | "schema"
   >("receiver");
 
   // 채널 선택 모드 (새 채널 생성만 허용)
   const receiverChannelMode: "create" = "create";
   const replyChannelMode: "create" = "create";
-
-  // 메시지 작성 상태
-  const [messageName, setMessageName] = useState("");
   const [messageDescription, setMessageDescription] = useState("");
-  const [messageType, setMessageType] = useState<"header" | "schema" | "name">(
     "name"
   );
   const [messageHeaders, setMessageHeaders] = useState<KeyValuePair[]>([]);
@@ -1615,7 +1611,7 @@ export function WsEditorForm({
                           onChange={(e) =>
                             setReply({ ...reply, address: e.target.value })
                           }
-                          placeholder="/app/chat/{roomId}"
+                          placeholder="/topic/chat/{roomId}"
                           disabled={isReadOnly}
                           className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
                             isReadOnly ? "opacity-60 cursor-not-allowed" : ""
