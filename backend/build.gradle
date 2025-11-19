@@ -9,7 +9,7 @@ plugins {
 }
 
 group = 'io.github.whitesnakegang'   // ← 실제 groupId 반영
-version = '1.0.4-SNAPSHOT'                    // ← 스냅샷이면 0.1.1-SNAPSHOT 등으로
+version = '1.0.4'                    // ← 스냅샷이면 0.1.1-SNAPSHOT 등으로
 
 description = 'Open Source Project'
 
