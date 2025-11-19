@@ -844,15 +844,15 @@ function MessageBubble({
         <div className={`flex items-center gap-2 mb-2 ${isSent ? "justify-end" : "justify-start"}`}>
           <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
             isSent 
-              ? "bg-blue-500 text-white" 
+              ? "bg-blue-500 text-white"
               : "bg-green-500 text-white"
           }`}>
             {isSent ? "SEND" : "RECEIVE"}
-          </span>
+            </span>
           <span className="text-[10px] font-medium text-gray-600 dark:text-[#8B949E]">
-            {formatTimestamp(message.timestamp)}
-          </span>
-          {relativeBadge}
+              {formatTimestamp(message.timestamp)}
+            </span>
+            {relativeBadge}
           {showMethodButton && (
             <button
               onClick={(e) => {
@@ -864,8 +864,8 @@ function MessageBubble({
             >
               ⏱️
             </button>
-          )}
-        </div>
+            )}
+          </div>
 
         {/* Destination/Address - 작고 간단하게 */}
         {message.address && message.address !== "CONNECTED" && message.address !== "ERROR" && message.address !== "WARNING" && message.address !== "INFO" && (
@@ -876,28 +876,28 @@ function MessageBubble({
           </div>
         )}
 
-        {/* Body */}
-        <div className="relative">
-          {isJson && isJsonFormatted ? (
+          {/* Body */}
+          <div className="relative">
+            {isJson && isJsonFormatted ? (
             <div className="rounded-lg overflow-hidden bg-white/90 dark:bg-black/40 border border-gray-200 dark:border-[#2D333B]">
-              <JsonHighlighter
-                code={message.content}
-                isSent={isSent}
-                useMonospace={useMonospace}
-                softWrap={softWrap}
-              />
-            </div>
-          ) : (
-            <div
-              className={`${
+                <JsonHighlighter
+                  code={message.content}
+                  isSent={isSent}
+                  useMonospace={useMonospace}
+                  softWrap={softWrap}
+                />
+              </div>
+            ) : (
+              <div
+                className={`${
                 compactMode ? "text-xs" : "text-sm"
               } font-mono whitespace-pre-wrap break-words text-gray-900 dark:text-[#E6EDF3]`}
-            >
-              {message.content || (
+              >
+                {message.content || (
                 <span className="text-gray-500 dark:text-[#8B949E] italic">(empty)</span>
-              )}
-            </div>
-          )}
+                )}
+              </div>
+            )}
         </div>
       </div>
     </div>
