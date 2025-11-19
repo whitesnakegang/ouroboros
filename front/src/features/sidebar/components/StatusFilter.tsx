@@ -49,7 +49,7 @@ export function StatusFilter({
               </div>
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#8B949E] flex-shrink-0"></div>
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#b6bdca] flex-shrink-0"></div>
                   <span className="text-xs text-gray-600 dark:text-[#8B949E]">
                     Gray: Not Implemented
                   </span>
@@ -67,7 +67,7 @@ export function StatusFilter({
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#10B981] flex-shrink-0"></div>
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#25eb64] flex-shrink-0"></div>
                   <span className="text-xs text-gray-600 dark:text-[#8B949E]">
                     Green: Completed
                   </span>

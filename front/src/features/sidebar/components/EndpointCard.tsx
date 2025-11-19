@@ -21,13 +21,13 @@ const methodTextColors = {
 
 // Mock 상태 표시 색상 (육안으로 확실히 구분 가능한 색상)
 const mockStatusColors = {
-  "not-implemented": "bg-[#8B949E]", // 회색
+  "not-implemented": "bg-[#b6bdca]", // 회색 (어두운 화면에서도 구분 가능)
   "in-progress": "bg-[#EAB308]", // 노란색 (주의)
   modifying: "bg-[#F97316]", // 주황색 (주의)
 };
 
 // Completed 상태 표시 색상 (육안으로 확실히 구분 가능한 색상)
-const completedStatusColor = "bg-[#10B981]"; // 초록색
+const completedStatusColor = "bg-[#25eb64]"; // 초록색 (어두운 화면에서도 구분 가능)
 
 // WebSocket 상태별 색상 및 라벨 결정 함수
 const getWebSocketStatus = (tag?: string, progress?: string) => {
@@ -38,12 +38,12 @@ const getWebSocketStatus = (tag?: string, progress?: string) => {
   if (normalizedTag === "receive") {
     if (normalizedProgress === "none" || !normalizedProgress) {
       return {
-        color: "bg-[#8B949E]", // 회색
+        color: "bg-[#b6bdca]", // 회색
         label: "Not Implemented",
       };
     } else if (normalizedProgress === "receive") {
       return {
-        color: "bg-[#10B981]", // 초록색
+        color: "bg-[#25eb64]", // 초록색
         label: "Completed",
       };
     }
@@ -53,17 +53,20 @@ const getWebSocketStatus = (tag?: string, progress?: string) => {
   if (normalizedTag === "duplicate") {
     if (normalizedProgress === "none" || !normalizedProgress) {
       return {
-        color: "bg-[#8B949E]", // 회색
+        color: "bg-[#b6bdca]", // 회색
         label: "Not Implemented",
       };
     } else if (normalizedProgress === "receive") {
       return {
         color: "bg-[#F97316]", // 주황색
         label: "Receive Only Verified",
-};
-    } else if (normalizedProgress === "complete" || normalizedProgress === "completed") {
+      };
+    } else if (
+      normalizedProgress === "complete" ||
+      normalizedProgress === "completed"
+    ) {
       return {
-        color: "bg-[#10B981]", // 초록색
+        color: "bg-[#25eb64]", // 초록색
         label: "Completed",
       };
     }
@@ -71,7 +74,7 @@ const getWebSocketStatus = (tag?: string, progress?: string) => {
 
   // 기본값 (기타 경우)
   return {
-    color: "bg-[#8B949E]", // 회색
+    color: "bg-[#b6bdca]", // 회색
     label: "미구현",
   };
 };
@@ -101,29 +104,32 @@ export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
       const tooltipRect = tooltipRef.current.getBoundingClientRect();
       const viewportHeight = window.innerHeight;
       const viewportWidth = window.innerWidth;
-      
+
       // 위쪽에 공간이 충분한지 확인
       const spaceAbove = badgeRect.top;
       const spaceBelow = viewportHeight - badgeRect.bottom;
-      
+
       let top = badgeRect.top - tooltipRect.height - 8;
       let left = badgeRect.left;
-      
+
       // 위쪽 공간이 부족하면 아래쪽에 표시
-      if (spaceAbove < tooltipRect.height + 8 && spaceBelow > tooltipRect.height + 8) {
+      if (
+        spaceAbove < tooltipRect.height + 8 &&
+        spaceBelow > tooltipRect.height + 8
+      ) {
         top = badgeRect.bottom + 8;
       }
-      
+
       // 오른쪽 경계 체크
       if (left + tooltipRect.width > viewportWidth) {
         left = viewportWidth - tooltipRect.width - 16;
       }
-      
+
       // 왼쪽 경계 체크
       if (left < 16) {
         left = 16;
       }
-      
+
       setTooltipPosition({ top, left });
     }
   }, [showTooltip]);
@@ -139,41 +145,46 @@ export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
     >
       <div className="flex items-start gap-3">
         {/* REST: Mock 탭에서만 구현 상태 표시 점 */}
-        {!isWebSocket && filterType === "mock" && endpoint.implementationStatus && (
-          <div
-            className={`w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0 ${
-              mockStatusColors[endpoint.implementationStatus]
-            }`}
-            title={
-              endpoint.implementationStatus === "not-implemented"
-                ? "Not Implemented"
-                : endpoint.implementationStatus === "in-progress"
-                ? "In Progress"
-                : "Modifying"
-            }
-          />
-        )}
+        {!isWebSocket &&
+          filterType === "mock" &&
+          endpoint.implementationStatus && (
+            <div
+              className={`w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0 ${
+                mockStatusColors[endpoint.implementationStatus]
+              }`}
+              title={
+                endpoint.implementationStatus === "not-implemented"
+                  ? "Not Implemented"
+                  : endpoint.implementationStatus === "in-progress"
+                  ? "In Progress"
+                  : "Modifying"
+              }
+            />
+          )}
 
         {/* REST: All 탭에서 mock 상태의 tag와 completed 상태를 배지로 표시 */}
         {!isWebSocket && filterType === "all" && (
           <>
             {/* Mock 상태: tag 상태에 따른 배지 */}
-            {(endpoint as { progress?: string }).progress?.toLowerCase() !== "completed" && endpoint.implementationStatus && (
-              <div
-                className={`w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0 ${
-                  mockStatusColors[endpoint.implementationStatus]
-                }`}
-                title={
-                  endpoint.implementationStatus === "not-implemented"
-                    ? "미구현"
-                    : endpoint.implementationStatus === "in-progress"
-                    ? "구현중"
-                    : "수정중"
-                }
-              />
-            )}
+            {(endpoint as { progress?: string }).progress?.toLowerCase() !==
+              "completed" &&
+              endpoint.implementationStatus && (
+                <div
+                  className={`w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0 ${
+                    mockStatusColors[endpoint.implementationStatus]
+                  }`}
+                  title={
+                    endpoint.implementationStatus === "not-implemented"
+                      ? "미구현"
+                      : endpoint.implementationStatus === "in-progress"
+                      ? "구현중"
+                      : "수정중"
+                  }
+                />
+              )}
             {/* Completed 상태: 초록색 배지 */}
-            {(endpoint as { progress?: string }).progress?.toLowerCase() === "completed" && (
+            {(endpoint as { progress?: string }).progress?.toLowerCase() ===
+              "completed" && (
               <div
                 className={`w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0 ${completedStatusColor}`}
                 title="Completed"
@@ -183,9 +194,12 @@ export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
         )}
 
         {/* WebSocket: tag와 progress 조합에 따른 상태 표시 점 */}
-        {isWebSocket && (
+        {isWebSocket &&
           (() => {
-            const wsStatus = getWebSocketStatus(endpoint.tag, endpoint.progress);
+            const wsStatus = getWebSocketStatus(
+              endpoint.tag,
+              endpoint.progress
+            );
             return (
               <>
                 <div
@@ -211,7 +225,7 @@ export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
                       </div>
                       <div className="space-y-1.5">
                         <div className="flex items-center gap-2">
-                          <div className="w-1.5 h-1.5 rounded-full bg-[#8B949E] flex-shrink-0"></div>
+                          <div className="w-1.5 h-1.5 rounded-full bg-[#b6bdca] flex-shrink-0"></div>
                           <span className="text-xs text-gray-600 dark:text-[#8B949E]">
                             Gray: Not Implemented
                           </span>
@@ -223,7 +237,7 @@ export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <div className="w-1.5 h-1.5 rounded-full bg-[#10B981] flex-shrink-0"></div>
+                          <div className="w-1.5 h-1.5 rounded-full bg-[#25eb64] flex-shrink-0"></div>
                           <span className="text-xs text-gray-600 dark:text-[#8B949E]">
                             Green: Completed
                           </span>
@@ -236,8 +250,7 @@ export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
                 )}
               </>
             );
-          })()
-        )}
+          })()}
 
         <div className="flex-1 min-w-0">
           {/* Method 배지와 Path */}
@@ -250,10 +263,14 @@ export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
             <span className="text-sm text-gray-900 dark:text-[#E6EDF3] truncate font-mono flex-1 min-w-0">
               {endpoint.path}
             </span>
-            
+
             {/* Diff 주의 표시 아이콘 */}
-            {(endpoint.diff && endpoint.diff !== "none") || endpoint.hasSpecError ? (
-              <div className="flex-shrink-0 ml-1" title="Spec and implementation do not match">
+            {(endpoint.diff && endpoint.diff !== "none") ||
+            endpoint.hasSpecError ? (
+              <div
+                className="flex-shrink-0 ml-1"
+                title="Spec and implementation do not match"
+              >
                 <svg
                   className="w-3.5 h-3.5 text-amber-500"
                   fill="none"

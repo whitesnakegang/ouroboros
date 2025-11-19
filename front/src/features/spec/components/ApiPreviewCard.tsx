@@ -139,8 +139,8 @@ export function ApiPreviewCard({
             Export YAML
           </button>
           <button
-            onClick={() => {
-              const md = exportToMarkdown({
+            onClick={async () => {
+              const md = await exportToMarkdown({
                 method,
                 url,
                 description,

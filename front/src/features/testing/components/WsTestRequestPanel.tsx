@@ -5,7 +5,11 @@ import { StompClient, buildWebSocketUrl } from "../utils/stompClient";
 import {
   getWebSocketOperation,
   getWebSocketChannel,
+  getSchema,
 } from "@/features/spec/services/api";
+import type { SchemaField } from "@/features/spec/types/schema.types";
+import { parseOpenAPISchemaToSchemaField } from "@/features/spec/utils/schemaConverter";
+import { isPrimitiveSchema } from "@/features/spec/types/schema.types";
 
 interface Subscription {
   id: string;
@@ -29,21 +33,56 @@ export function WsTestRequestPanel() {
   const [entryPoint, setEntryPoint] = useState("");
   const [receiveAddress, setReceiveAddress] = useState("");
   const [replyAddress, setReplyAddress] = useState("");
+  const [operationAction, setOperationAction] = useState<string | null>(null);
   const [connectHeaders, setConnectHeaders] = useState<
     Array<{ key: string; value: string }>
   >([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [newTopic, setNewTopic] = useState("");
 
-  // 간단한 모드 상태
-  const [sender, setSender] = useState("tester");
-  const [content, setContent] = useState("");
-  const [messageType, setMessageType] = useState<"TALK" | "ENTER" | "LEAVE">(
-    "TALK"
+  // Schema 기반 메시지 입력 상태
+  const [messageSchemaFields, setMessageSchemaFields] = useState<SchemaField[]>(
+    []
   );
+  const [messageFormData, setMessageFormData] = useState<
+    Record<string, unknown>
+  >({});
   const [enableTryHeader, setEnableTryHeader] = useState(true);
 
   const stompClientRef = useRef<StompClient | null>(null);
+
+  // 패턴 파라미터 입력 상태 (예: {roomId: "room1"})
+  const [pathParameters, setPathParameters] = useState<Record<string, string>>(
+    {}
+  );
+
+  // 패턴 감지 함수
+  const hasPathParameter = (address: string): boolean => {
+    if (!address) return false;
+    return /\{[^}]+\}/.test(address);
+  };
+
+  // 패턴에서 파라미터 이름 추출
+  const extractPathParameters = (address: string): string[] => {
+    if (!address) return [];
+    const matches = address.match(/\{([^}]+)\}/g);
+    return matches ? matches.map((m) => m.slice(1, -1)) : [];
+  };
+
+  // 패턴을 실제 값으로 치환
+  const replacePathParameters = (
+    address: string,
+    params: Record<string, string>
+  ): string => {
+    if (!address) return address;
+    let result = address;
+    Object.entries(params).forEach(([key, value]) => {
+      if (value) {
+        result = result.replace(`{${key}}`, value);
+      }
+    });
+    return result;
+  };
 
   // 주소에서 도메인 추출 (첫 번째 경로 세그먼트)
   const extractDomainFromAddress = (address: string): string => {
@@ -133,6 +172,18 @@ export function WsTestRequestPanel() {
 
   // 엔드포인트 선택 시 Entry Point 및 Receive/Reply Address 로드
   useEffect(() => {
+    // selectedEndpoint가 변경되면 기존 연결 끊기
+    if (wsConnectionStatus === "connected" && stompClientRef.current) {
+      const client = stompClientRef.current;
+      client.disconnect(() => {
+        setWsConnectionStatus("disconnected");
+        setWsConnectionStartTime(null);
+        updateWsStats({ connectionDuration: null });
+        setSubscriptions([]);
+        stompClientRef.current = null;
+      });
+    }
+
     const loadWebSocketInfo = async () => {
       if (selectedEndpoint && selectedEndpoint.protocol === "WebSocket") {
         // WebSocket 엔드포인트의 entrypoint는 entrypoint 필드에 저장되어 있음
@@ -148,8 +199,34 @@ export function WsTestRequestPanel() {
           const operationResponse = await getWebSocketOperation(operationId);
           const operation = operationResponse.data.operation;
 
+          // Operation action 저장 (입력창 표시 제어용)
+          // progress가 "completed"이고 action이 "receive"인 경우 "duplex"로 처리
+          const normalizedProgress = selectedEndpoint?.progress?.toLowerCase();
+          const isProgressCompleted =
+            normalizedProgress === "completed" ||
+            normalizedProgress === "complete";
+
+          let normalizedAction = operation.action
+            ? String(operation.action).toLowerCase()
+            : null;
+
+          // progress가 "completed"이고 action이 "receive"인 경우 "duplex"로 처리
+          if (isProgressCompleted && normalizedAction === "receive") {
+            normalizedAction = "duplex";
+          }
+
+          setOperationAction(normalizedAction);
+          console.log("Operation Action 설정:", {
+            original: operation.action,
+            normalized: normalizedAction,
+            progress: selectedEndpoint?.progress,
+            isProgressCompleted,
+          });
+
           // Receive address 추출
           let receiveAddr = "";
+
+          // 1. operation.action === "receive"인 경우 channel에서 추출
           if (operation.action === "receive" && operation.channel) {
             const channelRef = operation.channel.ref || "";
             const channelName = channelRef.replace("#/channels/", "");
@@ -162,11 +239,37 @@ export function WsTestRequestPanel() {
             } catch {
               receiveAddr = channelName;
             }
+          } else if (
+            operation.action === "send" ||
+            String(operation.action) === "sendto"
+          ) {
+            // 2. SEND/SENDTO 타입의 경우, receive address는 tags[1]이나 path에서 추출
+            // tags[1]에 receiver address가 저장되어 있음
+            if (selectedEndpoint.tags?.[1]) {
+              receiveAddr = selectedEndpoint.tags[1];
+            } else if (selectedEndpoint.path) {
+              const pathParts = selectedEndpoint.path.split(" - ");
+              if (pathParts.length > 0) {
+                receiveAddr = pathParts[0] || "";
+              }
+            }
+          } else {
+            // 3. 기타 경우: tags[1] 또는 path에서 추출 시도
+            if (selectedEndpoint.tags?.[1]) {
+              receiveAddr = selectedEndpoint.tags[1];
+            } else if (selectedEndpoint.path) {
+              const pathParts = selectedEndpoint.path.split(" - ");
+              if (pathParts.length > 0) {
+                receiveAddr = pathParts[0] || "";
+              }
+            }
           }
           setReceiveAddress(receiveAddr);
 
           // Reply address 추출
           let replyAddr = "";
+
+          // 1. operation.reply에서 추출 (최우선)
           if (operation.reply && operation.reply.channel) {
             const replyChannelRef = operation.reply.channel.ref || "";
             const replyChannelName = replyChannelRef.replace("#/channels/", "");
@@ -180,8 +283,10 @@ export function WsTestRequestPanel() {
             } catch {
               replyAddr = replyChannelName;
             }
-          } else if (operation.action === "send" && operation.channel) {
-            // SEND 타입의 경우 channel을 reply로 사용
+          }
+
+          // 2. operation.action === "send"인 경우 channel을 reply로 사용
+          if (!replyAddr && operation.action === "send" && operation.channel) {
             const channelRef = operation.channel.ref || "";
             const channelName = channelRef.replace("#/channels/", "");
 
@@ -192,28 +297,180 @@ export function WsTestRequestPanel() {
               replyAddr = channelName;
             }
           }
-          setReplyAddress(replyAddr);
-        } catch (error) {
-          console.error("WebSocket operation 정보 로드 실패:", error);
-          // 실패 시 path에서 파싱 시도
-          if (selectedEndpoint.path) {
+
+          // 3. path에서 reply address 추출 시도 ("receive - reply" 형태)
+          // operation.action이 "receive"인 경우에도 path에서 추출 가능
+          if (!replyAddr && selectedEndpoint.path) {
             const pathParts = selectedEndpoint.path.split(" - ");
-            if (pathParts.length > 0) {
-              setReceiveAddress(pathParts[0] || "");
-            }
             if (pathParts.length > 1) {
-              setReplyAddress(pathParts[1] || "");
+              replyAddr = pathParts[1] || "";
             }
           }
+
+          // receive 액션만 있는 경우 Reply Address는 필요 없음
+          // 디버깅: Reply Address 추출 결과 확인 (reply가 있는 경우만)
+          if (operation.action !== "receive" || replyAddr) {
+            console.log("Reply Address 추출:", {
+              operationAction: operation.action,
+              hasOperationReply: !!(operation.reply && operation.reply.channel),
+              path: selectedEndpoint.path,
+              extractedReplyAddr: replyAddr,
+            });
+          }
+
+          setReplyAddress(replyAddr);
+
+          // Receive operation의 messages에서 schema 로드
+          if (operation.messages && operation.messages.length > 0) {
+            const firstMessage = operation.messages[0];
+            let schemaRef: string | null = null;
+
+            // ref 형태인 경우
+            if (firstMessage.ref) {
+              const refValue = firstMessage.ref;
+              schemaRef = refValue.includes("#/components/schemas/")
+                ? refValue.replace("#/components/schemas/", "")
+                : refValue;
+            }
+
+            // Schema 로드 및 필드 생성
+            if (schemaRef) {
+              try {
+                const schemaResponse = await getSchema(schemaRef);
+                const schemaData = schemaResponse.data;
+
+                if (schemaData.properties) {
+                  const fields = Object.entries(schemaData.properties).map(
+                    ([key, propSchema]: [string, unknown]) => {
+                      return parseOpenAPISchemaToSchemaField(
+                        key,
+                        propSchema as Record<string, unknown>
+                      );
+                    }
+                  );
+
+                  // required 필드 설정
+                  if (
+                    schemaData.required &&
+                    Array.isArray(schemaData.required)
+                  ) {
+                    fields.forEach((field) => {
+                      if (schemaData.required!.includes(field.key)) {
+                        field.required = true;
+                      }
+                    });
+                  }
+
+                  setMessageSchemaFields(fields);
+
+                  // 기본값으로 formData 초기화
+                  const defaultFormData: Record<string, unknown> = {};
+                  fields.forEach((field) => {
+                    // 기본값 생성 로직 (간단한 버전)
+                    if (isPrimitiveSchema(field.schemaType)) {
+                      switch (field.schemaType.type) {
+                        case "string":
+                          defaultFormData[field.key] = "";
+                          break;
+                        case "integer":
+                        case "number":
+                          defaultFormData[field.key] = 0;
+                          break;
+                        case "boolean":
+                          defaultFormData[field.key] = false;
+                          break;
+                        default:
+                          defaultFormData[field.key] = "";
+                      }
+                    } else {
+                      defaultFormData[field.key] = "";
+                    }
+                  });
+                  setMessageFormData(defaultFormData);
+                } else {
+                  setMessageSchemaFields([]);
+                  setMessageFormData({});
+                }
+              } catch (error) {
+                console.error("Schema 로드 실패:", error);
+                setMessageSchemaFields([]);
+                setMessageFormData({});
+              }
+            } else {
+              setMessageSchemaFields([]);
+              setMessageFormData({});
+            }
+          } else {
+            setMessageSchemaFields([]);
+            setMessageFormData({});
+          }
+
+          // 패턴 파라미터 초기화 (operation 로드 성공 시)
+          const allParams = new Set<string>();
+          if (receiveAddr) {
+            extractPathParameters(receiveAddr).forEach((p) => allParams.add(p));
+          }
+          if (replyAddr) {
+            extractPathParameters(replyAddr).forEach((p) => allParams.add(p));
+          }
+
+          const newPathParameters: Record<string, string> = {};
+          allParams.forEach((param) => {
+            newPathParameters[param] = "";
+          });
+          setPathParameters(newPathParameters);
+        } catch (error) {
+          console.error("WebSocket operation 정보 로드 실패:", error);
+          // 실패 시 tags나 path에서 파싱 시도
+          let receiveAddr = "";
+          let replyAddr = "";
+
+          // tags[1]에서 receive address 추출
+          if (selectedEndpoint.tags?.[1]) {
+            receiveAddr = selectedEndpoint.tags[1];
+          }
+
+          // path에서 추출 ("receive - reply" 형태)
+          if (selectedEndpoint.path) {
+            const pathParts = selectedEndpoint.path.split(" - ");
+            if (pathParts.length > 0 && !receiveAddr) {
+              receiveAddr = pathParts[0] || "";
+            }
+            if (pathParts.length > 1) {
+              replyAddr = pathParts[1] || "";
+            }
+          }
+
+          setReceiveAddress(receiveAddr);
+          setReplyAddress(replyAddr);
+          setOperationAction(null);
+
+          // 패턴 파라미터 초기화 (에러 발생 시)
+          const allParams = new Set<string>();
+          if (receiveAddr) {
+            extractPathParameters(receiveAddr).forEach((p) => allParams.add(p));
+          }
+          if (replyAddr) {
+            extractPathParameters(replyAddr).forEach((p) => allParams.add(p));
+          }
+
+          const newPathParameters: Record<string, string> = {};
+          allParams.forEach((param) => {
+            newPathParameters[param] = "";
+          });
+          setPathParameters(newPathParameters);
         }
       } else {
         setEntryPoint("");
         setReceiveAddress("");
         setReplyAddress("");
+        setOperationAction(null);
+        setPathParameters({});
       }
     };
 
     loadWebSocketInfo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEndpoint]);
 
   // 연결 상태에 따른 통계 업데이트
@@ -287,9 +544,71 @@ export function WsTestRequestPanel() {
           };
           addWsMessage(message);
 
-          // Receive address가 있으면 자동으로 구독
-          if (receiveAddress && receiveAddress.trim() !== "") {
-            handleSubscribe(receiveAddress);
+          // Subscribe는 replyAddress로 구독 (서버가 클라이언트에게 메시지를 보낼 주소)
+          // replyAddress가 /topic/ 또는 /queue/로 시작하는 경우에만 구독
+          if (replyAddress && replyAddress.trim() !== "") {
+            if (
+              replyAddress.startsWith("/topic/") ||
+              replyAddress.startsWith("/queue/")
+            ) {
+              // replyAddress로 구독 (패턴 치환 필요)
+              let actualSubscribeAddress = replyAddress;
+              if (hasPathParameter(replyAddress)) {
+                actualSubscribeAddress = replacePathParameters(
+                  replyAddress,
+                  pathParameters
+                );
+                if (hasPathParameter(actualSubscribeAddress)) {
+                  const missingParams = extractPathParameters(
+                    actualSubscribeAddress
+                  );
+                  addWsMessage({
+                    id: `msg-${Date.now()}-${Math.random()}`,
+                    timestamp: Date.now(),
+                    direction: "received" as const,
+                    address: "WARNING",
+                    content: JSON.stringify({
+                      message: `구독 주소에 패턴이 포함되어 있습니다. Path Parameters를 입력해주세요: ${missingParams.join(
+                        ", "
+                      )}`,
+                      replyAddress,
+                      missingParameters: missingParams,
+                    }),
+                  });
+                } else {
+                  handleSubscribe(actualSubscribeAddress);
+                }
+              } else {
+                handleSubscribe(actualSubscribeAddress);
+              }
+            } else {
+              addWsMessage({
+                id: `msg-${Date.now()}-${Math.random()}`,
+                timestamp: Date.now(),
+                direction: "received" as const,
+                address: "INFO",
+                content: JSON.stringify({
+                  message:
+                    "Reply Address가 /topic/ 또는 /queue/로 시작하지 않습니다. 구독할 수 없습니다.",
+                  replyAddress,
+                }),
+              });
+            }
+          } else {
+            // replyAddress가 없으면 구독하지 않음
+            if (receiveAddress && receiveAddress.trim() !== "") {
+              addWsMessage({
+                id: `msg-${Date.now()}-${Math.random()}`,
+                timestamp: Date.now(),
+                direction: "received" as const,
+                address: "INFO",
+                content: JSON.stringify({
+                  message:
+                    "Reply Address가 없습니다. 서버가 메시지를 보낼 주소(/topic/ 또는 /queue/)가 필요합니다.",
+                  receiveAddress,
+                }),
+              });
+            }
           }
 
           // Try 알림 구독 (백엔드: /user/queue/ouro/try)
@@ -449,11 +768,15 @@ export function WsTestRequestPanel() {
             setTryId(tryIdHeader);
           }
 
+          // 수신된 MESSAGE의 address는 frame.headers.destination을 사용 (서버가 보낸 실제 destination)
+          // 이것은 replyAddress와 일치해야 함 (receiveAddress가 아님)
+          const messageAddress = frame.headers.destination || destination;
+
           const message = {
             id: `msg-${Date.now()}-${Math.random()}`,
             timestamp: Date.now(),
             direction: "received" as const,
-            address: frame.headers.destination || destination,
+            address: messageAddress,
             content: frame.body,
             tryId: tryIdHeader || undefined,
           };
@@ -558,32 +881,84 @@ export function WsTestRequestPanel() {
       return;
     }
 
-    // Reply address가 있으면 reply address로, 없으면 receive address로 전송
-    const destination =
-      replyAddress && replyAddress.trim() !== ""
-        ? replyAddress
-        : receiveAddress && receiveAddress.trim() !== ""
-        ? receiveAddress
-        : "";
+    // Send는 receiveAddress로 전송 (클라이언트→서버)
+    // receiveAddress가 없으면 replyAddress로 전송 시도
+    let destination = "";
+
+    if (receiveAddress && receiveAddress.trim() !== "") {
+      destination = receiveAddress;
+    } else if (replyAddress && replyAddress.trim() !== "") {
+      destination = replyAddress;
+    }
 
     if (!destination) {
-      alert("Please set Receive Address or Reply Address.");
+      alert(
+        "메시지를 전송할 수 없습니다.\n\nReply Address 또는 Receive Address를 설정해주세요."
+      );
       return;
     }
 
-    if (!content || content.trim() === "") {
-      alert("Please enter a message.");
-      return;
+    // 패턴이 포함되어 있으면 실제 값으로 치환
+    const actualDestination = hasPathParameter(destination)
+      ? replacePathParameters(destination, pathParameters)
+      : destination;
+
+    // 패턴이 치환되지 않았으면 경고
+    if (hasPathParameter(actualDestination)) {
+      const params = extractPathParameters(actualDestination);
+      const missingParams = params.filter((p) => !pathParameters[p]);
+      if (missingParams.length > 0) {
+        alert(
+          `메시지를 전송할 수 없습니다.\n\n` +
+            `주소에 패턴이 포함되어 있습니다: ${actualDestination}\n\n` +
+            `다음 파라미터를 입력해주세요: ${missingParams.join(", ")}`
+        );
+        return;
+      }
+    }
+
+    // 실제 destination 사용
+    destination = actualDestination;
+
+    // 디버깅: 실제 전송되는 destination 확인
+    console.log("WebSocket 메시지 전송:", {
+      destination,
+      replyAddress,
+      receiveAddress,
+      useReplyAddress: replyAddress && replyAddress.trim() !== "",
+    });
+
+    // Schema 기반 메시지 생성
+    let messageBody: string;
+    if (messageSchemaFields.length > 0) {
+      // Schema 필드가 있으면 formData를 JSON으로 변환
+      const messageData: Record<string, unknown> = {};
+      messageSchemaFields.forEach((field) => {
+        const value = messageFormData[field.key];
+        // undefined나 빈 문자열이 아닌 경우만 포함
+        if (value !== undefined && value !== "") {
+          messageData[field.key] = value;
+        }
+      });
+      messageBody = JSON.stringify(messageData);
+    } else {
+      // Schema 필드가 없으면 기본 형식 사용 (하위 호환성)
+      if (
+        !messageFormData.content ||
+        String(messageFormData.content).trim() === ""
+      ) {
+        alert("Please enter a message.");
+        return;
+      }
+      messageBody = JSON.stringify({
+        sender: messageFormData.sender || "tester",
+        content: messageFormData.content,
+        type: messageFormData.type || "TALK",
+        sentAt: new Date().toISOString(),
+      });
     }
 
     try {
-      const messageBody = JSON.stringify({
-        sender: sender || "tester",
-        content: content,
-        type: messageType,
-        sentAt: new Date().toISOString(),
-      });
-
       const headers: Record<string, string> = {
         "content-type": "application/json",
       };
@@ -608,8 +983,31 @@ export function WsTestRequestPanel() {
         totalSent: (prev?.totalSent || 0) + 1,
       }));
 
-      // Content 초기화
-      setContent("");
+      // FormData 초기화 (기본값으로)
+      if (messageSchemaFields.length > 0) {
+        const defaultFormData: Record<string, unknown> = {};
+        messageSchemaFields.forEach((field) => {
+          if (isPrimitiveSchema(field.schemaType)) {
+            switch (field.schemaType.type) {
+              case "string":
+                defaultFormData[field.key] = "";
+                break;
+              case "integer":
+              case "number":
+                defaultFormData[field.key] = 0;
+                break;
+              case "boolean":
+                defaultFormData[field.key] = false;
+                break;
+              default:
+                defaultFormData[field.key] = "";
+            }
+          } else {
+            defaultFormData[field.key] = "";
+          }
+        });
+        setMessageFormData(defaultFormData);
+      }
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
@@ -698,35 +1096,199 @@ export function WsTestRequestPanel() {
             />
           </div>
 
-          {/* Receive Address */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-              Receive Address
-            </label>
-            <input
-              type="text"
-              value={receiveAddress}
-              onChange={(e) => setReceiveAddress(e.target.value)}
-              placeholder="/topic/chat/room1"
-              disabled={wsConnectionStatus === "connected"}
-              className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-            />
-          </div>
+          {/* Receive Address - duplex 또는 receive일 때만 표시 */}
+          {(operationAction === "duplex" || operationAction === "receive") && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
+                Receive Address
+              </label>
+              <input
+                type="text"
+                value={receiveAddress}
+                onChange={(e) => {
+                  setReceiveAddress(e.target.value);
+                  // 패턴 파라미터 업데이트
+                  const params = extractPathParameters(e.target.value);
+                  const newParams = { ...pathParameters };
+                  params.forEach((p) => {
+                    if (!newParams[p]) {
+                      newParams[p] = "";
+                    }
+                  });
+                  setPathParameters(newParams);
+                }}
+                placeholder="/topic/chat/room1"
+                disabled={wsConnectionStatus === "connected"}
+                className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+              {hasPathParameter(receiveAddress) && (
+                <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                  패턴이 포함된 주소입니다. 아래 파라미터를 입력해주세요.
+                </p>
+              )}
+            </div>
+          )}
 
-          {/* Reply Address */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-              Reply Address
-            </label>
-            <input
-              type="text"
-              value={replyAddress}
-              onChange={(e) => setReplyAddress(e.target.value)}
-              placeholder="/app/chat/room1"
-              disabled={wsConnectionStatus === "connected"}
-              className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-            />
-          </div>
+          {/* Reply Address - duplex 또는 send/sendto일 때만 표시 */}
+          {(operationAction === "duplex" ||
+            operationAction === "send" ||
+            operationAction === "sendto") && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
+                Reply Address
+              </label>
+              <input
+                type="text"
+                value={replyAddress}
+                onChange={(e) => {
+                  setReplyAddress(e.target.value);
+                  // 패턴 파라미터 업데이트
+                  const params = extractPathParameters(e.target.value);
+                  const newParams = { ...pathParameters };
+                  params.forEach((p) => {
+                    if (!newParams[p]) {
+                      newParams[p] = "";
+                    }
+                  });
+                  setPathParameters(newParams);
+                }}
+                placeholder="/app/chat/room1"
+                disabled={wsConnectionStatus === "connected"}
+                className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+              {hasPathParameter(replyAddress) && (
+                <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                  패턴이 포함된 주소입니다. 아래 파라미터를 입력해주세요.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Path Parameters 입력 필드 - 패턴이 있을 때만 표시 */}
+          {(() => {
+            const allParams = new Set<string>();
+            if (receiveAddress) {
+              extractPathParameters(receiveAddress).forEach((p) =>
+                allParams.add(p)
+              );
+            }
+            if (replyAddress) {
+              extractPathParameters(replyAddress).forEach((p) =>
+                allParams.add(p)
+              );
+            }
+            const paramArray = Array.from(allParams);
+
+            if (paramArray.length === 0) return null;
+
+            return (
+              <div className="border border-amber-200 dark:border-amber-800 rounded-md p-3 bg-amber-50 dark:bg-amber-900/20">
+                <label className="block text-xs font-medium text-amber-800 dark:text-amber-300 mb-2">
+                  Path Parameters
+                </label>
+                <p className="text-xs text-amber-700 dark:text-amber-400 mb-3">
+                  주소에 패턴이 포함되어 있습니다. 실제 값을 입력해주세요.
+                </p>
+                <div className="space-y-2">
+                  {paramArray.map((param) => (
+                    <div key={param}>
+                      <label className="block text-xs font-medium text-amber-800 dark:text-amber-300 mb-1">
+                        {param}
+                      </label>
+                      <input
+                        type="text"
+                        value={pathParameters[param] || ""}
+                        onChange={(e) => {
+                          const newParams = {
+                            ...pathParameters,
+                            [param]: e.target.value,
+                          };
+                          setPathParameters(newParams);
+
+                          // 연결된 상태이고 receiveAddress에 패턴이 있으면 재구독
+                          if (
+                            wsConnectionStatus === "connected" &&
+                            receiveAddress &&
+                            hasPathParameter(receiveAddress)
+                          ) {
+                            const actualReceiveAddress = replacePathParameters(
+                              receiveAddress,
+                              newParams
+                            );
+
+                            // 모든 파라미터가 입력되었는지 확인
+                            const allParams =
+                              extractPathParameters(receiveAddress);
+                            const allParamsFilled = allParams.every(
+                              (p) => newParams[p] && newParams[p].trim() !== ""
+                            );
+
+                            if (
+                              allParamsFilled &&
+                              !hasPathParameter(actualReceiveAddress) &&
+                              actualReceiveAddress
+                            ) {
+                              // 기존 구독 해제 - receiveAddress 패턴과 관련된 모든 구독 찾기
+                              const existingSubs = subscriptions.filter(
+                                (s) =>
+                                  s.subscriptionId !== null &&
+                                  (s.destination === receiveAddress ||
+                                    (hasPathParameter(receiveAddress) &&
+                                      s.destination.startsWith(
+                                        receiveAddress.split("{")[0]
+                                      )) ||
+                                    // 이미 치환된 주소로 구독된 경우도 찾기
+                                    s.destination === actualReceiveAddress)
+                              );
+
+                              // 모든 관련 구독 해제
+                              existingSubs.forEach((sub) => {
+                                if (sub.subscriptionId) {
+                                  handleUnsubscribe(sub);
+                                }
+                              });
+
+                              // 잠시 후 재구독 (구독 해제 완료 대기)
+                              setTimeout(() => {
+                                handleSubscribe(actualReceiveAddress);
+                              }, 200);
+                            }
+                          }
+                        }}
+                        placeholder={`${param} 값 입력 (예: room1)`}
+                        className="w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-amber-300 dark:border-amber-700 text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-amber-400 dark:focus:ring-amber-500 focus:border-amber-400 dark:focus:border-amber-500 text-sm"
+                      />
+                      {/* 치환된 주소 미리보기 */}
+                      {pathParameters[param] && (
+                        <p className="mt-1 text-xs text-amber-600 dark:text-amber-400 font-mono">
+                          {receiveAddress &&
+                            hasPathParameter(receiveAddress) && (
+                              <span>
+                                Receive:{" "}
+                                {replacePathParameters(receiveAddress, {
+                                  ...pathParameters,
+                                  [param]: pathParameters[param],
+                                })}
+                                <br />
+                              </span>
+                            )}
+                          {replyAddress && hasPathParameter(replyAddress) && (
+                            <span>
+                              Reply:{" "}
+                              {replacePathParameters(replyAddress, {
+                                ...pathParameters,
+                                [param]: pathParameters[param],
+                              })}
+                            </span>
+                          )}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           <div className="flex gap-2">
             {wsConnectionStatus === "disconnected" ? (
@@ -819,60 +1381,182 @@ export function WsTestRequestPanel() {
       </div>
 
       {/* Main Content - Connected State */}
-      {wsConnectionStatus === "connected" && (
+      {wsConnectionStatus === "connected" && operationAction !== "reply" && (
         <div className="border-t border-gray-200 dark:border-[#2D333B] p-4">
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
-              메시지 전송
+              Send Message
             </h3>
 
-            <div>
-              <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                Sender
-              </label>
-              <input
-                type="text"
-                value={sender}
-                onChange={(e) => setSender(e.target.value)}
-                placeholder="tester"
-                className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
-              />
-            </div>
+            {/* Schema 기반 입력 필드 */}
+            {messageSchemaFields.length > 0 ? (
+              <div className="space-y-4">
+                {messageSchemaFields.map((field) => {
+                  const value = messageFormData[field.key] ?? "";
+                  let isBoolean = false;
+                  let isNumber = false;
+                  let primitiveType:
+                    | "string"
+                    | "integer"
+                    | "number"
+                    | "boolean"
+                    | "file"
+                    | null = null;
 
-            <div>
-              <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                Content
-              </label>
-              <input
-                type="text"
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="Message"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    handleSimpleSend();
+                  if (isPrimitiveSchema(field.schemaType)) {
+                    primitiveType = field.schemaType.type;
+                    isBoolean = field.schemaType.type === "boolean";
+                    isNumber =
+                      field.schemaType.type === "integer" ||
+                      field.schemaType.type === "number";
                   }
-                }}
-                className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
-              />
-            </div>
 
-            <div>
-              <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                Type
-              </label>
-              <select
-                value={messageType}
-                onChange={(e) =>
-                  setMessageType(e.target.value as "TALK" | "ENTER" | "LEAVE")
-                }
-                className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
-              >
-                <option value="TALK">TALK</option>
-                <option value="ENTER">ENTER</option>
-                <option value="LEAVE">LEAVE</option>
-              </select>
-            </div>
+                  return (
+                    <div key={field.key}>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
+                        {field.key}
+                        {field.required && (
+                          <span className="text-red-500 ml-1">*</span>
+                        )}
+                        {field.description && (
+                          <span className="text-xs text-gray-500 dark:text-[#8B949E] ml-2">
+                            ({field.description})
+                          </span>
+                        )}
+                      </label>
+                      {isBoolean ? (
+                        <select
+                          value={String(value)}
+                          onChange={(e) => {
+                            setMessageFormData({
+                              ...messageFormData,
+                              [field.key]: e.target.value === "true",
+                            });
+                          }}
+                          className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                        >
+                          <option value="false">false</option>
+                          <option value="true">true</option>
+                        </select>
+                      ) : isNumber && primitiveType ? (
+                        <input
+                          type="number"
+                          value={typeof value === "number" ? value : ""}
+                          onChange={(e) => {
+                            const numValue =
+                              primitiveType === "integer"
+                                ? parseInt(e.target.value) || 0
+                                : parseFloat(e.target.value) || 0;
+                            setMessageFormData({
+                              ...messageFormData,
+                              [field.key]: numValue,
+                            });
+                          }}
+                          placeholder={
+                            primitiveType === "integer" ? "0" : "0.0"
+                          }
+                          className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          value={String(value)}
+                          onChange={(e) => {
+                            setMessageFormData({
+                              ...messageFormData,
+                              [field.key]: e.target.value,
+                            });
+                          }}
+                          placeholder={field.key}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              handleSimpleSend();
+                            }
+                          }}
+                          className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              // Schema 필드가 없을 때 기본 입력 필드 (하위 호환성)
+              <>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
+                    Sender
+                  </label>
+                  <input
+                    type="text"
+                    value={
+                      typeof messageFormData.sender === "string"
+                        ? messageFormData.sender
+                        : ""
+                    }
+                    onChange={(e) => {
+                      setMessageFormData({
+                        ...messageFormData,
+                        sender: e.target.value,
+                      });
+                    }}
+                    placeholder="tester"
+                    className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
+                    Content
+                  </label>
+                  <input
+                    type="text"
+                    value={
+                      typeof messageFormData.content === "string"
+                        ? messageFormData.content
+                        : ""
+                    }
+                    onChange={(e) => {
+                      setMessageFormData({
+                        ...messageFormData,
+                        content: e.target.value,
+                      });
+                    }}
+                    placeholder="Message"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        handleSimpleSend();
+                      }
+                    }}
+                    className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
+                    Type
+                  </label>
+                  <select
+                    value={
+                      typeof messageFormData.type === "string"
+                        ? messageFormData.type
+                        : "TALK"
+                    }
+                    onChange={(e) => {
+                      setMessageFormData({
+                        ...messageFormData,
+                        type: e.target.value,
+                      });
+                    }}
+                    className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                  >
+                    <option value="TALK">TALK</option>
+                    <option value="ENTER">ENTER</option>
+                    <option value="LEAVE">LEAVE</option>
+                  </select>
+                </div>
+              </>
+            )}
 
             <div className="flex items-center gap-2">
               <input

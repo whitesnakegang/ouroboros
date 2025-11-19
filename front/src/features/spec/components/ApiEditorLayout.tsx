@@ -2216,7 +2216,7 @@ export function ApiEditorLayout() {
         setIsMdPreviewOpen(true);
       } else {
         const yaml = await exportYaml();
-        const md = convertYamlToMarkdown(yaml);
+        const md = await convertYamlToMarkdown(yaml);
         setMdPreviewContent(md);
         setMdPreviewFilename("API_DOCUMENTATION.md");
         setIsMdPreviewOpen(true);
@@ -2302,7 +2302,8 @@ export function ApiEditorLayout() {
             setAlertModal({
               isOpen: true,
               title: "Success",
-              message: "The actual implementation has been successfully reflected in the spec.",
+              message:
+                "The actual implementation has been successfully reflected in the spec.",
               variant: "success",
             });
           } else {
@@ -2333,7 +2334,8 @@ export function ApiEditorLayout() {
             setAlertModal({
               isOpen: true,
               title: "Success",
-              message: "The actual implementation has been successfully reflected in the spec.",
+              message:
+                "The actual implementation has been successfully reflected in the spec.",
               variant: "success",
             });
           }
@@ -2407,7 +2409,9 @@ export function ApiEditorLayout() {
                 const channelRef = updatedOperation.channel.ref || "";
                 const channelName = channelRef.replace("#/channels/", "");
                 try {
-                  const channelResponse = await getWebSocketChannel(channelName);
+                  const channelResponse = await getWebSocketChannel(
+                    channelName
+                  );
                   const actualAddress =
                     channelResponse.data.channel?.address || channelName;
                   domainName = extractDomain(actualAddress);
@@ -2435,7 +2439,8 @@ export function ApiEditorLayout() {
               setSelectedEndpoint({
                 ...selectedEndpoint,
                 diff: updatedOperation.diff || "none",
-                progress: updatedOperation.progress || selectedEndpoint.progress,
+                progress:
+                  updatedOperation.progress || selectedEndpoint.progress,
               });
             }
 
@@ -2465,7 +2470,9 @@ export function ApiEditorLayout() {
               messages:
                 operation.messages
                   ?.map((m) =>
-                    typeof m === "string" ? m : m.ref?.replace("#/messages/", "")
+                    typeof m === "string"
+                      ? m
+                      : m.ref?.replace("#/messages/", "")
                   )
                   .filter(Boolean) || [],
             };
@@ -2479,7 +2486,9 @@ export function ApiEditorLayout() {
               messages:
                 operation.reply.messages
                   ?.map((m) =>
-                    typeof m === "string" ? m : m.ref?.replace("#/messages/", "")
+                    typeof m === "string"
+                      ? m
+                      : m.ref?.replace("#/messages/", "")
                   )
                   .filter(Boolean) || [],
             };
