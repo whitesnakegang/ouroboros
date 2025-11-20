@@ -13,6 +13,7 @@ import { AlertModal } from "@/ui/AlertModal";
 import type { RequestBody } from "../types/schema.types";
 import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
 import { useTestingStore } from "@/features/testing/store/testing.store";
+import { useTranslation } from "react-i18next";
 import axios from "axios";
 import { downloadYaml } from "../utils/yamlExporter";
 import {
@@ -74,6 +75,7 @@ interface StatusCode {
 }
 
 export function ApiEditorLayout() {
+  const { t } = useTranslation();
   const {
     selectedEndpoint,
     deleteEndpoint,
@@ -2730,7 +2732,7 @@ export function ApiEditorLayout() {
                   : "text-gray-500 dark:text-[#8B949E] hover:text-gray-900 dark:hover:text-[#E6EDF3]"
               }`}
             >
-              <span className="relative z-10">API Spec</span>
+              <span className="relative z-10">{t("editor.apiSpec")}</span>
               {activeTab === "form" && (
                 <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#2563EB] dark:bg-[#58A6FF] rounded-t-full" />
               )}
@@ -2750,7 +2752,7 @@ export function ApiEditorLayout() {
                   : "text-gray-500 dark:text-[#8B949E] hover:text-gray-900 dark:hover:text-[#E6EDF3]"
               } ${!selectedEndpoint ? "opacity-50 cursor-not-allowed" : ""}`}
             >
-              <span className="relative z-10">API Test</span>
+              <span className="relative z-10">{t("editor.apiTest")}</span>
               {activeTab === "test" && (
                 <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#2563EB] dark:bg-[#58A6FF] rounded-t-full" />
               )}
@@ -2891,14 +2893,14 @@ export function ApiEditorLayout() {
                   onClick={handleImportYAML}
                   className="px-4 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-lg bg-transparent transition-colors text-sm font-medium focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0"
                 >
-                  Import
+                  {t("editor.import")}
                 </button>
                 <div className="relative" ref={exportDropdownRef}>
                   <button
                     onClick={() => setIsExportModalOpen(!isExportModalOpen)}
                     className="px-4 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-lg bg-transparent transition-colors text-sm font-medium focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0"
                   >
-                    Export
+                    {t("editor.export")}
                   </button>
                   {isExportModalOpen && (
                     <div className="absolute top-full right-0 mt-1 w-40 bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#30363D] shadow-lg z-50 overflow-hidden">
@@ -3121,10 +3123,10 @@ export function ApiEditorLayout() {
                     </svg>
                   </div>
                   <h3 className="text-xl font-semibold text-gray-900 dark:text-[#E6EDF3] mb-2">
-                    Select Protocol
+                    {t("editor.selectProtocol")}
                   </h3>
                   <p className="text-gray-600 dark:text-[#8B949E]">
-                    Select Protocol in Sidebar and click Add button.
+                    {t("editor.selectProtocolDescription")}
                   </p>
                 </div>
               </div>
@@ -3283,14 +3285,14 @@ export function ApiEditorLayout() {
                           d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
                         />
                       </svg>
-                      <span>Method & URL</span>
+                      <span>{t("apiCard.methodAndUrl")}</span>
                     </div>
                     {/* Code Snippet 버튼 - 생성 완료된 명세서에서만 활성화 (수정 중일 때는 숨김) */}
                     {selectedEndpoint && !isEditMode && (
                       <button
                         onClick={() => setIsCodeSnippetOpen(true)}
                         className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0"
-                        title="View Code Snippet"
+                        title={t("apiCard.viewCodeSnippet")}
                       >
                         <svg
                           className="w-4 h-4"
@@ -3305,7 +3307,9 @@ export function ApiEditorLayout() {
                             d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
                           />
                         </svg>
-                        <span className="hidden sm:inline">Code Snippet</span>
+                        <span className="hidden sm:inline">
+                          {t("apiCard.codeSnippet")}
+                        </span>
                       </button>
                     )}
                   </div>
@@ -3357,7 +3361,7 @@ export function ApiEditorLayout() {
                       {summary && (
                         <div>
                           <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-1">
-                            Owner
+                            {t("specForm.owner")}
                           </h3>
                           <p className="text-sm text-gray-900 dark:text-[#E6EDF3]">
                             {summary}
@@ -3379,7 +3383,7 @@ export function ApiEditorLayout() {
                       {tags && (
                         <div>
                           <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-1">
-                            Tags
+                            {t("apiCard.tags")}
                           </h3>
                           <div className="flex flex-wrap gap-2">
                             {tags.split(",").map((tag, idx) => (
@@ -3525,7 +3529,7 @@ export function ApiEditorLayout() {
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                           <div>
                             <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                              Tags/Category
+                              {t("specForm.tagsCategory")}
                             </label>
                             <input
                               type="text"
@@ -3542,7 +3546,7 @@ export function ApiEditorLayout() {
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                              Owner
+                              {t("specForm.owner")}
                             </label>
                             <input
                               type="text"
@@ -3562,7 +3566,7 @@ export function ApiEditorLayout() {
                         {/* Description */}
                         <div>
                           <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                            Description
+                            {t("specForm.description")}
                           </label>
                           <input
                             type="text"
@@ -3598,7 +3602,7 @@ export function ApiEditorLayout() {
                             : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
                         }`}
                       >
-                        Request
+                        {t("apiCard.request")}
                       </button>
                       <button
                         onClick={() => setSpecTab("response")}
@@ -3608,7 +3612,7 @@ export function ApiEditorLayout() {
                             : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
                         }`}
                       >
-                        Response
+                        {t("apiCard.response")}
                       </button>
                       {!isCompletedView && (
                         <button
@@ -3619,7 +3623,7 @@ export function ApiEditorLayout() {
                               : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
                           }`}
                         >
-                          Schema
+                          {t("schema.title")}
                         </button>
                       )}
                     </div>
@@ -3684,7 +3688,7 @@ export function ApiEditorLayout() {
                   onClick={handleCancelEdit}
                   className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0"
                 >
-                  취소
+                  {t("common.cancel")}
                 </button>
                 <button
                   onClick={handleSave}
@@ -3701,7 +3705,7 @@ export function ApiEditorLayout() {
                       : "bg-emerald-500 hover:bg-emerald-600 text-white"
                   }`}
                 >
-                  저장
+                  {t("common.save")}
                 </button>
               </>
             ) : (
@@ -3714,9 +3718,9 @@ export function ApiEditorLayout() {
                       ? "bg-gray-200 dark:bg-[#161B22] text-gray-400 dark:text-[#8B949E] cursor-not-allowed"
                       : "bg-[#2563EB] hover:bg-[#1E40AF] text-white"
                   }`}
-                  title={isCompleted ? "완료된 API는 수정할 수 없습니다" : ""}
+                  title={isCompleted ? t("modal.completedApisCannotEdit") : ""}
                 >
-                  Edit
+                  {t("common.edit")}
                 </button>
                 <button
                   onClick={handleDelete}
@@ -3726,9 +3730,11 @@ export function ApiEditorLayout() {
                       ? "bg-gray-200 dark:bg-[#161B22] text-gray-400 dark:text-[#8B949E] cursor-not-allowed"
                       : "bg-red-500 hover:bg-red-600 text-white"
                   }`}
-                  title={isCompleted ? "완료된 API는 삭제할 수 없습니다" : ""}
+                  title={
+                    isCompleted ? t("modal.completedApisCannotDelete") : ""
+                  }
                 >
-                  Delete
+                  {t("common.delete")}
                 </button>
               </>
             )}
@@ -3743,7 +3749,7 @@ export function ApiEditorLayout() {
               onClick={handleReset}
               className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0"
             >
-              Back
+              {t("editor.back")}
             </button>
             <button
               onClick={handleSave}
@@ -3754,7 +3760,7 @@ export function ApiEditorLayout() {
                   : "bg-[#2563EB] hover:bg-[#1E40AF] text-white"
               }`}
             >
-              Create
+              {t("editor.create")}
             </button>
           </div>
         </div>

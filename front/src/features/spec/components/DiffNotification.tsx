@@ -1,4 +1,5 @@
 // removed unused UI imports
+import { useTranslation } from "react-i18next";
 
 interface DiffDetails {
   type: "request" | "response" | "endpoint" | "both";
@@ -21,6 +22,8 @@ export function DiffNotification({
   reqLog,
   resLog,
 }: DiffNotificationProps) {
+  const { t } = useTranslation();
+  
   if (!diff || diff === "none") {
     return null;
   }
@@ -32,32 +35,28 @@ export function DiffNotification({
     if (lowerDiff.includes("both")) {
       return {
         type: "both",
-        description:
-          "Request and Response are different from the spec and the actual implementation.",
+        description: t("diffNotification.bothDescription"),
       };
     } else if (lowerDiff.includes("request")) {
       return {
         type: "request",
-        description:
-          "Request is different from the spec and the actual implementation.",
+        description: t("diffNotification.requestDescription"),
       };
     } else if (lowerDiff.includes("response")) {
       return {
         type: "response",
-        description:
-          "Response is different from the spec and the actual implementation.",
+        description: t("diffNotification.responseDescription"),
       };
     } else if (lowerDiff.includes("endpoint")) {
       return {
         type: "endpoint",
-        description:
-          "Endpoint information is different from the spec and the actual implementation.",
+        description: t("diffNotification.endpointDescription"),
       };
     }
 
     return {
       type: "both",
-      description: "The spec and the actual implementation are different.",
+      description: t("diffNotification.defaultDescription"),
     };
   };
 
@@ -70,15 +69,15 @@ export function DiffNotification({
   const getTypeLabel = () => {
     switch (diffDetails.type) {
       case "request":
-        return "Request Diff";
+        return t("diffNotification.requestDiff");
       case "response":
-        return "Response Diff";
+        return t("diffNotification.responseDiff");
       case "endpoint":
-        return "Endpoint Diff";
+        return t("diffNotification.endpointDiff");
       case "both":
-        return "Request/Response Diff";
+        return t("diffNotification.bothDiff");
       default:
-        return "Diff";
+        return t("diffNotification.diff");
     }
   };
 
@@ -103,7 +102,7 @@ export function DiffNotification({
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
               <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-                Diff Notification
+                {t("diffNotification.title")}
               </h3>
               <span className="px-2 py-0.5 bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200 text-xs font-medium rounded">
                 {getTypeLabel()}
@@ -114,10 +113,10 @@ export function DiffNotification({
             </p>
             <p className="text-xs text-amber-600 dark:text-amber-500 mt-2">
               {isCompleted
-                ? "This API is completed and the actual implementation is complete."
-                : "This API is mock."}
+                ? t("diffNotification.completedMessage")
+                : t("diffNotification.mockMessage")}
               {diffDetails.type === "endpoint" &&
-                " You can update the spec by clicking the button below."}
+                " " + t("diffNotification.updateSpecMessage")}
             </p>
           </div>
         </div>
@@ -142,7 +141,7 @@ export function DiffNotification({
                   d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                 />
               </svg>
-              Request(Request) Diff Details
+              {t("diffNotification.requestDiffDetails")}
             </h4>
             <div className="mt-2 p-2 bg-amber-100 dark:bg-amber-900/50 rounded border border-amber-300 dark:border-amber-700">
               <pre className="text-xs text-amber-900 dark:text-amber-200 whitespace-pre-wrap break-words font-mono">
@@ -168,7 +167,7 @@ export function DiffNotification({
                   d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                 />
               </svg>
-              Response(Response) Diff Details
+              {t("diffNotification.responseDiffDetails")}
             </h4>
             <div className="mt-2 p-2 bg-amber-100 dark:bg-amber-900/50 rounded border border-amber-300 dark:border-amber-700">
               <pre className="text-xs text-amber-900 dark:text-amber-200 whitespace-pre-wrap break-words font-mono">
@@ -196,13 +195,13 @@ export function DiffNotification({
                     d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                   />
                 </svg>
-                Diff Details
+                {t("diffNotification.diffDetails")}
               </h4>
               <div className="space-y-3 mt-2">
                 {reqLog && (
                   <div>
                     <h5 className="text-xs font-medium text-amber-800 dark:text-amber-300 mb-1">
-                      Request(Request) Diff:
+                      {t("diffNotification.requestDiffLabel")}
                     </h5>
                     <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded border border-amber-300 dark:border-amber-700">
                       <pre className="text-xs text-amber-900 dark:text-amber-200 whitespace-pre-wrap break-words font-mono">
@@ -214,7 +213,7 @@ export function DiffNotification({
                 {resLog && (
                   <div>
                     <h5 className="text-xs font-medium text-amber-800 dark:text-amber-300 mb-1">
-                      Response(Response) Diff:
+                      {t("diffNotification.responseDiffLabel")}
                     </h5>
                     <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded border border-amber-300 dark:border-amber-700">
                       <pre className="text-xs text-amber-900 dark:text-amber-200 whitespace-pre-wrap break-words font-mono">
@@ -245,7 +244,7 @@ export function DiffNotification({
                 d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
               />
             </svg>
-            Sync to Spec
+            {t("diffNotification.syncToSpec")}
           </button>
         )}
       </div>

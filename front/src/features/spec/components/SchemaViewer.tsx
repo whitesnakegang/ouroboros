@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import type { SchemaField, SchemaType } from "../types/schema.types";
 import {
   isPrimitiveSchema,
@@ -26,6 +27,7 @@ export function SchemaViewer({
   description,
   contentType = "application/json",
 }: SchemaViewerProps) {
+  const { t } = useTranslation();
   const [loadedFields, setLoadedFields] = useState<SchemaField[]>([]);
   const [isLoadingSchema, setIsLoadingSchema] = useState(false);
 
@@ -211,7 +213,7 @@ export function SchemaViewer({
       <div className="flex items-start justify-between">
         <div>
           <h3 className="text-lg font-bold text-gray-900 dark:text-[#E6EDF3]">
-            Body
+            {t("apiCard.body")}
           </h3>
           {description && (
             <p className="mt-1 text-sm text-gray-600 dark:text-[#8B949E]">

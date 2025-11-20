@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useTestingStore } from "../store/testing.store";
 import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
 import { StompClient, buildWebSocketUrl } from "../utils/stompClient";
@@ -18,6 +19,7 @@ interface Subscription {
 }
 
 export function WsTestRequestPanel() {
+  const { t } = useTranslation();
   const {
     wsConnectionStatus,
     setWsConnectionStatus,
@@ -568,9 +570,9 @@ export function WsTestRequestPanel() {
                     direction: "received" as const,
                     address: "WARNING",
                     content: JSON.stringify({
-                      message: `구독 주소에 패턴이 포함되어 있습니다. Path Parameters를 입력해주세요: ${missingParams.join(
-                        ", "
-                      )}`,
+                      message: t("wsTest.subscriptionAddressHasPattern", {
+                        params: missingParams.join(", "),
+                      }),
                       replyAddress,
                       missingParameters: missingParams,
                     }),
@@ -588,8 +590,7 @@ export function WsTestRequestPanel() {
                 direction: "received" as const,
                 address: "INFO",
                 content: JSON.stringify({
-                  message:
-                    "Reply Address가 /topic/ 또는 /queue/로 시작하지 않습니다. 구독할 수 없습니다.",
+                  message: t("wsTest.replyAddressNotStartWithTopicOrQueue"),
                   replyAddress,
                 }),
               });
@@ -603,8 +604,7 @@ export function WsTestRequestPanel() {
                 direction: "received" as const,
                 address: "INFO",
                 content: JSON.stringify({
-                  message:
-                    "Reply Address가 없습니다. 서버가 메시지를 보낼 주소(/topic/ 또는 /queue/)가 필요합니다.",
+                  message: t("wsTest.replyAddressRequired"),
                   receiveAddress,
                 }),
               });
@@ -713,7 +713,7 @@ export function WsTestRequestPanel() {
       );
     } catch {
       setWsConnectionStatus("disconnected");
-      alert("Connection failed.");
+      alert(t("wsTest.connectionFailed"));
     }
   };
 
@@ -745,7 +745,7 @@ export function WsTestRequestPanel() {
     }
 
     if (!stompClientRef.current || !stompClientRef.current.isConnected()) {
-      alert("Please connect first.");
+      alert(t("wsTest.pleaseConnectFirst"));
       return;
     }
 
@@ -866,7 +866,7 @@ export function WsTestRequestPanel() {
   // 간단한 모드 메시지 전송
   const handleSimpleSend = () => {
     if (wsConnectionStatus !== "connected") {
-      alert("Please connect first.");
+      alert(t("wsTest.pleaseConnectFirst"));
       return;
     }
 
@@ -876,7 +876,7 @@ export function WsTestRequestPanel() {
     }
 
     if (!stompClientRef.current.isConnected()) {
-      alert("Connection appears to be lost. Please reconnect.");
+      alert(t("wsTest.connectionLostPleaseReconnect"));
       setWsConnectionStatus("disconnected");
       return;
     }
@@ -892,9 +892,7 @@ export function WsTestRequestPanel() {
     }
 
     if (!destination) {
-      alert(
-        "메시지를 전송할 수 없습니다.\n\nReply Address 또는 Receive Address를 설정해주세요."
-      );
+      alert(t("wsTest.cannotSendMessageSetAddress"));
       return;
     }
 
@@ -909,9 +907,10 @@ export function WsTestRequestPanel() {
       const missingParams = params.filter((p) => !pathParameters[p]);
       if (missingParams.length > 0) {
         alert(
-          `메시지를 전송할 수 없습니다.\n\n` +
-            `주소에 패턴이 포함되어 있습니다: ${actualDestination}\n\n` +
-            `다음 파라미터를 입력해주세요: ${missingParams.join(", ")}`
+          t("wsTest.cannotSendMessagePatternInAddress", {
+            destination: actualDestination,
+            params: missingParams.join(", "),
+          })
         );
         return;
       }
@@ -1066,10 +1065,10 @@ export function WsTestRequestPanel() {
             />
             <span className="text-xs font-medium text-gray-600 dark:text-[#8B949E]">
               {wsConnectionStatus === "connected"
-                ? "Connected"
+                ? t("wsTest.connected")
                 : wsConnectionStatus === "connecting"
-                ? "Connecting..."
-                : "Disconnected"}
+                ? t("wsTest.connecting")
+                : t("wsTest.disconnected")}
             </span>
           </div>
         </div>
@@ -1079,12 +1078,12 @@ export function WsTestRequestPanel() {
         {/* 연결 설정 Section */}
         <div className="mb-6 space-y-4">
           <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
-            Connection settings
+            {t("wsTest.connectionSettings")}
           </h3>
 
           <div>
             <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-              WS Endpoint
+              {t("wsTest.wsEndpoint")}
             </label>
             <input
               type="text"
@@ -1100,7 +1099,7 @@ export function WsTestRequestPanel() {
           {(operationAction === "duplex" || operationAction === "receive") && (
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                Receive Address
+                {t("wsTest.receiveAddress")}
               </label>
               <input
                 type="text"
@@ -1123,7 +1122,7 @@ export function WsTestRequestPanel() {
               />
               {hasPathParameter(receiveAddress) && (
                 <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-                  패턴이 포함된 주소입니다. 아래 파라미터를 입력해주세요.
+                  {t("wsTest.addressContainsPattern")}
                 </p>
               )}
             </div>
@@ -1135,7 +1134,7 @@ export function WsTestRequestPanel() {
             operationAction === "sendto") && (
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                Reply Address
+                {t("wsTest.replyAddress")}
               </label>
               <input
                 type="text"
@@ -1184,10 +1183,10 @@ export function WsTestRequestPanel() {
             return (
               <div className="border border-amber-200 dark:border-amber-800 rounded-md p-3 bg-amber-50 dark:bg-amber-900/20">
                 <label className="block text-xs font-medium text-amber-800 dark:text-amber-300 mb-2">
-                  Path Parameters
+                  {t("wsTest.pathParameters")}
                 </label>
                 <p className="text-xs text-amber-700 dark:text-amber-400 mb-3">
-                  주소에 패턴이 포함되어 있습니다. 실제 값을 입력해주세요.
+                  {t("wsTest.pathPatternDescription")}
                 </p>
                 <div className="space-y-2">
                   {paramArray.map((param) => (
@@ -1255,7 +1254,7 @@ export function WsTestRequestPanel() {
                             }
                           }
                         }}
-                        placeholder={`${param} 값 입력 (예: room1)`}
+                        placeholder={t("wsTest.pathParameterPlaceholder", { param })}
                         className="w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-amber-300 dark:border-amber-700 text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-amber-400 dark:focus:ring-amber-500 focus:border-amber-400 dark:focus:border-amber-500 text-sm"
                       />
                       {/* 치환된 주소 미리보기 */}
@@ -1264,7 +1263,7 @@ export function WsTestRequestPanel() {
                           {receiveAddress &&
                             hasPathParameter(receiveAddress) && (
                               <span>
-                                Receive:{" "}
+                                {t("wsTest.receive")}:{" "}
                                 {replacePathParameters(receiveAddress, {
                                   ...pathParameters,
                                   [param]: pathParameters[param],
@@ -1274,7 +1273,7 @@ export function WsTestRequestPanel() {
                             )}
                           {replyAddress && hasPathParameter(replyAddress) && (
                             <span>
-                              Reply:{" "}
+                              {t("wsEditor.reply")}:{" "}
                               {replacePathParameters(replyAddress, {
                                 ...pathParameters,
                                 [param]: pathParameters[param],
@@ -1301,14 +1300,14 @@ export function WsTestRequestPanel() {
                     : "bg-[#2563EB] hover:bg-[#1E40AF] text-white"
                 }`}
               >
-                Connect
+                {t("wsTest.connect")}
               </button>
             ) : (
               <button
                 onClick={handleDisconnect}
                 className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-md transition-all text-sm font-semibold active:translate-y-[1px] focus:outline-none focus-visible:outline-none md:flex-none md:w-auto w-full"
               >
-                Disconnect
+                {t("wsTest.disconnect")}
               </button>
             )}
           </div>
@@ -1319,18 +1318,18 @@ export function WsTestRequestPanel() {
           <div className="mb-4 border border-gray-200 dark:border-[#2D333B] rounded-md p-3">
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs font-medium text-gray-600 dark:text-[#8B949E]">
-                STOMP CONNECT Headers (optional)
+                {t("wsTest.stompConnectHeaders")}
               </label>
               <button
                 onClick={addConnectHeader}
                 className="text-xs px-2 py-1 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none"
               >
-                + Add Header
+                {t("apiCard.addHeader")}
               </button>
             </div>
             {connectHeaders.length === 0 ? (
               <p className="text-xs text-gray-500 dark:text-[#8B949E] text-center py-2">
-                Connect with default settings. Add headers if needed.
+                {t("wsTest.connectWithDefaultSettings")}
               </p>
             ) : (
               <div className="space-y-2">
@@ -1342,7 +1341,7 @@ export function WsTestRequestPanel() {
                       onChange={(e) =>
                         updateConnectHeader(index, e.target.value, header.value)
                       }
-                      placeholder="Key"
+                      placeholder={t("wsTest.key")}
                       className="flex-1 px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
                     />
                     <input
@@ -1351,7 +1350,7 @@ export function WsTestRequestPanel() {
                       onChange={(e) =>
                         updateConnectHeader(index, header.key, e.target.value)
                       }
-                      placeholder="Value"
+                      placeholder={t("wsTest.value")}
                       className="flex-1 px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
                     />
                     <button
@@ -1654,9 +1653,10 @@ export function WsTestRequestPanel() {
                 d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
               />
             </svg>
-            Subscriptions (
-            {subscriptions.filter((s) => s.subscriptionId !== null).length}{" "}
-            active / {subscriptions.length} total)
+            {t("wsTest.subscriptions", {
+              active: subscriptions.filter((s) => s.subscriptionId !== null).length,
+              total: subscriptions.length,
+            })}
           </label>
           <div className="space-y-2">
             {subscriptions.map((subscription) => {

@@ -1,5 +1,10 @@
 import { useState, useEffect } from "react";
-import type { SchemaField, SchemaType, PrimitiveTypeName } from "../types/schema.types";
+import { useTranslation } from "react-i18next";
+import type {
+  SchemaField,
+  SchemaType,
+  PrimitiveTypeName,
+} from "../types/schema.types";
 import {
   createPrimitiveField,
   createObjectField,
@@ -20,8 +25,8 @@ interface SchemaFieldEditorProps {
   onRemove?: () => void;
   depth?: number;
   isReadOnly?: boolean;
-  allowFileType?: boolean;  // multipart/form-data에서만 file 타입 허용
-  allowMockExpression?: boolean;  // Schema 정의 시 mock expression 허용
+  allowFileType?: boolean; // multipart/form-data에서만 file 타입 허용
+  allowMockExpression?: boolean; // Schema 정의 시 mock expression 허용
 }
 
 export function SchemaFieldEditor({
@@ -33,6 +38,7 @@ export function SchemaFieldEditor({
   allowFileType = false,
   allowMockExpression = false,
 }: SchemaFieldEditorProps) {
+  const { t } = useTranslation();
   const [schemas, setSchemas] = useState<SchemaResponse[]>([]);
   const [isMockModalOpen, setIsMockModalOpen] = useState(false);
   const [isSchemaModalOpen, setIsSchemaModalOpen] = useState(false);
@@ -55,7 +61,7 @@ export function SchemaFieldEditor({
   // Kind 변경 핸들러
   const handleKindChange = (newKind: SchemaType["kind"]) => {
     let newField: SchemaField;
-    
+
     switch (newKind) {
       case "primitive":
         newField = createPrimitiveField(field.key, "string");
@@ -72,12 +78,12 @@ export function SchemaFieldEditor({
       default:
         return;
     }
-    
+
     // 기존 메타 정보 유지
     newField.description = field.description;
     newField.required = field.required;
     newField.mockExpression = field.mockExpression;
-    
+
     onChange(newField);
   };
 
@@ -161,7 +167,10 @@ export function SchemaFieldEditor({
     : ["string", "integer", "number", "boolean"];
 
   return (
-    <div className="border-l-2 border-gray-200 dark:border-gray-700 overflow-visible" style={indentStyle}>
+    <div
+      className="border-l-2 border-gray-200 dark:border-gray-700 overflow-visible"
+      style={indentStyle}
+    >
       <div className="flex gap-2 items-start mb-2 p-2 bg-gray-50 dark:bg-gray-800/50 rounded overflow-visible">
         {/* Required Checkbox */}
         <input
@@ -179,7 +188,7 @@ export function SchemaFieldEditor({
             type="text"
             value={field.key}
             onChange={(e) => onChange({ ...field, key: e.target.value })}
-            placeholder="Field name"
+            placeholder={t("apiCard.fieldName")}
             disabled={isReadOnly}
             className="w-full px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-sm"
           />
@@ -188,21 +197,25 @@ export function SchemaFieldEditor({
         {/* Schema Kind Selector */}
         <select
           value={schemaKind}
-          onChange={(e) => handleKindChange(e.target.value as SchemaType["kind"])}
+          onChange={(e) =>
+            handleKindChange(e.target.value as SchemaType["kind"])
+          }
           disabled={isReadOnly}
           className="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-sm relative z-10"
         >
-          <option value="primitive">Primitive</option>
-          <option value="object">Object</option>
-          <option value="array">Array</option>
-          <option value="ref">Schema</option>
+          <option value="primitive">{t("apiCard.primitive")}</option>
+          <option value="object">{t("apiCard.object")}</option>
+          <option value="array">{t("apiCard.array")}</option>
+          <option value="ref">{t("apiCard.schema")}</option>
         </select>
 
         {/* Type-specific controls */}
         {isPrimitiveSchema(field.schemaType) && (
           <select
             value={field.schemaType.type}
-            onChange={(e) => handlePrimitiveTypeChange(e.target.value as PrimitiveTypeName)}
+            onChange={(e) =>
+              handlePrimitiveTypeChange(e.target.value as PrimitiveTypeName)
+            }
             disabled={isReadOnly}
             className="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-sm"
           >
@@ -220,7 +233,7 @@ export function SchemaFieldEditor({
             disabled={isReadOnly}
             className="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-sm min-w-[200px] text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
           >
-            {field.schemaType.schemaName || "Select Schema..."}
+            {field.schemaType.schemaName || t("apiCard.selectSchema")}
           </button>
         )}
 
@@ -231,8 +244,18 @@ export function SchemaFieldEditor({
             className="p-1.5 text-red-500 hover:text-red-700"
             title="Remove field"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         )}
@@ -244,7 +267,7 @@ export function SchemaFieldEditor({
           type="text"
           value={field.description || ""}
           onChange={(e) => onChange({ ...field, description: e.target.value })}
-          placeholder="Description (optional)"
+          placeholder={t("apiCard.descriptionOptional")}
           disabled={isReadOnly}
           className="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900"
         />
@@ -261,7 +284,7 @@ export function SchemaFieldEditor({
               </span>
             ) : (
               <span className="text-gray-400 dark:text-gray-500">
-                Click to select Mock expression
+                {t("apiCard.clickToSelectMockExpression")}
               </span>
             )}
           </button>
@@ -277,7 +300,7 @@ export function SchemaFieldEditor({
               disabled={isReadOnly}
               className="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded"
             >
-              + Add Property
+              {t("apiCard.addProperty")}
             </button>
           </div>
           {field.schemaType.properties.map((prop, idx) => (
@@ -298,7 +321,9 @@ export function SchemaFieldEditor({
       {/* Array Items (재귀!) */}
       {isArraySchema(field.schemaType) && (
         <div className="ml-4 mb-2">
-          <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Array Items:</p>
+          <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
+            {t("apiCard.arrayItems")}
+          </p>
           <SchemaFieldEditor
             field={{
               key: "items",
@@ -322,7 +347,9 @@ export function SchemaFieldEditor({
                     ...field,
                     schemaType: {
                       ...field.schemaType,
-                      minItems: e.target.value ? parseInt(e.target.value) : undefined,
+                      minItems: e.target.value
+                        ? parseInt(e.target.value)
+                        : undefined,
                     },
                   });
                 }
@@ -340,7 +367,9 @@ export function SchemaFieldEditor({
                     ...field,
                     schemaType: {
                       ...field.schemaType,
-                      maxItems: e.target.value ? parseInt(e.target.value) : undefined,
+                      maxItems: e.target.value
+                        ? parseInt(e.target.value)
+                        : undefined,
                     },
                   });
                 }
@@ -386,4 +415,3 @@ export function SchemaFieldEditor({
     </div>
   );
 }
-

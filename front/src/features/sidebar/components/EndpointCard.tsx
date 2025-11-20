@@ -1,6 +1,7 @@
 import { useState, useRef, useLayoutEffect } from "react";
 import { useSidebarStore } from "../store/sidebar.store";
 import type { Endpoint } from "../store/sidebar.store";
+import { useTranslation } from "react-i18next";
 
 interface EndpointCardProps {
   endpoint: Endpoint;
@@ -29,62 +30,63 @@ const mockStatusColors = {
 // Completed 상태 표시 색상 (육안으로 확실히 구분 가능한 색상)
 const completedStatusColor = "bg-[#25eb64]"; // 초록색 (어두운 화면에서도 구분 가능)
 
-// WebSocket 상태별 색상 및 라벨 결정 함수
-const getWebSocketStatus = (tag?: string, progress?: string) => {
-  const normalizedProgress = progress?.toLowerCase();
-  const normalizedTag = tag?.toLowerCase();
-
-  // tag: receive인 경우
-  if (normalizedTag === "receive") {
-    if (normalizedProgress === "none" || !normalizedProgress) {
-      return {
-        color: "bg-[#b6bdca]", // 회색
-        label: "Not Implemented",
-      };
-    } else if (normalizedProgress === "receive") {
-      return {
-        color: "bg-[#25eb64]", // 초록색
-        label: "Completed",
-      };
-    }
-  }
-
-  // tag: duplicate인 경우
-  if (normalizedTag === "duplicate") {
-    if (normalizedProgress === "none" || !normalizedProgress) {
-      return {
-        color: "bg-[#b6bdca]", // 회색
-        label: "Not Implemented",
-      };
-    } else if (normalizedProgress === "receive") {
-      return {
-        color: "bg-[#F97316]", // 주황색
-        label: "Receive Only Verified",
-      };
-    } else if (
-      normalizedProgress === "complete" ||
-      normalizedProgress === "completed"
-    ) {
-      return {
-        color: "bg-[#25eb64]", // 초록색
-        label: "Completed",
-      };
-    }
-  }
-
-  // 기본값 (기타 경우)
-  return {
-    color: "bg-[#b6bdca]", // 회색
-    label: "미구현",
-  };
-};
-
 export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
   const { setSelectedEndpoint, selectedEndpoint } = useSidebarStore();
+  const { t } = useTranslation();
   const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
   const [showTooltip, setShowTooltip] = useState(false);
   const badgeRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+
+  // WebSocket 상태별 색상 및 라벨 결정 함수
+  const getWebSocketStatus = (tag?: string, progress?: string) => {
+    const normalizedProgress = progress?.toLowerCase();
+    const normalizedTag = tag?.toLowerCase();
+
+    // tag: receive인 경우
+    if (normalizedTag === "receive") {
+      if (normalizedProgress === "none" || !normalizedProgress) {
+        return {
+          color: "bg-[#b6bdca]", // 회색
+          label: t("status.notImplemented"),
+        };
+      } else if (normalizedProgress === "receive") {
+        return {
+          color: "bg-[#25eb64]", // 초록색
+          label: t("status.completed"),
+        };
+      }
+    }
+
+    // tag: duplicate인 경우
+    if (normalizedTag === "duplicate") {
+      if (normalizedProgress === "none" || !normalizedProgress) {
+        return {
+          color: "bg-[#b6bdca]", // 회색
+          label: t("status.notImplemented"),
+        };
+      } else if (normalizedProgress === "receive") {
+        return {
+          color: "bg-[#F97316]", // 주황색
+          label: t("status.receiveOnlyVerified"),
+        };
+      } else if (
+        normalizedProgress === "complete" ||
+        normalizedProgress === "completed"
+      ) {
+        return {
+          color: "bg-[#25eb64]", // 초록색
+          label: t("status.completed"),
+        };
+      }
+    }
+
+    // 기본값 (기타 경우)
+    return {
+      color: "bg-[#b6bdca]", // 회색
+      label: t("status.notImplemented"),
+    };
+  };
 
   const handleClick = () => {
     setSelectedEndpoint(endpoint);
@@ -154,10 +156,10 @@ export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
               }`}
               title={
                 endpoint.implementationStatus === "not-implemented"
-                  ? "Not Implemented"
+                  ? t("status.notImplemented")
                   : endpoint.implementationStatus === "in-progress"
-                  ? "In Progress"
-                  : "Modifying"
+                  ? t("status.inProgress")
+                  : t("status.modifying")
               }
             />
           )}
@@ -175,10 +177,10 @@ export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
                   }`}
                   title={
                     endpoint.implementationStatus === "not-implemented"
-                      ? "미구현"
+                      ? t("status.notImplemented")
                       : endpoint.implementationStatus === "in-progress"
-                      ? "구현중"
-                      : "수정중"
+                      ? t("status.inProgress")
+                      : t("status.modifying")
                   }
                 />
               )}
@@ -187,7 +189,7 @@ export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
               "completed" && (
               <div
                 className={`w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0 ${completedStatusColor}`}
-                title="Completed"
+                title={t("status.completed")}
               />
             )}
           </>
@@ -221,25 +223,25 @@ export function EndpointCard({ endpoint, filterType }: EndpointCardProps) {
                   >
                     <div className="bg-white dark:bg-[#161B22] border border-gray-300 dark:border-[#2D333B] rounded-md px-3 py-2 shadow-lg min-w-[200px]">
                       <div className="text-xs font-semibold text-gray-900 dark:text-[#E6EDF3] mb-2">
-                        Badge Status
+                        {t("badge.badgeStatus")}
                       </div>
                       <div className="space-y-1.5">
                         <div className="flex items-center gap-2">
                           <div className="w-1.5 h-1.5 rounded-full bg-[#b6bdca] flex-shrink-0"></div>
                           <span className="text-xs text-gray-600 dark:text-[#8B949E]">
-                            Gray: Not Implemented
+                            {t("badge.grayDescription")}
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
                           <div className="w-1.5 h-1.5 rounded-full bg-[#F97316] flex-shrink-0"></div>
                           <span className="text-xs text-gray-600 dark:text-[#8B949E]">
-                            Orange: Receive Only Verified
+                            {t("badge.orangeDescription")}
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
                           <div className="w-1.5 h-1.5 rounded-full bg-[#25eb64] flex-shrink-0"></div>
                           <span className="text-xs text-gray-600 dark:text-[#8B949E]">
-                            Green: Completed
+                            {t("badge.greenDescription")}
                           </span>
                         </div>
                       </div>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import type { RestApiSpecResponse } from "../services/api";
 import { exportYaml } from "../services/api";
 import { getEndpointSnippets } from "openapi-snippet";
@@ -25,6 +26,7 @@ export function CodeSnippetPanel({
   onClose,
   spec,
 }: CodeSnippetPanelProps) {
+  const { t } = useTranslation();
   const [selectedLanguage, setSelectedLanguage] = useState("node_native");
   const [copied, setCopied] = useState(false);
   const [snippet, setSnippet] = useState("");
@@ -50,9 +52,7 @@ export function CodeSnippetPanel({
           !openApiSpec.paths ||
           !openApiSpec.paths[spec.path]
         ) {
-          throw new Error(
-            "명세에 해당 경로가 없습니다. 실제 명세에 반영 후 다시 시도해주세요."
-          );
+          throw new Error(t("apiCard.pathNotFoundInSpec"));
         }
 
         // openapi-snippet으로 스니펫 생성
@@ -78,9 +78,11 @@ export function CodeSnippetPanel({
             .map((s: any) => s.id)
             .join(", ");
           setSnippet(
-            `// ${selectedLanguage} is not supported yet.\n// Available languages: ${
-              availableLanguages || "none"
-            }`
+            `// ${t("apiCard.languageNotSupportedYet", {
+              language: selectedLanguage,
+            })}\n// ${t("apiCard.availableLanguages", {
+              languages: availableLanguages || "none",
+            })}`
           );
         }
       } catch (error) {
@@ -88,7 +90,7 @@ export function CodeSnippetPanel({
         const errorMessage =
           error instanceof Error ? error.message : String(error);
         setSnippet(
-          `// ${errorMessage}\n// try again after updating the spec to the actual implementation.`
+          `// ${errorMessage}\n// ${t("apiCard.tryAgainAfterUpdatingSpec")}`
         );
       } finally {
         setLoading(false);
@@ -131,7 +133,7 @@ export function CodeSnippetPanel({
                 d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
               />
             </svg>
-            Code Snippets
+            {t("apiCard.codeSnippets")}
           </h2>
           <button
             onClick={onClose}
@@ -184,17 +186,19 @@ export function CodeSnippetPanel({
                 disabled={loading || !snippet}
                 className="px-3 py-1 text-sm bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {copied ? "Copied" : "Copy"}
+                {copied ? t("apiCard.copied") : t("apiCard.copy")}
               </button>
             </div>
             <div className="bg-[#0D1117] dark:bg-[#010409] p-4 rounded-md max-h-[calc(100vh-250px)] overflow-y-auto">
               {loading ? (
                 <div className="text-sm text-[#E6EDF3] text-center py-8">
-                  Generating Snippet...
+                  {t("apiCard.generatingSnippet")}
                 </div>
               ) : (
                 <pre className="text-sm text-[#E6EDF3] whitespace-pre-wrap overflow-x-auto font-mono">
-                  <code>{snippet || "// 스니펫을 생성할 수 없습니다."}</code>
+                  <code>
+                    {snippet || `// ${t("apiCard.cannotGenerateSnippet")}`}
+                  </code>
                 </pre>
               )}
             </div>
