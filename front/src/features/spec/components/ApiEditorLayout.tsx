@@ -35,6 +35,7 @@ import {
   getWebSocketOperation,
   createWebSocketOperation,
   updateWebSocketOperation,
+  deleteWebSocketOperation,
   syncWebSocketOperation,
   getWebSocketChannel,
   type RestApiSpecResponse,
@@ -46,7 +47,6 @@ import {
   parseOpenAPISchemaToSchemaField,
 } from "../utils/schemaConverter";
 import {
-  createPrimitiveField,
   isArraySchema,
   isRefSchema,
 } from "../types/schema.types";
@@ -230,7 +230,34 @@ export function ApiEditorLayout() {
   );
 
   // Completed 상태인지 확인
-  const isCompleted = selectedEndpoint?.progress?.toLowerCase() === "completed";
+  // REST: progress === "completed"
+  // WebSocket: progress === "completed" 또는 (tag === "receive" && progress === "receive")
+  const isCompleted = (() => {
+    if (!selectedEndpoint) return false;
+    
+    const progress = selectedEndpoint.progress?.toLowerCase();
+    const tag = selectedEndpoint.tag?.toLowerCase();
+    const endpointProtocol = selectedEndpoint.protocol || protocol;
+    
+    // REST API인 경우
+    if (endpointProtocol === "REST") {
+      return progress === "completed";
+    }
+    
+    // WebSocket인 경우
+    if (endpointProtocol === "WebSocket") {
+      // progress가 "completed"이면 완료 상태
+      if (progress === "completed") {
+        return true;
+      }
+      // tag가 "receive"이고 progress도 "receive"이면 완료 상태로 간주
+      if (tag === "receive" && progress === "receive") {
+        return true;
+      }
+    }
+    
+    return false;
+  })();
 
   // 수정/삭제 불가능한 상태인지 확인 (completed인 경우만, mock 상태는 diff가 있어도 수정/삭제 가능)
   const isReadOnly = isCompleted;
@@ -918,11 +945,19 @@ export function ApiEditorLayout() {
       const protocol = operationData.protocol || "ws"; // null이면 기본값 "ws"
       setWsProtocol(protocol as "ws" | "wss");
 
-      // selectedEndpoint에 entrypoint 업데이트
+      // selectedEndpoint에 entrypoint, progress, diff, tag 업데이트
       if (selectedEndpoint) {
+        const operationProgress = operationData.operation.progress;
+        const operationDiff = operationData.operation.diff;
+        const operationTag = operationData.tag;
+        
         setSelectedEndpoint({
           ...selectedEndpoint,
           entrypoint: entrypoint,
+          // progress가 명시적으로 제공되면 사용, 없으면 기존 값 유지
+          progress: operationProgress !== undefined ? operationProgress : (selectedEndpoint.progress || "none"),
+          diff: operationDiff !== undefined ? operationDiff : (selectedEndpoint.diff || "none"),
+          tag: operationTag !== undefined ? operationTag : selectedEndpoint.tag,
         });
       }
       setWsSummary(""); // Operation에는 summary가 없음
@@ -1924,28 +1959,6 @@ export function ApiEditorLayout() {
   const handleDelete = () => {
     if (!selectedEndpoint) return;
 
-    // WebSocket 삭제 로직
-    if (protocol === "WebSocket") {
-      setConfirmModal({
-        isOpen: true,
-        title: t("modal.deleteWebSocketOperation"),
-        message: t("modal.confirmDeleteWebSocket"),
-        variant: "danger",
-        onConfirm: () => {
-          setConfirmModal((prev) => ({ ...prev, isOpen: false }));
-          setAlertModal({
-            isOpen: true,
-            title: "Coming Soon",
-            message: "WebSocket Operation deletion feature is coming soon.",
-            variant: "info",
-          });
-          // TODO: Implement WebSocket Operation delete logic
-          // - deleteWebSocketOperation 호출
-        },
-      });
-      return;
-    }
-
     // completed 상태만 삭제 불가 (mock 상태는 diff가 있어도 삭제 가능)
     if (isCompleted) {
       setAlertModal({
@@ -1957,6 +1970,53 @@ export function ApiEditorLayout() {
       return;
     }
 
+    // WebSocket 삭제 로직
+    if (protocol === "WebSocket") {
+      setConfirmModal({
+        isOpen: true,
+        title: t("modal.deleteWebSocketOperation"),
+        message: t("modal.confirmDeleteWebSocket"),
+        variant: "danger",
+        onConfirm: async () => {
+          setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+          try {
+            await deleteWebSocketOperation(selectedEndpoint.id);
+            deleteEndpoint(selectedEndpoint.id);
+            setAlertModal({
+              isOpen: true,
+              title: "Deleted",
+              message: "WebSocket Operation has been deleted successfully.",
+              variant: "success",
+            });
+
+            // 폼 초기화
+            setSelectedEndpoint(null);
+            setWsEntryPoint("/ws");
+            setWsEntryPointError("");
+            setWsProtocol("ws");
+            setWsSummary("");
+            setWsDescription("");
+            setWsTags("");
+            setWsReceiver(null);
+            setWsReply(null);
+            setIsEditMode(false);
+            loadEndpoints();
+          } catch (error: unknown) {
+            console.error("WebSocket Operation 삭제 실패:", error);
+            const errorMessage = getErrorMessage(error);
+            setAlertModal({
+              isOpen: true,
+              title: "Delete Failed",
+              message: `Failed to delete WebSocket Operation: ${errorMessage}`,
+              variant: "error",
+            });
+          }
+        },
+      });
+      return;
+    }
+
+    // REST API 삭제 로직
     setConfirmModal({
       isOpen: true,
       title: t("modal.deleteEndpoint"),
@@ -2042,9 +2102,23 @@ export function ApiEditorLayout() {
 
   const handleCancelEdit = () => {
     if (selectedEndpoint) {
-      loadEndpointData(selectedEndpoint.id);
+      const endpointProtocol = selectedEndpoint.protocol || protocol;
+      
+      // WebSocket인 경우
+      if (endpointProtocol === "WebSocket") {
+        loadWebSocketOperationData(selectedEndpoint.id);
+      } else {
+        // REST API인 경우
+        loadEndpointData(selectedEndpoint.id);
+      }
     }
     setIsEditMode(false);
+  };
+
+  const handleBack = () => {
+    // 새 폼 작성 모드를 해제하고 이전 상태로 돌아가기
+    setIsNewFormMode(false);
+    setSelectedEndpoint(null);
   };
 
   const handleReset = () => {
@@ -2066,10 +2140,22 @@ export function ApiEditorLayout() {
         setPathParams([]);
         setAuth({ type: "none" });
         setRequestBody({
-          type: "json",
-          fields: [createPrimitiveField("email", "string")],
+          type: "none",
+          fields: [],
         });
         setStatusCodes([]);
+
+        // WebSocket 관련 초기화
+        if (protocol === "WebSocket") {
+          setWsEntryPoint("/ws");
+          setWsEntryPointError("");
+          setWsProtocol("ws");
+          setWsSummary("");
+          setWsDescription("");
+          setWsTags("");
+          setWsReceiver(null);
+          setWsReply(null);
+        }
       },
     });
   };
@@ -3729,7 +3815,9 @@ export function ApiEditorLayout() {
                       : "bg-red-500 hover:bg-red-600 text-white"
                   }`}
                   title={
-                    isCompleted ? t("modal.completedApisCannotDelete") : ""
+                    isCompleted
+                      ? t("modal.completedApisCannotDelete")
+                      : ""
                   }
                 >
                   {t("common.delete")}
@@ -3744,7 +3832,7 @@ export function ApiEditorLayout() {
         <div className="border-t border-gray-200 dark:border-[#2D333B] px-6 py-4 bg-white dark:bg-[#0D1117]">
           <div className="flex items-center justify-end gap-3">
             <button
-              onClick={handleReset}
+              onClick={handleBack}
               className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0"
             >
               {t("editor.back")}

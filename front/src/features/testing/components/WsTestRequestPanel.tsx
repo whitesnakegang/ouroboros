@@ -6,7 +6,7 @@ import { StompClient, buildWebSocketUrl } from "../utils/stompClient";
 import {
   getWebSocketOperation,
   getWebSocketChannel,
-  getSchema,
+  getWebSocketSchema,
 } from "@/features/spec/services/api";
 import type { SchemaField } from "@/features/spec/types/schema.types";
 import { parseOpenAPISchemaToSchemaField } from "@/features/spec/utils/schemaConverter";
@@ -338,7 +338,7 @@ export function WsTestRequestPanel() {
             // Schema 로드 및 필드 생성
             if (schemaRef) {
               try {
-                const schemaResponse = await getSchema(schemaRef);
+                const schemaResponse = await getWebSocketSchema(schemaRef);
                 const schemaData = schemaResponse.data;
 
                 if (schemaData.properties) {
