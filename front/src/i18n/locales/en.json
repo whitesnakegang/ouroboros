@@ -44,9 +44,9 @@
   },
   "endpoint": {
     "specAndImplementationMismatch": "Spec and implementation do not match",
-    "notImplemented": "미구현",
-    "inProgress": "구현중",
-    "modifying": "수정중"
+    "notImplemented": "Not implemented",
+    "inProgress": "In progress",
+    "modifying": "Modifying"
   },
   "header": {
     "title": "Ouroboros API",
@@ -228,8 +228,6 @@
     "bodyTypeXWwwFormUrlencoded": "x-www-form-urlencoded",
     "bodyTypeJson": "json",
     "bodyTypeXml": "xml",
-    "codeSnippet": "Code Snippet",
-    "viewCodeSnippet": "View Code Snippet",
     "cannotCreateWithKorean": "Cannot create with Korean characters",
     "specImplementationMismatch": "Spec and actual implementation do not match",
     "running": "Running...",
@@ -239,7 +237,6 @@
     "runningStatus": "Running...",
     "owner": "Owner",
     "description": "Description",
-    "tags": "Tags",
     "tagsCategory": "Tags/Category",
     "protocolNotReady": "{{protocol}} specification is being prepared.",
     "onlyRestAndWebSocket": "Currently only REST API and WebSocket are supported.",
@@ -388,7 +385,7 @@
     "noMessagesConfigured": "No messages configured.",
     "noSchemaInformation": "no schema information",
     "schemaReference": "Schema Reference",
-    "cannotLoadMessageInfo": "메시지 정보를 불러올 수 없습니다.",
+    "cannotLoadMessageInfo": "Cannot load message information",
     "noSchemaFieldsClickAdd": "No schema fields. Click \"+ Add Field\" to add or select a schema.",
     "createMessage": "Create Message",
     "cannotCreateWithKorean": "Cannot create with Korean characters",
@@ -412,7 +409,6 @@
     "pathParameters": "Path Parameters",
     "pathPatternDescription": "The address contains a pattern. Please enter the actual value.",
     "pathParameterPlaceholder": "Enter {{param}} value (e.g.: room1)",
-    "receive": "Receive",
     "connect": "Connect",
     "disconnect": "Disconnect",
     "stompConnectHeaders": "STOMP CONNECT Headers (optional)",

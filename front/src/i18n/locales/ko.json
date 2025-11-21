@@ -409,7 +409,6 @@
     "pathParameters": "경로 파라미터",
     "pathPatternDescription": "주소에 패턴이 포함되어 있습니다. 실제 값을 입력해주세요.",
     "pathParameterPlaceholder": "{{param}} 값 입력 (예: room1)",
-    "receive": "수신",
     "connect": "연결",
     "disconnect": "연결 해제",
     "stompConnectHeaders": "STOMP CONNECT 헤더 (선택사항)",

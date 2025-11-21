@@ -873,7 +873,6 @@ export function ApiRequestCard({
                                 <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
                                   <p>
                                     {t("apiCard.noFieldsYet")}
-                                    one.
                                   </p>
                                 </div>
                               )}
