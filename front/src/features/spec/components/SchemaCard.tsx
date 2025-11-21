@@ -292,8 +292,8 @@ export function SchemaCard({
         }
         setAlertModal({
           isOpen: true,
-          title: "Updated",
-          message: `Schema "${originalSchemaName}" has been updated successfully.`,
+          title: t("common.updated"),
+          message: t("schemaCard.schemaUpdatedSuccessfully", { name: originalSchemaName }),
           variant: "success",
         });
       } else {
@@ -305,8 +305,8 @@ export function SchemaCard({
         }
         setAlertModal({
           isOpen: true,
-          title: "Created",
-          message: `Schema "${currentSchemaName}" has been created successfully.`,
+          title: t("common.created"),
+          message: t("schemaCard.schemaCreatedSuccessfully", { name: currentSchemaName }),
           variant: "success",
         });
       }

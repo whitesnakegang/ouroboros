@@ -1928,8 +1928,8 @@ export function ApiEditorLayout() {
     if (protocol === "WebSocket") {
       setConfirmModal({
         isOpen: true,
-        title: "Delete WebSocket Operation",
-        message: "Are you sure you want to delete this WebSocket Operation?",
+        title: t("modal.deleteWebSocketOperation"),
+        message: t("modal.confirmDeleteWebSocket"),
         variant: "danger",
         onConfirm: () => {
           setConfirmModal((prev) => ({ ...prev, isOpen: false }));
@@ -1959,8 +1959,8 @@ export function ApiEditorLayout() {
 
     setConfirmModal({
       isOpen: true,
-      title: "Delete Endpoint",
-      message: "Are you sure you want to delete this endpoint?",
+      title: t("modal.deleteEndpoint"),
+      message: t("modal.confirmDeleteEndpoint"),
       variant: "danger",
       onConfirm: async () => {
         setConfirmModal((prev) => ({ ...prev, isOpen: false }));
@@ -2050,8 +2050,8 @@ export function ApiEditorLayout() {
   const handleReset = () => {
     setConfirmModal({
       isOpen: true,
-      title: "Reset Confirmation",
-      message: "Are you sure you want to reset the current content?",
+      title: t("modal.resetConfirmation"),
+      message: t("modal.confirmReset"),
       variant: "warning",
       onConfirm: () => {
         setConfirmModal((prev) => ({ ...prev, isOpen: false }));
@@ -2274,9 +2274,8 @@ export function ApiEditorLayout() {
 
     setConfirmModal({
       isOpen: true,
-      title: "Reflect Implementation to Spec",
-      message:
-        "Do you want to automatically reflect the actual implementation into the spec?\n\nThis operation cannot be undone.",
+      title: t("modal.reflectImplementationToSpec"),
+      message: t("modal.confirmReflectImplementation"),
       variant: "warning",
       onConfirm: async () => {
         setConfirmModal((prev) => ({ ...prev, isOpen: false }));
@@ -2374,9 +2373,8 @@ export function ApiEditorLayout() {
 
     setConfirmModal({
       isOpen: true,
-      title: "Reflect Channel to Spec",
-      message:
-        "Do you want to automatically reflect the actual implementation's Channel information into the spec?\n\nThis operation cannot be undone.",
+      title: t("modal.reflectChannelToSpec"),
+      message: t("modal.confirmReflectChannel"),
       variant: "warning",
       onConfirm: async () => {
         setConfirmModal((prev) => ({ ...prev, isOpen: false }));

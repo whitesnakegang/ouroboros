@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import dataFakerMethods from "../../../assets/data/datafaker-methods.json";
 
 interface MockExpressionModalProps {
@@ -29,6 +30,7 @@ export function MockExpressionModal({
   onSelect,
   initialValue = "",
 }: MockExpressionModalProps) {
+  const { t } = useTranslation();
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(
     null
   );
@@ -139,7 +141,7 @@ export function MockExpressionModal({
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-[#30363D]">
           <div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-[#E6EDF3]">
-              Select DataFaker Mock Expression
+              {t("mockExpression.selectDataFakerMockExpression")}
             </h2>
           </div>
           <button
@@ -169,7 +171,7 @@ export function MockExpressionModal({
             <div className="p-4">
               <input
                 type="text"
-                placeholder="Search providers..."
+                placeholder={t("mockExpression.searchProviders")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-[#30363D] rounded-lg bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -196,7 +198,7 @@ export function MockExpressionModal({
                         {provider.name}
                       </div>
                       <div className="text-xs text-gray-500 dark:text-[#8B949E]">
-                        {provider.methods.length} methods
+                        {provider.methods.length} {t("mockExpression.methods")}
                       </div>
                     </div>
                   </div>
@@ -210,7 +212,7 @@ export function MockExpressionModal({
             {selectedProvider ? (
               <div className="p-4 space-y-1">
                 <h3 className="text-sm font-semibold text-gray-700 dark:text-[#8B949E] mb-3 px-2">
-                  {selectedProvider.icon} {selectedProvider.name} Methods
+                  {selectedProvider.icon} {selectedProvider.name} {t("mockExpression.methods")}
                 </h3>
                 {selectedProvider.methods.map((method) => (
                   <button
@@ -226,7 +228,7 @@ export function MockExpressionModal({
                       {method.name}()
                       {method.hasParams && (
                         <span className="ml-2 text-xs text-orange-600 dark:text-orange-400">
-                          params
+                          {t("mockExpression.params")}
                         </span>
                       )}
                     </div>
@@ -234,7 +236,7 @@ export function MockExpressionModal({
                       {method.description}
                     </div>
                     <div className="text-xs text-gray-400 dark:text-[#6E7681] mt-1 font-mono">
-                      Example: {method.example}
+                      {t("mockExpression.example")}: {method.example}
                     </div>
                   </button>
                 ))}
@@ -255,7 +257,7 @@ export function MockExpressionModal({
                       d="M9 5l7 7-7 7"
                     />
                   </svg>
-                  <p>Select a Provider</p>
+                  <p>{t("mockExpression.selectProvider")}</p>
                 </div>
               </div>
             )}
@@ -267,7 +269,7 @@ export function MockExpressionModal({
               <div className="p-4 space-y-4">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-700 dark:text-[#8B949E] mb-2">
-                    Selected Method
+                    {t("mockExpression.selectedMethod")}
                   </h3>
                   <div className="bg-white dark:bg-[#0D1117] p-4 rounded-lg border border-gray-200 dark:border-[#30363D]">
                     <div className="flex items-center gap-2 mb-2">
@@ -289,12 +291,12 @@ export function MockExpressionModal({
                 {selectedMethod.hasParams && (
                   <div>
                     <h3 className="text-sm font-semibold text-gray-700 dark:text-[#8B949E] mb-2">
-                      Options (optional)
+                      {t("mockExpression.optionsOptional")}
                     </h3>
                     <div className="space-y-2">
                       <div>
                         <label className="block text-xs text-gray-600 dark:text-[#8B949E] mb-1">
-                          Length
+                          {t("mockExpression.length")}
                         </label>
                         <input
                           type="number"
@@ -308,7 +310,7 @@ export function MockExpressionModal({
                       </div>
                       <div>
                         <label className="block text-xs text-gray-600 dark:text-[#8B949E] mb-1">
-                          Min
+                          {t("mockExpression.min")}
                         </label>
                         <input
                           type="number"
@@ -322,7 +324,7 @@ export function MockExpressionModal({
                       </div>
                       <div>
                         <label className="block text-xs text-gray-600 dark:text-[#8B949E] mb-1">
-                          Max
+                          {t("mockExpression.max")}
                         </label>
                         <input
                           type="number"
@@ -341,7 +343,7 @@ export function MockExpressionModal({
                 {/* Preview */}
                 <div>
                   <h3 className="text-sm font-semibold text-gray-700 dark:text-[#8B949E] mb-2">
-                    Preview
+                    {t("mockExpression.preview")}
                   </h3>
                   <div className="bg-gray-900 dark:bg-black p-4 rounded-lg border border-gray-700">
                     <div className="font-mono text-sm text-green-400">
@@ -349,8 +351,7 @@ export function MockExpressionModal({
                     </div>
                   </div>
                   <p className="text-xs text-gray-500 dark:text-[#8B949E] mt-2">
-                    This expression creates mock data using DataFaker in the
-                    backend.
+                    {t("mockExpression.description")}
                   </p>
                 </div>
               </div>
@@ -370,7 +371,7 @@ export function MockExpressionModal({
                       d="M9 5l7 7-7 7"
                     />
                   </svg>
-                  <p>Select a method</p>
+                  <p>{t("mockExpression.selectMethod")}</p>
                 </div>
               </div>
             )}
@@ -389,14 +390,14 @@ export function MockExpressionModal({
               onClick={handleClose}
               className="px-6 py-2 border border-gray-300 dark:border-[#30363D] rounded-lg hover:bg-gray-100 dark:hover:bg-[#30363D] transition-colors text-gray-700 dark:text-[#E6EDF3]"
             >
-              Cancel
+              {t("common.cancel")}
             </button>
             <button
               onClick={handleConfirm}
               disabled={!selectedMethod || !selectedProvider}
               className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed transition-colors"
             >
-              Select
+              {t("mockExpression.select")}
             </button>
           </div>
         </div>

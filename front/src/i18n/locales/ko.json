@@ -11,7 +11,9 @@
     "save": "저장",
     "delete": "삭제",
     "edit": "편집",
-    "processing": "처리 중..."
+    "processing": "처리 중...",
+    "updated": "업데이트됨",
+    "created": "생성됨"
   },
   "sidebar": {
     "closeSidebar": "사이드바 닫기",
@@ -84,6 +86,10 @@
     "completedApisCannotEdit": "완료된 API는 편집할 수 없습니다.",
     "resetConfirmation": "초기화 확인",
     "confirmReset": "현재 내용을 초기화하시겠습니까?",
+    "reflectImplementationToSpec": "구현 사항을 명세에 반영",
+    "confirmReflectImplementation": "실제 구현 사항을 명세에 자동으로 반영하시겠습니까?\n\n이 작업은 취소할 수 없습니다.",
+    "reflectChannelToSpec": "채널을 명세에 반영",
+    "confirmReflectChannel": "실제 구현의 채널 정보를 명세에 자동으로 반영하시겠습니까?\n\n이 작업은 취소할 수 없습니다.",
     "fileFormatError": "파일 형식 오류",
     "onlyYamlFiles": "YAML 파일(.yml 또는 .yaml)만 업로드할 수 있습니다.",
     "websocketOperationUpdated": "WebSocket 작업이 성공적으로 업데이트되었습니다."
@@ -332,7 +338,9 @@
     "editingMode": "편집 모드: \"{{name}}\" 스키마를 편집 중입니다. 이름은 변경할 수 없습니다.",
     "editingModeShort": "편집 모드",
     "typeError": "타입 오류",
-    "onlyObjectTypeSupported": "객체 타입 스키마만 지원됩니다."
+    "onlyObjectTypeSupported": "객체 타입 스키마만 지원됩니다.",
+    "schemaUpdatedSuccessfully": "스키마 \"{{name}}\"이(가) 성공적으로 업데이트되었습니다.",
+    "schemaCreatedSuccessfully": "스키마 \"{{name}}\"이(가) 성공적으로 생성되었습니다."
   },
   "diffNotification": {
     "title": "명세 불일치 알림",
@@ -447,5 +455,55 @@
     "replyAddressRequired": "Reply Address가 없습니다. 서버가 메시지를 보낼 주소(/topic/ 또는 /queue/)가 필요합니다.",
     "cannotSendMessageSetAddress": "메시지를 전송할 수 없습니다.\n\nReply Address 또는 Receive Address를 설정해주세요.",
     "cannotSendMessagePatternInAddress": "메시지를 전송할 수 없습니다.\n\n주소에 패턴이 포함되어 있습니다: {{destination}}\n\n다음 파라미터를 입력해주세요: {{params}}"
+  },
+  "mockExpression": {
+    "selectDataFakerMockExpression": "DataFaker Mock 표현식 선택",
+    "searchProviders": "프로바이더 검색...",
+    "methods": "메서드",
+    "params": "파라미터",
+    "example": "예시",
+    "selectProvider": "프로바이더 선택",
+    "selectedMethod": "선택된 메서드",
+    "optionsOptional": "옵션 (선택사항)",
+    "length": "길이",
+    "min": "최소값",
+    "max": "최대값",
+    "preview": "미리보기",
+    "description": "이 표현식은 백엔드에서 DataFaker를 사용하여 Mock 데이터를 생성합니다.",
+    "selectMethod": "메서드 선택",
+    "select": "선택"
+  },
+  "traceModal": {
+    "callTrace": "호출 추적",
+    "tryId": "Try ID",
+    "traceId": "Trace ID",
+    "totalDuration": "총 소요 시간",
+    "self": "자체",
+    "noTraceDataFound": "추적 데이터를 찾을 수 없습니다.",
+    "tempoDisabledOrNotFound": "Tempo가 비활성화되었거나 추적을 찾을 수 없습니다."
+  },
+  "messageDetail": {
+    "messageDetail": "메시지 상세",
+    "message": "메시지",
+    "test": "테스트",
+    "direction": "방향",
+    "address": "주소",
+    "timestamp": "타임스탬프",
+    "tryId": "Try ID",
+    "content": "내용",
+    "sent": "전송",
+    "received": "수신"
+  },
+  "markdownPreview": {
+    "markdownPreview": "Markdown 미리보기",
+    "copy": "복사",
+    "close": "닫기",
+    "download": "다운로드",
+    "copyCompleted": "복사 완료",
+    "markdownCopiedToClipboard": "Markdown이 클립보드에 복사되었습니다.",
+    "copyFailed": "복사 실패",
+    "failedToCopyToClipboard": "클립보드에 복사하는 데 실패했습니다.",
+    "showSource": "소스 보기",
+    "showPreview": "미리보기 보기"
   }
 }

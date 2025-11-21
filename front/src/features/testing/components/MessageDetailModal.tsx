@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import type { WebSocketMessage } from "../store/testing.store";
 import type { TryMethod, TryTraceData } from "@/features/spec/services/api";
 import { getTryMethodList, getTryTrace } from "@/features/spec/services/api";
@@ -32,6 +33,7 @@ function convertToTryMethodLite(methods: TryMethod[]): Array<{
 }
 
 export function MessageDetailModal({ isOpen, onClose, message }: MessageDetailModalProps) {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<"message" | "test">("message");
   const [methodList, setMethodList] = useState<TryMethod[] | null>(null);
   const [totalDurationMs, setTotalDurationMs] = useState<number | null>(null);
@@ -114,7 +116,7 @@ export function MessageDetailModal({ isOpen, onClose, message }: MessageDetailMo
           <div className="flex items-center gap-3">
             <div className={`w-3 h-3 rounded-full ${isSent ? "bg-blue-500" : "bg-green-500"}`} />
             <h2 className="text-lg font-semibold text-gray-900 dark:text-[#E6EDF3]">
-              메시지 상세
+              {t("messageDetail.messageDetail")}
             </h2>
           </div>
           <button
@@ -135,9 +137,9 @@ export function MessageDetailModal({ isOpen, onClose, message }: MessageDetailMo
               activeTab === "message"
                 ? "text-[#2563EB] border-b-2 border-[#2563EB] bg-blue-50 dark:bg-blue-900/20"
                 : "text-gray-600 dark:text-[#8B949E] hover:text-gray-900 dark:hover:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#0D1117]"
-            }`}
+              }`}
           >
-            Message
+            {t("messageDetail.message")}
           </button>
           {message.tryId && (
             <button
@@ -148,7 +150,7 @@ export function MessageDetailModal({ isOpen, onClose, message }: MessageDetailMo
                   : "text-gray-600 dark:text-[#8B949E] hover:text-gray-900 dark:hover:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#0D1117]"
               }`}
             >
-              Test
+              {t("messageDetail.test")}
             </button>
           )}
         </div>
@@ -161,7 +163,7 @@ export function MessageDetailModal({ isOpen, onClose, message }: MessageDetailMo
               <div className="space-y-3">
                 <div>
                   <label className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] uppercase tracking-wide">
-                    Direction
+                    {t("messageDetail.direction")}
                   </label>
                   <div className="mt-1">
                     <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
@@ -169,14 +171,14 @@ export function MessageDetailModal({ isOpen, onClose, message }: MessageDetailMo
                         ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400"
                         : "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
                     }`}>
-                      {isSent ? "Sent" : "Received"}
+                      {isSent ? t("messageDetail.sent") : t("messageDetail.received")}
                     </span>
                   </div>
                 </div>
 
                 <div>
                   <label className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] uppercase tracking-wide">
-                    Address
+                    {t("messageDetail.address")}
                   </label>
                   <div className="mt-1 px-3 py-2 bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] rounded-md">
                     <code className="text-sm font-mono text-gray-900 dark:text-[#E6EDF3]">
@@ -187,7 +189,7 @@ export function MessageDetailModal({ isOpen, onClose, message }: MessageDetailMo
 
                 <div>
                   <label className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] uppercase tracking-wide">
-                    Timestamp
+                    {t("messageDetail.timestamp")}
                   </label>
                   <div className="mt-1 px-3 py-2 bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] rounded-md">
                     <span className="text-sm text-gray-900 dark:text-[#E6EDF3]">
@@ -199,7 +201,7 @@ export function MessageDetailModal({ isOpen, onClose, message }: MessageDetailMo
                 {message.tryId && (
                   <div>
                     <label className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] uppercase tracking-wide">
-                      Try ID
+                      {t("messageDetail.tryId")}
                     </label>
                     <div className="mt-1 px-3 py-2 bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] rounded-md">
                       <code className="text-sm font-mono text-gray-900 dark:text-[#E6EDF3]">
@@ -211,7 +213,7 @@ export function MessageDetailModal({ isOpen, onClose, message }: MessageDetailMo
 
                 <div>
                   <label className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] uppercase tracking-wide">
-                    Content
+                    {t("messageDetail.content")}
                   </label>
                   <div className="mt-1">
                     {isJson ? (

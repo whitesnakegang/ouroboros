@@ -11,7 +11,9 @@
     "save": "Save",
     "delete": "Delete",
     "edit": "Edit",
-    "processing": "Processing..."
+    "processing": "Processing...",
+    "updated": "Updated",
+    "created": "Created"
   },
   "sidebar": {
     "closeSidebar": "Close sidebar",
@@ -84,6 +86,10 @@
     "completedApisCannotEdit": "Completed APIs cannot be edited.",
     "resetConfirmation": "Reset Confirmation",
     "confirmReset": "Are you sure you want to reset the current content?",
+    "reflectImplementationToSpec": "Reflect Implementation to Spec",
+    "confirmReflectImplementation": "Do you want to automatically reflect the actual implementation into the spec?\n\nThis operation cannot be undone.",
+    "reflectChannelToSpec": "Reflect Channel to Spec",
+    "confirmReflectChannel": "Do you want to automatically reflect the actual implementation's Channel information into the spec?\n\nThis operation cannot be undone.",
     "fileFormatError": "File Format Error",
     "onlyYamlFiles": "Only YAML files (.yml or .yaml) can be uploaded.",
     "websocketOperationUpdated": "WebSocket Operation has been updated successfully."
@@ -332,7 +338,9 @@
     "editingMode": "Editing mode: \"{{name}}\" schema is being edited. The name cannot be changed.",
     "editingModeShort": "editing mode",
     "typeError": "Type Error",
-    "onlyObjectTypeSupported": "Only object type schemas are supported."
+    "onlyObjectTypeSupported": "Only object type schemas are supported.",
+    "schemaUpdatedSuccessfully": "Schema \"{{name}}\" has been updated successfully.",
+    "schemaCreatedSuccessfully": "Schema \"{{name}}\" has been created successfully."
   },
   "diffNotification": {
     "title": "Diff Notification",
@@ -447,5 +455,55 @@
     "replyAddressRequired": "Reply Address is missing. The server needs an address (/topic/ or /queue/) to send messages.",
     "cannotSendMessageSetAddress": "Cannot send message.\n\nPlease set Reply Address or Receive Address.",
     "cannotSendMessagePatternInAddress": "Cannot send message.\n\nThe address contains a pattern: {{destination}}\n\nPlease enter the following parameters: {{params}}"
+  },
+  "mockExpression": {
+    "selectDataFakerMockExpression": "Select DataFaker Mock Expression",
+    "searchProviders": "Search providers...",
+    "methods": "methods",
+    "params": "params",
+    "example": "Example",
+    "selectProvider": "Select a Provider",
+    "selectedMethod": "Selected Method",
+    "optionsOptional": "Options (optional)",
+    "length": "Length",
+    "min": "Min",
+    "max": "Max",
+    "preview": "Preview",
+    "description": "This expression creates mock data using DataFaker in the backend.",
+    "selectMethod": "Select a method",
+    "select": "Select"
+  },
+  "traceModal": {
+    "callTrace": "Call Trace",
+    "tryId": "Try ID",
+    "traceId": "Trace ID",
+    "totalDuration": "Total Duration",
+    "self": "Self",
+    "noTraceDataFound": "No trace data found.",
+    "tempoDisabledOrNotFound": "Tempo is disabled or trace not found."
+  },
+  "messageDetail": {
+    "messageDetail": "Message Detail",
+    "message": "Message",
+    "test": "Test",
+    "direction": "Direction",
+    "address": "Address",
+    "timestamp": "Timestamp",
+    "tryId": "Try ID",
+    "content": "Content",
+    "sent": "Sent",
+    "received": "Received"
+  },
+  "markdownPreview": {
+    "markdownPreview": "Markdown Preview",
+    "copy": "Copy",
+    "close": "Close",
+    "download": "Download",
+    "copyCompleted": "Copy Completed",
+    "markdownCopiedToClipboard": "Markdown has been copied to the clipboard.",
+    "copyFailed": "Copy Failed",
+    "failedToCopyToClipboard": "Failed to copy to clipboard.",
+    "showSource": "Show Source",
+    "showPreview": "Show Preview"
   }
 }
