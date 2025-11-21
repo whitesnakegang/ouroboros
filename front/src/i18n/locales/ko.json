@@ -2,7 +2,7 @@
   "common": {
     "search": "검색",
     "loading": "로딩 중...",
-    "add": "+ 추가",
+    "add": "추가",
     "all": "전체",
     "close": "닫기",
     "confirm": "확인",
@@ -19,11 +19,11 @@
     "closeSidebar": "사이드바 닫기",
     "toggleMenu": "메뉴 토글",
     "noEndpointsFound": "엔드포인트를 찾을 수 없습니다",
-    "addNew": "+ 추가"
+    "addNew": "추가"
   },
   "status": {
     "all": "전체",
-    "mock": "mock",
+    "mock": "Mock",
     "completed": "완료",
     "notImplemented": "미구현",
     "inProgress": "구현 중",
@@ -119,7 +119,8 @@
     "apiCreated": "API {{method}} {{url}}이(가) 성공적으로 생성되었습니다.",
     "websocketYamlImportCompleted": "WebSocket YAML 가져오기가 성공적으로 완료되었습니다.",
     "yamlImportFailed": "YAML 가져오기 실패",
-    "updated": "업데이트됨"
+    "updated": "업데이트됨",
+    "progressCompleted": "진행 완료:"
   },
   "importResult": {
     "importCompleted": "가져오기 완료",

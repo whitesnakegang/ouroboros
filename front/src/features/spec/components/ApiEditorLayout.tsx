@@ -46,10 +46,7 @@ import {
   parseOpenAPIRequestBody,
   parseOpenAPISchemaToSchemaField,
 } from "../utils/schemaConverter";
-import {
-  isArraySchema,
-  isRefSchema,
-} from "../types/schema.types";
+import { isArraySchema, isRefSchema } from "../types/schema.types";
 
 interface KeyValuePair {
   key: string;
@@ -234,16 +231,16 @@ export function ApiEditorLayout() {
   // WebSocket: progress === "completed" 또는 (tag === "receive" && progress === "receive")
   const isCompleted = (() => {
     if (!selectedEndpoint) return false;
-    
+
     const progress = selectedEndpoint.progress?.toLowerCase();
     const tag = selectedEndpoint.tag?.toLowerCase();
     const endpointProtocol = selectedEndpoint.protocol || protocol;
-    
+
     // REST API인 경우
     if (endpointProtocol === "REST") {
       return progress === "completed";
     }
-    
+
     // WebSocket인 경우
     if (endpointProtocol === "WebSocket") {
       // progress가 "completed"이면 완료 상태
@@ -255,7 +252,7 @@ export function ApiEditorLayout() {
         return true;
       }
     }
-    
+
     return false;
   })();
 
@@ -896,10 +893,23 @@ export function ApiEditorLayout() {
           alertMessage =
             "서버에 연결할 수 없습니다.\n\n서버가 실행 중인지 확인해주세요.";
         }
+        // 400 에러 (잘못된 요청 - ID가 유효하지 않음)
+        else if (
+          errMsg.includes("400") ||
+          errMsg.includes("bad request") ||
+          errMsg.includes("invalid request data")
+        ) {
+          alertMessage =
+            "명세에 없는 내용입니다. 선택된 엔드포인트가 존재하지 않습니다.\n\n사이드바 목록을 새로고침합니다.";
+          // 사이드바 목록 새로고침
+          loadEndpoints();
+        }
         // 404 에러 (엔드포인트 없음)
         else if (errMsg.includes("404") || errMsg.includes("not found")) {
           alertMessage =
             "명세에 없는 내용입니다. 선택된 엔드포인트가 존재하지 않습니다.";
+          // 사이드바 목록 새로고침
+          loadEndpoints();
         }
         // 기타 서버 에러
         else {
@@ -950,13 +960,19 @@ export function ApiEditorLayout() {
         const operationProgress = operationData.operation.progress;
         const operationDiff = operationData.operation.diff;
         const operationTag = operationData.tag;
-        
+
         setSelectedEndpoint({
           ...selectedEndpoint,
           entrypoint: entrypoint,
           // progress가 명시적으로 제공되면 사용, 없으면 기존 값 유지
-          progress: operationProgress !== undefined ? operationProgress : (selectedEndpoint.progress || "none"),
-          diff: operationDiff !== undefined ? operationDiff : (selectedEndpoint.diff || "none"),
+          progress:
+            operationProgress !== undefined
+              ? operationProgress
+              : selectedEndpoint.progress || "none",
+          diff:
+            operationDiff !== undefined
+              ? operationDiff
+              : selectedEndpoint.diff || "none",
           tag: operationTag !== undefined ? operationTag : selectedEndpoint.tag,
         });
       }
@@ -2103,7 +2119,7 @@ export function ApiEditorLayout() {
   const handleCancelEdit = () => {
     if (selectedEndpoint) {
       const endpointProtocol = selectedEndpoint.protocol || protocol;
-      
+
       // WebSocket인 경우
       if (endpointProtocol === "WebSocket") {
         loadWebSocketOperationData(selectedEndpoint.id);
@@ -2854,7 +2870,7 @@ export function ApiEditorLayout() {
                   selectedEndpoint.method?.toLowerCase() === "send") && (
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-gray-600 dark:text-[#8B949E] font-medium">
-                      pregress completed:
+                      {t("editor.progressCompleted")}
                     </span>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input
@@ -3078,7 +3094,7 @@ export function ApiEditorLayout() {
                       }}
                       placeholder="Authorization"
                       autoFocus
-                      className="px-3 py-2 pr-10 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-2 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm w-full sm:w-64"
+                      className="px-3 py-2 pr-10 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm w-full sm:w-64"
                     />
                     {authorization && authorization.trim() && (
                       <div className="absolute right-3 flex items-center">
@@ -3492,7 +3508,7 @@ export function ApiEditorLayout() {
                               value={method}
                               onChange={(e) => setMethod(e.target.value)}
                               disabled={!!(selectedEndpoint && !isEditMode)}
-                              className={`appearance-none w-full sm:w-auto px-3 py-2 pr-10 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm font-medium min-w-[120px] ${
+                              className={`appearance-none w-full sm:w-auto px-3 py-2 pr-10 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm font-medium min-w-[120px] ${
                                 selectedEndpoint && !isEditMode
                                   ? "opacity-60 cursor-not-allowed"
                                   : ""
@@ -3551,11 +3567,7 @@ export function ApiEditorLayout() {
                                 urlError
                                   ? "border-red-500 dark:border-red-500"
                                   : "border-gray-300 dark:border-[#2D333B]"
-                              } text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 ${
-                                urlError
-                                  ? "focus:ring-red-500 focus:border-red-500"
-                                  : "focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500"
-                              } text-sm font-mono ${
+                              } text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm font-mono ${
                                 selectedEndpoint && !isEditMode
                                   ? "opacity-60 cursor-not-allowed"
                                   : ""
@@ -3621,7 +3633,7 @@ export function ApiEditorLayout() {
                               onChange={(e) => setTags(e.target.value)}
                               placeholder="AUTH"
                               disabled={!!(selectedEndpoint && !isEditMode)}
-                              className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
+                              className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm ${
                                 selectedEndpoint && !isEditMode
                                   ? "opacity-60 cursor-not-allowed"
                                   : ""
@@ -3638,7 +3650,7 @@ export function ApiEditorLayout() {
                               onChange={(e) => setSummary(e.target.value)}
                               placeholder="John Doe"
                               disabled={!!(selectedEndpoint && !isEditMode)}
-                              className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
+                              className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm ${
                                 selectedEndpoint && !isEditMode
                                   ? "opacity-60 cursor-not-allowed"
                                   : ""
@@ -3658,7 +3670,7 @@ export function ApiEditorLayout() {
                             onChange={(e) => setDescription(e.target.value)}
                             placeholder="User login process"
                             disabled={!!(selectedEndpoint && !isEditMode)}
-                            className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
+                            className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm ${
                               selectedEndpoint && !isEditMode
                                 ? "opacity-60 cursor-not-allowed"
                                 : ""
@@ -3815,9 +3827,7 @@ export function ApiEditorLayout() {
                       : "bg-red-500 hover:bg-red-600 text-white"
                   }`}
                   title={
-                    isCompleted
-                      ? t("modal.completedApisCannotDelete")
-                      : ""
+                    isCompleted ? t("modal.completedApisCannotDelete") : ""
                   }
                 >
                   {t("common.delete")}

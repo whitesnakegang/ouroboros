@@ -96,7 +96,7 @@ export function AlertModal({
           <div className="px-6 pb-6 flex items-center justify-end">
             <button
               onClick={onClose}
-              className="px-4 py-2 bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:ring-offset-2 dark:focus:ring-offset-[#0D1117] active:scale-[0.98]"
+              className="px-4 py-2 bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-0 focus-visible:outline-none active:scale-[0.98]"
             >
               {confirmText}
             </button>

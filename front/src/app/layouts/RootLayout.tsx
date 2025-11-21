@@ -1,7 +1,7 @@
 import { Outlet } from "react-router-dom";
 import { Sidebar } from "@/features/sidebar/components/Sidebar";
 import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
-import { useEffect, useLayoutEffect, useMemo } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 export function RootLayout() {
@@ -22,9 +22,11 @@ export function RootLayout() {
     return lang.startsWith("ko") ? "ko" : "en";
   }, [i18n.language]);
 
-  const toggleLanguage = async () => {
-    const newLanguage = currentLanguage === "ko" ? "en" : "ko";
-    
+  // 언어 선택 드롭다운 상태
+  const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false);
+  const languageMenuRef = useRef<HTMLDivElement>(null);
+
+  const changeLanguage = async (newLanguage: "ko" | "en") => {
     // localStorage에 먼저 저장 (중요: changeLanguage 전에 저장)
     localStorage.setItem("i18nextLng", newLanguage);
     
@@ -32,7 +34,28 @@ export function RootLayout() {
     // changeLanguage는 Promise를 반환하므로 await로 완료 대기
     // t 함수를 사용하는 모든 컴포넌트가 자동으로 리렌더링됨
     await i18n.changeLanguage(newLanguage);
+    setIsLanguageMenuOpen(false);
   };
+
+  // 외부 클릭 시 드롭다운 닫기
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        languageMenuRef.current &&
+        !languageMenuRef.current.contains(event.target as Node)
+      ) {
+        setIsLanguageMenuOpen(false);
+      }
+    }
+
+    if (isLanguageMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isLanguageMenuOpen]);
 
   const handleNewApiForm = () => {
     // 새 API 폼 트리거
@@ -73,6 +96,9 @@ export function RootLayout() {
 
   // 다크 모드 설정 적용 (초기 로드 시 즉시 적용 및 변경 시)
   useLayoutEffect(() => {
+    // 전환 애니메이션을 위한 클래스 추가
+    document.documentElement.style.transition = "background-color 0.5s ease-in-out, color 0.5s ease-in-out";
+    
     if (isDarkMode) {
       document.documentElement.classList.add("dark");
       document.documentElement.style.colorScheme = "dark";
@@ -90,6 +116,7 @@ export function RootLayout() {
       try {
         const parsed = JSON.parse(stored);
         if (parsed.state?.isDarkMode !== undefined) {
+          // 초기 로드 시에는 애니메이션 없이 즉시 적용
           if (parsed.state.isDarkMode) {
             document.documentElement.classList.add("dark");
             document.documentElement.style.colorScheme = "dark";
@@ -102,12 +129,19 @@ export function RootLayout() {
         // localStorage 파싱 실패 시 무시
       }
     }
+    
+    // 초기 로드 후 약간의 지연을 두고 전환 애니메이션 활성화
+    const timer = setTimeout(() => {
+      document.documentElement.style.transition = "background-color 0.5s ease-in-out, color 0.5s ease-in-out";
+    }, 100);
+    
+    return () => clearTimeout(timer);
   }, []);
 
 
   return (
-    <div className="h-screen flex flex-col bg-white dark:bg-[#0D1117] transition-colors">
-      <header className="border-b border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#0D1117] px-4 py-2 flex items-center justify-between">
+    <div className="h-screen flex flex-col bg-white dark:bg-[#0D1117] transition-[background-color] duration-500 ease-in-out">
+      <header className="border-b border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#0D1117] px-4 py-2 flex items-center justify-between transition-[background-color,border-color] duration-500 ease-in-out">
         <div className="flex items-center gap-3">
           {/* 모바일 메뉴 버튼 */}
           <button
@@ -151,22 +185,96 @@ export function RootLayout() {
               {progressPercentage}%
             </span>
           </div>
-          {/* 언어 전환 버튼 */}
-          <button
-            onClick={toggleLanguage}
-            className="px-3 py-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-[#161B22] transition-colors text-sm font-medium text-gray-700 dark:text-[#E6EDF3] border border-gray-300 dark:border-[#2D333B]"
-            title={currentLanguage === "ko" ? t("header.switchToEnglish") : t("header.switchToKorean")}
-          >
-            {currentLanguage === "ko" ? "EN" : "한"}
-          </button>
+          {/* 언어 선택 드롭다운 */}
+          <div className="relative" ref={languageMenuRef}>
+            <button
+              onClick={() => setIsLanguageMenuOpen(!isLanguageMenuOpen)}
+              className="p-2 text-xl hover:opacity-70 transition-opacity"
+              style={{ 
+                appearance: 'none', 
+                WebkitAppearance: 'none',
+                background: 'transparent',
+                border: 'none',
+                outline: 'none',
+                boxShadow: 'none',
+                padding: '0.5rem',
+                cursor: 'pointer'
+              }}
+              onMouseDown={(e) => e.preventDefault()}
+              title={currentLanguage === "ko" ? t("header.switchToEnglish") : t("header.switchToKorean")}
+            >
+              🌐
+            </button>
+            {isLanguageMenuOpen && (
+              <div className="absolute right-0 top-full mt-2 w-32 bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#2D333B] rounded-md shadow-lg z-50">
+                <button
+                  onClick={() => changeLanguage("ko")}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-[#0D1117] transition-colors focus:outline-none focus-visible:outline-none flex items-center justify-between"
+                >
+                  <span className={currentLanguage === "ko" ? "text-[#2563EB] dark:text-[#58A6FF]" : "text-gray-700 dark:text-[#E6EDF3]"}>
+                    한국어
+                  </span>
+                  {currentLanguage === "ko" && (
+                    <svg
+                      className="w-4 h-4 text-[#2563EB] dark:text-[#58A6FF]"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                  )}
+                </button>
+                <button
+                  onClick={() => changeLanguage("en")}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-[#0D1117] transition-colors focus:outline-none focus-visible:outline-none flex items-center justify-between"
+                >
+                  <span className={currentLanguage === "en" ? "text-[#2563EB] dark:text-[#58A6FF]" : "text-gray-700 dark:text-[#E6EDF3]"}>
+                    English
+                  </span>
+                  {currentLanguage === "en" && (
+                    <svg
+                      className="w-4 h-4 text-[#2563EB] dark:text-[#58A6FF]"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
           <button
             onClick={toggleDarkMode}
-            className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-[#161B22] transition-colors"
+            className="p-2 hover:opacity-70 transition-opacity"
+            style={{ 
+              appearance: 'none', 
+              WebkitAppearance: 'none',
+              background: 'transparent',
+              border: 'none',
+              outline: 'none',
+              boxShadow: 'none',
+              padding: '0.5rem',
+              cursor: 'pointer'
+            }}
+            onMouseDown={(e) => e.preventDefault()}
             title={isDarkMode ? t("header.switchToLightMode") : t("header.switchToDarkMode")}
           >
             {isDarkMode ? (
               <svg
-                className="w-5 h-5 text-yellow-500"
+                className="w-5 h-5 text-yellow-500 transition-all duration-500 ease-in-out"
                 fill="currentColor"
                 viewBox="0 0 20 20"
               >
@@ -178,7 +286,7 @@ export function RootLayout() {
               </svg>
             ) : (
               <svg
-                className="w-5 h-5 text-gray-600 dark:text-[#8B949E]"
+                className="w-5 h-5 text-gray-600 dark:text-[#8B949E] transition-all duration-500 ease-in-out"
                 fill="currentColor"
                 viewBox="0 0 20 20"
               >

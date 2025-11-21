@@ -730,7 +730,7 @@ function XmlBodyForm({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder='<?xml version="1.0" encoding="UTF-8"?>\n<root>\n  <key>value</key>\n</root>'
-        className="w-full h-40 px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 font-mono text-sm"
+        className="w-full h-40 px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none font-mono text-sm"
       />
     </div>
   );

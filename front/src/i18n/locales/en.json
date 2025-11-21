@@ -119,7 +119,8 @@
     "apiCreated": "API {{method}} {{url}} has been created successfully.",
     "websocketYamlImportCompleted": "WebSocket YAML import has been completed successfully.",
     "yamlImportFailed": "YAML import failed",
-    "updated": "Updated"
+    "updated": "Updated",
+    "progressCompleted": "Progress completed:"
   },
   "importResult": {
     "importCompleted": "Import Completed",
