@@ -210,8 +210,12 @@ export function WsTestResponseTabs() {
   );
 
   const handleMessageClick = (message: WebSocketMessage) => {
-    setSelectedMessage(message);
-    setIsMessageModalOpen(true);
+    // tryId가 있는 경우에만 모달을 열고 Test 탭으로 이동
+    if (message.tryId) {
+      setSelectedMessage(message);
+      setIsMessageModalOpen(true);
+    }
+    // tryId가 없으면 아무것도 하지 않음 (상세 메시지 모달 표시 안 함)
   };
 
   // 연결 지속 시간 포맷팅
@@ -507,7 +511,7 @@ function buildMessageRows(
         prevTimestamp={prev?.timestamp ?? null}
         isJsonFormatted={isJsonFormatted}
         compactMode={isCompact}
-        onClick={() => onMessageClick(message)}
+        onClick={message.tryId ? () => onMessageClick(message) : undefined}
         t={t}
       />
     );
@@ -1068,6 +1072,14 @@ export function TestContent({
         <p className="text-xs mt-1 text-gray-500 dark:text-[#6B7280]">
           You can check method execution time by running in Trace mode
         </p>
+        {tryId && (
+          <p className="text-xs mt-2 text-amber-600 dark:text-amber-400">
+            Try ID: {tryId}
+            <br />
+            백엔드에서 추적 데이터를 찾을 수 없습니다. Tempo가 활성화되어 있고,
+            WebSocket 핸들러가 추적 대상 패키지에 포함되어 있는지 확인하세요.
+          </p>
+        )}
       </div>
     );
   }
