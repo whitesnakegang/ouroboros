@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { JsonEditor } from "@/components/JsonEditor";
 
 interface KeyValuePair {
@@ -22,6 +23,7 @@ interface SpecFormProps {
 }
 
 export function SpecForm({ protocol }: SpecFormProps) {
+  const { t } = useTranslation();
   const [method, setMethod] = useState("POST");
   const [url, setUrl] = useState("");
   const [tags, setTags] = useState("");
@@ -250,7 +252,7 @@ export function SpecForm({ protocol }: SpecFormProps) {
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                Tags/Category
+                {t("specForm.tagsCategory")}
               </label>
               <input
                 type="text"
@@ -568,21 +570,21 @@ export function SpecForm({ protocol }: SpecFormProps) {
                         // JSON이 아닌 경우 무시
                       }
                     }}
-                  className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
-                  title="JSON 포맷팅"
-                >
-                  Format
-                </button>
-                <button
-                  onClick={() =>
-                    setRequestBody({ ...requestBody, content: "" })
-                  }
-                  className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
-                  title="내용 지우기"
-                >
-                  Clear
-                </button>
-              </div>
+                    className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
+                    title="JSON 포맷팅"
+                  >
+                    Format
+                  </button>
+                  <button
+                    onClick={() =>
+                      setRequestBody({ ...requestBody, content: "" })
+                    }
+                    className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
+                    title="내용 지우기"
+                  >
+                    Clear
+                  </button>
+                </div>
               )}
             </div>
           )}

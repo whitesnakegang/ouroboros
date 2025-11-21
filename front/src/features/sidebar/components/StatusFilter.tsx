@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface StatusFilterProps {
   activeFilter: "mock" | "completed" | "all";
@@ -9,6 +10,7 @@ export function StatusFilter({
   activeFilter,
   onFilterChange,
 }: StatusFilterProps) {
+  const { t } = useTranslation();
   const [isFocused, setIsFocused] = useState(false);
 
   return (
@@ -22,7 +24,7 @@ export function StatusFilter({
               : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
           }`}
         >
-          All
+          {t("status.all")}
         </button>
         <div className="relative group">
           <button
@@ -35,7 +37,7 @@ export function StatusFilter({
                 : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
             }`}
           >
-            Mock
+            {t("status.mock")}
           </button>
           {/* 툴팁 */}
           <div
@@ -45,31 +47,31 @@ export function StatusFilter({
           >
             <div className="bg-white dark:bg-[#161B22] border border-gray-300 dark:border-[#2D333B] rounded-md px-3 py-2 shadow-lg min-w-[200px]">
               <div className="text-xs font-semibold text-gray-900 dark:text-[#E6EDF3] mb-2">
-                Badge Status
+                {t("badge.badgeStatus")}
               </div>
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-[#b6bdca] flex-shrink-0"></div>
                   <span className="text-xs text-gray-600 dark:text-[#8B949E]">
-                    Gray: Not Implemented
+                    {t("badge.grayDescription")}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-[#EAB308] flex-shrink-0"></div>
                   <span className="text-xs text-gray-600 dark:text-[#8B949E]">
-                    Yellow: In Progress
+                    {t("badge.yellowDescription")}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-[#F97316] flex-shrink-0"></div>
                   <span className="text-xs text-gray-600 dark:text-[#8B949E]">
-                    Orange: Modifying
+                    {t("badge.orangeDescription")}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-[#25eb64] flex-shrink-0"></div>
                   <span className="text-xs text-gray-600 dark:text-[#8B949E]">
-                    Green: Completed
+                    {t("badge.greenDescription")}
                   </span>
                 </div>
               </div>
@@ -86,7 +88,7 @@ export function StatusFilter({
               : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
           }`}
         >
-          Completed
+          {t("status.completed")}
         </button>
       </div>
     </div>

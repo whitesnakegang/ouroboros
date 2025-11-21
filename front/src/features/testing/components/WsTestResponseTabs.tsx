@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { useTestingStore } from "../store/testing.store";
 // removed unused useSidebarStore import
 import { MessageDetailModal } from "./MessageDetailModal";
@@ -147,6 +148,7 @@ const JsonHighlighter = ({
 };
 
 export function WsTestResponseTabs() {
+  const { t } = useTranslation();
   const { wsMessages, wsConnectionStatus, wsStats, wsConnectionStartTime } =
     useTestingStore();
   // removed unused selectedEndpoint
@@ -280,21 +282,21 @@ export function WsTestResponseTabs() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
-              Log
+              {t("wsTest.log")}
             </span>
             {wsConnectionStatus === "connected" ? (
               <span className="px-2 py-0.5 text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full flex items-center gap-1.5">
                 <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
-                Connected
+                {t("wsTest.connected")}
               </span>
             ) : wsConnectionStatus === "connecting" ? (
               <span className="px-2 py-0.5 text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded-full flex items-center gap-1.5">
                 <div className="w-1.5 h-1.5 bg-yellow-500 rounded-full animate-pulse"></div>
-                Connecting
+                {t("wsTest.connecting")}
               </span>
             ) : (
               <span className="px-2 py-0.5 text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-full">
-                Disconnected
+                {t("wsTest.disconnected")}
               </span>
             )}
             {wsConnectionStatus === "connected" && wsConnectionStartTime && (
@@ -358,6 +360,7 @@ export function WsTestResponseTabs() {
           exportMessages={exportMessages}
           messagesEndRef={messagesEndRef}
           onMessageClick={handleMessageClick}
+          t={t}
         />
       </div>
 
@@ -405,7 +408,8 @@ function createDivider(
 // Group Header 생성 함수
 function createGroupHeader(
   message: WebSocketMessage,
-  runCount: number
+  runCount: number,
+  t: (key: string, options?: any) => string
 ): React.ReactElement {
   return (
     <div
@@ -421,7 +425,7 @@ function createGroupHeader(
             : "text-green-700 dark:text-green-400"
         }`}
       >
-        {message.direction === "sent" ? "Sent" : "Received"} · {runCount}
+        {message.direction === "sent" ? t("wsTest.sent") : t("wsTest.received")} · {runCount}
       </span>
       <div className="h-px flex-1 bg-gray-200 dark:bg-[#2D333B]" />
     </div>
@@ -473,7 +477,8 @@ function buildMessageRows(
   formatTimestamp: (timestamp: number) => string,
   isJsonFormatted: boolean,
   isCompact: boolean,
-  onMessageClick: (message: WebSocketMessage) => void
+  onMessageClick: (message: WebSocketMessage) => void,
+  t: (key: string, options?: any) => string
 ): React.ReactElement[] {
   const rows: React.ReactElement[] = [];
 
@@ -489,7 +494,7 @@ function buildMessageRows(
     // 그룹 헤더 추가
     if (shouldInsertGroupHeader(i, allMessages)) {
       const runCount = countGroupRun(i, allMessages);
-      rows.push(createGroupHeader(message, runCount));
+      rows.push(createGroupHeader(message, runCount, t));
     }
 
     // 메시지 추가
@@ -502,6 +507,7 @@ function buildMessageRows(
         isJsonFormatted={isJsonFormatted}
         compactMode={isCompact}
         onClick={() => onMessageClick(message)}
+        t={t}
       />
     );
   }
@@ -522,6 +528,7 @@ function ResponseContent({
   exportMessages,
   messagesEndRef,
   onMessageClick,
+  t,
 }: {
   receivedMessages: WebSocketMessage[];
   sentMessages: WebSocketMessage[];
@@ -535,6 +542,7 @@ function ResponseContent({
   exportMessages: (format: "json" | "csv") => void;
   messagesEndRef: React.RefObject<HTMLDivElement | null>;
   onMessageClick: (message: WebSocketMessage) => void;
+  t: (key: string, options?: any) => string;
 }) {
   const allMessages = [...sentMessages, ...receivedMessages].sort(
     (a, b) => a.timestamp - b.timestamp
@@ -568,7 +576,7 @@ function ResponseContent({
               onKeyDown={(e) => {
                 if (e.key === "Escape") setSearchQuery("");
               }}
-              placeholder="Search messages..."
+              placeholder={t("wsTest.searchMessages")}
               className="w-full pl-9 pr-9 py-2 text-sm rounded-md bg-white dark:bg-[#161B22] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-2 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-transparent"
             />
             {searchQuery && (
@@ -604,7 +612,7 @@ function ResponseContent({
                   : "text-gray-700 dark:text-[#8B949E] hover:bg-gray-100 dark:hover:bg-[#0D1117]"
               }`}
             >
-              All Messages
+              {t("wsTest.allMessages")}
             </button>
             <button
               onClick={() => setMessageFilter("sent")}
@@ -627,7 +635,7 @@ function ResponseContent({
                   d="M7 11l5-5m0 0l5 5m-5-5v12"
                 />
               </svg>
-              Sent
+              {t("wsTest.sent")}
             </button>
             <button
               onClick={() => setMessageFilter("received")}
@@ -650,7 +658,7 @@ function ResponseContent({
                   d="M17 13l-5 5m0 0l-5-5m5 5V6"
                 />
               </svg>
-              Received
+              {t("wsTest.received")}
             </button>
           </div>
 
@@ -665,7 +673,7 @@ function ResponseContent({
                     : "bg-white dark:bg-[#161B22] text-gray-700 dark:text-[#8B949E]"
                 }`}
               >
-                Pretty
+                {t("wsTest.pretty")}
               </button>
               <button
                 onClick={() => setIsJsonFormatted(false)}
@@ -675,7 +683,7 @@ function ResponseContent({
                     : "bg-white dark:bg-[#161B22] text-gray-700 dark:text-[#8B949E]"
                 }`}
               >
-                Raw
+                {t("wsTest.raw")}
               </button>
             </div>
 
@@ -696,7 +704,7 @@ function ResponseContent({
                   d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
                 />
               </svg>
-              Export
+              {t("wsTest.export")}
             </button>
           </div>
         </div>
@@ -720,14 +728,14 @@ function ResponseContent({
               />
             </svg>
           </div>
-          <p className="text-sm">No messages</p>
+          <p className="text-sm">{t("wsTest.noMessages")}</p>
           <p className="text-xs mt-1 text-gray-500 dark:text-[#6B7280]">
             {searchQuery ? (
               <>
-                No messages found for "<span className="font-mono">{searchQuery}</span>"
+                {t("wsTest.noMessagesFoundFor", { query: searchQuery })}
               </>
             ) : (
-              <>Messages will be displayed here after connecting and sending or receiving</>
+              <>{t("wsTest.messagesWillBeDisplayed")}</>
             )}
           </p>
           {(searchQuery || messageFilter !== "all") && (
@@ -736,18 +744,18 @@ function ResponseContent({
                 <button
                   onClick={() => setSearchQuery("")}
                   className="px-3 py-1.5 text-xs border rounded-md"
-                  title="Clear search"
+                  title={t("wsTest.clearSearch")}
                 >
-                  Clear search
+                  {t("wsTest.clearSearch")}
                 </button>
               )}
               {messageFilter !== "all" && (
                 <button
                   onClick={() => setMessageFilter("all")}
                   className="px-3 py-1.5 text-xs border rounded-md"
-                  title="Reset filter"
+                  title={t("wsTest.resetFilter")}
                 >
-                  Reset filter
+                  {t("wsTest.resetFilter")}
                 </button>
               )}
             </div>
@@ -760,7 +768,8 @@ function ResponseContent({
             formatTimestamp,
             isJsonFormatted,
             isCompact,
-            onMessageClick
+            onMessageClick,
+            t
           )}
           <div ref={messagesEndRef} />
         </div>
@@ -778,6 +787,7 @@ function MessageBubble({
   softWrap = true,
   compactMode = false,
   onClick,
+  t,
 }: {
   message: WebSocketMessage;
   formatTimestamp: (timestamp: number) => string;
@@ -787,6 +797,7 @@ function MessageBubble({
   softWrap?: boolean;
   compactMode?: boolean;
   onClick?: () => void;
+  t: (key: string, options?: any) => string;
 }) {
   const isSent = message.direction === "sent";
   const isTryMessage = !!message.tryId; // tryId가 있으면 Try 메시지로 구분
@@ -847,7 +858,7 @@ function MessageBubble({
               ? "bg-blue-500 text-white"
               : "bg-green-500 text-white"
           }`}>
-            {isSent ? "SEND" : "RECEIVE"}
+            {isSent ? t("wsTest.send") : t("wsTest.receive")}
             </span>
           <span className="text-[10px] font-medium text-gray-600 dark:text-[#8B949E]">
               {formatTimestamp(message.timestamp)}

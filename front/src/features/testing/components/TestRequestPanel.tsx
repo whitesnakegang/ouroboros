@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useTestingStore } from "../store/testing.store";
 import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
 import { getRestApiSpec, getSchema } from "@/features/spec/services/api";
@@ -11,6 +12,7 @@ import { isArraySchema, isRefSchema } from "@/features/spec/types/schema.types";
 import { RequestBodyForm } from "./RequestBodyForm";
 
 export function TestRequestPanel() {
+  const { t } = useTranslation();
   const {
     request,
     setRequest,
@@ -20,6 +22,8 @@ export function TestRequestPanel() {
     updateQueryParam,
     addQueryParam,
     removeQueryParam,
+    authorization,
+    setAuthorization,
   } = useTestingStore();
   const { selectedEndpoint } = useSidebarStore();
   const [requestBody, setRequestBody] = useState<RequestBody | null>(null);
@@ -129,7 +133,9 @@ export function TestRequestPanel() {
                 (!parsed.fields || parsed.fields.length === 0)
               ) {
                 try {
-                  const schemaResponse = await getSchema(parsed.rootSchemaType.schemaName);
+                  const schemaResponse = await getSchema(
+                    parsed.rootSchemaType.schemaName
+                  );
                   const schemaData = schemaResponse.data;
 
                   if (schemaData.properties) {
@@ -170,22 +176,30 @@ export function TestRequestPanel() {
               }
 
               // rootSchemaType이 array이고 items가 ref인 경우 스키마 조회
-              if (parsed.rootSchemaType && isArraySchema(parsed.rootSchemaType)) {
+              if (
+                parsed.rootSchemaType &&
+                isArraySchema(parsed.rootSchemaType)
+              ) {
                 if (isRefSchema(parsed.rootSchemaType.items)) {
                   try {
-                    const schemaResponse = await getSchema(parsed.rootSchemaType.items.schemaName);
+                    const schemaResponse = await getSchema(
+                      parsed.rootSchemaType.items.schemaName
+                    );
                     const schemaData = schemaResponse.data;
 
                     // 스키마의 properties를 items의 object schema로 변환
                     if (schemaData.properties) {
-                      const properties = Object.entries(schemaData.properties).map(
-                        ([key, propSchema]: [string, any]) => {
-                          return parseOpenAPISchemaToSchemaField(key, propSchema);
-                        }
-                      );
+                      const properties = Object.entries(
+                        schemaData.properties
+                      ).map(([key, propSchema]: [string, any]) => {
+                        return parseOpenAPISchemaToSchemaField(key, propSchema);
+                      });
 
                       // required 필드 설정
-                      if (schemaData.required && Array.isArray(schemaData.required)) {
+                      if (
+                        schemaData.required &&
+                        Array.isArray(schemaData.required)
+                      ) {
                         properties.forEach((field) => {
                           if (schemaData.required!.includes(field.key)) {
                             field.required = true;
@@ -263,7 +277,7 @@ export function TestRequestPanel() {
             d="M12 4v16m8-8H4"
           />
         </svg>
-        <span>Request</span>
+        <span>{t("testing.request")}</span>
       </div>
 
       {/* Method + URL */}
@@ -271,7 +285,7 @@ export function TestRequestPanel() {
         <div className="grid grid-cols-12 gap-3">
           <div className="col-span-3">
             <label className="block text-xs font-medium text-[#8B949E] mb-2">
-              METHOD
+              {t("testing.method")}
             </label>
             <select
               value={request.method}
@@ -301,7 +315,7 @@ export function TestRequestPanel() {
 
         <div>
           <label className="block text-xs font-medium text-[#8B949E] mb-2">
-            Desc
+            {t("testing.desc")}
           </label>
           <input
             type="text"
@@ -316,12 +330,14 @@ export function TestRequestPanel() {
       {/* Headers */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-3">
-          <label className="text-xs font-medium text-[#8B949E]">Headers</label>
+          <label className="text-xs font-medium text-[#8B949E]">
+            {t("testing.headers")}
+          </label>
           <button
             onClick={addRequestHeader}
             className="text-xs px-2 py-1 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none"
           >
-            + Add
+            {t("common.add")}
           </button>
         </div>
         <div className="space-y-2">
@@ -373,13 +389,13 @@ export function TestRequestPanel() {
         <div className="mb-6">
           <div className="flex items-center justify-between mb-3">
             <label className="text-xs font-medium text-[#8B949E]">
-              Query Parameters
+              {t("testing.queryParameters")}
             </label>
             <button
               onClick={addQueryParam}
               className="text-xs px-2 py-1 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none"
             >
-              + Add
+              {t("common.add")}
             </button>
           </div>
           <div className="space-y-2">
@@ -432,9 +448,11 @@ export function TestRequestPanel() {
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="block text-xs font-medium text-[#8B949E]">
-              Request body
+              {t("testing.requestBody")}
               {requestBody.required && (
-                <span className="text-red-500 ml-1">required</span>
+                <span className="text-red-500 ml-1">
+                  {t("testing.required")}
+                </span>
               )}
             </label>
             <span className="text-xs text-[#8B949E]">
@@ -461,6 +479,31 @@ export function TestRequestPanel() {
           />
         </div>
       )}
+
+      {/* Authorization & Run Button */}
+      <div className="border-t border-gray-200 dark:border-[#2D333B] pt-4 mt-6">
+        <div className="flex gap-3">
+          <input
+            type="text"
+            value={authorization}
+            onChange={(e) => setAuthorization(e.target.value)}
+            placeholder={t("testing.authorization")}
+            className="flex-1 px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+          />
+          <button
+            onClick={async () => {
+              // TODO: Implement API execution
+              console.log("RUN button clicked", { request, authorization });
+            }}
+            className="px-4 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none flex items-center gap-2 font-medium"
+          >
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+            </svg>
+            {t("testing.run")}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

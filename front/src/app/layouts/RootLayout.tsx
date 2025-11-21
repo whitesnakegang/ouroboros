@@ -2,6 +2,7 @@ import { Outlet } from "react-router-dom";
 import { Sidebar } from "@/features/sidebar/components/Sidebar";
 import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
 import { useEffect, useLayoutEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 
 export function RootLayout() {
   const {
@@ -12,6 +13,26 @@ export function RootLayout() {
     toggleDarkMode,
     endpoints,
   } = useSidebarStore();
+  const { i18n, t } = useTranslation(); // i18n과 t 모두 가져오기
+  
+  // 현재 언어를 i18n.language에서 직접 계산
+  // t 함수를 실제로 사용하여 언어 변경 시 자동 리렌더링 보장
+  const currentLanguage = useMemo(() => {
+    const lang = i18n.language || localStorage.getItem("i18nextLng") || "en";
+    return lang.startsWith("ko") ? "ko" : "en";
+  }, [i18n.language]);
+
+  const toggleLanguage = async () => {
+    const newLanguage = currentLanguage === "ko" ? "en" : "ko";
+    
+    // localStorage에 먼저 저장 (중요: changeLanguage 전에 저장)
+    localStorage.setItem("i18nextLng", newLanguage);
+    
+    // useTranslation에서 가져온 i18n 인스턴스 사용
+    // changeLanguage는 Promise를 반환하므로 await로 완료 대기
+    // t 함수를 사용하는 모든 컴포넌트가 자동으로 리렌더링됨
+    await i18n.changeLanguage(newLanguage);
+  };
 
   const handleNewApiForm = () => {
     // 새 API 폼 트리거
@@ -83,6 +104,7 @@ export function RootLayout() {
     }
   }, []);
 
+
   return (
     <div className="h-screen flex flex-col bg-white dark:bg-[#0D1117] transition-colors">
       <header className="border-b border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#0D1117] px-4 py-2 flex items-center justify-between">
@@ -108,7 +130,7 @@ export function RootLayout() {
             </svg>
           </button>
           <h1 className="text-xl font-bold text-gray-900 dark:text-[#E6EDF3]">
-            Ouroboros API
+            {t("header.title")}
           </h1>
         </div>
         <div className="flex items-center gap-4">
@@ -116,7 +138,7 @@ export function RootLayout() {
           <div className="flex items-center gap-3">
             <div className="text-right">
               <div className="text-xs text-gray-600 dark:text-[#8B949E]">
-                {completedEndpoints}/{totalEndpoints} Completed
+                {completedEndpoints}/{totalEndpoints} {t("header.completed")}
               </div>
             </div>
             <div className="w-24 h-2 bg-gray-200 dark:bg-[#161B22] border border-gray-300 dark:border-[#2D333B] rounded-md overflow-hidden">
@@ -129,10 +151,18 @@ export function RootLayout() {
               {progressPercentage}%
             </span>
           </div>
+          {/* 언어 전환 버튼 */}
+          <button
+            onClick={toggleLanguage}
+            className="px-3 py-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-[#161B22] transition-colors text-sm font-medium text-gray-700 dark:text-[#E6EDF3] border border-gray-300 dark:border-[#2D333B]"
+            title={currentLanguage === "ko" ? t("header.switchToEnglish") : t("header.switchToKorean")}
+          >
+            {currentLanguage === "ko" ? "EN" : "한"}
+          </button>
           <button
             onClick={toggleDarkMode}
             className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-[#161B22] transition-colors"
-            title={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
+            title={isDarkMode ? t("header.switchToLightMode") : t("header.switchToDarkMode")}
           >
             {isDarkMode ? (
               <svg

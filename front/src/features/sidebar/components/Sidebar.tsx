@@ -4,6 +4,7 @@ import { EndpointGroup } from "./EndpointGroup";
 import { EndpointCard } from "./EndpointCard";
 import { ProtocolTabs } from "@/features/spec/components/ProtocolTabs";
 import { useSidebarStore } from "../store/sidebar.store";
+import { useTranslation } from "react-i18next";
 
 interface SidebarProps {
   onAddNew?: () => void;
@@ -11,9 +12,10 @@ interface SidebarProps {
 
 export function Sidebar({ onAddNew }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeFilter, setActiveFilter] = useState<"mock" | "completed" | "all">(
-    "all"
-  );
+  const [activeFilter, setActiveFilter] = useState<
+    "mock" | "completed" | "all"
+  >("all");
+  const { t } = useTranslation();
 
   const {
     toggle,
@@ -143,7 +145,7 @@ export function Sidebar({ onAddNew }: SidebarProps) {
           </svg>
           <input
             type="text"
-            placeholder="Search"
+            placeholder={t("common.search")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-8 py-2 border border-gray-300 dark:border-[#2D333B] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder-gray-400 dark:placeholder-[#8B949E]"
@@ -179,10 +181,14 @@ export function Sidebar({ onAddNew }: SidebarProps) {
         )}
       </div>
 
-      <div className={`flex-1 overflow-y-auto ${protocol === "REST" ? "bg-white dark:bg-[#0D1117]" : ""}`}>
+      <div
+        className={`flex-1 overflow-y-auto ${
+          protocol === "REST" ? "bg-white dark:bg-[#0D1117]" : ""
+        }`}
+      >
         {isLoading ? (
           <div className="p-4 text-center text-gray-500 dark:text-[#8B949E] text-sm">
-            Loading...
+            {t("common.loading")}
           </div>
         ) : Object.keys(filteredEndpoints).length > 0 ? (
           Object.entries(filteredEndpoints).map(([groupName, endpoints]) => (
@@ -198,7 +204,7 @@ export function Sidebar({ onAddNew }: SidebarProps) {
           ))
         ) : (
           <div className="p-4 text-center text-gray-500 dark:text-[#8B949E] text-sm">
-            No endpoints found
+            {t("sidebar.noEndpointsFound")}
           </div>
         )}
       </div>
@@ -221,7 +227,7 @@ export function Sidebar({ onAddNew }: SidebarProps) {
               : "bg-black dark:bg-[#161B22] text-white dark:text-[#E6EDF3] hover:bg-gray-800 dark:hover:bg-[#21262D]"
           }`}
         >
-          + Add
+          {t("sidebar.addNew")}
         </button>
       </div>
     </div>

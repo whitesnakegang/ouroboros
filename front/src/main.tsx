@@ -5,6 +5,7 @@ import { AppProvider } from "@/app/providers/AppProvider";
 import { ExplorerPage } from "@/pages/ExplorerPage";
 import { RootLayout } from "@/app/layouts/RootLayout";
 import "@/index.css";
+import "@/i18n/config";
 
 // 초기 로드 시 저장된 테마 설정을 즉시 적용하여 깜빡임 방지 및 시스템 설정과의 충돌 방지
 const applyInitialTheme = () => {
