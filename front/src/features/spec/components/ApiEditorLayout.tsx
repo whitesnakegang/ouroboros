@@ -3837,8 +3837,8 @@ export function ApiEditorLayout() {
           </div>
         </div>
       )}
-      {/* 하단 생성/초기화 버튼 - 새 명세 작성 중일 때 표시 (명세서 폼에서만) */}
-      {activeTab === "form" && !selectedEndpoint && (
+      {/* 하단 생성/초기화 버튼 - 새 명세 작성 중일 때만 표시 (명세서 폼에서만) */}
+      {activeTab === "form" && !selectedEndpoint && isNewFormMode && (
         <div className="border-t border-gray-200 dark:border-[#2D333B] px-6 py-4 bg-white dark:bg-[#0D1117]">
           <div className="flex items-center justify-end gap-3">
             <button
