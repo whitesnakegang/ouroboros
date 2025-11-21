@@ -570,21 +570,21 @@ export function SpecForm({ protocol }: SpecFormProps) {
                         // JSON이 아닌 경우 무시
                       }
                     }}
-                    className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
-                    title="JSON 포맷팅"
-                  >
-                    Format
-                  </button>
-                  <button
-                    onClick={() =>
-                      setRequestBody({ ...requestBody, content: "" })
-                    }
-                    className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
-                    title="내용 지우기"
-                  >
-                    Clear
-                  </button>
-                </div>
+                  className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
+                  title="JSON 포맷팅"
+                >
+                  Format
+                </button>
+                <button
+                  onClick={() =>
+                    setRequestBody({ ...requestBody, content: "" })
+                  }
+                  className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
+                  title="내용 지우기"
+                >
+                  Clear
+                </button>
+              </div>
               )}
             </div>
           )}

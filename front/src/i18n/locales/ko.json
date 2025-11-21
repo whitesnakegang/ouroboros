@@ -486,7 +486,7 @@
     "tempoDisabledOrNotFound": "Tempo가 비활성화되었거나 추적을 찾을 수 없습니다."
   },
   "messageDetail": {
-    "messageDetail": "메시지 상세",
+    "messageDetail": "메서드 실행 시간",
     "message": "메시지",
     "test": "테스트",
     "direction": "방향",

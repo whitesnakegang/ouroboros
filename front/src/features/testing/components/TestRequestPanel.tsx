@@ -192,7 +192,7 @@ export function TestRequestPanel() {
                       const properties = Object.entries(
                         schemaData.properties
                       ).map(([key, propSchema]: [string, any]) => {
-                        return parseOpenAPISchemaToSchemaField(key, propSchema);
+                          return parseOpenAPISchemaToSchemaField(key, propSchema);
                       });
 
                       // required 필드 설정

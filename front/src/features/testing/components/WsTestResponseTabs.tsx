@@ -825,10 +825,6 @@ function MessageBubble({
     );
   })();
 
-  // tryId가 있는 모든 메시지에 대해 메서드 실행 시간 버튼 표시
-  // (문서에 따르면 모든 구독 메시지에 X-Ouroboros-Try-Id 헤더가 포함될 수 있음)
-  const showMethodButton = !!message.tryId;
-
   return (
     <div
       className={`group relative flex ${
@@ -862,6 +858,18 @@ function MessageBubble({
             isSent ? "justify-end" : "justify-start"
           }`}
         >
+          {message.tryId && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onClick) onClick();
+              }}
+              className="text-[10px] px-2 py-0.5 rounded bg-purple-500 hover:bg-purple-600 text-white font-medium transition-colors flex items-center gap-1"
+              title={t("wsTest.viewMethodExecutionTime")}
+            >
+              ⏱ {t("wsTest.methodExecutionTime")}
+            </button>
+          )}
           <span
             className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
               isSent ? "bg-blue-500 text-white" : "bg-green-500 text-white"
@@ -873,18 +881,6 @@ function MessageBubble({
             {formatTimestamp(message.timestamp)}
           </span>
           {relativeBadge}
-          {showMethodButton && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onClick) onClick();
-              }}
-              className="text-[10px] px-2 py-0.5 rounded bg-purple-500 hover:bg-purple-600 text-white font-medium transition-colors"
-              title={t("wsTest.viewMethodExecutionTime")}
-            >
-              ⏱ {t("wsTest.methodExecutionTime")}
-            </button>
-          )}
         </div>
 
         {/* Destination/Address - 작고 간단하게 */}

@@ -11,6 +11,8 @@ import {
 import type { SchemaField } from "@/features/spec/types/schema.types";
 import { parseOpenAPISchemaToSchemaField } from "@/features/spec/utils/schemaConverter";
 import { isPrimitiveSchema } from "@/features/spec/types/schema.types";
+import { MessageDetailModal } from "./MessageDetailModal";
+import type { WebSocketMessage } from "../store/testing.store";
 
 interface Subscription {
   id: string;
@@ -29,6 +31,7 @@ export function WsTestRequestPanel() {
     setWsConnectionStartTime,
     wsConnectionStartTime,
     setTryId,
+    tryId,
   } = useTestingStore();
   const { selectedEndpoint, endpoints } = useSidebarStore();
 
@@ -41,6 +44,9 @@ export function WsTestRequestPanel() {
   >([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [newTopic, setNewTopic] = useState("");
+  const [selectedMessage, setSelectedMessage] =
+    useState<WebSocketMessage | null>(null);
+  const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
 
   // Schema 기반 메시지 입력 상태
   const [messageSchemaFields, setMessageSchemaFields] = useState<SchemaField[]>(
@@ -1039,12 +1045,13 @@ export function WsTestRequestPanel() {
       stompClientRef.current.send(destination, headers, messageBody);
 
       // 전송된 메시지 로그
-      const message = {
+      const message: WebSocketMessage = {
         id: `msg-${Date.now()}-${Math.random()}`,
         timestamp: Date.now(),
         direction: "sent" as const,
         address: destination,
         content: messageBody,
+        tryId: enableTryHeader ? tryId || undefined : undefined,
       };
       addWsMessage(message);
       updateWsStats((prev) => ({
@@ -1845,6 +1852,18 @@ export function WsTestRequestPanel() {
             })}
           </div>
         </div>
+      )}
+
+      {/* Message Detail Modal */}
+      {selectedMessage && (
+        <MessageDetailModal
+          isOpen={isMessageModalOpen}
+          onClose={() => {
+            setIsMessageModalOpen(false);
+            setSelectedMessage(null);
+          }}
+          message={selectedMessage}
+        />
       )}
     </div>
   );

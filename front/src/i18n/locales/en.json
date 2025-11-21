@@ -486,7 +486,7 @@
     "tempoDisabledOrNotFound": "Tempo is disabled or trace not found."
   },
   "messageDetail": {
-    "messageDetail": "Message Detail",
+    "messageDetail": "Method Execution Time",
     "message": "Message",
     "test": "Test",
     "direction": "Direction",
