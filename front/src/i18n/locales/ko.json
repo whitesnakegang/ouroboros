@@ -455,7 +455,9 @@
     "replyAddressNotStartWithTopicOrQueue": "Reply Address가 /topic/ 또는 /queue/로 시작하지 않습니다. 구독할 수 없습니다.",
     "replyAddressRequired": "Reply Address가 없습니다. 서버가 메시지를 보낼 주소(/topic/ 또는 /queue/)가 필요합니다.",
     "cannotSendMessageSetAddress": "메시지를 전송할 수 없습니다.\n\nReply Address 또는 Receive Address를 설정해주세요.",
-    "cannotSendMessagePatternInAddress": "메시지를 전송할 수 없습니다.\n\n주소에 패턴이 포함되어 있습니다: {{destination}}\n\n다음 파라미터를 입력해주세요: {{params}}"
+    "cannotSendMessagePatternInAddress": "메시지를 전송할 수 없습니다.\n\n주소에 패턴이 포함되어 있습니다: {{destination}}\n\n다음 파라미터를 입력해주세요: {{params}}",
+    "viewMethodExecutionTime": "테스트 결과 확인",
+    "methodExecutionTime": "메서드 실행 시간"
   },
   "mockExpression": {
     "selectDataFakerMockExpression": "DataFaker Mock 표현식 선택",

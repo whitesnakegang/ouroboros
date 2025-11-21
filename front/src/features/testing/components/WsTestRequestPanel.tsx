@@ -597,7 +597,13 @@ export function WsTestRequestPanel() {
             }
           } else {
             // replyAddress가 없으면 구독하지 않음
-            if (receiveAddress && receiveAddress.trim() !== "") {
+            // receive 액션만 있는 경우는 reply address가 없는 게 정상이므로 에러 메시지 표시하지 않음
+            if (
+              receiveAddress &&
+              receiveAddress.trim() !== "" &&
+              operationAction !== null &&
+              operationAction !== "receive"
+            ) {
               addWsMessage({
                 id: `msg-${Date.now()}-${Math.random()}`,
                 timestamp: Date.now(),
@@ -619,9 +625,25 @@ export function WsTestRequestPanel() {
                 tryNotificationDestination,
                 (frame) => {
                   // Try 알림 메시지에서 tryId 추출
-                  const tryIdHeader =
+                  // STOMP 프레임 헤더는 대소문자를 구분할 수 있으므로 모든 키를 확인
+                  let tryIdHeader: string | undefined = undefined;
+
+                  // 먼저 일반적인 키로 확인
+                  tryIdHeader =
                     frame.headers["X-Ouroboros-Try-Id"] ||
-                    frame.headers["x-ouroboros-try-id"];
+                    frame.headers["x-ouroboros-try-id"] ||
+                    frame.headers["X-OUROBOROS-TRY-ID"];
+
+                  // 헤더에 tryId가 없으면 모든 헤더 키를 순회하면서 대소문자 구분 없이 찾기
+                  if (!tryIdHeader && frame.headers) {
+                    const headerKeys = Object.keys(frame.headers);
+                    for (const key of headerKeys) {
+                      if (key.toLowerCase() === "x-ouroboros-try-id") {
+                        tryIdHeader = frame.headers[key];
+                        break;
+                      }
+                    }
+                  }
 
                   if (tryIdHeader) {
                     setTryId(tryIdHeader);
@@ -759,9 +781,49 @@ export function WsTestRequestPanel() {
         destination,
         (frame) => {
           // 응답 메시지에서 X-Ouroboros-Try-Id 헤더 추출
-          const tryIdHeader =
+          // STOMP 프레임 헤더는 대소문자를 구분할 수 있으므로 모든 키를 확인
+          let tryIdHeader: string | undefined = undefined;
+
+          // 먼저 일반적인 키로 확인
+          tryIdHeader =
             frame.headers["X-Ouroboros-Try-Id"] ||
-            frame.headers["x-ouroboros-try-id"];
+            frame.headers["x-ouroboros-try-id"] ||
+            frame.headers["X-OUROBOROS-TRY-ID"];
+
+          // 헤더에 tryId가 없으면 모든 헤더 키를 순회하면서 대소문자 구분 없이 찾기
+          if (!tryIdHeader && frame.headers) {
+            const headerKeys = Object.keys(frame.headers);
+            for (const key of headerKeys) {
+              if (key.toLowerCase() === "x-ouroboros-try-id") {
+                tryIdHeader = frame.headers[key];
+                break;
+              }
+            }
+          }
+
+          // 헤더에 tryId가 없으면 메시지 본문에서 추출 시도
+          if (!tryIdHeader && frame.body) {
+            try {
+              const bodyJson = JSON.parse(frame.body);
+              // 본문에 tryId가 있는 경우 (예: { tryId: "...", ... })
+              if (bodyJson.tryId) {
+                tryIdHeader = bodyJson.tryId;
+              }
+              // 본문의 headers에 tryId가 있는 경우 (예: { headers: { "X-Ouroboros-Try-Id": "..." }, ... })
+              else if (bodyJson.headers) {
+                // headers 객체의 모든 키를 확인
+                const headerKeys = Object.keys(bodyJson.headers);
+                for (const key of headerKeys) {
+                  if (key.toLowerCase() === "x-ouroboros-try-id") {
+                    tryIdHeader = bodyJson.headers[key];
+                    break;
+                  }
+                }
+              }
+            } catch {
+              // JSON 파싱 실패 시 무시
+            }
+          }
 
           // tryId가 있으면 store에 저장
           if (tryIdHeader) {
@@ -1254,7 +1316,9 @@ export function WsTestRequestPanel() {
                             }
                           }
                         }}
-                        placeholder={t("wsTest.pathParameterPlaceholder", { param })}
+                        placeholder={t("wsTest.pathParameterPlaceholder", {
+                          param,
+                        })}
                         className="w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-amber-300 dark:border-amber-700 text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm"
                       />
                       {/* 치환된 주소 미리보기 */}
@@ -1654,7 +1718,8 @@ export function WsTestRequestPanel() {
               />
             </svg>
             {t("wsTest.subscriptions", {
-              active: subscriptions.filter((s) => s.subscriptionId !== null).length,
+              active: subscriptions.filter((s) => s.subscriptionId !== null)
+                .length,
               total: subscriptions.length,
             })}
           </label>

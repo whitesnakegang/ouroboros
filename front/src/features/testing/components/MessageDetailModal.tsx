@@ -51,10 +51,12 @@ export function MessageDetailModal({ isOpen, onClose, message }: MessageDetailMo
       setIsLoadingMethods(true);
       try {
         const response = await getTryMethodList(message.tryId);
-        setMethodList(response.data.methods);
-        setTotalDurationMs(response.data.totalDurationMs);
-            } catch (error) {
-              setMethodList(null);
+        // methods가 빈 배열이어도 정상 응답이므로 null이 아닌 빈 배열로 설정
+        setMethodList(response.data.methods || []);
+        setTotalDurationMs(response.data.totalDurationMs || 0);
+      } catch (error) {
+        console.error("메서드 실행 정보 로드 실패:", error);
+        setMethodList(null);
         setTotalDurationMs(null);
       } finally {
         setIsLoadingMethods(false);
@@ -67,7 +69,8 @@ export function MessageDetailModal({ isOpen, onClose, message }: MessageDetailMo
   // 모달이 열릴 때 탭 초기화
   useEffect(() => {
     if (isOpen) {
-      setActiveTab(message.tryId ? "message" : "message");
+      // tryId가 있으면 기본적으로 message 탭으로 시작 (사용자가 test 탭을 선택할 수 있음)
+      setActiveTab("message");
     }
   }, [isOpen, message.tryId]);
 

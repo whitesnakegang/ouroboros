@@ -455,7 +455,9 @@
     "replyAddressNotStartWithTopicOrQueue": "Reply Address does not start with /topic/ or /queue/. Cannot subscribe.",
     "replyAddressRequired": "Reply Address is missing. The server needs an address (/topic/ or /queue/) to send messages.",
     "cannotSendMessageSetAddress": "Cannot send message.\n\nPlease set Reply Address or Receive Address.",
-    "cannotSendMessagePatternInAddress": "Cannot send message.\n\nThe address contains a pattern: {{destination}}\n\nPlease enter the following parameters: {{params}}"
+    "cannotSendMessagePatternInAddress": "Cannot send message.\n\nThe address contains a pattern: {{destination}}\n\nPlease enter the following parameters: {{params}}",
+    "viewMethodExecutionTime": "View Test Results",
+    "methodExecutionTime": "method execution time"
   },
   "mockExpression": {
     "selectDataFakerMockExpression": "Select DataFaker Mock Expression",
