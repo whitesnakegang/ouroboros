@@ -148,7 +148,7 @@ export function Sidebar({ onAddNew }: SidebarProps) {
             placeholder={t("common.search")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-8 py-2 border border-gray-300 dark:border-[#2D333B] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder-gray-400 dark:placeholder-[#8B949E]"
+            className="w-full pl-10 pr-8 py-2 border border-gray-300 dark:border-[#2D333B] rounded-lg focus:outline-none focus:ring-0 focus-visible:outline-none bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder-gray-400 dark:placeholder-[#8B949E]"
           />
           {searchQuery && (
             <button

@@ -173,7 +173,7 @@ export function SpecForm({ protocol }: SpecFormProps) {
               <select
                 value={method}
                 onChange={(e) => setMethod(e.target.value)}
-                className="appearance-none w-full sm:w-auto px-4 py-3 pr-10 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 font-medium"
+                className="appearance-none w-full sm:w-auto px-4 py-3 pr-10 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-0 focus-visible:outline-none transition-all duration-200 font-medium"
               >
                 {methods.map((m) => (
                   <option key={m} value={m}>
@@ -202,7 +202,7 @@ export function SpecForm({ protocol }: SpecFormProps) {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="예: /api/users, /api/auth/login"
-              className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 font-mono"
+              className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-0 focus-visible:outline-none transition-all duration-200 font-mono"
             />
           </div>
 
@@ -259,7 +259,7 @@ export function SpecForm({ protocol }: SpecFormProps) {
                 value={tags}
                 onChange={(e) => setTags(e.target.value)}
                 placeholder="예: AUTH, USER, PRODUCT, ORDER"
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-0 focus-visible:outline-none transition-all duration-200"
               />
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 쉼표로 구분하여 여러 태그를 입력할 수 있습니다
@@ -275,7 +275,7 @@ export function SpecForm({ protocol }: SpecFormProps) {
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
                 placeholder="예: 사용자 로그인, 상품 목록 조회, 주문 생성"
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 resize-none"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-0 focus-visible:outline-none transition-all duration-200 resize-none"
               />
             </div>
           </div>
@@ -290,7 +290,7 @@ export function SpecForm({ protocol }: SpecFormProps) {
                 value={owner}
                 onChange={(e) => setOwner(e.target.value)}
                 placeholder="예: SMART-TEAM, 김개발, 백엔드팀"
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-0 focus-visible:outline-none transition-all duration-200"
               />
             </div>
 
@@ -420,7 +420,7 @@ export function SpecForm({ protocol }: SpecFormProps) {
                       )
                     }
                     placeholder="Header Name (e.g., Content-Type)"
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 font-medium"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-0 focus-visible:outline-none transition-all duration-200 font-medium"
                   />
                 </div>
                 <div className="flex-1">
@@ -437,7 +437,7 @@ export function SpecForm({ protocol }: SpecFormProps) {
                       )
                     }
                     placeholder="Header Value (e.g., application/json)"
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-0 focus-visible:outline-none transition-all duration-200"
                   />
                 </div>
                 <button
@@ -552,7 +552,7 @@ export function SpecForm({ protocol }: SpecFormProps) {
                       ? "key1=value1\nkey2=value2"
                       : "param1=value1&param2=value2"
                   }
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-gray-900 text-green-400 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 resize-none"
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-gray-900 text-green-400 font-mono text-sm focus:outline-none focus:ring-0 focus-visible:outline-none transition-all duration-200 resize-none"
                 />
               )}
               {requestBody.type === "raw" && (
@@ -570,21 +570,21 @@ export function SpecForm({ protocol }: SpecFormProps) {
                         // JSON이 아닌 경우 무시
                       }
                     }}
-                    className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
-                    title="JSON 포맷팅"
-                  >
-                    Format
-                  </button>
-                  <button
-                    onClick={() =>
-                      setRequestBody({ ...requestBody, content: "" })
-                    }
-                    className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
-                    title="내용 지우기"
-                  >
-                    Clear
-                  </button>
-                </div>
+                  className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
+                  title="JSON 포맷팅"
+                >
+                  Format
+                </button>
+                <button
+                  onClick={() =>
+                    setRequestBody({ ...requestBody, content: "" })
+                  }
+                  className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
+                  title="내용 지우기"
+                >
+                  Clear
+                </button>
+              </div>
               )}
             </div>
           )}
@@ -673,7 +673,7 @@ export function SpecForm({ protocol }: SpecFormProps) {
                       )
                     }
                     placeholder="Header Name (e.g., Content-Type)"
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 font-medium"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-0 focus-visible:outline-none transition-all duration-200 font-medium"
                   />
                 </div>
                 <div className="flex-1">
@@ -690,7 +690,7 @@ export function SpecForm({ protocol }: SpecFormProps) {
                       )
                     }
                     placeholder="Header Value (e.g., application/json)"
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-0 focus-visible:outline-none transition-all duration-200"
                   />
                 </div>
                 <button
@@ -742,7 +742,7 @@ export function SpecForm({ protocol }: SpecFormProps) {
             <select
               value={responseBody}
               onChange={(e) => setResponseBody(e.target.value)}
-              className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+              className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-0 focus-visible:outline-none transition-all duration-200"
             >
               {responseTypes.map((type) => (
                 <option key={type} value={type}>
@@ -797,7 +797,7 @@ export function SpecForm({ protocol }: SpecFormProps) {
                 ? '<?xml version="1.0" encoding="UTF-8"?>\n<response>\n  <success>true</success>\n  <data>\n    <id>1</id>\n    <name>example</name>\n  </data>\n</response>'
                 : "Response content here..."
             }
-            className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-gray-900 text-green-400 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 resize-none"
+            className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-gray-900 text-green-400 font-mono text-sm focus:outline-none focus:ring-0 focus-visible:outline-none transition-all duration-200 resize-none"
           />
         </div>
       </div>
@@ -834,7 +834,7 @@ export function SpecForm({ protocol }: SpecFormProps) {
                     }
                   }
                 }}
-                className="appearance-none px-4 py-2 pr-10 text-sm border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                className="appearance-none px-4 py-2 pr-10 text-sm border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-0 focus-visible:outline-none transition-all duration-200"
               >
                 <option value="">템플릿 선택...</option>
                 <optgroup label="Success">
@@ -962,7 +962,7 @@ export function SpecForm({ protocol }: SpecFormProps) {
                           onChange={(e) =>
                             updateStatusCode(index, "type", e.target.value)
                           }
-                          className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                          className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-0 focus-visible:outline-none transition-all duration-200"
                         >
                           <option value="Success">Success</option>
                           <option value="Error">Error</option>
@@ -976,7 +976,7 @@ export function SpecForm({ protocol }: SpecFormProps) {
                             updateStatusCode(index, "message", e.target.value)
                           }
                           placeholder="상태 코드 설명을 입력하세요"
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:outline-none focus:ring-0 focus-visible:outline-none transition-all duration-200"
                         />
                       </td>
                       <td className="px-6 py-4 text-center">

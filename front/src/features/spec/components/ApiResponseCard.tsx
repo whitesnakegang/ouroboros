@@ -411,7 +411,7 @@ export function ApiResponseCard({
                       }
                     }
                   }}
-                  className="px-3 py-1 text-sm border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500"
+                  className="px-3 py-1 text-sm border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-0 focus-visible:outline-none"
                 >
                   <option value="">{t("specForm.selectTemplate")}</option>
                   <optgroup label={t("status.success")}>
@@ -478,7 +478,7 @@ export function ApiResponseCard({
                           }
                           placeholder="200"
                           disabled={isReadOnly}
-                          className={`w-full px-2 py-1 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 ${
+                          className={`w-full px-2 py-1 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none ${
                             isReadOnly ? "opacity-60 cursor-not-allowed" : ""
                           }`}
                         />
@@ -490,7 +490,7 @@ export function ApiResponseCard({
                             updateStatusCode(index, "type", e.target.value)
                           }
                           disabled={isReadOnly}
-                          className={`w-full px-2 py-1 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 ${
+                          className={`w-full px-2 py-1 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-0 focus-visible:outline-none ${
                             isReadOnly ? "opacity-60 cursor-not-allowed" : ""
                           }`}
                         >
@@ -507,7 +507,7 @@ export function ApiResponseCard({
                           }
                           placeholder={t("specForm.statusCodePlaceholder")}
                           disabled={isReadOnly}
-                          className={`w-full px-2 py-1 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 ${
+                          className={`w-full px-2 py-1 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none ${
                             isReadOnly ? "opacity-60 cursor-not-allowed" : ""
                           }`}
                         />
@@ -580,7 +580,7 @@ export function ApiResponseCard({
                                 setStatusCodes(updated);
                               }}
                               disabled={isReadOnly}
-                              className={`px-1.5 py-1 text-[11px] border border-gray-300 dark:border-[#2D333B] rounded bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 ${
+                              className={`px-1.5 py-1 text-[11px] border border-gray-300 dark:border-[#2D333B] rounded bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] focus:outline-none focus:ring-0 focus-visible:outline-none ${
                                 isReadOnly
                                   ? "opacity-60 cursor-not-allowed"
                                   : ""
@@ -639,7 +639,7 @@ export function ApiResponseCard({
                                     setStatusCodes(updated);
                                   }}
                                   disabled={isReadOnly}
-                                  className={`px-1.5 py-1 text-[11px] border border-gray-300 dark:border-[#2D333B] rounded bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 ${
+                                  className={`px-1.5 py-1 text-[11px] border border-gray-300 dark:border-[#2D333B] rounded bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] focus:outline-none focus:ring-0 focus-visible:outline-none ${
                                     isReadOnly
                                       ? "opacity-60 cursor-not-allowed"
                                       : ""
@@ -1016,7 +1016,7 @@ export function ApiResponseCard({
                                     }}
                                     placeholder="Header Key (e.g., Content-Type)"
                                     disabled={isReadOnly}
-                                    className={`flex-1 px-3 py-1.5 text-sm border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                                    className={`flex-1 px-3 py-1.5 text-sm border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none ${
                                       isReadOnly
                                         ? "opacity-60 cursor-not-allowed"
                                         : ""
@@ -1035,7 +1035,7 @@ export function ApiResponseCard({
                                     }}
                                     placeholder="Header Value (e.g., application/json)"
                                     disabled={isReadOnly}
-                                    className={`flex-1 px-3 py-1.5 text-sm border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                                    className={`flex-1 px-3 py-1.5 text-sm border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none ${
                                       isReadOnly
                                         ? "opacity-60 cursor-not-allowed"
                                         : ""

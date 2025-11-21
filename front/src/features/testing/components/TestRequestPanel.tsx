@@ -192,7 +192,7 @@ export function TestRequestPanel() {
                       const properties = Object.entries(
                         schemaData.properties
                       ).map(([key, propSchema]: [string, any]) => {
-                        return parseOpenAPISchemaToSchemaField(key, propSchema);
+                          return parseOpenAPISchemaToSchemaField(key, propSchema);
                       });
 
                       // required 필드 설정
@@ -290,7 +290,7 @@ export function TestRequestPanel() {
             <select
               value={request.method}
               onChange={(e) => setRequest({ method: e.target.value })}
-              className="w-full px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm font-medium"
+              className="w-full px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm font-medium"
             >
               {methods.map((m) => (
                 <option key={m} value={m}>
@@ -308,7 +308,7 @@ export function TestRequestPanel() {
               value={request.url}
               onChange={(e) => setRequest({ url: e.target.value })}
               placeholder="/api/endpoint"
-              className="w-full px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm font-mono"
+              className="w-full px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm font-mono"
             />
           </div>
         </div>
@@ -322,7 +322,7 @@ export function TestRequestPanel() {
             value={request.description}
             onChange={(e) => setRequest({ description: e.target.value })}
             placeholder="Description"
-            className="w-full px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+            className="w-full px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm"
           />
         </div>
       </div>
@@ -350,7 +350,7 @@ export function TestRequestPanel() {
                   updateRequestHeader(index, e.target.value, header.value)
                 }
                 placeholder="Key"
-                className="flex-1 px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                className="flex-1 px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm"
               />
               <input
                 type="text"
@@ -359,7 +359,7 @@ export function TestRequestPanel() {
                   updateRequestHeader(index, header.key, e.target.value)
                 }
                 placeholder="Value"
-                className="flex-1 px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                className="flex-1 px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm"
               />
               <button
                 onClick={() => removeRequestHeader(index)}
@@ -408,7 +408,7 @@ export function TestRequestPanel() {
                     updateQueryParam(index, e.target.value, param.value)
                   }
                   placeholder="Key"
-                  className="flex-1 px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                  className="flex-1 px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm"
                 />
                 <input
                   type="text"
@@ -417,7 +417,7 @@ export function TestRequestPanel() {
                     updateQueryParam(index, param.key, e.target.value)
                   }
                   placeholder="Value"
-                  className="flex-1 px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                  className="flex-1 px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm"
                 />
                 <button
                   onClick={() => removeQueryParam(index)}
@@ -488,7 +488,7 @@ export function TestRequestPanel() {
             value={authorization}
             onChange={(e) => setAuthorization(e.target.value)}
             placeholder={t("testing.authorization")}
-            className="flex-1 px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+            className="flex-1 px-3 py-2 rounded-md bg-[#0D1117] border border-[#2D333B] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm"
           />
           <button
             onClick={async () => {

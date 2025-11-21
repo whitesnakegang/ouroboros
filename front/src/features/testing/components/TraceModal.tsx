@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import type { TryTraceSpan } from "@/features/spec/services/api";
 
 interface TraceModalProps {
@@ -19,6 +20,7 @@ export function TraceModal({
   traceData,
   initialExpandedSpanId,
 }: TraceModalProps) {
+  const { t } = useTranslation();
   const [expandedSpans, setExpandedSpans] = useState<Set<string>>(new Set());
   const [highlightedSpanId, setHighlightedSpanId] = useState<string | null>(
     null
@@ -200,7 +202,7 @@ export function TraceModal({
                   {span.durationMs.toLocaleString()}ms
                 </div>
                 <div className="text-xs text-gray-600 dark:text-[#8B949E]">
-                  (Self: {span.selfDurationMs.toLocaleString()}ms)
+                  ({t("traceModal.self")}: {span.selfDurationMs.toLocaleString()}ms)
                 </div>
                 <div className="text-xs text-gray-500 dark:text-[#6B7280] mt-1">
                   {span.percentage.toFixed(1)}% /{" "}
@@ -262,20 +264,20 @@ export function TraceModal({
                     d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
                   />
                 </svg>
-                Call Trace
+                {t("traceModal.callTrace")}
               </h2>
               <div className="mt-2 flex items-center gap-4 text-sm text-gray-600 dark:text-[#8B949E]">
                 <span>
-                  Try ID: <span className="font-mono">{traceData.tryId}</span>
+                  {t("traceModal.tryId")}: <span className="font-mono">{traceData.tryId}</span>
                 </span>
                 {traceData.traceId && (
                   <span>
-                    Trace ID:{" "}
+                    {t("traceModal.traceId")}:{" "}
                     <span className="font-mono">{traceData.traceId}</span>
                   </span>
                 )}
                 <span>
-                  Total Duration:{" "}
+                  {t("traceModal.totalDuration")}:{" "}
                   <span className="font-bold">
                     {traceData.totalDurationMs.toLocaleString()}ms
                   </span>
@@ -306,9 +308,9 @@ export function TraceModal({
           <div className="flex-1 overflow-auto p-6">
             {traceData.spans.length === 0 ? (
               <div className="text-center py-12 text-gray-600 dark:text-[#8B949E]">
-                <p className="text-sm">No trace data found.</p>
+                <p className="text-sm">{t("traceModal.noTraceDataFound")}</p>
                 <p className="text-xs mt-1 text-gray-500 dark:text-[#6B7280]">
-                  Tempo is disabled or trace not found.
+                  {t("traceModal.tempoDisabledOrNotFound")}
                 </p>
               </div>
             ) : (

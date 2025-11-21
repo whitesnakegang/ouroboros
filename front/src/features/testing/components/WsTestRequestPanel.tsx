@@ -6,11 +6,13 @@ import { StompClient, buildWebSocketUrl } from "../utils/stompClient";
 import {
   getWebSocketOperation,
   getWebSocketChannel,
-  getSchema,
+  getWebSocketSchema,
 } from "@/features/spec/services/api";
 import type { SchemaField } from "@/features/spec/types/schema.types";
 import { parseOpenAPISchemaToSchemaField } from "@/features/spec/utils/schemaConverter";
 import { isPrimitiveSchema } from "@/features/spec/types/schema.types";
+import { MessageDetailModal } from "./MessageDetailModal";
+import type { WebSocketMessage } from "../store/testing.store";
 
 interface Subscription {
   id: string;
@@ -29,6 +31,7 @@ export function WsTestRequestPanel() {
     setWsConnectionStartTime,
     wsConnectionStartTime,
     setTryId,
+    tryId,
   } = useTestingStore();
   const { selectedEndpoint, endpoints } = useSidebarStore();
 
@@ -41,6 +44,9 @@ export function WsTestRequestPanel() {
   >([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [newTopic, setNewTopic] = useState("");
+  const [selectedMessage, setSelectedMessage] =
+    useState<WebSocketMessage | null>(null);
+  const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
 
   // Schema 기반 메시지 입력 상태
   const [messageSchemaFields, setMessageSchemaFields] = useState<SchemaField[]>(
@@ -218,12 +224,6 @@ export function WsTestRequestPanel() {
           }
 
           setOperationAction(normalizedAction);
-          console.log("Operation Action 설정:", {
-            original: operation.action,
-            normalized: normalizedAction,
-            progress: selectedEndpoint?.progress,
-            isProgressCompleted,
-          });
 
           // Receive address 추출
           let receiveAddr = "";
@@ -310,15 +310,6 @@ export function WsTestRequestPanel() {
           }
 
           // receive 액션만 있는 경우 Reply Address는 필요 없음
-          // 디버깅: Reply Address 추출 결과 확인 (reply가 있는 경우만)
-          if (operation.action !== "receive" || replyAddr) {
-            console.log("Reply Address 추출:", {
-              operationAction: operation.action,
-              hasOperationReply: !!(operation.reply && operation.reply.channel),
-              path: selectedEndpoint.path,
-              extractedReplyAddr: replyAddr,
-            });
-          }
 
           setReplyAddress(replyAddr);
 
@@ -338,7 +329,7 @@ export function WsTestRequestPanel() {
             // Schema 로드 및 필드 생성
             if (schemaRef) {
               try {
-                const schemaResponse = await getSchema(schemaRef);
+                const schemaResponse = await getWebSocketSchema(schemaRef);
                 const schemaData = schemaResponse.data;
 
                 if (schemaData.properties) {
@@ -597,7 +588,13 @@ export function WsTestRequestPanel() {
             }
           } else {
             // replyAddress가 없으면 구독하지 않음
-            if (receiveAddress && receiveAddress.trim() !== "") {
+            // receive 액션만 있는 경우는 reply address가 없는 게 정상이므로 에러 메시지 표시하지 않음
+            if (
+              receiveAddress &&
+              receiveAddress.trim() !== "" &&
+              operationAction !== null &&
+              operationAction !== "receive"
+            ) {
               addWsMessage({
                 id: `msg-${Date.now()}-${Math.random()}`,
                 timestamp: Date.now(),
@@ -619,9 +616,25 @@ export function WsTestRequestPanel() {
                 tryNotificationDestination,
                 (frame) => {
                   // Try 알림 메시지에서 tryId 추출
-                  const tryIdHeader =
+                  // STOMP 프레임 헤더는 대소문자를 구분할 수 있으므로 모든 키를 확인
+                  let tryIdHeader: string | undefined = undefined;
+
+                  // 먼저 일반적인 키로 확인
+                  tryIdHeader =
                     frame.headers["X-Ouroboros-Try-Id"] ||
-                    frame.headers["x-ouroboros-try-id"];
+                    frame.headers["x-ouroboros-try-id"] ||
+                    frame.headers["X-OUROBOROS-TRY-ID"];
+
+                  // 헤더에 tryId가 없으면 모든 헤더 키를 순회하면서 대소문자 구분 없이 찾기
+                  if (!tryIdHeader && frame.headers) {
+                    const headerKeys = Object.keys(frame.headers);
+                    for (const key of headerKeys) {
+                      if (key.toLowerCase() === "x-ouroboros-try-id") {
+                        tryIdHeader = frame.headers[key];
+                        break;
+                      }
+                    }
+                  }
 
                   if (tryIdHeader) {
                     setTryId(tryIdHeader);
@@ -661,6 +674,7 @@ export function WsTestRequestPanel() {
                       content: payloadContent,
                       tryId: tryIdHeader,
                     };
+
                     addWsMessage(tryMessage);
                     updateWsStats((prev) => ({
                       totalSent: (prev?.totalSent || 0) + 1,
@@ -759,9 +773,49 @@ export function WsTestRequestPanel() {
         destination,
         (frame) => {
           // 응답 메시지에서 X-Ouroboros-Try-Id 헤더 추출
-          const tryIdHeader =
+          // STOMP 프레임 헤더는 대소문자를 구분할 수 있으므로 모든 키를 확인
+          let tryIdHeader: string | undefined = undefined;
+
+          // 먼저 일반적인 키로 확인
+          tryIdHeader =
             frame.headers["X-Ouroboros-Try-Id"] ||
-            frame.headers["x-ouroboros-try-id"];
+            frame.headers["x-ouroboros-try-id"] ||
+            frame.headers["X-OUROBOROS-TRY-ID"];
+
+          // 헤더에 tryId가 없으면 모든 헤더 키를 순회하면서 대소문자 구분 없이 찾기
+          if (!tryIdHeader && frame.headers) {
+            const headerKeys = Object.keys(frame.headers);
+            for (const key of headerKeys) {
+              if (key.toLowerCase() === "x-ouroboros-try-id") {
+                tryIdHeader = frame.headers[key];
+                break;
+              }
+            }
+          }
+
+          // 헤더에 tryId가 없으면 메시지 본문에서 추출 시도
+          if (!tryIdHeader && frame.body) {
+            try {
+              const bodyJson = JSON.parse(frame.body);
+              // 본문에 tryId가 있는 경우 (예: { tryId: "...", ... })
+              if (bodyJson.tryId) {
+                tryIdHeader = bodyJson.tryId;
+              }
+              // 본문의 headers에 tryId가 있는 경우 (예: { headers: { "X-Ouroboros-Try-Id": "..." }, ... })
+              else if (bodyJson.headers) {
+                // headers 객체의 모든 키를 확인
+                const headerKeys = Object.keys(bodyJson.headers);
+                for (const key of headerKeys) {
+                  if (key.toLowerCase() === "x-ouroboros-try-id") {
+                    tryIdHeader = bodyJson.headers[key];
+                    break;
+                  }
+                }
+              }
+            } catch {
+              // JSON 파싱 실패 시 무시
+            }
+          }
 
           // tryId가 있으면 store에 저장
           if (tryIdHeader) {
@@ -919,13 +973,29 @@ export function WsTestRequestPanel() {
     // 실제 destination 사용
     destination = actualDestination;
 
-    // 디버깅: 실제 전송되는 destination 확인
-    console.log("WebSocket 메시지 전송:", {
-      destination,
-      replyAddress,
-      receiveAddress,
-      useReplyAddress: replyAddress && replyAddress.trim() !== "",
-    });
+    // 자동 생성 필드인지 확인하는 헬퍼 함수
+    const isAutoGeneratedField = (field: SchemaField): boolean => {
+      const fieldKeyLower = field.key.toLowerCase();
+      // 필드명 기반 판단
+      const isAutoFieldName =
+        fieldKeyLower === "sentat" ||
+        fieldKeyLower === "sent_at" ||
+        fieldKeyLower === "createdat" ||
+        fieldKeyLower === "created_at" ||
+        fieldKeyLower === "timestamp" ||
+        field.key === "sentAt" ||
+        field.key === "createdAt";
+
+      // 타입 기반 판단 (date-time 또는 instant)
+      const isDateTimeField =
+        isPrimitiveSchema(field.schemaType) &&
+        field.schemaType.type === "string" &&
+        (field.schemaType.format === "date-time" ||
+          field.schemaType.format === "instant" ||
+          field.schemaType.format === "date");
+
+      return isAutoFieldName || isDateTimeField;
+    };
 
     // Schema 기반 메시지 생성
     let messageBody: string;
@@ -933,10 +1003,15 @@ export function WsTestRequestPanel() {
       // Schema 필드가 있으면 formData를 JSON으로 변환
       const messageData: Record<string, unknown> = {};
       messageSchemaFields.forEach((field) => {
-        const value = messageFormData[field.key];
-        // undefined나 빈 문자열이 아닌 경우만 포함
-        if (value !== undefined && value !== "") {
-          messageData[field.key] = value;
+        // 자동 생성 필드는 항상 현재 시간으로 설정
+        if (isAutoGeneratedField(field)) {
+          messageData[field.key] = new Date().toISOString();
+        } else {
+          const value = messageFormData[field.key];
+          // undefined나 빈 문자열이 아닌 경우만 포함
+          if (value !== undefined && value !== "") {
+            messageData[field.key] = value;
+          }
         }
       });
       messageBody = JSON.stringify(messageData);
@@ -970,12 +1045,13 @@ export function WsTestRequestPanel() {
       stompClientRef.current.send(destination, headers, messageBody);
 
       // 전송된 메시지 로그
-      const message = {
+      const message: WebSocketMessage = {
         id: `msg-${Date.now()}-${Math.random()}`,
         timestamp: Date.now(),
         direction: "sent" as const,
         address: destination,
         content: messageBody,
+        tryId: enableTryHeader ? tryId || undefined : undefined,
       };
       addWsMessage(message);
       updateWsStats((prev) => ({
@@ -986,6 +1062,29 @@ export function WsTestRequestPanel() {
       if (messageSchemaFields.length > 0) {
         const defaultFormData: Record<string, unknown> = {};
         messageSchemaFields.forEach((field) => {
+          // 자동 생성 필드는 초기화하지 않음 (항상 전송 시 현재 시간으로 설정됨)
+          const fieldKeyLower = field.key.toLowerCase();
+          const isAutoFieldName =
+            fieldKeyLower === "sentat" ||
+            fieldKeyLower === "sent_at" ||
+            fieldKeyLower === "createdat" ||
+            fieldKeyLower === "created_at" ||
+            fieldKeyLower === "timestamp" ||
+            field.key === "sentAt" ||
+            field.key === "createdAt";
+
+          const isDateTimeField =
+            isPrimitiveSchema(field.schemaType) &&
+            field.schemaType.type === "string" &&
+            (field.schemaType.format === "date-time" ||
+              field.schemaType.format === "instant" ||
+              field.schemaType.format === "date");
+
+          if (isAutoFieldName || isDateTimeField) {
+            // 자동 생성 필드는 초기화하지 않음
+            return;
+          }
+
           if (isPrimitiveSchema(field.schemaType)) {
             switch (field.schemaType.type) {
               case "string":
@@ -1091,7 +1190,7 @@ export function WsTestRequestPanel() {
               onChange={(e) => setEntryPoint(e.target.value)}
               placeholder="ws://localhost:8080/ws"
               disabled={wsConnectionStatus === "connected"}
-              className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm font-mono disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm font-mono disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -1118,7 +1217,7 @@ export function WsTestRequestPanel() {
                 }}
                 placeholder="/topic/chat/room1"
                 disabled={wsConnectionStatus === "connected"}
-                className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               />
               {hasPathParameter(receiveAddress) && (
                 <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
@@ -1153,7 +1252,7 @@ export function WsTestRequestPanel() {
                 }}
                 placeholder="/app/chat/room1"
                 disabled={wsConnectionStatus === "connected"}
-                className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               />
               {hasPathParameter(replyAddress) && (
                 <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
@@ -1254,8 +1353,10 @@ export function WsTestRequestPanel() {
                             }
                           }
                         }}
-                        placeholder={t("wsTest.pathParameterPlaceholder", { param })}
-                        className="w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-amber-300 dark:border-amber-700 text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-amber-400 dark:focus:ring-amber-500 focus:border-amber-400 dark:focus:border-amber-500 text-sm"
+                        placeholder={t("wsTest.pathParameterPlaceholder", {
+                          param,
+                        })}
+                        className="w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-amber-300 dark:border-amber-700 text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm"
                       />
                       {/* 치환된 주소 미리보기 */}
                       {pathParameters[param] && (
@@ -1342,7 +1443,7 @@ export function WsTestRequestPanel() {
                         updateConnectHeader(index, e.target.value, header.value)
                       }
                       placeholder={t("wsTest.key")}
-                      className="flex-1 px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                      className="flex-1 px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm"
                     />
                     <input
                       type="text"
@@ -1351,7 +1452,7 @@ export function WsTestRequestPanel() {
                         updateConnectHeader(index, header.key, e.target.value)
                       }
                       placeholder={t("wsTest.value")}
-                      className="flex-1 px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                      className="flex-1 px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm"
                     />
                     <button
                       onClick={() => removeConnectHeader(index)}
@@ -1391,6 +1492,55 @@ export function WsTestRequestPanel() {
             {messageSchemaFields.length > 0 ? (
               <div className="space-y-4">
                 {messageSchemaFields.map((field) => {
+                  // 자동 생성 필드인지 확인
+                  const fieldKeyLower = field.key.toLowerCase();
+                  const isAutoFieldName =
+                    fieldKeyLower === "sentat" ||
+                    fieldKeyLower === "sent_at" ||
+                    fieldKeyLower === "createdat" ||
+                    fieldKeyLower === "created_at" ||
+                    fieldKeyLower === "timestamp" ||
+                    field.key === "sentAt" ||
+                    field.key === "createdAt";
+
+                  const isDateTimeField =
+                    isPrimitiveSchema(field.schemaType) &&
+                    field.schemaType.type === "string" &&
+                    (field.schemaType.format === "date-time" ||
+                      field.schemaType.format === "instant" ||
+                      field.schemaType.format === "date");
+
+                  const isAutoGenerated = isAutoFieldName || isDateTimeField;
+
+                  // 자동 생성 필드는 읽기 전용으로 표시
+                  if (isAutoGenerated) {
+                    return (
+                      <div key={field.key}>
+                        <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
+                          {field.key}
+                          {field.required && (
+                            <span className="text-red-500 ml-1">*</span>
+                          )}
+                          {field.description && (
+                            <span className="text-xs text-gray-500 dark:text-[#8B949E] ml-2">
+                              ({field.description})
+                            </span>
+                          )}
+                          <span className="text-xs text-blue-600 dark:text-blue-400 ml-2">
+                            (auto)
+                          </span>
+                        </label>
+                        <input
+                          type="text"
+                          value={new Date().toISOString()}
+                          readOnly
+                          disabled
+                          className="w-full px-3 py-2 rounded-md bg-gray-100 dark:bg-[#161B22] border border-gray-300 dark:border-[#2D333B] text-gray-600 dark:text-[#8B949E] cursor-not-allowed text-sm"
+                        />
+                      </div>
+                    );
+                  }
+
                   const value = messageFormData[field.key] ?? "";
                   let isBoolean = false;
                   let isNumber = false;
@@ -1432,7 +1582,7 @@ export function WsTestRequestPanel() {
                               [field.key]: e.target.value === "true",
                             });
                           }}
-                          className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                          className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm"
                         >
                           <option value="false">false</option>
                           <option value="true">true</option>
@@ -1454,7 +1604,7 @@ export function WsTestRequestPanel() {
                           placeholder={
                             primitiveType === "integer" ? "0" : "0.0"
                           }
-                          className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                          className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm"
                         />
                       ) : (
                         <input
@@ -1472,7 +1622,7 @@ export function WsTestRequestPanel() {
                               handleSimpleSend();
                             }
                           }}
-                          className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                          className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm"
                         />
                       )}
                     </div>
@@ -1500,7 +1650,7 @@ export function WsTestRequestPanel() {
                       });
                     }}
                     placeholder="tester"
-                    className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                    className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm"
                   />
                 </div>
 
@@ -1527,7 +1677,7 @@ export function WsTestRequestPanel() {
                         handleSimpleSend();
                       }
                     }}
-                    className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                    className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm"
                   />
                 </div>
 
@@ -1547,7 +1697,7 @@ export function WsTestRequestPanel() {
                         type: e.target.value,
                       });
                     }}
-                    className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                    className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm"
                   >
                     <option value="TALK">TALK</option>
                     <option value="ENTER">ENTER</option>
@@ -1563,7 +1713,7 @@ export function WsTestRequestPanel() {
                 id="enableTryHeader"
                 checked={enableTryHeader}
                 onChange={(e) => setEnableTryHeader(e.target.checked)}
-                className="w-4 h-4 text-gray-600 dark:text-gray-400 bg-gray-100 border-gray-300 rounded focus:ring-gray-400 dark:focus:ring-gray-500"
+                className="w-4 h-4 text-gray-600 dark:text-gray-400 bg-gray-100 border-gray-300 rounded focus:ring-0 focus-visible:outline-none"
               />
               <label
                 htmlFor="enableTryHeader"
@@ -1625,7 +1775,7 @@ export function WsTestRequestPanel() {
                           }}
                           className="sr-only peer"
                         />
-                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-gray-300 dark:peer-focus:ring-gray-600 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-gray-600"></div>
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-0 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-gray-600"></div>
                       </label>
                     </div>
                   ))}
@@ -1654,7 +1804,8 @@ export function WsTestRequestPanel() {
               />
             </svg>
             {t("wsTest.subscriptions", {
-              active: subscriptions.filter((s) => s.subscriptionId !== null).length,
+              active: subscriptions.filter((s) => s.subscriptionId !== null)
+                .length,
               total: subscriptions.length,
             })}
           </label>
@@ -1694,13 +1845,25 @@ export function WsTestRequestPanel() {
                       }}
                       className="sr-only peer"
                     />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-gray-300 dark:peer-focus:ring-gray-600 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-gray-600"></div>
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-0 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-gray-600"></div>
                   </label>
                 </div>
               );
             })}
           </div>
         </div>
+      )}
+
+      {/* Message Detail Modal */}
+      {selectedMessage && (
+        <MessageDetailModal
+          isOpen={isMessageModalOpen}
+          onClose={() => {
+            setIsMessageModalOpen(false);
+            setSelectedMessage(null);
+          }}
+          message={selectedMessage}
+        />
       )}
     </div>
   );

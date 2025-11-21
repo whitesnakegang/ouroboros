@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { type ImportYamlData, type RenamedItem } from "../services/api";
 
 interface ImportResultModalProps {
@@ -11,6 +12,7 @@ export function ImportResultModal({
   onClose,
   result,
 }: ImportResultModalProps) {
+  const { t } = useTranslation();
   if (!isOpen) return null;
 
   return (
@@ -45,7 +47,7 @@ export function ImportResultModal({
                 </div>
                 <div>
                   <h2 className="text-xl font-semibold text-gray-900 dark:text-[#E6EDF3]">
-                    Import 완료
+                    {t("importResult.importCompleted")}
                   </h2>
                   <p className="text-sm text-gray-600 dark:text-[#8B949E]">
                     {result.summary}
@@ -79,7 +81,7 @@ export function ImportResultModal({
             <div className="grid grid-cols-2 gap-4 mb-6">
               <div className="bg-gray-50 dark:bg-[#0D1117] border border-gray-200 dark:border-[#2D333B] rounded-md p-4">
                 <div className="text-sm text-gray-600 dark:text-[#8B949E] mb-1">
-                  Import된 API
+                  {t("importResult.importedApi")}
                 </div>
                 <div className="text-2xl font-bold text-gray-900 dark:text-[#E6EDF3]">
                   {result.imported}
@@ -87,7 +89,7 @@ export function ImportResultModal({
               </div>
               <div className="bg-gray-50 dark:bg-[#0D1117] border border-gray-200 dark:border-[#2D333B] rounded-md p-4">
                 <div className="text-sm text-gray-600 dark:text-[#8B949E] mb-1">
-                  이름 변경
+                  {t("importResult.renamed")}
                 </div>
                 <div className="text-2xl font-bold text-gray-900 dark:text-[#E6EDF3]">
                   {result.renamed}
@@ -99,7 +101,7 @@ export function ImportResultModal({
             {result.renamed > 0 && result.renamedList.length > 0 && (
               <div>
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3] mb-3">
-                  중복으로 인해 이름이 변경된 항목
+                  {t("importResult.renamedItemsDueToDuplication")}
                 </h3>
                 <div className="space-y-2">
                   {result.renamedList.map(
@@ -171,7 +173,7 @@ export function ImportResultModal({
               onClick={onClose}
               className="w-full md:w-auto px-6 py-3 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-all font-medium active:translate-y-[1px] focus:outline-none focus-visible:outline-none"
             >
-              확인
+              {t("common.confirm")}
             </button>
           </div>
         </div>

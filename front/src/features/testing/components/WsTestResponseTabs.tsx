@@ -139,7 +139,7 @@ const JsonHighlighter = ({
     <pre
       tabIndex={0}
       className={`p-3 text-sm ${fontClass} ${wrapClass} overflow-x-auto rounded-lg ${
-        isSent ? "bg-black/30 text-white" : "bg-black/20 text-white/90"
+        isSent ? "bg-black text-white" : "bg-black text-white"
       } focus-visible:outline-none focus-visible:ring-0`}
     >
       <code>{highlightJson(code)}</code>
@@ -210,8 +210,12 @@ export function WsTestResponseTabs() {
   );
 
   const handleMessageClick = (message: WebSocketMessage) => {
-    setSelectedMessage(message);
-    setIsMessageModalOpen(true);
+    // tryId가 있는 경우에만 모달을 열고 Test 탭으로 이동
+    if (message.tryId) {
+      setSelectedMessage(message);
+      setIsMessageModalOpen(true);
+    }
+    // tryId가 없으면 아무것도 하지 않음 (상세 메시지 모달 표시 안 함)
   };
 
   // 연결 지속 시간 포맷팅
@@ -285,17 +289,17 @@ export function WsTestResponseTabs() {
               {t("wsTest.log")}
             </span>
             {wsConnectionStatus === "connected" ? (
-              <span className="px-2 py-0.5 text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full flex items-center gap-1.5">
+              <span className="px-2 py-0.5 text-xs font-medium bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-400 rounded-full flex items-center gap-1.5">
                 <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
                 {t("wsTest.connected")}
               </span>
             ) : wsConnectionStatus === "connecting" ? (
-              <span className="px-2 py-0.5 text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded-full flex items-center gap-1.5">
+              <span className="px-2 py-0.5 text-xs font-medium bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-400 rounded-full flex items-center gap-1.5">
                 <div className="w-1.5 h-1.5 bg-yellow-500 rounded-full animate-pulse"></div>
                 {t("wsTest.connecting")}
               </span>
             ) : (
-              <span className="px-2 py-0.5 text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-full">
+              <span className="px-2 py-0.5 text-xs font-medium bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-400 rounded-full">
                 {t("wsTest.disconnected")}
               </span>
             )}
@@ -425,7 +429,8 @@ function createGroupHeader(
             : "text-green-700 dark:text-green-400"
         }`}
       >
-        {message.direction === "sent" ? t("wsTest.sent") : t("wsTest.received")} · {runCount}
+        {message.direction === "sent" ? t("wsTest.sent") : t("wsTest.received")}{" "}
+        · {runCount}
       </span>
       <div className="h-px flex-1 bg-gray-200 dark:bg-[#2D333B]" />
     </div>
@@ -506,7 +511,7 @@ function buildMessageRows(
         prevTimestamp={prev?.timestamp ?? null}
         isJsonFormatted={isJsonFormatted}
         compactMode={isCompact}
-        onClick={() => onMessageClick(message)}
+        onClick={message.tryId ? () => onMessageClick(message) : undefined}
         t={t}
       />
     );
@@ -577,7 +582,7 @@ function ResponseContent({
                 if (e.key === "Escape") setSearchQuery("");
               }}
               placeholder={t("wsTest.searchMessages")}
-              className="w-full pl-9 pr-9 py-2 text-sm rounded-md bg-white dark:bg-[#161B22] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-2 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-transparent"
+              className="w-full pl-9 pr-9 py-2 text-sm rounded-md bg-white dark:bg-[#161B22] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none"
             />
             {searchQuery && (
               <button
@@ -731,9 +736,7 @@ function ResponseContent({
           <p className="text-sm">{t("wsTest.noMessages")}</p>
           <p className="text-xs mt-1 text-gray-500 dark:text-[#6B7280]">
             {searchQuery ? (
-              <>
-                {t("wsTest.noMessagesFoundFor", { query: searchQuery })}
-              </>
+              <>{t("wsTest.noMessagesFoundFor", { query: searchQuery })}</>
             ) : (
               <>{t("wsTest.messagesWillBeDisplayed")}</>
             )}
@@ -822,14 +825,12 @@ function MessageBubble({
     );
   })();
 
-  // /queue/ouro/try 또는 /user/queue/ouro/try로 send할 때만 메서드 실행 시간 버튼 표시
-  const showMethodButton = 
-    isSent && 
-    message.tryId && 
-    (message.address === "/queue/ouro/try" || message.address === "/user/queue/ouro/try");
-
   return (
-    <div className={`group relative flex ${isSent ? "justify-end" : "justify-start"} mb-3`}>
+    <div
+      className={`group relative flex ${
+        isSent ? "justify-end" : "justify-start"
+      } mb-3`}
+    >
       <div
         onClick={onClick}
         tabIndex={0}
@@ -845,70 +846,80 @@ function MessageBubble({
           onClick ? "cursor-pointer active:scale-[0.98]" : ""
         } ${
           isTryMessage
-            ? "bg-green-100 dark:bg-green-900/20 border-green-300 dark:border-green-700/50"
+            ? "bg-green-100 dark:bg-green-900 border-green-300 dark:border-green-700"
             : isSent
-            ? "bg-blue-100 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700/50"
-            : "bg-green-100 dark:bg-green-900/20 border-green-300 dark:border-green-700/50"
+            ? "bg-blue-100 dark:bg-blue-900 border-blue-300 dark:border-blue-700"
+            : "bg-green-100 dark:bg-green-900 border-green-300 dark:border-green-700"
         }`}
       >
         {/* Header - RECEIVE/SEND 배지와 타임스탬프 */}
-        <div className={`flex items-center gap-2 mb-2 ${isSent ? "justify-end" : "justify-start"}`}>
-          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-            isSent 
-              ? "bg-blue-500 text-white"
-              : "bg-green-500 text-white"
-          }`}>
-            {isSent ? t("wsTest.send") : t("wsTest.receive")}
-            </span>
-          <span className="text-[10px] font-medium text-gray-600 dark:text-[#8B949E]">
-              {formatTimestamp(message.timestamp)}
-            </span>
-            {relativeBadge}
-          {showMethodButton && (
+        <div
+          className={`flex items-center gap-2 mb-2 ${
+            isSent ? "justify-end" : "justify-start"
+          }`}
+        >
+          {message.tryId && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 if (onClick) onClick();
               }}
-              className="text-[10px] px-2 py-0.5 rounded bg-purple-500 hover:bg-purple-600 text-white font-medium transition-colors"
-              title="메서드 실행 시간 보기"
+              className="text-[10px] px-2 py-0.5 rounded bg-purple-500 hover:bg-purple-600 text-white font-medium transition-colors flex items-center gap-1"
+              title={t("wsTest.viewMethodExecutionTime")}
             >
-              ⏱️
+              ⏱ {t("wsTest.methodExecutionTime")}
             </button>
-            )}
-          </div>
+          )}
+          <span
+            className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+              isSent ? "bg-blue-500 text-white" : "bg-green-500 text-white"
+            }`}
+          >
+            {isSent ? t("wsTest.send") : t("wsTest.receive")}
+          </span>
+          <span className="text-[10px] font-medium text-gray-600 dark:text-[#8B949E]">
+            {formatTimestamp(message.timestamp)}
+          </span>
+          {relativeBadge}
+        </div>
 
         {/* Destination/Address - 작고 간단하게 */}
-        {message.address && message.address !== "CONNECTED" && message.address !== "ERROR" && message.address !== "WARNING" && message.address !== "INFO" && (
-          <div className={`mb-2 ${isSent ? "text-right" : "text-left"}`}>
-            <span className="text-[10px] font-mono text-gray-600 dark:text-[#8B949E]">
-              {message.address}
-            </span>
-          </div>
-        )}
+        {message.address &&
+          message.address !== "CONNECTED" &&
+          message.address !== "ERROR" &&
+          message.address !== "WARNING" &&
+          message.address !== "INFO" && (
+            <div className={`mb-2 ${isSent ? "text-right" : "text-left"}`}>
+              <span className="text-[10px] font-mono text-gray-600 dark:text-[#8B949E]">
+                {message.address}
+              </span>
+            </div>
+          )}
 
-          {/* Body */}
-          <div className="relative">
-            {isJson && isJsonFormatted ? (
-            <div className="rounded-lg overflow-hidden bg-white/90 dark:bg-black/40 border border-gray-200 dark:border-[#2D333B]">
-                <JsonHighlighter
-                  code={message.content}
-                  isSent={isSent}
-                  useMonospace={useMonospace}
-                  softWrap={softWrap}
-                />
-              </div>
-            ) : (
-              <div
-                className={`${
+        {/* Body */}
+        <div className="relative">
+          {isJson && isJsonFormatted ? (
+            <div className="rounded-lg overflow-hidden bg-white dark:bg-black border border-gray-200 dark:border-[#2D333B]">
+              <JsonHighlighter
+                code={message.content}
+                isSent={isSent}
+                useMonospace={useMonospace}
+                softWrap={softWrap}
+              />
+            </div>
+          ) : (
+            <div
+              className={`${
                 compactMode ? "text-xs" : "text-sm"
               } font-mono whitespace-pre-wrap break-words text-gray-900 dark:text-[#E6EDF3]`}
-              >
-                {message.content || (
-                <span className="text-gray-500 dark:text-[#8B949E] italic">(empty)</span>
-                )}
-              </div>
-            )}
+            >
+              {message.content || (
+                <span className="text-gray-500 dark:text-[#8B949E] italic">
+                  (empty)
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -964,7 +975,8 @@ export function TestContent({
           Mock endpoints do not provide method execution information
         </p>
         <p className="text-xs mt-1 text-gray-500 dark:text-[#6B7280]">
-          Method execution time can only be checked for actually implemented endpoints (completed)
+          Method execution time can only be checked for actually implemented
+          endpoints (completed)
         </p>
       </div>
     );
@@ -1056,6 +1068,14 @@ export function TestContent({
         <p className="text-xs mt-1 text-gray-500 dark:text-[#6B7280]">
           You can check method execution time by running in Trace mode
         </p>
+        {tryId && (
+          <p className="text-xs mt-2 text-amber-600 dark:text-amber-400">
+            Try ID: {tryId}
+            <br />
+            백엔드에서 추적 데이터를 찾을 수 없습니다. Tempo가 활성화되어 있고,
+            WebSocket 핸들러가 추적 대상 패키지에 포함되어 있는지 확인하세요.
+          </p>
+        )}
       </div>
     );
   }
@@ -1157,7 +1177,7 @@ export function TestContent({
                         ) => (
                           <span
                             key={paramIndex}
-                            className="px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded"
+                            className="px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300 rounded"
                           >
                             {param.type} {param.name}
                           </span>
