@@ -18,8 +18,8 @@ export function ConfirmModal({
   onConfirm,
   title,
   message,
-  confirmText = "Confirm",
-  cancelText = "Cancel",
+  confirmText,
+  cancelText,
   variant = "info",
   isLoading = false,
 }: ConfirmModalProps) {
@@ -80,7 +80,7 @@ export function ConfirmModal({
                 <button
                   onClick={onClose}
                   className="flex-shrink-0 p-1.5 -mt-1 -mr-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#21262D] rounded-md transition-colors"
-                  aria-label="Close"
+                  aria-label={t("common.close")}
                 >
                   <svg
                     className="w-5 h-5"
@@ -114,7 +114,7 @@ export function ConfirmModal({
               disabled={isLoading}
               className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-[#C9D1D9] bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#30363D] rounded-lg hover:bg-gray-50 dark:hover:bg-[#161B22] transition-colors focus:outline-none focus:ring-0 focus-visible:outline-none disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
             >
-              {cancelText}
+              {cancelText || t("common.cancel")}
             </button>
             <button
               onClick={handleConfirm}
@@ -146,7 +146,7 @@ export function ConfirmModal({
                   {t("common.processing")}
                 </span>
               ) : (
-                confirmText
+                confirmText || t("common.confirm")
               )}
             </button>
           </div>

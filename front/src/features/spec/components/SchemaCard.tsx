@@ -167,8 +167,8 @@ export function SchemaCard({
   const handleDeleteSchema = (schemaName: string) => {
     setConfirmModal({
       isOpen: true,
-      title: "Delete Schema",
-      message: `Are you sure you want to delete the schema "${schemaName}"?`,
+      title: t("schema.deleteSchema"),
+      message: t("schema.confirmDeleteSchema", { name: schemaName }),
       variant: "danger",
       onConfirm: async () => {
         setConfirmModal((prev) => ({ ...prev, isOpen: false }));
@@ -192,8 +192,8 @@ export function SchemaCard({
 
           setAlertModal({
             isOpen: true,
-            title: "Deleted",
-            message: `Schema "${schemaName}" has been deleted successfully.`,
+            title: t("modal.deleted"),
+            message: t("schema.schemaDeletedSuccessfully", { name: schemaName }),
             variant: "success",
           });
 
@@ -205,10 +205,10 @@ export function SchemaCard({
           console.error("스키마 삭제 실패:", err);
           setAlertModal({
             isOpen: true,
-            title: "Delete Failed",
-            message: `Failed to delete schema: ${
-              err instanceof Error ? err.message : "Unknown error"
-            }`,
+            title: t("modal.deleteFailed"),
+            message: t("schema.failedToDeleteSchema", {
+              error: err instanceof Error ? err.message : t("common.error"),
+            }),
             variant: "error",
           });
         }
@@ -221,8 +221,8 @@ export function SchemaCard({
     if (!currentSchemaName.trim()) {
       setAlertModal({
         isOpen: true,
-        title: "Input Error",
-        message: "Please enter a schema name.",
+        title: t("modal.inputError"),
+        message: t("schema.pleaseEnterSchemaName"),
         variant: "warning",
       });
       return;
@@ -232,8 +232,8 @@ export function SchemaCard({
     if (schemaFields.length === 0) {
       setAlertModal({
         isOpen: true,
-        title: "Input Error",
-        message: "Please add at least one field.",
+        title: t("modal.inputError"),
+        message: t("schema.pleaseAddAtLeastOneField"),
         variant: "warning",
       });
       return;
@@ -332,8 +332,8 @@ export function SchemaCard({
       const errorMessage = getErrorMessage(err);
       setAlertModal({
         isOpen: true,
-        title: "Save Failed",
-        message: `Failed to save schema: ${errorMessage}`,
+        title: t("modal.saveFailed"),
+        message: t("schema.failedToSaveSchema", { error: errorMessage }),
         variant: "error",
       });
     } finally {

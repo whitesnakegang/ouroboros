@@ -164,9 +164,9 @@ export function SchemaModal({
           <div className="p-6">
             {schemas.length === 0 ? (
               <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                <p>저장된 Schema가 없습니다.</p>
+                <p>{t("schema.noSchemasSaved")}</p>
                 <p className="text-sm mt-2">
-                  Response 탭에서 새 Schema를 생성하세요.
+                  {t("schema.createSchemaInResponseTab")}
                 </p>
               </div>
             ) : (
