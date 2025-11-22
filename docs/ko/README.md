@@ -169,12 +169,12 @@
 
 ### 설치
 
-> **⚠️ 버전 경고**: 1.0.2 버전은 에러가 발생하므로 사용하지 마세요. 반드시 1.0.4 버전을 사용해주세요.
+> **⚠️ 버전 경고**: 1.0.2 버전은 에러가 발생하므로 사용하지 마세요. 반드시 1.0.5 버전을 사용해주세요.
 
 #### Gradle
 ```gradle
 dependencies {
-    implementation 'io.github.whitesnakegang:ouroboros:1.0.4'
+    implementation 'io.github.whitesnakegang:ouroboros:1.0.5'
     implementation 'org.springframework.boot:spring-boot-starter-web'
 }
 ```
@@ -184,7 +184,7 @@ dependencies {
 <dependency>
     <groupId>io.github.whitesnakegang</groupId>
     <artifactId>ouroboros</artifactId>
-    <version>1.0.4</version>
+    <version>1.0.5</version>
 </dependency>
 ```
 
