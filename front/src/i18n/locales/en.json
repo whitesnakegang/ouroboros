@@ -92,7 +92,24 @@
     "confirmReflectChannel": "Do you want to automatically reflect the actual implementation's Channel information into the spec?\n\nThis operation cannot be undone.",
     "fileFormatError": "File Format Error",
     "onlyYamlFiles": "Only YAML files (.yml or .yaml) can be uploaded.",
-    "websocketOperationUpdated": "WebSocket Operation has been updated successfully."
+    "websocketOperationUpdated": "WebSocket Operation has been updated successfully.",
+    "websocketOperationDeletedSuccessfully": "WebSocket Operation has been deleted successfully.",
+    "failedToDeleteWebSocketOperation": "Failed to delete WebSocket Operation: {{error}}",
+    "importCompleted": "Import Completed",
+    "downloadCompleted": "Download Completed",
+    "yamlFileDownloadedSuccessfully": "YAML file has been downloaded successfully.",
+    "failedToExportMarkdown": "Failed to export Markdown.\nError: {{error}}",
+    "failedToExportYaml": "Failed to export YAML.\nError: {{error}}",
+    "yamlImportFailedWithError": "YAML import failed\n\n{{error}}",
+    "success": "Success",
+    "implementationReflectedInSpec": "The actual implementation has been successfully reflected in the spec.",
+    "channelReflectedInSpec": "The actual implementation's Channel has been successfully reflected in the spec.",
+    "syncFailed": "Sync Failed",
+    "failedToSyncSpec": "Failed to sync spec: {{error}}",
+    "error": "Error",
+    "operationIdNotFound": "Operation ID not found.",
+    "updateFailed": "Update Failed",
+    "failedToUpdateProgress": "Failed to update progress: {{error}}"
   },
   "editor": {
     "selectProtocol": "Select Protocol",
@@ -132,7 +149,13 @@
     "title": "Schema",
     "deleteSchema": "Delete Schema",
     "confirmDeleteSchema": "Are you sure you want to delete the schema \"{{name}}\"?",
-    "schemaDeletedSuccessfully": "Schema \"{{name}}\" has been deleted successfully."
+    "schemaDeletedSuccessfully": "Schema \"{{name}}\" has been deleted successfully.",
+    "noSchemasSaved": "No schemas saved.",
+    "createSchemaInResponseTab": "Please create a new schema in the Response tab.",
+    "failedToDeleteSchema": "Failed to delete schema: {{error}}",
+    "pleaseEnterSchemaName": "Please enter a schema name.",
+    "pleaseAddAtLeastOneField": "Please add at least one field.",
+    "failedToSaveSchema": "Failed to save schema: {{error}}"
   },
   "specForm": {
     "title": "API Specification",
@@ -325,7 +348,9 @@
     "clickRunButton": "Click the RUN button to execute the test",
     "queryParameters": "Query Parameters",
     "authorization": "Authorization",
-    "run": "RUN"
+    "run": "RUN",
+    "testPreparing": "{{protocol}} test is being prepared.",
+    "onlyRestAndWebSocketSupported": "Currently only REST and WebSocket protocols are supported."
   },
   "schemaCard": {
     "newSchema": "+ New Schema",
@@ -366,6 +391,8 @@
     "syncToSpec": "Sync to Spec"
   },
   "wsEditor": {
+    "messageCreatedSuccessfully": "Message has been created successfully.",
+    "failedToCreateMessage": "Failed to create message: {{error}}",
     "protocolAndPathname": "Protocol & Pathname",
     "protocolAndEntrypoint": "Protocol & Entrypoint",
     "protocol": "Protocol",

@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 interface AlertModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -13,8 +15,9 @@ export function AlertModal({
   title,
   message,
   variant = "info",
-  confirmText = "OK",
+  confirmText,
 }: AlertModalProps) {
+  const { t } = useTranslation();
   if (!isOpen) return null;
 
   const getVariantStyles = () => {
@@ -66,7 +69,7 @@ export function AlertModal({
               <button
                 onClick={onClose}
                 className="flex-shrink-0 p-1.5 -mt-1 -mr-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#21262D] rounded-md transition-colors"
-                aria-label="Close"
+                aria-label={t("common.close")}
               >
                 <svg
                   className="w-5 h-5"
@@ -98,7 +101,7 @@ export function AlertModal({
               onClick={onClose}
               className="px-4 py-2 bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-0 focus-visible:outline-none active:scale-[0.98]"
             >
-              {confirmText}
+              {confirmText || t("common.ok")}
             </button>
           </div>
         </div>

@@ -12,8 +12,8 @@
     "delete": "삭제",
     "edit": "편집",
     "processing": "처리 중...",
-    "updated": "업데이트됨",
-    "created": "생성됨"
+    "updated": "업데이트",
+    "created": "생성"
   },
   "sidebar": {
     "closeSidebar": "사이드바 닫기",
@@ -92,7 +92,24 @@
     "confirmReflectChannel": "실제 구현의 채널 정보를 명세에 자동으로 반영하시겠습니까?\n\n이 작업은 취소할 수 없습니다.",
     "fileFormatError": "파일 형식 오류",
     "onlyYamlFiles": "YAML 파일(.yml 또는 .yaml)만 업로드할 수 있습니다.",
-    "websocketOperationUpdated": "WebSocket 작업이 성공적으로 업데이트되었습니다."
+    "websocketOperationUpdated": "WebSocket 작업이 성공적으로 업데이트되었습니다.",
+    "websocketOperationDeletedSuccessfully": "WebSocket 작업이 성공적으로 삭제되었습니다.",
+    "failedToDeleteWebSocketOperation": "WebSocket 작업 삭제에 실패했습니다: {{error}}",
+    "importCompleted": "가져오기 완료",
+    "downloadCompleted": "다운로드 완료",
+    "yamlFileDownloadedSuccessfully": "YAML 파일이 성공적으로 다운로드되었습니다.",
+    "failedToExportMarkdown": "Markdown 내보내기에 실패했습니다.\n오류: {{error}}",
+    "failedToExportYaml": "YAML 내보내기에 실패했습니다.\n오류: {{error}}",
+    "yamlImportFailedWithError": "YAML 가져오기 실패\n\n{{error}}",
+    "success": "성공",
+    "implementationReflectedInSpec": "실제 구현 사항이 성공적으로 명세에 반영되었습니다.",
+    "channelReflectedInSpec": "실제 구현의 채널 정보가 성공적으로 명세에 반영되었습니다.",
+    "syncFailed": "동기화 실패",
+    "failedToSyncSpec": "명세 동기화에 실패했습니다: {{error}}",
+    "error": "오류",
+    "operationIdNotFound": "작업 ID를 찾을 수 없습니다.",
+    "updateFailed": "업데이트 실패",
+    "failedToUpdateProgress": "진행 상태 업데이트에 실패했습니다: {{error}}"
   },
   "editor": {
     "selectProtocol": "프로토콜 선택",
@@ -119,7 +136,7 @@
     "apiCreated": "API {{method}} {{url}}이(가) 성공적으로 생성되었습니다.",
     "websocketYamlImportCompleted": "WebSocket YAML 가져오기가 성공적으로 완료되었습니다.",
     "yamlImportFailed": "YAML 가져오기 실패",
-    "updated": "업데이트됨",
+    "updated": "업데이트",
     "progressCompleted": "진행 완료:"
   },
   "importResult": {
@@ -132,7 +149,13 @@
     "title": "스키마",
     "deleteSchema": "스키마 삭제",
     "confirmDeleteSchema": "스키마 \"{{name}}\"을(를) 삭제하시겠습니까?",
-    "schemaDeletedSuccessfully": "스키마 \"{{name}}\"이(가) 성공적으로 삭제되었습니다."
+    "schemaDeletedSuccessfully": "스키마 \"{{name}}\"이(가) 성공적으로 삭제되었습니다.",
+    "noSchemasSaved": "저장된 Schema가 없습니다.",
+    "createSchemaInResponseTab": "Response 탭에서 새 Schema를 생성하세요.",
+    "failedToDeleteSchema": "스키마 삭제에 실패했습니다: {{error}}",
+    "pleaseEnterSchemaName": "스키마 이름을 입력하세요.",
+    "pleaseAddAtLeastOneField": "최소 하나의 필드를 추가하세요.",
+    "failedToSaveSchema": "스키마 저장에 실패했습니다: {{error}}"
   },
   "specForm": {
     "title": "API 명세서 작성",
@@ -325,7 +348,9 @@
     "clickRunButton": "RUN 버튼을 클릭하여 테스트를 실행하세요",
     "queryParameters": "쿼리 파라미터",
     "authorization": "인증",
-    "run": "실행"
+    "run": "실행",
+    "testPreparing": "{{protocol}} 테스트 준비 중",
+    "onlyRestAndWebSocketSupported": "현재는 REST와 WebSocket 프로토콜만 지원합니다."
   },
   "schemaCard": {
     "newSchema": "새 스키마",
@@ -366,6 +391,8 @@
     "syncToSpec": "명세에 동기화"
   },
   "wsEditor": {
+    "messageCreatedSuccessfully": "메시지가 성공적으로 생성되었습니다.",
+    "failedToCreateMessage": "메시지 생성에 실패했습니다: {{error}}",
     "protocolAndPathname": "프로토콜 & 경로명",
     "protocolAndEntrypoint": "프로토콜 & Entrypoint",
     "protocol": "프로토콜",

@@ -3,8 +3,10 @@ import { TestResponseTabs } from "./TestResponseTabs";
 import { WsTestRequestPanel } from "./WsTestRequestPanel";
 import { WsTestResponseTabs } from "./WsTestResponseTabs";
 import { useTestingStore } from "../store/testing.store";
+import { useTranslation } from "react-i18next";
 
 export function TestLayout() {
+  const { t } = useTranslation();
   const { protocol } = useTestingStore();
 
   return (
@@ -40,10 +42,10 @@ export function TestLayout() {
                 </svg>
               </div>
               <h3 className="text-xl font-semibold text-gray-900 dark:text-[#E6EDF3] mb-2">
-                {protocol} 테스트 준비 중
+                {t("testing.testPreparing", { protocol })}
               </h3>
               <p className="text-gray-600 dark:text-[#8B949E]">
-                현재는 REST와 WebSocket 프로토콜만 지원합니다.
+                {t("testing.onlyRestAndWebSocketSupported")}
               </p>
             </div>
           </div>

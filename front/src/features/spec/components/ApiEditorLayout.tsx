@@ -24,7 +24,6 @@ import {
   importWebSocketYaml,
 } from "../services/api";
 import { MarkdownPreviewModal } from "./MarkdownPreviewModal";
-// FilenameOptions removed
 import {
   createRestApiSpec,
   updateRestApiSpec,
@@ -1646,8 +1645,8 @@ export function ApiEditorLayout() {
           if (!receives && !replies) {
             setAlertModal({
               isOpen: true,
-              title: "Input Error",
-              message: "At least one of Receiver or Reply must be provided.",
+              title: t("modal.inputError"),
+              message: t("modal.receiverOrReplyRequired"),
               variant: "warning",
             });
             return;
@@ -1668,8 +1667,8 @@ export function ApiEditorLayout() {
           });
           setAlertModal({
             isOpen: true,
-            title: "Updated",
-            message: "WebSocket Operation has been updated successfully.",
+            title: t("common.updated"),
+            message: t("modal.websocketOperationUpdated"),
             variant: "success",
           });
 
@@ -1821,8 +1820,8 @@ export function ApiEditorLayout() {
           } else {
             setAlertModal({
               isOpen: true,
-              title: "Created",
-              message: "WebSocket Operation has been created successfully.",
+              title: t("common.created"),
+              message: t("editor.websocketOperationCreated"),
               variant: "success",
             });
             // 사이드바 목록 다시 로드
@@ -1833,10 +1832,11 @@ export function ApiEditorLayout() {
         }
       } catch (error: any) {
         console.error("WebSocket Operation 저장 실패:", error);
+        const errorMessage = error.message || t("modal.failedToSaveWebSocket");
         setAlertModal({
           isOpen: true,
-          title: "Save Failed",
-          message: error.message || "Failed to save WebSocket Operation.",
+          title: t("modal.saveFailed"),
+          message: errorMessage,
           variant: "error",
         });
       }
@@ -1849,8 +1849,8 @@ export function ApiEditorLayout() {
     if (protocol === "REST" && (!method || !url || !url.trim())) {
       setAlertModal({
         isOpen: true,
-        title: "Input Error",
-        message: "Please enter Method and URL.",
+        title: t("modal.inputError"),
+        message: t("modal.methodAndUrlRequired"),
         variant: "warning",
       });
       return;
@@ -1881,8 +1881,8 @@ export function ApiEditorLayout() {
 
         setAlertModal({
           isOpen: true,
-          title: "Updated",
-          message: "API spec has been updated successfully.",
+          title: t("common.updated"),
+          message: t("editor.apiSpecUpdated"),
           variant: "success",
         });
         setIsEditMode(false);
@@ -1944,8 +1944,8 @@ export function ApiEditorLayout() {
         addEndpoint(newEndpoint, group);
         setAlertModal({
           isOpen: true,
-          title: "Created",
-          message: `API ${method} ${url} has been created successfully.`,
+          title: t("common.created"),
+          message: t("editor.apiCreated", { method, url }),
           variant: "success",
         });
 
@@ -1965,8 +1965,8 @@ export function ApiEditorLayout() {
       const errorMessage = getErrorMessage(error);
       setAlertModal({
         isOpen: true,
-        title: "Save Failed",
-        message: `Failed to save API: ${errorMessage}`,
+        title: t("modal.saveFailed"),
+        message: t("modal.failedToSaveApi", { error: errorMessage }),
         variant: "error",
       });
     }
@@ -1979,8 +1979,8 @@ export function ApiEditorLayout() {
     if (isCompleted) {
       setAlertModal({
         isOpen: true,
-        title: "Cannot Delete",
-        message: "Completed APIs cannot be deleted.",
+        title: t("modal.cannotDelete"),
+        message: t("modal.completedApisCannotDelete"),
         variant: "warning",
       });
       return;
@@ -2000,8 +2000,8 @@ export function ApiEditorLayout() {
             deleteEndpoint(selectedEndpoint.id);
             setAlertModal({
               isOpen: true,
-              title: "Deleted",
-              message: "WebSocket Operation has been deleted successfully.",
+              title: t("modal.deleted"),
+              message: t("modal.websocketOperationDeletedSuccessfully"),
               variant: "success",
             });
 
@@ -2022,8 +2022,8 @@ export function ApiEditorLayout() {
             const errorMessage = getErrorMessage(error);
             setAlertModal({
               isOpen: true,
-              title: "Delete Failed",
-              message: `Failed to delete WebSocket Operation: ${errorMessage}`,
+              title: t("modal.deleteFailed"),
+              message: t("modal.failedToDeleteWebSocketOperation", { error: errorMessage }),
               variant: "error",
             });
           }
@@ -2045,8 +2045,8 @@ export function ApiEditorLayout() {
           deleteEndpoint(selectedEndpoint.id);
           setAlertModal({
             isOpen: true,
-            title: "Deleted",
-            message: "Endpoint has been deleted successfully.",
+            title: t("modal.deleted"),
+            message: t("modal.endpointDeletedSuccessfully"),
             variant: "success",
           });
 
@@ -2064,8 +2064,8 @@ export function ApiEditorLayout() {
           const errorMessage = getErrorMessage(error);
           setAlertModal({
             isOpen: true,
-            title: "Delete Failed",
-            message: `Failed to delete API: ${errorMessage}`,
+            title: t("modal.deleteFailed"),
+            message: t("modal.failedToDeleteApi", { error: errorMessage }),
             variant: "error",
           });
         }
@@ -2078,8 +2078,8 @@ export function ApiEditorLayout() {
     if (isCompleted) {
       setAlertModal({
         isOpen: true,
-        title: "Cannot Edit",
-        message: "Completed APIs cannot be edited.",
+        title: t("modal.cannotEdit"),
+        message: t("modal.completedApisCannotEdit"),
         variant: "warning",
       });
       return;
@@ -2260,8 +2260,8 @@ export function ApiEditorLayout() {
       if (!fileName.endsWith(".yml") && !fileName.endsWith(".yaml")) {
         setAlertModal({
           isOpen: true,
-          title: "File Format Error",
-          message: "Only YAML files (.yml or .yaml) can be uploaded.",
+          title: t("modal.fileFormatError"),
+          message: t("modal.onlyYamlFiles"),
           variant: "warning",
         });
         return;
@@ -2278,8 +2278,8 @@ export function ApiEditorLayout() {
           } else {
             setAlertModal({
               isOpen: true,
-              title: "Import Completed",
-              message: "WebSocket YAML import has been completed successfully.",
+              title: t("modal.importCompleted"),
+              message: t("editor.websocketYamlImportCompleted"),
               variant: "success",
             });
           }
@@ -2296,8 +2296,8 @@ export function ApiEditorLayout() {
         const errorMsg = getErrorMessage(error);
         setAlertModal({
           isOpen: true,
-          title: "Import Failed",
-          message: `YAML import failed\n\n${errorMsg}`,
+          title: t("editor.importFailed"),
+          message: t("modal.yamlImportFailedWithError", { error: errorMsg }),
           variant: "error",
         });
       }
@@ -2331,8 +2331,8 @@ export function ApiEditorLayout() {
       const errorMsg = getErrorMessage(e);
       setAlertModal({
         isOpen: true,
-        title: "Export Failed",
-        message: `Failed to export Markdown.\nError: ${errorMsg}`,
+        title: t("editor.exportFailed"),
+        message: t("modal.failedToExportMarkdown", { error: errorMsg }),
         variant: "error",
       });
       setIsExportModalOpen(false);
@@ -2351,8 +2351,8 @@ export function ApiEditorLayout() {
       );
       setAlertModal({
         isOpen: true,
-        title: "Download Completed",
-        message: "YAML file has been downloaded successfully.",
+        title: t("modal.downloadCompleted"),
+        message: t("modal.yamlFileDownloadedSuccessfully"),
         variant: "success",
       });
       setIsExportModalOpen(false);
@@ -2361,8 +2361,8 @@ export function ApiEditorLayout() {
       const errorMsg = getErrorMessage(e);
       setAlertModal({
         isOpen: true,
-        title: "Export Failed",
-        message: `Failed to export YAML.\nError: ${errorMsg}`,
+        title: t("editor.exportFailed"),
+        message: t("modal.failedToExportYaml", { error: errorMsg }),
         variant: "error",
       });
       setIsExportModalOpen(false);
@@ -2404,9 +2404,8 @@ export function ApiEditorLayout() {
 
             setAlertModal({
               isOpen: true,
-              title: "Success",
-              message:
-                "The actual implementation has been successfully reflected in the spec.",
+              title: t("modal.success"),
+              message: t("modal.implementationReflectedInSpec"),
               variant: "success",
             });
           } else {
@@ -2436,9 +2435,8 @@ export function ApiEditorLayout() {
 
             setAlertModal({
               isOpen: true,
-              title: "Success",
-              message:
-                "The actual implementation has been successfully reflected in the spec.",
+              title: t("modal.success"),
+              message: t("modal.implementationReflectedInSpec"),
               variant: "success",
             });
           }
@@ -2446,8 +2444,8 @@ export function ApiEditorLayout() {
           const errorMessage = getErrorMessage(error);
           setAlertModal({
             isOpen: true,
-            title: "Sync Failed",
-            message: `Failed to sync spec: ${errorMessage}`,
+            title: t("modal.syncFailed"),
+            message: t("modal.failedToSyncSpec", { error: errorMessage }),
             variant: "error",
           });
         }
@@ -2464,8 +2462,8 @@ export function ApiEditorLayout() {
     if (!operationId) {
       setAlertModal({
         isOpen: true,
-        title: "Error",
-        message: "Operation ID not found.",
+        title: t("modal.error"),
+        message: t("modal.operationIdNotFound"),
         variant: "error",
       });
       return;
@@ -2548,9 +2546,8 @@ export function ApiEditorLayout() {
 
             setAlertModal({
               isOpen: true,
-              title: "Success",
-              message:
-                "The actual implementation's Channel has been successfully reflected in the spec.",
+              title: t("modal.success"),
+              message: t("modal.channelReflectedInSpec"),
               variant: "success",
             });
             return;
@@ -2617,8 +2614,8 @@ export function ApiEditorLayout() {
           const errorMessage = getErrorMessage(error);
           setAlertModal({
             isOpen: true,
-            title: "Sync Failed",
-            message: `Failed to sync spec: ${errorMessage}`,
+            title: t("modal.syncFailed"),
+            message: t("modal.failedToSyncSpec", { error: errorMessage }),
             variant: "error",
           });
         }
@@ -2944,12 +2941,12 @@ export function ApiEditorLayout() {
                             );
                             setAlertModal({
                               isOpen: true,
-                              title: "Update Failed",
-                              message: `Failed to update progress: ${
-                                error instanceof Error
+                              title: t("modal.updateFailed"),
+                              message: t("modal.failedToUpdateProgress", {
+                                error: error instanceof Error
                                   ? error.message
-                                  : "Unknown error"
-                              }`,
+                                  : t("common.error"),
+                              }),
                               variant: "error",
                             });
                           } finally {

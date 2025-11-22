@@ -450,8 +450,8 @@ export function WsEditorForm({
       await createWebSocketMessage(request);
       setAlertModal({
         isOpen: true,
-        title: "Created",
-        message: "Message has been created successfully.",
+        title: t("common.created"),
+        message: t("wsEditor.messageCreatedSuccessfully"),
         variant: "success",
       });
 
@@ -468,10 +468,10 @@ export function WsEditorForm({
     } catch (error) {
       setAlertModal({
         isOpen: true,
-        title: "Creation Failed",
-        message: `Failed to create message: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`,
+        title: t("modal.saveFailed"),
+        message: t("wsEditor.failedToCreateMessage", {
+          error: error instanceof Error ? error.message : t("common.error"),
+        }),
         variant: "error",
       });
     }
