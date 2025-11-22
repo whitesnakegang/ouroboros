@@ -493,7 +493,6 @@ export function TestRequestPanel() {
           <button
             onClick={async () => {
               // TODO: Implement API execution
-              console.log("RUN button clicked", { request, authorization });
             }}
             className="px-4 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none flex items-center gap-2 font-medium"
           >

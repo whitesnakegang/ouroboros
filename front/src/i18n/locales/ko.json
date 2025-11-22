@@ -137,9 +137,7 @@
     "websocketYamlImportCompleted": "WebSocket YAML 가져오기가 성공적으로 완료되었습니다.",
     "yamlImportFailed": "YAML 가져오기 실패",
     "updated": "업데이트",
-    "progressCompleted": "진행 완료:",
-    "downloadCompleted": "다운로드 완료",
-    "yamlFileDownloadedSuccessfully": "YAML 파일이 성공적으로 다운로드되었습니다."
+    "progressCompleted": "진행 완료:"
   },
   "importResult": {
     "importCompleted": "가져오기 완료",
@@ -350,7 +348,9 @@
     "clickRunButton": "RUN 버튼을 클릭하여 테스트를 실행하세요",
     "queryParameters": "쿼리 파라미터",
     "authorization": "인증",
-    "run": "실행"
+    "run": "실행",
+    "testPreparing": "{{protocol}} 테스트 준비 중",
+    "onlyRestAndWebSocketSupported": "현재는 REST와 WebSocket 프로토콜만 지원합니다."
   },
   "schemaCard": {
     "newSchema": "새 스키마",
@@ -535,9 +535,5 @@
     "failedToCopyToClipboard": "클립보드에 복사하는 데 실패했습니다.",
     "showSource": "소스 보기",
     "showPreview": "미리보기 보기"
-  },
-  "testing": {
-    "testPreparing": "{{protocol}} 테스트 준비 중",
-    "onlyRestAndWebSocketSupported": "현재는 REST와 WebSocket 프로토콜만 지원합니다."
   }
 }

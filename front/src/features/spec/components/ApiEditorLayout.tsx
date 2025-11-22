@@ -24,7 +24,6 @@ import {
   importWebSocketYaml,
 } from "../services/api";
 import { MarkdownPreviewModal } from "./MarkdownPreviewModal";
-// FilenameOptions removed
 import {
   createRestApiSpec,
   updateRestApiSpec,

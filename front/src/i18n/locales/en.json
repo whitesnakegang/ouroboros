@@ -137,9 +137,7 @@
     "websocketYamlImportCompleted": "WebSocket YAML import has been completed successfully.",
     "yamlImportFailed": "YAML import failed",
     "updated": "Updated",
-    "progressCompleted": "Progress completed:",
-    "downloadCompleted": "Download Completed",
-    "yamlFileDownloadedSuccessfully": "YAML file has been downloaded successfully."
+    "progressCompleted": "Progress completed:"
   },
   "importResult": {
     "importCompleted": "Import Completed",
@@ -350,7 +348,9 @@
     "clickRunButton": "Click the RUN button to execute the test",
     "queryParameters": "Query Parameters",
     "authorization": "Authorization",
-    "run": "RUN"
+    "run": "RUN",
+    "testPreparing": "{{protocol}} test is being prepared.",
+    "onlyRestAndWebSocketSupported": "Currently only REST and WebSocket protocols are supported."
   },
   "schemaCard": {
     "newSchema": "+ New Schema",
@@ -535,9 +535,5 @@
     "failedToCopyToClipboard": "Failed to copy to clipboard.",
     "showSource": "Show Source",
     "showPreview": "Show Preview"
-  },
-  "testing": {
-    "testPreparing": "{{protocol}} test is being prepared.",
-    "onlyRestAndWebSocketSupported": "Currently only REST and WebSocket protocols are supported."
   }
 }
