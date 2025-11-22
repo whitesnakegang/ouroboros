@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import React from "react";
 import { SchemaModal } from "./SchemaModal";
 import { SchemaViewer } from "./SchemaViewer";
@@ -40,23 +41,68 @@ export function ApiResponseCard({
   isReadOnly = false,
   isDocumentView = false,
 }: ApiResponseCardProps) {
+  const { t } = useTranslation();
   const statusCodeTemplates: StatusCode[] = [
-    { code: "200", type: "Success", message: "Successfully processed request" },
-    { code: "201", type: "Success", message: "Successfully created resource" },
-    { code: "204", type: "Success", message: "Success (no response body)" },
-    { code: "400", type: "Error", message: "Bad request format" },
+    {
+      code: "200",
+      type: "Success",
+      message: t("specForm.statusCodeMessages.200"),
+    },
+    {
+      code: "201",
+      type: "Success",
+      message: t("specForm.statusCodeMessages.201"),
+    },
+    {
+      code: "204",
+      type: "Success",
+      message: t("specForm.statusCodeMessages.204"),
+    },
+    {
+      code: "400",
+      type: "Error",
+      message: t("specForm.statusCodeMessages.400"),
+    },
     {
       code: "401",
       type: "Error",
-      message: "Authentication failed (invalid token)",
+      message: t("specForm.statusCodeMessages.401"),
     },
-    { code: "403", type: "Error", message: "Access denied" },
-    { code: "404", type: "Error", message: "Resource not found" },
-    { code: "409", type: "Error", message: "Resource conflict" },
-    { code: "422", type: "Error", message: "Validation failed" },
-    { code: "500", type: "Error", message: "Internal server error" },
-    { code: "502", type: "Error", message: "Gateway error" },
-    { code: "503", type: "Error", message: "Service unavailable" },
+    {
+      code: "403",
+      type: "Error",
+      message: t("specForm.statusCodeMessages.403"),
+    },
+    {
+      code: "404",
+      type: "Error",
+      message: t("specForm.statusCodeMessages.404"),
+    },
+    {
+      code: "409",
+      type: "Error",
+      message: t("specForm.statusCodeMessages.409"),
+    },
+    {
+      code: "422",
+      type: "Error",
+      message: t("specForm.statusCodeMessages.422"),
+    },
+    {
+      code: "500",
+      type: "Error",
+      message: t("specForm.statusCodeMessages.500"),
+    },
+    {
+      code: "502",
+      type: "Error",
+      message: t("specForm.statusCodeMessages.502"),
+    },
+    {
+      code: "503",
+      type: "Error",
+      message: t("specForm.statusCodeMessages.503"),
+    },
   ];
 
   const addStatusCode = (template?: StatusCode) => {
@@ -106,9 +152,9 @@ export function ApiResponseCard({
   const [schemaFieldsMap, setSchemaFieldsMap] = useState<
     Record<number, SchemaField[]>
   >({});
-  const [schemaNamesMap, setSchemaNamesMap] = useState<
-    Record<number, string>
-  >({});
+  const [schemaNamesMap, setSchemaNamesMap] = useState<Record<number, string>>(
+    {}
+  );
 
   // 스키마 목록 로드
   const loadSchemas = async () => {
@@ -300,7 +346,7 @@ export function ApiResponseCard({
               {statusCode.headers && statusCode.headers.length > 0 && (
                 <div className="mt-2 ml-5 space-y-1">
                   <div className="text-xs font-semibold text-gray-700 dark:text-[#C9D1D9]">
-                    Headers:
+                    {t("apiCard.responseHeaders")}:
                   </div>
                   {statusCode.headers.map((header, hIndex) => (
                     <div
@@ -316,7 +362,7 @@ export function ApiResponseCard({
           ))
         ) : (
           <div className="text-sm text-gray-500 dark:text-[#8B949E] italic">
-            No response codes configured.
+            {t("apiCard.noResponseCodesConfigured")}
           </div>
         )}
       </div>
@@ -340,7 +386,7 @@ export function ApiResponseCard({
             d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
           />
         </svg>
-        <span>Response</span>
+        <span>{t("apiCard.response")}</span>
       </div>
 
       {/* Content */}
@@ -348,7 +394,7 @@ export function ApiResponseCard({
         <div>
           <div className="flex items-center justify-between mb-4">
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              HTTP Status Code Management
+              {t("apiCard.httpStatusCodeManagement")}
             </p>
             {!isReadOnly && (
               <div className="flex gap-2">
@@ -365,10 +411,10 @@ export function ApiResponseCard({
                       }
                     }
                   }}
-                  className="px-3 py-1 text-sm border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500"
+                  className="px-3 py-1 text-sm border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-0 focus-visible:outline-none"
                 >
-                  <option value="">Select Template</option>
-                  <optgroup label="Success">
+                  <option value="">{t("specForm.selectTemplate")}</option>
+                  <optgroup label={t("status.success")}>
                     {statusCodeTemplates
                       .filter((t) => t.type === "Success")
                       .map((template) => (
@@ -377,7 +423,7 @@ export function ApiResponseCard({
                         </option>
                       ))}
                   </optgroup>
-                  <optgroup label="Error">
+                  <optgroup label={t("status.error")}>
                     {statusCodeTemplates
                       .filter((t) => t.type === "Error")
                       .map((template) => (
@@ -391,7 +437,7 @@ export function ApiResponseCard({
                   onClick={() => addStatusCode()}
                   className="px-3 py-1 text-sm text-[#2563EB] font-medium border border-[#2563EB] rounded-md hover:bg-[#2563EB] hover:text-white transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none focus-visible:[box-shadow:inset_2px_0_0_#3B82F6] dark:focus-visible:[box-shadow:inset_2px_0_0_#60A5FA]"
                 >
-                  + Add Custom
+                  {t("specForm.addCustom")}
                 </button>
               </div>
             )}
@@ -402,19 +448,19 @@ export function ApiResponseCard({
               <thead>
                 <tr className="border-b border-gray-200 dark:border-gray-700">
                   <th className="px-2 py-2 font-medium text-gray-700 dark:text-gray-300 w-24">
-                    Status Code
+                    {t("specForm.statusCode")}
                   </th>
                   <th className="px-2 py-2 font-medium text-gray-700 dark:text-gray-300 w-20">
-                    Type
+                    {t("specForm.type")}
                   </th>
                   <th className="px-2 py-2 font-medium text-gray-700 dark:text-gray-300 min-w-[200px]">
-                    Message / Description
+                    {t("apiCard.messageDescription")}
                   </th>
                   <th className="px-2 py-2 font-medium text-gray-700 dark:text-gray-300 min-w-[280px]">
-                    Schema
+                    {t("apiCard.schema")}
                   </th>
                   <th className="px-2 py-2 font-medium text-gray-700 dark:text-gray-300 w-24">
-                    Headers
+                    {t("apiCard.headers")}
                   </th>
                   <th className="px-2 py-2 w-10"></th>
                 </tr>
@@ -432,7 +478,7 @@ export function ApiResponseCard({
                           }
                           placeholder="200"
                           disabled={isReadOnly}
-                          className={`w-full px-2 py-1 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 ${
+                          className={`w-full px-2 py-1 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none ${
                             isReadOnly ? "opacity-60 cursor-not-allowed" : ""
                           }`}
                         />
@@ -444,7 +490,7 @@ export function ApiResponseCard({
                             updateStatusCode(index, "type", e.target.value)
                           }
                           disabled={isReadOnly}
-                          className={`w-full px-2 py-1 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 ${
+                          className={`w-full px-2 py-1 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-0 focus-visible:outline-none ${
                             isReadOnly ? "opacity-60 cursor-not-allowed" : ""
                           }`}
                         >
@@ -459,9 +505,9 @@ export function ApiResponseCard({
                           onChange={(e) =>
                             updateStatusCode(index, "message", e.target.value)
                           }
-                          placeholder="e.g. Successfully processed request"
+                          placeholder={t("specForm.statusCodePlaceholder")}
                           disabled={isReadOnly}
-                          className={`w-full px-2 py-1 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 ${
+                          className={`w-full px-2 py-1 text-xs border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none ${
                             isReadOnly ? "opacity-60 cursor-not-allowed" : ""
                           }`}
                         />
@@ -534,7 +580,7 @@ export function ApiResponseCard({
                                 setStatusCodes(updated);
                               }}
                               disabled={isReadOnly}
-                              className={`px-1.5 py-1 text-[11px] border border-gray-300 dark:border-[#2D333B] rounded bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 ${
+                              className={`px-1.5 py-1 text-[11px] border border-gray-300 dark:border-[#2D333B] rounded bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] focus:outline-none focus:ring-0 focus-visible:outline-none ${
                                 isReadOnly
                                   ? "opacity-60 cursor-not-allowed"
                                   : ""
@@ -562,10 +608,14 @@ export function ApiResponseCard({
                                       ? "opacity-60 cursor-not-allowed"
                                       : ""
                                   }`}
-                                  title={statusCode.schema?.ref || "Select Schema..."}
+                                  title={
+                                    statusCode.schema?.ref ||
+                                    t("apiCard.selectSchema")
+                                  }
                                 >
                                   <span className="truncate block">
-                                  {statusCode.schema?.ref || "Select Schema..."}
+                                    {statusCode.schema?.ref ||
+                                      t("apiCard.selectSchema")}
                                   </span>
                                 </button>
                               )}
@@ -589,7 +639,7 @@ export function ApiResponseCard({
                                     setStatusCodes(updated);
                                   }}
                                   disabled={isReadOnly}
-                                  className={`px-1.5 py-1 text-[11px] border border-gray-300 dark:border-[#2D333B] rounded bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 ${
+                                  className={`px-1.5 py-1 text-[11px] border border-gray-300 dark:border-[#2D333B] rounded bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] focus:outline-none focus:ring-0 focus-visible:outline-none ${
                                     isReadOnly
                                       ? "opacity-60 cursor-not-allowed"
                                       : ""
@@ -838,7 +888,9 @@ export function ApiResponseCard({
                               <div className="flex items-center justify-between border-b border-gray-200 dark:border-[#2D333B] pb-2">
                                 <div className="flex items-center gap-2">
                                   <span className="px-3 py-1.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded-md text-sm font-semibold border border-emerald-200 dark:border-emerald-800">
-                                    Schema: {schemaNamesMap[index] || statusCode.schema?.ref}
+                                    Schema:{" "}
+                                    {schemaNamesMap[index] ||
+                                      statusCode.schema?.ref}
                                   </span>
                                   <span className="text-xs text-gray-500 dark:text-gray-400">
                                     ({schemaFieldsMap[index].length} fields)
@@ -867,8 +919,8 @@ export function ApiResponseCard({
                                 >
                                   <span>
                                     {expandedSchemaIndex === index
-                                      ? "Hide Fields"
-                                      : "Show Fields"}
+                                      ? t("apiCard.hideFields")
+                                      : t("apiCard.showFields")}
                                   </span>
                                   <svg
                                     className={`w-4 h-4 transition-transform ${
@@ -893,18 +945,20 @@ export function ApiResponseCard({
                               {/* Schema Fields - 펼쳐져 있을 때만 표시 */}
                               {expandedSchemaIndex === index && (
                                 <div className="space-y-2 pt-2">
-                                  {schemaFieldsMap[index].map((field, fieldIndex) => (
-                                    <SchemaFieldEditor
-                                      key={fieldIndex}
-                                      field={field}
-                                      onChange={() => {
-                                        // 읽기 전용이므로 변경 불가
-                                      }}
-                                      isReadOnly={true}
-                                      allowFileType={false}
-                                      allowMockExpression={false}
-                                    />
-                                  ))}
+                                  {schemaFieldsMap[index].map(
+                                    (field, fieldIndex) => (
+                                      <SchemaFieldEditor
+                                        key={fieldIndex}
+                                        field={field}
+                                        onChange={() => {
+                                          // 읽기 전용이므로 변경 불가
+                                        }}
+                                        isReadOnly={true}
+                                        allowFileType={false}
+                                        allowMockExpression={false}
+                                      />
+                                    )
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -919,7 +973,7 @@ export function ApiResponseCard({
                           <div className="space-y-3">
                             <div className="flex items-center justify-between">
                               <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                                Response Headers
+                                {t("apiCard.responseHeaders")}
                               </h4>
                               <button
                                 onClick={() => {
@@ -945,82 +999,83 @@ export function ApiResponseCard({
                               </button>
                             </div>
                             <div className="space-y-2">
-                            {statusCode.headers.map((header, headerIndex) => (
-                              <div
-                                key={headerIndex}
+                              {statusCode.headers.map((header, headerIndex) => (
+                                <div
+                                  key={headerIndex}
                                   className="flex items-center gap-2 p-2 border border-gray-200 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117]"
-                              >
-                                <input
-                                  type="text"
-                                  value={header.key}
-                                  onChange={(e) => {
-                                    if (isReadOnly) return;
-                                    const updated = [...statusCodes];
-                                    updated[index].headers![headerIndex].key =
-                                      e.target.value;
-                                    setStatusCodes(updated);
-                                  }}
-                                  placeholder="Header Key (e.g., Content-Type)"
-                                  disabled={isReadOnly}
-                                    className={`flex-1 px-3 py-1.5 text-sm border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                                    isReadOnly
-                                      ? "opacity-60 cursor-not-allowed"
-                                      : ""
-                                  }`}
-                                />
-                                <input
-                                  type="text"
-                                  value={header.value}
-                                  onChange={(e) => {
-                                    if (isReadOnly) return;
-                                    const updated = [...statusCodes];
-                                    updated[index].headers![headerIndex].value =
-                                      e.target.value;
-                                    setStatusCodes(updated);
-                                  }}
-                                  placeholder="Header Value (e.g., application/json)"
-                                  disabled={isReadOnly}
-                                    className={`flex-1 px-3 py-1.5 text-sm border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                                    isReadOnly
-                                      ? "opacity-60 cursor-not-allowed"
-                                      : ""
-                                  }`}
-                                />
-                                <button
-                                  onClick={() => {
-                                    if (isReadOnly) return;
-                                    const updated = [...statusCodes];
-                                    updated[index].headers = updated[
-                                      index
-                                    ].headers!.filter(
-                                      (_, i) => i !== headerIndex
-                                    );
-                                    setStatusCodes(updated);
-                                  }}
-                                  disabled={isReadOnly}
-                                    className={`p-1.5 text-red-500 hover:text-red-600 transition-colors ${
-                                    isReadOnly
-                                      ? "opacity-50 cursor-not-allowed"
-                                      : ""
-                                  }`}
-                                    title="Remove Header"
                                 >
-                                  <svg
-                                      className="w-4 h-4"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
+                                  <input
+                                    type="text"
+                                    value={header.key}
+                                    onChange={(e) => {
+                                      if (isReadOnly) return;
+                                      const updated = [...statusCodes];
+                                      updated[index].headers![headerIndex].key =
+                                        e.target.value;
+                                      setStatusCodes(updated);
+                                    }}
+                                    placeholder="Header Key (e.g., Content-Type)"
+                                    disabled={isReadOnly}
+                                    className={`flex-1 px-3 py-1.5 text-sm border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none ${
+                                      isReadOnly
+                                        ? "opacity-60 cursor-not-allowed"
+                                        : ""
+                                    }`}
+                                  />
+                                  <input
+                                    type="text"
+                                    value={header.value}
+                                    onChange={(e) => {
+                                      if (isReadOnly) return;
+                                      const updated = [...statusCodes];
+                                      updated[index].headers![
+                                        headerIndex
+                                      ].value = e.target.value;
+                                      setStatusCodes(updated);
+                                    }}
+                                    placeholder="Header Value (e.g., application/json)"
+                                    disabled={isReadOnly}
+                                    className={`flex-1 px-3 py-1.5 text-sm border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none ${
+                                      isReadOnly
+                                        ? "opacity-60 cursor-not-allowed"
+                                        : ""
+                                    }`}
+                                  />
+                                  <button
+                                    onClick={() => {
+                                      if (isReadOnly) return;
+                                      const updated = [...statusCodes];
+                                      updated[index].headers = updated[
+                                        index
+                                      ].headers!.filter(
+                                        (_, i) => i !== headerIndex
+                                      );
+                                      setStatusCodes(updated);
+                                    }}
+                                    disabled={isReadOnly}
+                                    className={`p-1.5 text-red-500 hover:text-red-600 transition-colors ${
+                                      isReadOnly
+                                        ? "opacity-50 cursor-not-allowed"
+                                        : ""
+                                    }`}
+                                    title="Remove Header"
                                   >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M6 18L18 6M6 6l12 12"
-                                    />
-                                  </svg>
-                                </button>
-                              </div>
-                            ))}
+                                    <svg
+                                      className="w-4 h-4"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M6 18L18 6M6 6l12 12"
+                                      />
+                                    </svg>
+                                  </button>
+                                </div>
+                              ))}
                             </div>
                           </div>
                         </td>

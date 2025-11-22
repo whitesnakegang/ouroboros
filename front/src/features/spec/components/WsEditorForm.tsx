@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { SchemaFieldEditor } from "./SchemaFieldEditor";
 import { SchemaModal } from "./SchemaModal";
 import { SchemaCard } from "./SchemaCard";
@@ -99,6 +100,7 @@ export function WsEditorForm({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   onProgressUpdate: _onProgressUpdate,
 }: WsEditorFormProps) {
+  const { t } = useTranslation();
   const [schemas, setSchemas] = useState<SchemaResponse[]>([]);
   const [messages, setMessages] = useState<MessageResponse[]>([]);
   const [isReceiverSchemaModalOpen, setIsReceiverSchemaModalOpen] =
@@ -220,7 +222,7 @@ export function WsEditorForm({
     }
     // entryPoint 변경 시 한글 검증
     if (entryPoint && hasKorean(entryPoint)) {
-      setEntryPointError("Cannot create with Korean characters");
+      setEntryPointError(t("wsEditor.cannotCreateWithKorean"));
     } else {
       setEntryPointError("");
     }
@@ -393,8 +395,8 @@ export function WsEditorForm({
     if (!messageName.trim()) {
       setAlertModal({
         isOpen: true,
-        title: "Input Error",
-        message: "Please enter a message name.",
+        title: t("wsEditor.inputError"),
+        message: t("wsEditor.pleaseEnterMessageName"),
         variant: "warning",
       });
       return;
@@ -448,8 +450,8 @@ export function WsEditorForm({
       await createWebSocketMessage(request);
       setAlertModal({
         isOpen: true,
-        title: "Created",
-        message: "Message has been created successfully.",
+        title: t("common.created"),
+        message: t("wsEditor.messageCreatedSuccessfully"),
         variant: "success",
       });
 
@@ -466,10 +468,10 @@ export function WsEditorForm({
     } catch (error) {
       setAlertModal({
         isOpen: true,
-        title: "Creation Failed",
-        message: `Failed to create message: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`,
+        title: t("modal.saveFailed"),
+        message: t("wsEditor.failedToCreateMessage", {
+          error: error instanceof Error ? error.message : t("common.error"),
+        }),
         variant: "error",
       });
     }
@@ -552,8 +554,8 @@ export function WsEditorForm({
     } else {
       setAlertModal({
         isOpen: true,
-        title: "Type Error",
-        message: "Only object type schemas are supported.",
+        title: t("wsEditor.typeError"),
+        message: t("schemaCard.onlyObjectTypeSupported"),
         variant: "warning",
       });
     }
@@ -578,8 +580,8 @@ export function WsEditorForm({
     } else {
       setAlertModal({
         isOpen: true,
-        title: "Type Error",
-        message: "Only object type schemas are supported.",
+        title: t("wsEditor.typeError"),
+        message: t("schemaCard.onlyObjectTypeSupported"),
         variant: "warning",
       });
     }
@@ -597,8 +599,8 @@ export function WsEditorForm({
     } else {
       setAlertModal({
         isOpen: true,
-        title: "Type Error",
-        message: "Only object type schemas are supported.",
+        title: t("wsEditor.typeError"),
+        message: t("schemaCard.onlyObjectTypeSupported"),
         variant: "warning",
       });
     }
@@ -614,25 +616,23 @@ export function WsEditorForm({
     if (lowerDiff === "channel") {
       return {
         type: "channel" as const,
-        label: "Channel Diff",
-        description:
-          "Channel information is different from the spec and the actual implementation.",
+        label: t("wsEditor.channelDiff"),
+        description: t("wsEditor.channelDiffDescription"),
         canSync: true,
       };
     } else if (lowerDiff === "payload") {
       return {
         type: "payload" as const,
-        label: "Payload Diff",
-        description:
-          "Message Payload structure is different from the spec and the actual implementation.",
+        label: t("wsEditor.payloadDiff"),
+        description: t("wsEditor.payloadDiffDescription"),
         canSync: false,
       };
     }
 
     return {
       type: "other" as const,
-      label: "Diff",
-      description: "The spec and the actual implementation are different.",
+      label: t("diffNotification.diff"),
+      description: t("diffNotification.defaultDescription"),
       canSync: false,
     };
   };
@@ -668,7 +668,7 @@ export function WsEditorForm({
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
                 <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-                  Diff Notification
+                  {t("diffNotification.title")}
                 </h3>
                 <span className="px-2 py-0.5 bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200 text-xs font-medium rounded">
                   {details.label}
@@ -679,10 +679,9 @@ export function WsEditorForm({
               </p>
               <p className="text-xs text-amber-600 dark:text-amber-500 mt-2">
                 {isCompleted
-                  ? "This Operation is completed and the actual implementation is complete."
-                  : "This Operation is in progress."}
-                {details.canSync &&
-                  " You can update the spec by clicking the button below."}
+                  ? t("wsEditor.operationCompleted")
+                  : t("wsEditor.operationInProgress")}
+                {details.canSync && t("diffNotification.updateSpecMessage")}
               </p>
             </div>
           </div>
@@ -705,7 +704,7 @@ export function WsEditorForm({
                   d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
               </svg>
-              Instructions
+              {t("wsEditor.instructions")}
             </h4>
             <ul className="space-y-2">
               <li className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
@@ -723,11 +722,11 @@ export function WsEditorForm({
                   />
                 </svg>
                 <span>
-                  Backend uses{" "}
+                  {t("wsEditor.backendUses")}{" "}
                   <code className="px-1 py-0.5 bg-amber-100 dark:bg-amber-900 border border-amber-300 dark:border-amber-700 rounded text-[10px] font-mono text-amber-900 dark:text-amber-200">
                     x-ouroboros-diff
                   </code>{" "}
-                  field to detect the difference.
+                  {t("wsEditor.fieldToDetectDifference")}
                 </span>
               </li>
               {details.type === "channel" && (
@@ -745,11 +744,7 @@ export function WsEditorForm({
                       d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
                     />
                   </svg>
-                  <span>
-                    If there is a Channel that exists in the actual
-                    implementation but not in the spec, you can click the button
-                    below to automatically add it to the spec.
-                  </span>
+                  <span>{t("wsEditor.channelExistsInActualNotInSpec")}</span>
                 </li>
               )}
             </ul>
@@ -773,7 +768,7 @@ export function WsEditorForm({
                   d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                 />
               </svg>
-              Sync to Spec
+              {t("diffNotification.syncToSpec")}
             </button>
           )}
         </div>
@@ -802,7 +797,7 @@ export function WsEditorForm({
     if (!schemaName) {
       return (
         <span className="text-sm text-gray-500 dark:text-[#8B949E] italic">
-          (no schema information)
+          ({t("wsEditor.noSchemaInformation")})
         </span>
       );
     }
@@ -811,7 +806,7 @@ export function WsEditorForm({
     return (
       <div className="p-3 bg-gray-50 dark:bg-[#0D1117] border border-gray-200 dark:border-[#2D333B] rounded-md">
         <div className="text-sm text-gray-600 dark:text-[#8B949E]">
-          <span className="font-medium">Schema Reference:</span>{" "}
+          <span className="font-medium">{t("wsEditor.schemaReference")}:</span>{" "}
           <span className="font-mono text-gray-900 dark:text-[#E6EDF3]">
             {schemaName}
           </span>
@@ -840,7 +835,7 @@ export function WsEditorForm({
           {/* Address */}
           <div>
             <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">
-              Address
+              {t("wsEditor.address")}
             </h3>
             <div className="flex items-start gap-3 text-sm">
               <span className="font-mono text-gray-900 dark:text-[#E6EDF3]">
@@ -855,7 +850,7 @@ export function WsEditorForm({
           {channel.messages && channel.messages.length > 0 ? (
             <div>
               <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">
-                Messages
+                {t("wsEditor.messages")}
               </h3>
               <div className="space-y-4">
                 {channel.messages.map((messageName, idx) => {
@@ -888,7 +883,7 @@ export function WsEditorForm({
                         {messageInfo?.name && (
                           <div>
                             <span className="text-xs font-semibold text-gray-600 dark:text-[#8B949E]">
-                              Name:
+                              {t("wsEditor.name")}:
                             </span>
                             <span className="ml-2 text-sm text-gray-900 dark:text-[#E6EDF3]">
                               {messageInfo.name}
@@ -901,7 +896,7 @@ export function WsEditorForm({
                           Object.keys(messageInfo.headers).length > 0 && (
                             <div>
                               <span className="text-xs font-semibold text-gray-600 dark:text-[#8B949E]">
-                                Headers:
+                                {t("apiCard.headers")}:
                               </span>
                               <div className="mt-1 space-y-1">
                                 {Object.entries(messageInfo.headers).map(
@@ -936,7 +931,7 @@ export function WsEditorForm({
                             return (
                               <div>
                                 <span className="text-xs font-semibold text-gray-600 dark:text-[#8B949E]">
-                                  Payload:
+                                  {t("wsEditor.payload")}:
                                 </span>
                                 <div className="mt-2">
                                   {schema?.$ref ? (
@@ -992,7 +987,7 @@ export function WsEditorForm({
                                     </div>
                                   ) : (
                                     <span className="text-sm text-gray-500 dark:text-[#8B949E] italic">
-                                      (schema 정보 없음)
+                                      ({t("wsEditor.noSchemaInformation")})
                                     </span>
                                   )}
                                 </div>
@@ -1003,7 +998,7 @@ export function WsEditorForm({
                         {/* 메시지 정보가 없는 경우 */}
                         {!messageInfo && (
                           <div className="text-xs text-gray-500 dark:text-[#8B949E] italic">
-                            메시지 정보를 불러올 수 없습니다.
+                            {t("wsEditor.cannotLoadMessageInfo")}
                           </div>
                         )}
                       </div>
@@ -1014,7 +1009,7 @@ export function WsEditorForm({
             </div>
           ) : (
             <div className="text-sm text-gray-500 dark:text-[#8B949E] italic">
-              No messages configured.
+              {t("wsEditor.noMessagesConfigured")}
             </div>
           )}
         </div>
@@ -1045,7 +1040,7 @@ export function WsEditorForm({
                   />
                 </svg>
                 <h2 className="text-base font-semibold text-gray-900 dark:text-[#E6EDF3]">
-                  Protocol & Entrypoint
+                  {t("wsEditor.protocolAndEntrypoint")}
                 </h2>
               </div>
             </div>
@@ -1067,7 +1062,7 @@ export function WsEditorForm({
             {summary && (
               <div className="mt-4">
                 <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-1">
-                  Owner
+                  {t("specForm.owner")}
                 </h3>
                 <p className="text-sm text-gray-900 dark:text-[#E6EDF3]">
                   {summary}
@@ -1079,7 +1074,7 @@ export function WsEditorForm({
             {description && (
               <div className="mt-4">
                 <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-1">
-                  Description
+                  {t("specForm.description")}
                 </h3>
                 <p className="text-sm text-gray-900 dark:text-[#E6EDF3]">
                   {description}
@@ -1091,7 +1086,7 @@ export function WsEditorForm({
             {tags && (
               <div className="mt-4">
                 <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-1">
-                  Tags
+                  {t("apiCard.tags")}
                 </h3>
                 <div className="flex flex-wrap gap-2">
                   {tags.split(",").map((tag, idx) => (
@@ -1110,7 +1105,7 @@ export function WsEditorForm({
             {operationInfo?.tag && !tags && (
               <div className="mt-4">
                 <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-1">
-                  Tag
+                  {t("wsEditor.tag")}
                 </h3>
                 <span className="px-2 py-1 bg-gray-100 dark:bg-[#21262D] text-gray-700 dark:text-[#C9D1D9] rounded text-xs">
                   {operationInfo.tag.toUpperCase()}
@@ -1134,7 +1129,7 @@ export function WsEditorForm({
                       : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
                   }`}
                 >
-                  Receiver
+                  {t("wsEditor.receiver")}
                 </button>
                 <button
                   onClick={() => setWsSpecTab("reply")}
@@ -1144,7 +1139,7 @@ export function WsEditorForm({
                       : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
                   }`}
                 >
-                  Reply
+                  {t("wsEditor.reply")}
                 </button>
               </div>
             </div>
@@ -1156,14 +1151,14 @@ export function WsEditorForm({
                   renderMessages(receiver, "Receiver")
                 ) : (
                   <div className="text-sm text-gray-500 dark:text-[#8B949E] italic text-center py-8">
-                    No Receiver configuration.
+                    {t("wsEditor.noReceiverConfiguration")}
                   </div>
                 )
               ) : reply ? (
                 renderMessages(reply, "Reply")
               ) : (
                 <div className="text-sm text-gray-500 dark:text-[#8B949E] italic text-center py-8">
-                  No Reply configuration.
+                  {t("wsEditor.noReplyConfiguration")}
                 </div>
               )}
             </div>
@@ -1175,7 +1170,7 @@ export function WsEditorForm({
           <div className="rounded-md border border-gray-200 dark:border-[#2D333B] bg-white dark:bg-[#161B22] shadow-sm overflow-hidden">
             <div className="p-4 bg-white dark:bg-[#161B22]">
               <div className="text-sm text-gray-500 dark:text-[#8B949E] italic text-center py-8">
-                No configuration available.
+                {t("wsEditor.noConfigurationAvailable")}
               </div>
             </div>
           </div>
@@ -1205,14 +1200,14 @@ export function WsEditorForm({
               d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
             />
           </svg>
-          <span>Protocol & Pathname</span>
+          <span>{t("wsEditor.protocolAndPathname")}</span>
         </div>
 
         {/* Operation 정보 (읽기 전용 모드) */}
         {isReadOnly && operationInfo && (
           <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
             <div className="text-xs text-blue-600 dark:text-blue-500 font-medium mb-1">
-              Operation Name
+              {t("wsEditor.operationName")}
             </div>
             <div className="text-sm text-blue-800 dark:text-blue-400 font-mono">
               {operationInfo.operationName}
@@ -1226,7 +1221,7 @@ export function WsEditorForm({
             {/* Protocol 선택 */}
             <div className="col-span-1">
               <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                Protocol
+                {t("wsEditor.protocol")}
               </label>
               <select
                 value={protocol}
@@ -1236,7 +1231,7 @@ export function WsEditorForm({
                   setPathname(pathname);
                 }}
                 disabled={isReadOnly}
-                className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
+                className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm ${
                   isReadOnly ? "opacity-60 cursor-not-allowed" : ""
                 }`}
               >
@@ -1248,7 +1243,7 @@ export function WsEditorForm({
             {/* Pathname 입력 */}
             <div className="col-span-3">
               <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                Pathname (Entry Point)
+                {t("wsEditor.pathnameEntryPoint")}
               </label>
               <input
                 type="text"
@@ -1259,7 +1254,7 @@ export function WsEditorForm({
                   setEntryPoint(newPathname);
                   // 한글 검증
                   if (hasKorean(newPathname)) {
-                    setEntryPointError("Cannot create with Korean characters");
+                    setEntryPointError(t("wsEditor.cannotCreateWithKorean"));
                   } else {
                     setEntryPointError("");
                   }
@@ -1277,11 +1272,7 @@ export function WsEditorForm({
                   entryPointError
                     ? "border-red-500 dark:border-red-500"
                     : "border-gray-300 dark:border-[#2D333B]"
-                } text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 ${
-                  entryPointError
-                    ? "focus:ring-red-500 focus:border-red-500"
-                    : "focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500"
-                } text-sm font-mono ${
+                } text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm font-mono ${
                   isReadOnly ? "opacity-60 cursor-not-allowed" : ""
                 }`}
               />
@@ -1298,7 +1289,7 @@ export function WsEditorForm({
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                Tags/Category
+                {t("specForm.tagsCategory")}
               </label>
               <input
                 type="text"
@@ -1306,14 +1297,14 @@ export function WsEditorForm({
                 onChange={(e) => setTags(e.target.value)}
                 placeholder="CHAT"
                 disabled={isReadOnly}
-                className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
+                className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm ${
                   isReadOnly ? "opacity-60 cursor-not-allowed" : ""
                 }`}
               />
             </div>
             <div className="lg:col-span-2">
               <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                Owner
+                {t("specForm.owner")}
               </label>
               <input
                 type="text"
@@ -1321,7 +1312,7 @@ export function WsEditorForm({
                 onChange={(e) => setSummary(e.target.value)}
                 placeholder="John Doe"
                 disabled={isReadOnly}
-                className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
+                className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm ${
                   isReadOnly ? "opacity-60 cursor-not-allowed" : ""
                 }`}
               />
@@ -1331,7 +1322,7 @@ export function WsEditorForm({
           {/* Description */}
           <div>
             <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-              Description
+              {t("specForm.description")}
             </label>
             <input
               type="text"
@@ -1339,7 +1330,7 @@ export function WsEditorForm({
               onChange={(e) => setDescription(e.target.value)}
               placeholder="hat room test process"
               disabled={isReadOnly}
-              className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
+              className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm ${
                 isReadOnly ? "opacity-60 cursor-not-allowed" : ""
               }`}
             />
@@ -1360,7 +1351,7 @@ export function WsEditorForm({
                   : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
               }`}
             >
-              Receiver
+              {t("wsEditor.receiver")}
             </button>
             <button
               onClick={() => setWsTab("reply")}
@@ -1370,7 +1361,7 @@ export function WsEditorForm({
                   : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
               }`}
             >
-              Reply
+              {t("wsEditor.reply")}
             </button>
             <button
               onClick={() => setWsTab("message")}
@@ -1380,7 +1371,7 @@ export function WsEditorForm({
                   : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
               }`}
             >
-              Message
+              {t("wsEditor.message")}
             </button>
             <button
               onClick={() => setWsTab("schema")}
@@ -1390,7 +1381,7 @@ export function WsEditorForm({
                   : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
               }`}
             >
-              Schema
+              {t("schema.title")}
             </button>
           </div>
         </div>
@@ -1402,7 +1393,7 @@ export function WsEditorForm({
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
-                    Receiver
+                    {t("wsEditor.receiver")}
                   </h3>
                 </div>
                 {!isReadOnly && (
@@ -1412,7 +1403,7 @@ export function WsEditorForm({
                         onClick={() => setReceiver(null)}
                         className="text-red-500 hover:text-red-700 text-sm font-medium"
                       >
-                        Remove
+                        {t("wsEditor.remove")}
                       </button>
                     ) : (
                       <button
@@ -1432,7 +1423,7 @@ export function WsEditorForm({
                             d="M12 4v16m8-8H4"
                           />
                         </svg>
-                        Add
+                        {t("common.add")}
                       </button>
                     )}
                   </div>
@@ -1447,7 +1438,8 @@ export function WsEditorForm({
                       {/* 주소 */}
                       <div>
                         <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                          Address <span className="text-red-500">*</span>
+                          {t("wsEditor.address")}{" "}
+                          <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="text"
@@ -1460,7 +1452,7 @@ export function WsEditorForm({
                           }
                           placeholder="/app/chat/{roomId}"
                           disabled={isReadOnly}
-                          className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
+                          className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm ${
                             isReadOnly ? "opacity-60 cursor-not-allowed" : ""
                           }`}
                         />
@@ -1470,14 +1462,14 @@ export function WsEditorForm({
                       <div className="mt-4">
                         <div className="flex items-center justify-between mb-2">
                           <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E]">
-                            📨 Messages{" "}
+                            {t("wsEditor.messages")}{" "}
                             {messages.length > 0 && `(${messages.length})`}
                           </label>
                           {!isReadOnly && (
                             <button
                               onClick={loadMessages}
                               className="text-[#2563EB] hover:text-[#1E40AF] text-xs"
-                              title="Refresh"
+                              title={t("wsEditor.refresh")}
                             >
                               ↻
                             </button>
@@ -1517,7 +1509,7 @@ export function WsEditorForm({
                                       });
                                     }}
                                     disabled={isReadOnly}
-                                    className="w-4 h-4 text-blue-600 focus:ring-blue-500 flex-shrink-0"
+                                    className="w-4 h-4 text-blue-600 focus:ring-0 focus-visible:outline-none flex-shrink-0"
                                   />
                                   <div className="flex-1 min-w-0">
                                     <div className="text-sm text-gray-900 dark:text-[#E6EDF3] font-medium truncate">
@@ -1535,10 +1527,10 @@ export function WsEditorForm({
                           ) : (
                             <div className="text-center py-6">
                               <p className="text-sm text-gray-500 dark:text-[#8B949E] mb-2">
-                                No available messages.
+                                {t("wsEditor.noAvailableMessages")}
                               </p>
                               <p className="text-xs text-gray-400 dark:text-[#6E7681]">
-                                Please create messages in the Message tab first.
+                                {t("wsEditor.createMessagesInMessageTab")}
                               </p>
                             </div>
                           )}
@@ -1549,7 +1541,7 @@ export function WsEditorForm({
                 </div>
               ) : (
                 <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
-                  <p>No Receiver. Click the "Add" button to add.</p>
+                  <p>{t("wsEditor.noReceiverClickAdd")}</p>
                 </div>
               )}
             </div>
@@ -1560,7 +1552,7 @@ export function WsEditorForm({
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
-                    Reply
+                    {t("wsEditor.reply")}
                   </h3>
                 </div>
                 {!isReadOnly && (
@@ -1570,7 +1562,7 @@ export function WsEditorForm({
                         onClick={() => setReply(null)}
                         className="text-red-500 hover:text-red-700 text-sm font-medium"
                       >
-                        Remove
+                        {t("wsEditor.remove")}
                       </button>
                     ) : (
                       <button
@@ -1590,7 +1582,7 @@ export function WsEditorForm({
                             d="M12 4v16m8-8H4"
                           />
                         </svg>
-                        Add
+                        {t("common.add")}
                       </button>
                     )}
                   </div>
@@ -1605,7 +1597,8 @@ export function WsEditorForm({
                       {/* 주소 */}
                       <div>
                         <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                          Address <span className="text-red-500">*</span>
+                          {t("wsEditor.address")}{" "}
+                          <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="text"
@@ -1615,7 +1608,7 @@ export function WsEditorForm({
                           }
                           placeholder="/topic/chat/{roomId}"
                           disabled={isReadOnly}
-                          className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
+                          className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm ${
                             isReadOnly ? "opacity-60 cursor-not-allowed" : ""
                           }`}
                         />
@@ -1625,14 +1618,14 @@ export function WsEditorForm({
                       <div className="mt-4">
                         <div className="flex items-center justify-between mb-2">
                           <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E]">
-                            📨 Messages{" "}
+                            {t("wsEditor.messages")}{" "}
                             {messages.length > 0 && `(${messages.length})`}
                           </label>
                           {!isReadOnly && (
                             <button
                               onClick={loadMessages}
                               className="text-[#2563EB] hover:text-[#1E40AF] text-xs"
-                              title="Refresh"
+                              title={t("wsEditor.refresh")}
                             >
                               ↻
                             </button>
@@ -1704,7 +1697,7 @@ export function WsEditorForm({
                 </div>
               ) : (
                 <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
-                  <p>No Reply. Click the "Add" button to add.</p>
+                  <p>{t("wsEditor.noReplyClickAdd")}</p>
                 </div>
               )}
             </div>
@@ -1722,14 +1715,15 @@ export function WsEditorForm({
             <div className="space-y-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
-                  Message
+                  {t("wsEditor.message")}
                 </h3>
               </div>
 
               {/* 메시지 이름 */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                  Message Name <span className="text-red-500">*</span>
+                  {t("wsEditor.messageName")}{" "}
+                  <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -1737,7 +1731,7 @@ export function WsEditorForm({
                   onChange={(e) => setMessageName(e.target.value)}
                   placeholder="ChatMessage"
                   disabled={isReadOnly}
-                  className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
+                  className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm ${
                     isReadOnly ? "opacity-60 cursor-not-allowed" : ""
                   }`}
                 />
@@ -1746,7 +1740,7 @@ export function WsEditorForm({
               {/* 메시지 설명 */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                  Description
+                  {t("specForm.description")}
                 </label>
                 <input
                   type="text"
@@ -1754,7 +1748,7 @@ export function WsEditorForm({
                   onChange={(e) => setMessageDescription(e.target.value)}
                   placeholder="Description"
                   disabled={isReadOnly}
-                  className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
+                  className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm ${
                     isReadOnly ? "opacity-60 cursor-not-allowed" : ""
                   }`}
                 />
@@ -1763,7 +1757,7 @@ export function WsEditorForm({
               {/* 메시지 타입 선택 */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                  Message Type
+                  {t("wsEditor.messageType")}
                 </label>
                 <div className="flex gap-2">
                   <button
@@ -1775,7 +1769,7 @@ export function WsEditorForm({
                         : "bg-gray-100 dark:bg-[#21262D] text-gray-700 dark:text-[#C9D1D9] hover:bg-gray-200 dark:hover:bg-[#30363D]"
                     } ${isReadOnly ? "opacity-60 cursor-not-allowed" : ""}`}
                   >
-                    None
+                    {t("wsEditor.none")}
                   </button>
                   <button
                     onClick={() => setMessageType("header")}
@@ -1786,7 +1780,7 @@ export function WsEditorForm({
                         : "bg-gray-100 dark:bg-[#21262D] text-gray-700 dark:text-[#C9D1D9] hover:bg-gray-200 dark:hover:bg-[#30363D]"
                     } ${isReadOnly ? "opacity-60 cursor-not-allowed" : ""}`}
                   >
-                    Header
+                    {t("apiCard.headers")}
                   </button>
                   <button
                     onClick={() => setMessageType("schema")}
@@ -1797,7 +1791,7 @@ export function WsEditorForm({
                         : "bg-gray-100 dark:bg-[#21262D] text-gray-700 dark:text-[#C9D1D9] hover:bg-gray-200 dark:hover:bg-[#30363D]"
                     } ${isReadOnly ? "opacity-60 cursor-not-allowed" : ""}`}
                   >
-                    Payload
+                    {t("wsEditor.payload")}
                   </button>
                 </div>
               </div>
@@ -1807,14 +1801,14 @@ export function WsEditorForm({
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E]">
-                      Headers
+                      {t("apiCard.headers")}
                     </label>
                     {!isReadOnly && (
                       <button
                         onClick={addMessageHeader}
                         className="text-[#2563EB] hover:text-[#1E40AF] text-xs font-medium"
                       >
-                        + Add Header
+                        {t("apiCard.addHeader")}
                       </button>
                     )}
                   </div>
@@ -1829,7 +1823,7 @@ export function WsEditorForm({
                           }
                           placeholder="Header Name"
                           disabled={isReadOnly}
-                          className={`flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
+                          className={`flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm ${
                             isReadOnly ? "opacity-60 cursor-not-allowed" : ""
                           }`}
                         />
@@ -1841,7 +1835,7 @@ export function WsEditorForm({
                           }
                           placeholder="Header Value"
                           disabled={isReadOnly}
-                          className={`flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
+                          className={`flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm ${
                             isReadOnly ? "opacity-60 cursor-not-allowed" : ""
                           }`}
                         />
@@ -1876,7 +1870,7 @@ export function WsEditorForm({
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E]">
-                      Payload Schema
+                      {t("wsEditor.payloadSchema")}
                     </label>
                     <div className="flex gap-2">
                       {!isReadOnly && (
@@ -1885,13 +1879,13 @@ export function WsEditorForm({
                             onClick={() => setIsMessageSchemaModalOpen(true)}
                             className="text-[#2563EB] hover:text-[#1E40AF] text-xs font-medium"
                           >
-                            Schema 선택
+                            {t("wsEditor.selectSchema")}
                           </button>
                           <button
                             onClick={addMessagePayloadField}
                             className="text-[#2563EB] hover:text-[#1E40AF] text-xs font-medium"
                           >
-                            + Add Field
+                            {t("apiCard.addField")}
                           </button>
                         </>
                       )}
@@ -1902,14 +1896,15 @@ export function WsEditorForm({
                     <div className="mb-2 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-blue-700 dark:text-blue-300 font-medium">
-                          Schema: {getShortSchemaName(selectedMessageSchema)}
+                          {t("wsEditor.schemaReference")}:{" "}
+                          {getShortSchemaName(selectedMessageSchema)}
                         </span>
                         {!isReadOnly && (
                           <button
                             onClick={() => setSelectedMessageSchema(null)}
                             className="text-blue-500 hover:text-blue-700 text-xs"
                           >
-                            제거
+                            {t("wsEditor.remove")}
                           </button>
                         )}
                       </div>
@@ -1935,8 +1930,7 @@ export function WsEditorForm({
                         ))
                       ) : (
                         <p className="text-xs text-gray-500 dark:text-gray-400 text-center py-2">
-                          No schema fields. Click "+ Add Field" to add or select
-                          a schema.
+                          {t("wsEditor.noSchemaFieldsClickAdd")}
                         </p>
                       )}
                     </div>
@@ -1951,7 +1945,7 @@ export function WsEditorForm({
                     onClick={handleCreateMessage}
                     className="w-full px-4 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md text-sm font-medium transition-colors"
                   >
-                    Create Message
+                    {t("wsEditor.createMessage")}
                   </button>
                 </div>
               )}
@@ -1959,7 +1953,7 @@ export function WsEditorForm({
               {/* 생성된 메시지 목록 */}
               <div className="mt-6">
                 <h4 className="text-xs font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">
-                  Messages ({messages.length})
+                  {t("wsEditor.messages")} ({messages.length})
                 </h4>
                 <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-200 dark:border-[#2D333B] rounded-md p-3 bg-gray-50 dark:bg-[#0D1117]">
                   {messages.length > 0 ? (

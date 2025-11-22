@@ -531,13 +531,6 @@ export async function deleteSchema(
  * OpenAPI 3.1.0 YAML 파일을 업로드하여 ourorest.yml에 병합
  */
 export async function importYaml(file: File): Promise<ImportYamlResponse> {
-  console.log("YAML Import 시작:", {
-    fileName: file.name,
-    fileSize: file.size,
-    fileType: file.type,
-    endpoint: `${API_BASE_URL}/import`,
-  });
-
   const formData = new FormData();
   formData.append("file", file);
 
@@ -545,12 +538,6 @@ export async function importYaml(file: File): Promise<ImportYamlResponse> {
     method: "POST",
     body: formData,
     // multipart/form-data는 브라우저가 자동으로 설정
-  });
-
-  console.log("YAML Import 응답:", {
-    status: response.status,
-    statusText: response.statusText,
-    ok: response.ok,
   });
 
   if (!response.ok) {
@@ -633,25 +620,12 @@ export interface WsImportYamlErrorResponse {
  * AsyncAPI 3.0.0 YAML 파일을 업로드하여 ourowebsocket.yml에 병합
  */
 export async function importWebSocketYaml(file: File): Promise<any> {
-  console.log("WS YAML Import 시작:", {
-    fileName: file.name,
-    fileSize: file.size,
-    fileType: file.type,
-    endpoint: `${WS_SPEC_BASE_URL}/import`,
-  });
-
   const formData = new FormData();
   formData.append("file", file);
 
   const response = await fetch(`${WS_SPEC_BASE_URL}/import`, {
     method: "POST",
     body: formData,
-  });
-
-  console.log("WS YAML Import 응답:", {
-    status: response.status,
-    statusText: response.statusText,
-    ok: response.ok,
   });
 
   if (!response.ok) {

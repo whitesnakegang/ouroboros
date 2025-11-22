@@ -13,6 +13,7 @@ import { AlertModal } from "@/ui/AlertModal";
 import type { RequestBody } from "../types/schema.types";
 import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
 import { useTestingStore } from "@/features/testing/store/testing.store";
+import { useTranslation } from "react-i18next";
 import axios from "axios";
 import { downloadYaml } from "../utils/yamlExporter";
 import {
@@ -23,7 +24,6 @@ import {
   importWebSocketYaml,
 } from "../services/api";
 import { MarkdownPreviewModal } from "./MarkdownPreviewModal";
-// FilenameOptions removed
 import {
   createRestApiSpec,
   updateRestApiSpec,
@@ -34,6 +34,7 @@ import {
   getWebSocketOperation,
   createWebSocketOperation,
   updateWebSocketOperation,
+  deleteWebSocketOperation,
   syncWebSocketOperation,
   getWebSocketChannel,
   type RestApiSpecResponse,
@@ -44,11 +45,7 @@ import {
   parseOpenAPIRequestBody,
   parseOpenAPISchemaToSchemaField,
 } from "../utils/schemaConverter";
-import {
-  createPrimitiveField,
-  isArraySchema,
-  isRefSchema,
-} from "../types/schema.types";
+import { isArraySchema, isRefSchema } from "../types/schema.types";
 
 interface KeyValuePair {
   key: string;
@@ -74,6 +71,7 @@ interface StatusCode {
 }
 
 export function ApiEditorLayout() {
+  const { t } = useTranslation();
   const {
     selectedEndpoint,
     deleteEndpoint,
@@ -228,7 +226,34 @@ export function ApiEditorLayout() {
   );
 
   // Completed 상태인지 확인
-  const isCompleted = selectedEndpoint?.progress?.toLowerCase() === "completed";
+  // REST: progress === "completed"
+  // WebSocket: progress === "completed" 또는 (tag === "receive" && progress === "receive")
+  const isCompleted = (() => {
+    if (!selectedEndpoint) return false;
+
+    const progress = selectedEndpoint.progress?.toLowerCase();
+    const tag = selectedEndpoint.tag?.toLowerCase();
+    const endpointProtocol = selectedEndpoint.protocol || protocol;
+
+    // REST API인 경우
+    if (endpointProtocol === "REST") {
+      return progress === "completed";
+    }
+
+    // WebSocket인 경우
+    if (endpointProtocol === "WebSocket") {
+      // progress가 "completed"이면 완료 상태
+      if (progress === "completed") {
+        return true;
+      }
+      // tag가 "receive"이고 progress도 "receive"이면 완료 상태로 간주
+      if (tag === "receive" && progress === "receive") {
+        return true;
+      }
+    }
+
+    return false;
+  })();
 
   // 수정/삭제 불가능한 상태인지 확인 (completed인 경우만, mock 상태는 diff가 있어도 수정/삭제 가능)
   const isReadOnly = isCompleted;
@@ -867,10 +892,23 @@ export function ApiEditorLayout() {
           alertMessage =
             "서버에 연결할 수 없습니다.\n\n서버가 실행 중인지 확인해주세요.";
         }
+        // 400 에러 (잘못된 요청 - ID가 유효하지 않음)
+        else if (
+          errMsg.includes("400") ||
+          errMsg.includes("bad request") ||
+          errMsg.includes("invalid request data")
+        ) {
+          alertMessage =
+            "명세에 없는 내용입니다. 선택된 엔드포인트가 존재하지 않습니다.\n\n사이드바 목록을 새로고침합니다.";
+          // 사이드바 목록 새로고침
+          loadEndpoints();
+        }
         // 404 에러 (엔드포인트 없음)
         else if (errMsg.includes("404") || errMsg.includes("not found")) {
           alertMessage =
             "명세에 없는 내용입니다. 선택된 엔드포인트가 존재하지 않습니다.";
+          // 사이드바 목록 새로고침
+          loadEndpoints();
         }
         // 기타 서버 에러
         else {
@@ -916,11 +954,25 @@ export function ApiEditorLayout() {
       const protocol = operationData.protocol || "ws"; // null이면 기본값 "ws"
       setWsProtocol(protocol as "ws" | "wss");
 
-      // selectedEndpoint에 entrypoint 업데이트
+      // selectedEndpoint에 entrypoint, progress, diff, tag 업데이트
       if (selectedEndpoint) {
+        const operationProgress = operationData.operation.progress;
+        const operationDiff = operationData.operation.diff;
+        const operationTag = operationData.tag;
+
         setSelectedEndpoint({
           ...selectedEndpoint,
           entrypoint: entrypoint,
+          // progress가 명시적으로 제공되면 사용, 없으면 기존 값 유지
+          progress:
+            operationProgress !== undefined
+              ? operationProgress
+              : selectedEndpoint.progress || "none",
+          diff:
+            operationDiff !== undefined
+              ? operationDiff
+              : selectedEndpoint.diff || "none",
+          tag: operationTag !== undefined ? operationTag : selectedEndpoint.tag,
         });
       }
       setWsSummary(""); // Operation에는 summary가 없음
@@ -1593,8 +1645,8 @@ export function ApiEditorLayout() {
           if (!receives && !replies) {
             setAlertModal({
               isOpen: true,
-              title: "Input Error",
-              message: "At least one of Receiver or Reply must be provided.",
+              title: t("modal.inputError"),
+              message: t("modal.receiverOrReplyRequired"),
               variant: "warning",
             });
             return;
@@ -1615,8 +1667,8 @@ export function ApiEditorLayout() {
           });
           setAlertModal({
             isOpen: true,
-            title: "Updated",
-            message: "WebSocket Operation has been updated successfully.",
+            title: t("common.updated"),
+            message: t("modal.websocketOperationUpdated"),
             variant: "success",
           });
 
@@ -1768,8 +1820,8 @@ export function ApiEditorLayout() {
           } else {
             setAlertModal({
               isOpen: true,
-              title: "Created",
-              message: "WebSocket Operation has been created successfully.",
+              title: t("common.created"),
+              message: t("editor.websocketOperationCreated"),
               variant: "success",
             });
             // 사이드바 목록 다시 로드
@@ -1780,10 +1832,11 @@ export function ApiEditorLayout() {
         }
       } catch (error: any) {
         console.error("WebSocket Operation 저장 실패:", error);
+        const errorMessage = error.message || t("modal.failedToSaveWebSocket");
         setAlertModal({
           isOpen: true,
-          title: "Save Failed",
-          message: error.message || "Failed to save WebSocket Operation.",
+          title: t("modal.saveFailed"),
+          message: errorMessage,
           variant: "error",
         });
       }
@@ -1796,8 +1849,8 @@ export function ApiEditorLayout() {
     if (protocol === "REST" && (!method || !url || !url.trim())) {
       setAlertModal({
         isOpen: true,
-        title: "Input Error",
-        message: "Please enter Method and URL.",
+        title: t("modal.inputError"),
+        message: t("modal.methodAndUrlRequired"),
         variant: "warning",
       });
       return;
@@ -1828,8 +1881,8 @@ export function ApiEditorLayout() {
 
         setAlertModal({
           isOpen: true,
-          title: "Updated",
-          message: "API spec has been updated successfully.",
+          title: t("common.updated"),
+          message: t("editor.apiSpecUpdated"),
           variant: "success",
         });
         setIsEditMode(false);
@@ -1891,8 +1944,8 @@ export function ApiEditorLayout() {
         addEndpoint(newEndpoint, group);
         setAlertModal({
           isOpen: true,
-          title: "Created",
-          message: `API ${method} ${url} has been created successfully.`,
+          title: t("common.created"),
+          message: t("editor.apiCreated", { method, url }),
           variant: "success",
         });
 
@@ -1912,8 +1965,8 @@ export function ApiEditorLayout() {
       const errorMessage = getErrorMessage(error);
       setAlertModal({
         isOpen: true,
-        title: "Save Failed",
-        message: `Failed to save API: ${errorMessage}`,
+        title: t("modal.saveFailed"),
+        message: t("modal.failedToSaveApi", { error: errorMessage }),
         variant: "error",
       });
     }
@@ -1922,43 +1975,68 @@ export function ApiEditorLayout() {
   const handleDelete = () => {
     if (!selectedEndpoint) return;
 
-    // WebSocket 삭제 로직
-    if (protocol === "WebSocket") {
-      setConfirmModal({
-        isOpen: true,
-        title: "Delete WebSocket Operation",
-        message: "Are you sure you want to delete this WebSocket Operation?",
-        variant: "danger",
-        onConfirm: () => {
-          setConfirmModal((prev) => ({ ...prev, isOpen: false }));
-          setAlertModal({
-            isOpen: true,
-            title: "Coming Soon",
-            message: "WebSocket Operation deletion feature is coming soon.",
-            variant: "info",
-          });
-          // TODO: Implement WebSocket Operation delete logic
-          // - deleteWebSocketOperation 호출
-        },
-      });
-      return;
-    }
-
     // completed 상태만 삭제 불가 (mock 상태는 diff가 있어도 삭제 가능)
     if (isCompleted) {
       setAlertModal({
         isOpen: true,
-        title: "Cannot Delete",
-        message: "Completed APIs cannot be deleted.",
+        title: t("modal.cannotDelete"),
+        message: t("modal.completedApisCannotDelete"),
         variant: "warning",
       });
       return;
     }
 
+    // WebSocket 삭제 로직
+    if (protocol === "WebSocket") {
+      setConfirmModal({
+        isOpen: true,
+        title: t("modal.deleteWebSocketOperation"),
+        message: t("modal.confirmDeleteWebSocket"),
+        variant: "danger",
+        onConfirm: async () => {
+          setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+          try {
+            await deleteWebSocketOperation(selectedEndpoint.id);
+            deleteEndpoint(selectedEndpoint.id);
+            setAlertModal({
+              isOpen: true,
+              title: t("modal.deleted"),
+              message: t("modal.websocketOperationDeletedSuccessfully"),
+              variant: "success",
+            });
+
+            // 폼 초기화
+            setSelectedEndpoint(null);
+            setWsEntryPoint("/ws");
+            setWsEntryPointError("");
+            setWsProtocol("ws");
+            setWsSummary("");
+            setWsDescription("");
+            setWsTags("");
+            setWsReceiver(null);
+            setWsReply(null);
+            setIsEditMode(false);
+            loadEndpoints();
+          } catch (error: unknown) {
+            console.error("WebSocket Operation 삭제 실패:", error);
+            const errorMessage = getErrorMessage(error);
+            setAlertModal({
+              isOpen: true,
+              title: t("modal.deleteFailed"),
+              message: t("modal.failedToDeleteWebSocketOperation", { error: errorMessage }),
+              variant: "error",
+            });
+          }
+        },
+      });
+      return;
+    }
+
+    // REST API 삭제 로직
     setConfirmModal({
       isOpen: true,
-      title: "Delete Endpoint",
-      message: "Are you sure you want to delete this endpoint?",
+      title: t("modal.deleteEndpoint"),
+      message: t("modal.confirmDeleteEndpoint"),
       variant: "danger",
       onConfirm: async () => {
         setConfirmModal((prev) => ({ ...prev, isOpen: false }));
@@ -1967,8 +2045,8 @@ export function ApiEditorLayout() {
           deleteEndpoint(selectedEndpoint.id);
           setAlertModal({
             isOpen: true,
-            title: "Deleted",
-            message: "Endpoint has been deleted successfully.",
+            title: t("modal.deleted"),
+            message: t("modal.endpointDeletedSuccessfully"),
             variant: "success",
           });
 
@@ -1986,8 +2064,8 @@ export function ApiEditorLayout() {
           const errorMessage = getErrorMessage(error);
           setAlertModal({
             isOpen: true,
-            title: "Delete Failed",
-            message: `Failed to delete API: ${errorMessage}`,
+            title: t("modal.deleteFailed"),
+            message: t("modal.failedToDeleteApi", { error: errorMessage }),
             variant: "error",
           });
         }
@@ -2000,8 +2078,8 @@ export function ApiEditorLayout() {
     if (isCompleted) {
       setAlertModal({
         isOpen: true,
-        title: "Cannot Edit",
-        message: "Completed APIs cannot be edited.",
+        title: t("modal.cannotEdit"),
+        message: t("modal.completedApisCannotEdit"),
         variant: "warning",
       });
       return;
@@ -2040,16 +2118,30 @@ export function ApiEditorLayout() {
 
   const handleCancelEdit = () => {
     if (selectedEndpoint) {
-      loadEndpointData(selectedEndpoint.id);
+      const endpointProtocol = selectedEndpoint.protocol || protocol;
+
+      // WebSocket인 경우
+      if (endpointProtocol === "WebSocket") {
+        loadWebSocketOperationData(selectedEndpoint.id);
+      } else {
+        // REST API인 경우
+        loadEndpointData(selectedEndpoint.id);
+      }
     }
     setIsEditMode(false);
+  };
+
+  const handleBack = () => {
+    // 새 폼 작성 모드를 해제하고 이전 상태로 돌아가기
+    setIsNewFormMode(false);
+    setSelectedEndpoint(null);
   };
 
   const handleReset = () => {
     setConfirmModal({
       isOpen: true,
-      title: "Reset Confirmation",
-      message: "Are you sure you want to reset the current content?",
+      title: t("modal.resetConfirmation"),
+      message: t("modal.confirmReset"),
       variant: "warning",
       onConfirm: () => {
         setConfirmModal((prev) => ({ ...prev, isOpen: false }));
@@ -2064,10 +2156,22 @@ export function ApiEditorLayout() {
         setPathParams([]);
         setAuth({ type: "none" });
         setRequestBody({
-          type: "json",
-          fields: [createPrimitiveField("email", "string")],
+          type: "none",
+          fields: [],
         });
         setStatusCodes([]);
+
+        // WebSocket 관련 초기화
+        if (protocol === "WebSocket") {
+          setWsEntryPoint("/ws");
+          setWsEntryPointError("");
+          setWsProtocol("ws");
+          setWsSummary("");
+          setWsDescription("");
+          setWsTags("");
+          setWsReceiver(null);
+          setWsReply(null);
+        }
       },
     });
   };
@@ -2156,8 +2260,8 @@ export function ApiEditorLayout() {
       if (!fileName.endsWith(".yml") && !fileName.endsWith(".yaml")) {
         setAlertModal({
           isOpen: true,
-          title: "File Format Error",
-          message: "Only YAML files (.yml or .yaml) can be uploaded.",
+          title: t("modal.fileFormatError"),
+          message: t("modal.onlyYamlFiles"),
           variant: "warning",
         });
         return;
@@ -2174,8 +2278,8 @@ export function ApiEditorLayout() {
           } else {
             setAlertModal({
               isOpen: true,
-              title: "Import Completed",
-              message: "WebSocket YAML import has been completed successfully.",
+              title: t("modal.importCompleted"),
+              message: t("editor.websocketYamlImportCompleted"),
               variant: "success",
             });
           }
@@ -2192,8 +2296,8 @@ export function ApiEditorLayout() {
         const errorMsg = getErrorMessage(error);
         setAlertModal({
           isOpen: true,
-          title: "Import Failed",
-          message: `YAML import failed\n\n${errorMsg}`,
+          title: t("editor.importFailed"),
+          message: t("modal.yamlImportFailedWithError", { error: errorMsg }),
           variant: "error",
         });
       }
@@ -2227,8 +2331,8 @@ export function ApiEditorLayout() {
       const errorMsg = getErrorMessage(e);
       setAlertModal({
         isOpen: true,
-        title: "Export Failed",
-        message: `Failed to export Markdown.\nError: ${errorMsg}`,
+        title: t("editor.exportFailed"),
+        message: t("modal.failedToExportMarkdown", { error: errorMsg }),
         variant: "error",
       });
       setIsExportModalOpen(false);
@@ -2247,8 +2351,8 @@ export function ApiEditorLayout() {
       );
       setAlertModal({
         isOpen: true,
-        title: "Download Completed",
-        message: "YAML file has been downloaded successfully.",
+        title: t("modal.downloadCompleted"),
+        message: t("modal.yamlFileDownloadedSuccessfully"),
         variant: "success",
       });
       setIsExportModalOpen(false);
@@ -2257,8 +2361,8 @@ export function ApiEditorLayout() {
       const errorMsg = getErrorMessage(e);
       setAlertModal({
         isOpen: true,
-        title: "Export Failed",
-        message: `Failed to export YAML.\nError: ${errorMsg}`,
+        title: t("editor.exportFailed"),
+        message: t("modal.failedToExportYaml", { error: errorMsg }),
         variant: "error",
       });
       setIsExportModalOpen(false);
@@ -2272,9 +2376,8 @@ export function ApiEditorLayout() {
 
     setConfirmModal({
       isOpen: true,
-      title: "Reflect Implementation to Spec",
-      message:
-        "Do you want to automatically reflect the actual implementation into the spec?\n\nThis operation cannot be undone.",
+      title: t("modal.reflectImplementationToSpec"),
+      message: t("modal.confirmReflectImplementation"),
       variant: "warning",
       onConfirm: async () => {
         setConfirmModal((prev) => ({ ...prev, isOpen: false }));
@@ -2301,9 +2404,8 @@ export function ApiEditorLayout() {
 
             setAlertModal({
               isOpen: true,
-              title: "Success",
-              message:
-                "The actual implementation has been successfully reflected in the spec.",
+              title: t("modal.success"),
+              message: t("modal.implementationReflectedInSpec"),
               variant: "success",
             });
           } else {
@@ -2333,9 +2435,8 @@ export function ApiEditorLayout() {
 
             setAlertModal({
               isOpen: true,
-              title: "Success",
-              message:
-                "The actual implementation has been successfully reflected in the spec.",
+              title: t("modal.success"),
+              message: t("modal.implementationReflectedInSpec"),
               variant: "success",
             });
           }
@@ -2343,8 +2444,8 @@ export function ApiEditorLayout() {
           const errorMessage = getErrorMessage(error);
           setAlertModal({
             isOpen: true,
-            title: "Sync Failed",
-            message: `Failed to sync spec: ${errorMessage}`,
+            title: t("modal.syncFailed"),
+            message: t("modal.failedToSyncSpec", { error: errorMessage }),
             variant: "error",
           });
         }
@@ -2361,8 +2462,8 @@ export function ApiEditorLayout() {
     if (!operationId) {
       setAlertModal({
         isOpen: true,
-        title: "Error",
-        message: "Operation ID not found.",
+        title: t("modal.error"),
+        message: t("modal.operationIdNotFound"),
         variant: "error",
       });
       return;
@@ -2372,9 +2473,8 @@ export function ApiEditorLayout() {
 
     setConfirmModal({
       isOpen: true,
-      title: "Reflect Channel to Spec",
-      message:
-        "Do you want to automatically reflect the actual implementation's Channel information into the spec?\n\nThis operation cannot be undone.",
+      title: t("modal.reflectChannelToSpec"),
+      message: t("modal.confirmReflectChannel"),
       variant: "warning",
       onConfirm: async () => {
         setConfirmModal((prev) => ({ ...prev, isOpen: false }));
@@ -2446,9 +2546,8 @@ export function ApiEditorLayout() {
 
             setAlertModal({
               isOpen: true,
-              title: "Success",
-              message:
-                "The actual implementation's Channel has been successfully reflected in the spec.",
+              title: t("modal.success"),
+              message: t("modal.channelReflectedInSpec"),
               variant: "success",
             });
             return;
@@ -2515,8 +2614,8 @@ export function ApiEditorLayout() {
           const errorMessage = getErrorMessage(error);
           setAlertModal({
             isOpen: true,
-            title: "Sync Failed",
-            message: `Failed to sync spec: ${errorMessage}`,
+            title: t("modal.syncFailed"),
+            message: t("modal.failedToSyncSpec", { error: errorMessage }),
             variant: "error",
           });
         }
@@ -2730,7 +2829,7 @@ export function ApiEditorLayout() {
                   : "text-gray-500 dark:text-[#8B949E] hover:text-gray-900 dark:hover:text-[#E6EDF3]"
               }`}
             >
-              <span className="relative z-10">API Spec</span>
+              <span className="relative z-10">{t("editor.apiSpec")}</span>
               {activeTab === "form" && (
                 <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#2563EB] dark:bg-[#58A6FF] rounded-t-full" />
               )}
@@ -2750,7 +2849,7 @@ export function ApiEditorLayout() {
                   : "text-gray-500 dark:text-[#8B949E] hover:text-gray-900 dark:hover:text-[#E6EDF3]"
               } ${!selectedEndpoint ? "opacity-50 cursor-not-allowed" : ""}`}
             >
-              <span className="relative z-10">API Test</span>
+              <span className="relative z-10">{t("editor.apiTest")}</span>
               {activeTab === "test" && (
                 <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#2563EB] dark:bg-[#58A6FF] rounded-t-full" />
               )}
@@ -2768,7 +2867,7 @@ export function ApiEditorLayout() {
                   selectedEndpoint.method?.toLowerCase() === "send") && (
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-gray-600 dark:text-[#8B949E] font-medium">
-                      pregress completed:
+                      {t("editor.progressCompleted")}
                     </span>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input
@@ -2842,12 +2941,12 @@ export function ApiEditorLayout() {
                             );
                             setAlertModal({
                               isOpen: true,
-                              title: "Update Failed",
-                              message: `Failed to update progress: ${
-                                error instanceof Error
+                              title: t("modal.updateFailed"),
+                              message: t("modal.failedToUpdateProgress", {
+                                error: error instanceof Error
                                   ? error.message
-                                  : "Unknown error"
-                              }`,
+                                  : t("common.error"),
+                              }),
                               variant: "error",
                             });
                           } finally {
@@ -2891,14 +2990,14 @@ export function ApiEditorLayout() {
                   onClick={handleImportYAML}
                   className="px-4 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-lg bg-transparent transition-colors text-sm font-medium focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0"
                 >
-                  Import
+                  {t("editor.import")}
                 </button>
                 <div className="relative" ref={exportDropdownRef}>
                   <button
                     onClick={() => setIsExportModalOpen(!isExportModalOpen)}
                     className="px-4 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-lg bg-transparent transition-colors text-sm font-medium focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0"
                   >
-                    Export
+                    {t("editor.export")}
                   </button>
                   {isExportModalOpen && (
                     <div className="absolute top-full right-0 mt-1 w-40 bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#30363D] shadow-lg z-50 overflow-hidden">
@@ -2992,7 +3091,7 @@ export function ApiEditorLayout() {
                       }}
                       placeholder="Authorization"
                       autoFocus
-                      className="px-3 py-2 pr-10 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-2 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm w-full sm:w-64"
+                      className="px-3 py-2 pr-10 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm w-full sm:w-64"
                     />
                     {authorization && authorization.trim() && (
                       <div className="absolute right-3 flex items-center">
@@ -3121,10 +3220,10 @@ export function ApiEditorLayout() {
                     </svg>
                   </div>
                   <h3 className="text-xl font-semibold text-gray-900 dark:text-[#E6EDF3] mb-2">
-                    Select Protocol
+                    {t("editor.selectProtocol")}
                   </h3>
                   <p className="text-gray-600 dark:text-[#8B949E]">
-                    Select Protocol in Sidebar and click Add button.
+                    {t("editor.selectProtocolDescription")}
                   </p>
                 </div>
               </div>
@@ -3283,14 +3382,14 @@ export function ApiEditorLayout() {
                           d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
                         />
                       </svg>
-                      <span>Method & URL</span>
+                      <span>{t("apiCard.methodAndUrl")}</span>
                     </div>
                     {/* Code Snippet 버튼 - 생성 완료된 명세서에서만 활성화 (수정 중일 때는 숨김) */}
                     {selectedEndpoint && !isEditMode && (
                       <button
                         onClick={() => setIsCodeSnippetOpen(true)}
                         className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0"
-                        title="View Code Snippet"
+                        title={t("apiCard.viewCodeSnippet")}
                       >
                         <svg
                           className="w-4 h-4"
@@ -3305,7 +3404,9 @@ export function ApiEditorLayout() {
                             d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
                           />
                         </svg>
-                        <span className="hidden sm:inline">Code Snippet</span>
+                        <span className="hidden sm:inline">
+                          {t("apiCard.codeSnippet")}
+                        </span>
                       </button>
                     )}
                   </div>
@@ -3357,7 +3458,7 @@ export function ApiEditorLayout() {
                       {summary && (
                         <div>
                           <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-1">
-                            Owner
+                            {t("specForm.owner")}
                           </h3>
                           <p className="text-sm text-gray-900 dark:text-[#E6EDF3]">
                             {summary}
@@ -3379,7 +3480,7 @@ export function ApiEditorLayout() {
                       {tags && (
                         <div>
                           <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-1">
-                            Tags
+                            {t("apiCard.tags")}
                           </h3>
                           <div className="flex flex-wrap gap-2">
                             {tags.split(",").map((tag, idx) => (
@@ -3404,7 +3505,7 @@ export function ApiEditorLayout() {
                               value={method}
                               onChange={(e) => setMethod(e.target.value)}
                               disabled={!!(selectedEndpoint && !isEditMode)}
-                              className={`appearance-none w-full sm:w-auto px-3 py-2 pr-10 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm font-medium min-w-[120px] ${
+                              className={`appearance-none w-full sm:w-auto px-3 py-2 pr-10 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm font-medium min-w-[120px] ${
                                 selectedEndpoint && !isEditMode
                                   ? "opacity-60 cursor-not-allowed"
                                   : ""
@@ -3463,11 +3564,7 @@ export function ApiEditorLayout() {
                                 urlError
                                   ? "border-red-500 dark:border-red-500"
                                   : "border-gray-300 dark:border-[#2D333B]"
-                              } text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 ${
-                                urlError
-                                  ? "focus:ring-red-500 focus:border-red-500"
-                                  : "focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500"
-                              } text-sm font-mono ${
+                              } text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm font-mono ${
                                 selectedEndpoint && !isEditMode
                                   ? "opacity-60 cursor-not-allowed"
                                   : ""
@@ -3525,7 +3622,7 @@ export function ApiEditorLayout() {
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                           <div>
                             <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                              Tags/Category
+                              {t("specForm.tagsCategory")}
                             </label>
                             <input
                               type="text"
@@ -3533,7 +3630,7 @@ export function ApiEditorLayout() {
                               onChange={(e) => setTags(e.target.value)}
                               placeholder="AUTH"
                               disabled={!!(selectedEndpoint && !isEditMode)}
-                              className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
+                              className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm ${
                                 selectedEndpoint && !isEditMode
                                   ? "opacity-60 cursor-not-allowed"
                                   : ""
@@ -3542,7 +3639,7 @@ export function ApiEditorLayout() {
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                              Owner
+                              {t("specForm.owner")}
                             </label>
                             <input
                               type="text"
@@ -3550,7 +3647,7 @@ export function ApiEditorLayout() {
                               onChange={(e) => setSummary(e.target.value)}
                               placeholder="John Doe"
                               disabled={!!(selectedEndpoint && !isEditMode)}
-                              className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
+                              className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm ${
                                 selectedEndpoint && !isEditMode
                                   ? "opacity-60 cursor-not-allowed"
                                   : ""
@@ -3562,7 +3659,7 @@ export function ApiEditorLayout() {
                         {/* Description */}
                         <div>
                           <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                            Description
+                            {t("specForm.description")}
                           </label>
                           <input
                             type="text"
@@ -3570,7 +3667,7 @@ export function ApiEditorLayout() {
                             onChange={(e) => setDescription(e.target.value)}
                             placeholder="User login process"
                             disabled={!!(selectedEndpoint && !isEditMode)}
-                            className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm ${
+                            className={`w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm ${
                               selectedEndpoint && !isEditMode
                                 ? "opacity-60 cursor-not-allowed"
                                 : ""
@@ -3598,7 +3695,7 @@ export function ApiEditorLayout() {
                             : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
                         }`}
                       >
-                        Request
+                        {t("apiCard.request")}
                       </button>
                       <button
                         onClick={() => setSpecTab("response")}
@@ -3608,7 +3705,7 @@ export function ApiEditorLayout() {
                             : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
                         }`}
                       >
-                        Response
+                        {t("apiCard.response")}
                       </button>
                       {!isCompletedView && (
                         <button
@@ -3619,7 +3716,7 @@ export function ApiEditorLayout() {
                               : "text-gray-500 dark:text-[#8B949E] bg-transparent border-transparent hover:text-gray-700 dark:hover:text-[#C9D1D9] hover:bg-gray-100 dark:hover:bg-[#21262D]"
                           }`}
                         >
-                          Schema
+                          {t("schema.title")}
                         </button>
                       )}
                     </div>
@@ -3684,7 +3781,7 @@ export function ApiEditorLayout() {
                   onClick={handleCancelEdit}
                   className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0"
                 >
-                  취소
+                  {t("common.cancel")}
                 </button>
                 <button
                   onClick={handleSave}
@@ -3701,7 +3798,7 @@ export function ApiEditorLayout() {
                       : "bg-emerald-500 hover:bg-emerald-600 text-white"
                   }`}
                 >
-                  저장
+                  {t("common.save")}
                 </button>
               </>
             ) : (
@@ -3714,9 +3811,9 @@ export function ApiEditorLayout() {
                       ? "bg-gray-200 dark:bg-[#161B22] text-gray-400 dark:text-[#8B949E] cursor-not-allowed"
                       : "bg-[#2563EB] hover:bg-[#1E40AF] text-white"
                   }`}
-                  title={isCompleted ? "완료된 API는 수정할 수 없습니다" : ""}
+                  title={isCompleted ? t("modal.completedApisCannotEdit") : ""}
                 >
-                  Edit
+                  {t("common.edit")}
                 </button>
                 <button
                   onClick={handleDelete}
@@ -3726,24 +3823,26 @@ export function ApiEditorLayout() {
                       ? "bg-gray-200 dark:bg-[#161B22] text-gray-400 dark:text-[#8B949E] cursor-not-allowed"
                       : "bg-red-500 hover:bg-red-600 text-white"
                   }`}
-                  title={isCompleted ? "완료된 API는 삭제할 수 없습니다" : ""}
+                  title={
+                    isCompleted ? t("modal.completedApisCannotDelete") : ""
+                  }
                 >
-                  Delete
+                  {t("common.delete")}
                 </button>
               </>
             )}
           </div>
         </div>
       )}
-      {/* 하단 생성/초기화 버튼 - 새 명세 작성 중일 때 표시 (명세서 폼에서만) */}
-      {activeTab === "form" && !selectedEndpoint && (
+      {/* 하단 생성/초기화 버튼 - 새 명세 작성 중일 때만 표시 (명세서 폼에서만) */}
+      {activeTab === "form" && !selectedEndpoint && isNewFormMode && (
         <div className="border-t border-gray-200 dark:border-[#2D333B] px-6 py-4 bg-white dark:bg-[#0D1117]">
           <div className="flex items-center justify-end gap-3">
             <button
-              onClick={handleReset}
+              onClick={handleBack}
               className="px-3 py-2 border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] rounded-md bg-transparent transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus-visible:outline-none ring-0 hover:ring-0 active:ring-0"
             >
-              Back
+              {t("editor.back")}
             </button>
             <button
               onClick={handleSave}
@@ -3754,7 +3853,7 @@ export function ApiEditorLayout() {
                   : "bg-[#2563EB] hover:bg-[#1E40AF] text-white"
               }`}
             >
-              Create
+              {t("editor.create")}
             </button>
           </div>
         </div>

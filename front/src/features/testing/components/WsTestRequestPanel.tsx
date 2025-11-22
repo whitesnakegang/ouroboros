@@ -1,15 +1,18 @@
 import { useState, useEffect, useRef, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useTestingStore } from "../store/testing.store";
 import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
 import { StompClient, buildWebSocketUrl } from "../utils/stompClient";
 import {
   getWebSocketOperation,
   getWebSocketChannel,
-  getSchema,
+  getWebSocketSchema,
 } from "@/features/spec/services/api";
 import type { SchemaField } from "@/features/spec/types/schema.types";
 import { parseOpenAPISchemaToSchemaField } from "@/features/spec/utils/schemaConverter";
 import { isPrimitiveSchema } from "@/features/spec/types/schema.types";
+import { MessageDetailModal } from "./MessageDetailModal";
+import type { WebSocketMessage } from "../store/testing.store";
 
 interface Subscription {
   id: string;
@@ -18,6 +21,7 @@ interface Subscription {
 }
 
 export function WsTestRequestPanel() {
+  const { t } = useTranslation();
   const {
     wsConnectionStatus,
     setWsConnectionStatus,
@@ -27,6 +31,7 @@ export function WsTestRequestPanel() {
     setWsConnectionStartTime,
     wsConnectionStartTime,
     setTryId,
+    tryId,
   } = useTestingStore();
   const { selectedEndpoint, endpoints } = useSidebarStore();
 
@@ -39,6 +44,9 @@ export function WsTestRequestPanel() {
   >([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [newTopic, setNewTopic] = useState("");
+  const [selectedMessage, setSelectedMessage] =
+    useState<WebSocketMessage | null>(null);
+  const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
 
   // Schema 기반 메시지 입력 상태
   const [messageSchemaFields, setMessageSchemaFields] = useState<SchemaField[]>(
@@ -216,12 +224,6 @@ export function WsTestRequestPanel() {
           }
 
           setOperationAction(normalizedAction);
-          console.log("Operation Action 설정:", {
-            original: operation.action,
-            normalized: normalizedAction,
-            progress: selectedEndpoint?.progress,
-            isProgressCompleted,
-          });
 
           // Receive address 추출
           let receiveAddr = "";
@@ -308,15 +310,6 @@ export function WsTestRequestPanel() {
           }
 
           // receive 액션만 있는 경우 Reply Address는 필요 없음
-          // 디버깅: Reply Address 추출 결과 확인 (reply가 있는 경우만)
-          if (operation.action !== "receive" || replyAddr) {
-            console.log("Reply Address 추출:", {
-              operationAction: operation.action,
-              hasOperationReply: !!(operation.reply && operation.reply.channel),
-              path: selectedEndpoint.path,
-              extractedReplyAddr: replyAddr,
-            });
-          }
 
           setReplyAddress(replyAddr);
 
@@ -336,7 +329,7 @@ export function WsTestRequestPanel() {
             // Schema 로드 및 필드 생성
             if (schemaRef) {
               try {
-                const schemaResponse = await getSchema(schemaRef);
+                const schemaResponse = await getWebSocketSchema(schemaRef);
                 const schemaData = schemaResponse.data;
 
                 if (schemaData.properties) {
@@ -568,9 +561,9 @@ export function WsTestRequestPanel() {
                     direction: "received" as const,
                     address: "WARNING",
                     content: JSON.stringify({
-                      message: `구독 주소에 패턴이 포함되어 있습니다. Path Parameters를 입력해주세요: ${missingParams.join(
-                        ", "
-                      )}`,
+                      message: t("wsTest.subscriptionAddressHasPattern", {
+                        params: missingParams.join(", "),
+                      }),
                       replyAddress,
                       missingParameters: missingParams,
                     }),
@@ -588,23 +581,27 @@ export function WsTestRequestPanel() {
                 direction: "received" as const,
                 address: "INFO",
                 content: JSON.stringify({
-                  message:
-                    "Reply Address가 /topic/ 또는 /queue/로 시작하지 않습니다. 구독할 수 없습니다.",
+                  message: t("wsTest.replyAddressNotStartWithTopicOrQueue"),
                   replyAddress,
                 }),
               });
             }
           } else {
             // replyAddress가 없으면 구독하지 않음
-            if (receiveAddress && receiveAddress.trim() !== "") {
+            // receive 액션만 있는 경우는 reply address가 없는 게 정상이므로 에러 메시지 표시하지 않음
+            if (
+              receiveAddress &&
+              receiveAddress.trim() !== "" &&
+              operationAction !== null &&
+              operationAction !== "receive"
+            ) {
               addWsMessage({
                 id: `msg-${Date.now()}-${Math.random()}`,
                 timestamp: Date.now(),
                 direction: "received" as const,
                 address: "INFO",
                 content: JSON.stringify({
-                  message:
-                    "Reply Address가 없습니다. 서버가 메시지를 보낼 주소(/topic/ 또는 /queue/)가 필요합니다.",
+                  message: t("wsTest.replyAddressRequired"),
                   receiveAddress,
                 }),
               });
@@ -619,9 +616,25 @@ export function WsTestRequestPanel() {
                 tryNotificationDestination,
                 (frame) => {
                   // Try 알림 메시지에서 tryId 추출
-                  const tryIdHeader =
+                  // STOMP 프레임 헤더는 대소문자를 구분할 수 있으므로 모든 키를 확인
+                  let tryIdHeader: string | undefined = undefined;
+
+                  // 먼저 일반적인 키로 확인
+                  tryIdHeader =
                     frame.headers["X-Ouroboros-Try-Id"] ||
-                    frame.headers["x-ouroboros-try-id"];
+                    frame.headers["x-ouroboros-try-id"] ||
+                    frame.headers["X-OUROBOROS-TRY-ID"];
+
+                  // 헤더에 tryId가 없으면 모든 헤더 키를 순회하면서 대소문자 구분 없이 찾기
+                  if (!tryIdHeader && frame.headers) {
+                    const headerKeys = Object.keys(frame.headers);
+                    for (const key of headerKeys) {
+                      if (key.toLowerCase() === "x-ouroboros-try-id") {
+                        tryIdHeader = frame.headers[key];
+                        break;
+                      }
+                    }
+                  }
 
                   if (tryIdHeader) {
                     setTryId(tryIdHeader);
@@ -661,6 +674,7 @@ export function WsTestRequestPanel() {
                       content: payloadContent,
                       tryId: tryIdHeader,
                     };
+
                     addWsMessage(tryMessage);
                     updateWsStats((prev) => ({
                       totalSent: (prev?.totalSent || 0) + 1,
@@ -713,7 +727,7 @@ export function WsTestRequestPanel() {
       );
     } catch {
       setWsConnectionStatus("disconnected");
-      alert("Connection failed.");
+      alert(t("wsTest.connectionFailed"));
     }
   };
 
@@ -745,7 +759,7 @@ export function WsTestRequestPanel() {
     }
 
     if (!stompClientRef.current || !stompClientRef.current.isConnected()) {
-      alert("Please connect first.");
+      alert(t("wsTest.pleaseConnectFirst"));
       return;
     }
 
@@ -759,9 +773,49 @@ export function WsTestRequestPanel() {
         destination,
         (frame) => {
           // 응답 메시지에서 X-Ouroboros-Try-Id 헤더 추출
-          const tryIdHeader =
+          // STOMP 프레임 헤더는 대소문자를 구분할 수 있으므로 모든 키를 확인
+          let tryIdHeader: string | undefined = undefined;
+
+          // 먼저 일반적인 키로 확인
+          tryIdHeader =
             frame.headers["X-Ouroboros-Try-Id"] ||
-            frame.headers["x-ouroboros-try-id"];
+            frame.headers["x-ouroboros-try-id"] ||
+            frame.headers["X-OUROBOROS-TRY-ID"];
+
+          // 헤더에 tryId가 없으면 모든 헤더 키를 순회하면서 대소문자 구분 없이 찾기
+          if (!tryIdHeader && frame.headers) {
+            const headerKeys = Object.keys(frame.headers);
+            for (const key of headerKeys) {
+              if (key.toLowerCase() === "x-ouroboros-try-id") {
+                tryIdHeader = frame.headers[key];
+                break;
+              }
+            }
+          }
+
+          // 헤더에 tryId가 없으면 메시지 본문에서 추출 시도
+          if (!tryIdHeader && frame.body) {
+            try {
+              const bodyJson = JSON.parse(frame.body);
+              // 본문에 tryId가 있는 경우 (예: { tryId: "...", ... })
+              if (bodyJson.tryId) {
+                tryIdHeader = bodyJson.tryId;
+              }
+              // 본문의 headers에 tryId가 있는 경우 (예: { headers: { "X-Ouroboros-Try-Id": "..." }, ... })
+              else if (bodyJson.headers) {
+                // headers 객체의 모든 키를 확인
+                const headerKeys = Object.keys(bodyJson.headers);
+                for (const key of headerKeys) {
+                  if (key.toLowerCase() === "x-ouroboros-try-id") {
+                    tryIdHeader = bodyJson.headers[key];
+                    break;
+                  }
+                }
+              }
+            } catch {
+              // JSON 파싱 실패 시 무시
+            }
+          }
 
           // tryId가 있으면 store에 저장
           if (tryIdHeader) {
@@ -866,7 +920,7 @@ export function WsTestRequestPanel() {
   // 간단한 모드 메시지 전송
   const handleSimpleSend = () => {
     if (wsConnectionStatus !== "connected") {
-      alert("Please connect first.");
+      alert(t("wsTest.pleaseConnectFirst"));
       return;
     }
 
@@ -876,7 +930,7 @@ export function WsTestRequestPanel() {
     }
 
     if (!stompClientRef.current.isConnected()) {
-      alert("Connection appears to be lost. Please reconnect.");
+      alert(t("wsTest.connectionLostPleaseReconnect"));
       setWsConnectionStatus("disconnected");
       return;
     }
@@ -892,9 +946,7 @@ export function WsTestRequestPanel() {
     }
 
     if (!destination) {
-      alert(
-        "메시지를 전송할 수 없습니다.\n\nReply Address 또는 Receive Address를 설정해주세요."
-      );
+      alert(t("wsTest.cannotSendMessageSetAddress"));
       return;
     }
 
@@ -909,9 +961,10 @@ export function WsTestRequestPanel() {
       const missingParams = params.filter((p) => !pathParameters[p]);
       if (missingParams.length > 0) {
         alert(
-          `메시지를 전송할 수 없습니다.\n\n` +
-            `주소에 패턴이 포함되어 있습니다: ${actualDestination}\n\n` +
-            `다음 파라미터를 입력해주세요: ${missingParams.join(", ")}`
+          t("wsTest.cannotSendMessagePatternInAddress", {
+            destination: actualDestination,
+            params: missingParams.join(", "),
+          })
         );
         return;
       }
@@ -920,13 +973,29 @@ export function WsTestRequestPanel() {
     // 실제 destination 사용
     destination = actualDestination;
 
-    // 디버깅: 실제 전송되는 destination 확인
-    console.log("WebSocket 메시지 전송:", {
-      destination,
-      replyAddress,
-      receiveAddress,
-      useReplyAddress: replyAddress && replyAddress.trim() !== "",
-    });
+    // 자동 생성 필드인지 확인하는 헬퍼 함수
+    const isAutoGeneratedField = (field: SchemaField): boolean => {
+      const fieldKeyLower = field.key.toLowerCase();
+      // 필드명 기반 판단
+      const isAutoFieldName =
+        fieldKeyLower === "sentat" ||
+        fieldKeyLower === "sent_at" ||
+        fieldKeyLower === "createdat" ||
+        fieldKeyLower === "created_at" ||
+        fieldKeyLower === "timestamp" ||
+        field.key === "sentAt" ||
+        field.key === "createdAt";
+
+      // 타입 기반 판단 (date-time 또는 instant)
+      const isDateTimeField =
+        isPrimitiveSchema(field.schemaType) &&
+        field.schemaType.type === "string" &&
+        (field.schemaType.format === "date-time" ||
+          field.schemaType.format === "instant" ||
+          field.schemaType.format === "date");
+
+      return isAutoFieldName || isDateTimeField;
+    };
 
     // Schema 기반 메시지 생성
     let messageBody: string;
@@ -934,10 +1003,15 @@ export function WsTestRequestPanel() {
       // Schema 필드가 있으면 formData를 JSON으로 변환
       const messageData: Record<string, unknown> = {};
       messageSchemaFields.forEach((field) => {
-        const value = messageFormData[field.key];
-        // undefined나 빈 문자열이 아닌 경우만 포함
-        if (value !== undefined && value !== "") {
-          messageData[field.key] = value;
+        // 자동 생성 필드는 항상 현재 시간으로 설정
+        if (isAutoGeneratedField(field)) {
+          messageData[field.key] = new Date().toISOString();
+        } else {
+          const value = messageFormData[field.key];
+          // undefined나 빈 문자열이 아닌 경우만 포함
+          if (value !== undefined && value !== "") {
+            messageData[field.key] = value;
+          }
         }
       });
       messageBody = JSON.stringify(messageData);
@@ -971,12 +1045,13 @@ export function WsTestRequestPanel() {
       stompClientRef.current.send(destination, headers, messageBody);
 
       // 전송된 메시지 로그
-      const message = {
+      const message: WebSocketMessage = {
         id: `msg-${Date.now()}-${Math.random()}`,
         timestamp: Date.now(),
         direction: "sent" as const,
         address: destination,
         content: messageBody,
+        tryId: enableTryHeader ? tryId || undefined : undefined,
       };
       addWsMessage(message);
       updateWsStats((prev) => ({
@@ -987,6 +1062,29 @@ export function WsTestRequestPanel() {
       if (messageSchemaFields.length > 0) {
         const defaultFormData: Record<string, unknown> = {};
         messageSchemaFields.forEach((field) => {
+          // 자동 생성 필드는 초기화하지 않음 (항상 전송 시 현재 시간으로 설정됨)
+          const fieldKeyLower = field.key.toLowerCase();
+          const isAutoFieldName =
+            fieldKeyLower === "sentat" ||
+            fieldKeyLower === "sent_at" ||
+            fieldKeyLower === "createdat" ||
+            fieldKeyLower === "created_at" ||
+            fieldKeyLower === "timestamp" ||
+            field.key === "sentAt" ||
+            field.key === "createdAt";
+
+          const isDateTimeField =
+            isPrimitiveSchema(field.schemaType) &&
+            field.schemaType.type === "string" &&
+            (field.schemaType.format === "date-time" ||
+              field.schemaType.format === "instant" ||
+              field.schemaType.format === "date");
+
+          if (isAutoFieldName || isDateTimeField) {
+            // 자동 생성 필드는 초기화하지 않음
+            return;
+          }
+
           if (isPrimitiveSchema(field.schemaType)) {
             switch (field.schemaType.type) {
               case "string":
@@ -1066,10 +1164,10 @@ export function WsTestRequestPanel() {
             />
             <span className="text-xs font-medium text-gray-600 dark:text-[#8B949E]">
               {wsConnectionStatus === "connected"
-                ? "Connected"
+                ? t("wsTest.connected")
                 : wsConnectionStatus === "connecting"
-                ? "Connecting..."
-                : "Disconnected"}
+                ? t("wsTest.connecting")
+                : t("wsTest.disconnected")}
             </span>
           </div>
         </div>
@@ -1079,12 +1177,12 @@ export function WsTestRequestPanel() {
         {/* 연결 설정 Section */}
         <div className="mb-6 space-y-4">
           <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
-            Connection settings
+            {t("wsTest.connectionSettings")}
           </h3>
 
           <div>
             <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-              WS Endpoint
+              {t("wsTest.wsEndpoint")}
             </label>
             <input
               type="text"
@@ -1092,7 +1190,7 @@ export function WsTestRequestPanel() {
               onChange={(e) => setEntryPoint(e.target.value)}
               placeholder="ws://localhost:8080/ws"
               disabled={wsConnectionStatus === "connected"}
-              className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm font-mono disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm font-mono disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -1100,7 +1198,7 @@ export function WsTestRequestPanel() {
           {(operationAction === "duplex" || operationAction === "receive") && (
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                Receive Address
+                {t("wsTest.receiveAddress")}
               </label>
               <input
                 type="text"
@@ -1119,11 +1217,11 @@ export function WsTestRequestPanel() {
                 }}
                 placeholder="/topic/chat/room1"
                 disabled={wsConnectionStatus === "connected"}
-                className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               />
               {hasPathParameter(receiveAddress) && (
                 <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-                  패턴이 포함된 주소입니다. 아래 파라미터를 입력해주세요.
+                  {t("wsTest.addressContainsPattern")}
                 </p>
               )}
             </div>
@@ -1135,7 +1233,7 @@ export function WsTestRequestPanel() {
             operationAction === "sendto") && (
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
-                Reply Address
+                {t("wsTest.replyAddress")}
               </label>
               <input
                 type="text"
@@ -1154,7 +1252,7 @@ export function WsTestRequestPanel() {
                 }}
                 placeholder="/app/chat/room1"
                 disabled={wsConnectionStatus === "connected"}
-                className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               />
               {hasPathParameter(replyAddress) && (
                 <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
@@ -1184,10 +1282,10 @@ export function WsTestRequestPanel() {
             return (
               <div className="border border-amber-200 dark:border-amber-800 rounded-md p-3 bg-amber-50 dark:bg-amber-900/20">
                 <label className="block text-xs font-medium text-amber-800 dark:text-amber-300 mb-2">
-                  Path Parameters
+                  {t("wsTest.pathParameters")}
                 </label>
                 <p className="text-xs text-amber-700 dark:text-amber-400 mb-3">
-                  주소에 패턴이 포함되어 있습니다. 실제 값을 입력해주세요.
+                  {t("wsTest.pathPatternDescription")}
                 </p>
                 <div className="space-y-2">
                   {paramArray.map((param) => (
@@ -1255,8 +1353,10 @@ export function WsTestRequestPanel() {
                             }
                           }
                         }}
-                        placeholder={`${param} 값 입력 (예: room1)`}
-                        className="w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-amber-300 dark:border-amber-700 text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-amber-400 dark:focus:ring-amber-500 focus:border-amber-400 dark:focus:border-amber-500 text-sm"
+                        placeholder={t("wsTest.pathParameterPlaceholder", {
+                          param,
+                        })}
+                        className="w-full px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-amber-300 dark:border-amber-700 text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm"
                       />
                       {/* 치환된 주소 미리보기 */}
                       {pathParameters[param] && (
@@ -1264,7 +1364,7 @@ export function WsTestRequestPanel() {
                           {receiveAddress &&
                             hasPathParameter(receiveAddress) && (
                               <span>
-                                Receive:{" "}
+                                {t("wsTest.receive")}:{" "}
                                 {replacePathParameters(receiveAddress, {
                                   ...pathParameters,
                                   [param]: pathParameters[param],
@@ -1274,7 +1374,7 @@ export function WsTestRequestPanel() {
                             )}
                           {replyAddress && hasPathParameter(replyAddress) && (
                             <span>
-                              Reply:{" "}
+                              {t("wsEditor.reply")}:{" "}
                               {replacePathParameters(replyAddress, {
                                 ...pathParameters,
                                 [param]: pathParameters[param],
@@ -1301,14 +1401,14 @@ export function WsTestRequestPanel() {
                     : "bg-[#2563EB] hover:bg-[#1E40AF] text-white"
                 }`}
               >
-                Connect
+                {t("wsTest.connect")}
               </button>
             ) : (
               <button
                 onClick={handleDisconnect}
                 className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-md transition-all text-sm font-semibold active:translate-y-[1px] focus:outline-none focus-visible:outline-none md:flex-none md:w-auto w-full"
               >
-                Disconnect
+                {t("wsTest.disconnect")}
               </button>
             )}
           </div>
@@ -1319,18 +1419,18 @@ export function WsTestRequestPanel() {
           <div className="mb-4 border border-gray-200 dark:border-[#2D333B] rounded-md p-3">
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs font-medium text-gray-600 dark:text-[#8B949E]">
-                STOMP CONNECT Headers (optional)
+                {t("wsTest.stompConnectHeaders")}
               </label>
               <button
                 onClick={addConnectHeader}
                 className="text-xs px-2 py-1 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none"
               >
-                + Add Header
+                {t("apiCard.addHeader")}
               </button>
             </div>
             {connectHeaders.length === 0 ? (
               <p className="text-xs text-gray-500 dark:text-[#8B949E] text-center py-2">
-                Connect with default settings. Add headers if needed.
+                {t("wsTest.connectWithDefaultSettings")}
               </p>
             ) : (
               <div className="space-y-2">
@@ -1342,8 +1442,8 @@ export function WsTestRequestPanel() {
                       onChange={(e) =>
                         updateConnectHeader(index, e.target.value, header.value)
                       }
-                      placeholder="Key"
-                      className="flex-1 px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                      placeholder={t("wsTest.key")}
+                      className="flex-1 px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm"
                     />
                     <input
                       type="text"
@@ -1351,8 +1451,8 @@ export function WsTestRequestPanel() {
                       onChange={(e) =>
                         updateConnectHeader(index, header.key, e.target.value)
                       }
-                      placeholder="Value"
-                      className="flex-1 px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                      placeholder={t("wsTest.value")}
+                      className="flex-1 px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm"
                     />
                     <button
                       onClick={() => removeConnectHeader(index)}
@@ -1392,6 +1492,55 @@ export function WsTestRequestPanel() {
             {messageSchemaFields.length > 0 ? (
               <div className="space-y-4">
                 {messageSchemaFields.map((field) => {
+                  // 자동 생성 필드인지 확인
+                  const fieldKeyLower = field.key.toLowerCase();
+                  const isAutoFieldName =
+                    fieldKeyLower === "sentat" ||
+                    fieldKeyLower === "sent_at" ||
+                    fieldKeyLower === "createdat" ||
+                    fieldKeyLower === "created_at" ||
+                    fieldKeyLower === "timestamp" ||
+                    field.key === "sentAt" ||
+                    field.key === "createdAt";
+
+                  const isDateTimeField =
+                    isPrimitiveSchema(field.schemaType) &&
+                    field.schemaType.type === "string" &&
+                    (field.schemaType.format === "date-time" ||
+                      field.schemaType.format === "instant" ||
+                      field.schemaType.format === "date");
+
+                  const isAutoGenerated = isAutoFieldName || isDateTimeField;
+
+                  // 자동 생성 필드는 읽기 전용으로 표시
+                  if (isAutoGenerated) {
+                    return (
+                      <div key={field.key}>
+                        <label className="block text-xs font-medium text-gray-600 dark:text-[#8B949E] mb-2">
+                          {field.key}
+                          {field.required && (
+                            <span className="text-red-500 ml-1">*</span>
+                          )}
+                          {field.description && (
+                            <span className="text-xs text-gray-500 dark:text-[#8B949E] ml-2">
+                              ({field.description})
+                            </span>
+                          )}
+                          <span className="text-xs text-blue-600 dark:text-blue-400 ml-2">
+                            (auto)
+                          </span>
+                        </label>
+                        <input
+                          type="text"
+                          value={new Date().toISOString()}
+                          readOnly
+                          disabled
+                          className="w-full px-3 py-2 rounded-md bg-gray-100 dark:bg-[#161B22] border border-gray-300 dark:border-[#2D333B] text-gray-600 dark:text-[#8B949E] cursor-not-allowed text-sm"
+                        />
+                      </div>
+                    );
+                  }
+
                   const value = messageFormData[field.key] ?? "";
                   let isBoolean = false;
                   let isNumber = false;
@@ -1433,7 +1582,7 @@ export function WsTestRequestPanel() {
                               [field.key]: e.target.value === "true",
                             });
                           }}
-                          className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                          className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm"
                         >
                           <option value="false">false</option>
                           <option value="true">true</option>
@@ -1455,7 +1604,7 @@ export function WsTestRequestPanel() {
                           placeholder={
                             primitiveType === "integer" ? "0" : "0.0"
                           }
-                          className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                          className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm"
                         />
                       ) : (
                         <input
@@ -1473,7 +1622,7 @@ export function WsTestRequestPanel() {
                               handleSimpleSend();
                             }
                           }}
-                          className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                          className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm"
                         />
                       )}
                     </div>
@@ -1501,7 +1650,7 @@ export function WsTestRequestPanel() {
                       });
                     }}
                     placeholder="tester"
-                    className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                    className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm"
                   />
                 </div>
 
@@ -1528,7 +1677,7 @@ export function WsTestRequestPanel() {
                         handleSimpleSend();
                       }
                     }}
-                    className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                    className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-500 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm"
                   />
                 </div>
 
@@ -1548,7 +1697,7 @@ export function WsTestRequestPanel() {
                         type: e.target.value,
                       });
                     }}
-                    className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                    className="w-full px-3 py-2 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm"
                   >
                     <option value="TALK">TALK</option>
                     <option value="ENTER">ENTER</option>
@@ -1564,7 +1713,7 @@ export function WsTestRequestPanel() {
                 id="enableTryHeader"
                 checked={enableTryHeader}
                 onChange={(e) => setEnableTryHeader(e.target.checked)}
-                className="w-4 h-4 text-gray-600 dark:text-gray-400 bg-gray-100 border-gray-300 rounded focus:ring-gray-400 dark:focus:ring-gray-500"
+                className="w-4 h-4 text-gray-600 dark:text-gray-400 bg-gray-100 border-gray-300 rounded focus:ring-0 focus-visible:outline-none"
               />
               <label
                 htmlFor="enableTryHeader"
@@ -1626,7 +1775,7 @@ export function WsTestRequestPanel() {
                           }}
                           className="sr-only peer"
                         />
-                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-gray-300 dark:peer-focus:ring-gray-600 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-gray-600"></div>
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-0 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-gray-600"></div>
                       </label>
                     </div>
                   ))}
@@ -1654,9 +1803,11 @@ export function WsTestRequestPanel() {
                 d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
               />
             </svg>
-            Subscriptions (
-            {subscriptions.filter((s) => s.subscriptionId !== null).length}{" "}
-            active / {subscriptions.length} total)
+            {t("wsTest.subscriptions", {
+              active: subscriptions.filter((s) => s.subscriptionId !== null)
+                .length,
+              total: subscriptions.length,
+            })}
           </label>
           <div className="space-y-2">
             {subscriptions.map((subscription) => {
@@ -1694,13 +1845,25 @@ export function WsTestRequestPanel() {
                       }}
                       className="sr-only peer"
                     />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-gray-300 dark:peer-focus:ring-gray-600 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-gray-600"></div>
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-0 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-gray-600"></div>
                   </label>
                 </div>
               );
             })}
           </div>
         </div>
+      )}
+
+      {/* Message Detail Modal */}
+      {selectedMessage && (
+        <MessageDetailModal
+          isOpen={isMessageModalOpen}
+          onClose={() => {
+            setIsMessageModalOpen(false);
+            setSelectedMessage(null);
+          }}
+          message={selectedMessage}
+        />
       )}
     </div>
   );

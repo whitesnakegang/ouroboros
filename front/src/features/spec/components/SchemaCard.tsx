@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { SchemaModal } from "./SchemaModal";
 import { SchemaFieldEditor } from "./SchemaFieldEditor";
 import { ConfirmModal } from "@/ui/ConfirmModal";
@@ -44,6 +45,7 @@ export function SchemaCard({
   isDocumentView = false,
   onSchemaChange,
 }: SchemaCardProps) {
+  const { t } = useTranslation();
   const [schemas, setSchemas] = useState<SchemaResponse[]>([]);
   const [isSchemaModalOpen, setIsSchemaModalOpen] = useState(false);
   const [selectedSchemaName, setSelectedSchemaName] = useState<string | null>(
@@ -165,8 +167,8 @@ export function SchemaCard({
   const handleDeleteSchema = (schemaName: string) => {
     setConfirmModal({
       isOpen: true,
-      title: "Delete Schema",
-      message: `Are you sure you want to delete the schema "${schemaName}"?`,
+      title: t("schema.deleteSchema"),
+      message: t("schema.confirmDeleteSchema", { name: schemaName }),
       variant: "danger",
       onConfirm: async () => {
         setConfirmModal((prev) => ({ ...prev, isOpen: false }));
@@ -190,8 +192,8 @@ export function SchemaCard({
 
           setAlertModal({
             isOpen: true,
-            title: "Deleted",
-            message: `Schema "${schemaName}" has been deleted successfully.`,
+            title: t("modal.deleted"),
+            message: t("schema.schemaDeletedSuccessfully", { name: schemaName }),
             variant: "success",
           });
 
@@ -203,10 +205,10 @@ export function SchemaCard({
           console.error("스키마 삭제 실패:", err);
           setAlertModal({
             isOpen: true,
-            title: "Delete Failed",
-            message: `Failed to delete schema: ${
-              err instanceof Error ? err.message : "Unknown error"
-            }`,
+            title: t("modal.deleteFailed"),
+            message: t("schema.failedToDeleteSchema", {
+              error: err instanceof Error ? err.message : t("common.error"),
+            }),
             variant: "error",
           });
         }
@@ -219,8 +221,8 @@ export function SchemaCard({
     if (!currentSchemaName.trim()) {
       setAlertModal({
         isOpen: true,
-        title: "Input Error",
-        message: "Please enter a schema name.",
+        title: t("modal.inputError"),
+        message: t("schema.pleaseEnterSchemaName"),
         variant: "warning",
       });
       return;
@@ -230,8 +232,8 @@ export function SchemaCard({
     if (schemaFields.length === 0) {
       setAlertModal({
         isOpen: true,
-        title: "Input Error",
-        message: "Please add at least one field.",
+        title: t("modal.inputError"),
+        message: t("schema.pleaseAddAtLeastOneField"),
         variant: "warning",
       });
       return;
@@ -290,8 +292,8 @@ export function SchemaCard({
         }
         setAlertModal({
           isOpen: true,
-          title: "Updated",
-          message: `Schema "${originalSchemaName}" has been updated successfully.`,
+          title: t("common.updated"),
+          message: t("schemaCard.schemaUpdatedSuccessfully", { name: originalSchemaName }),
           variant: "success",
         });
       } else {
@@ -303,8 +305,8 @@ export function SchemaCard({
         }
         setAlertModal({
           isOpen: true,
-          title: "Created",
-          message: `Schema "${currentSchemaName}" has been created successfully.`,
+          title: t("common.created"),
+          message: t("schemaCard.schemaCreatedSuccessfully", { name: currentSchemaName }),
           variant: "success",
         });
       }
@@ -330,8 +332,8 @@ export function SchemaCard({
       const errorMessage = getErrorMessage(err);
       setAlertModal({
         isOpen: true,
-        title: "Save Failed",
-        message: `Failed to save schema: ${errorMessage}`,
+        title: t("modal.saveFailed"),
+        message: t("schema.failedToSaveSchema", { error: errorMessage }),
         variant: "error",
       });
     } finally {
@@ -404,7 +406,7 @@ export function SchemaCard({
         <div className="p-4 border-b border-gray-200 dark:border-[#2D333B]">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-[#E6EDF3]">
-              Schema List
+              {t("apiCard.schemaList")}
             </h3>
             <button
               onClick={loadSchemas}
@@ -447,7 +449,7 @@ export function SchemaCard({
                 d="M12 4v16m8-8H4"
               />
             </svg>
-            New Schema
+            {t("schemaCard.newSchema")}
           </button>
         </div>
 
@@ -455,11 +457,11 @@ export function SchemaCard({
         <div className="flex-1 overflow-y-auto p-2">
           {isLoading && schemas.length === 0 ? (
             <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
-              Loading...
+              {t("common.loading")}
             </div>
           ) : schemas.length === 0 ? (
             <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
-              <p>No schemas saved.</p>
+              <p>{t("schemaCard.noSchemasSaved")}</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -485,8 +487,8 @@ export function SchemaCard({
                         <span className="text-xs text-gray-500 dark:text-[#8B949E]">
                           {schema.properties
                             ? Object.keys(schema.properties).length
-                            : 0}
-                          fields
+                            : 0}{" "}
+                          {t("apiCard.fields")}
                         </span>
                       </div>
                       {schema.description && (
@@ -502,7 +504,7 @@ export function SchemaCard({
                           handleDeleteSchema(schema.schemaName);
                         }}
                         className="p-1 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 flex-shrink-0"
-                        title="Delete"
+                        title={t("apiCard.delete")}
                       >
                         <svg
                           className="w-4 h-4"
@@ -540,7 +542,7 @@ export function SchemaCard({
           <div className="space-y-2 mb-4 flex-shrink-0">
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                Schema Name
+                {t("schemaCard.schemaName")}
               </label>
               <input
                 type="text"
@@ -555,9 +557,9 @@ export function SchemaCard({
                     setCurrentSchemaDescription("");
                   }
                 }}
-                placeholder="Schema Name"
+                placeholder={t("schemaCard.schemaName")}
                 disabled={isReadOnly || originalSchemaName !== null}
-                className={`w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 ${
+                className={`w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none ${
                   isReadOnly || originalSchemaName !== null
                     ? "opacity-60 cursor-not-allowed"
                     : ""
@@ -565,23 +567,22 @@ export function SchemaCard({
               />
               {originalSchemaName !== null && (
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  editing mode: "{originalSchemaName}" schema is being edited.
-                  The name cannot be changed.
+                  {t("schemaCard.editingMode", { name: originalSchemaName })}
                 </p>
               )}
             </div>
 
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                Schema Description
+                {t("schemaCard.schemaDescription")}
               </label>
               <textarea
                 value={currentSchemaDescription}
                 onChange={(e) => setCurrentSchemaDescription(e.target.value)}
-                placeholder="Description (optional)"
+                placeholder={t("apiCard.descriptionOptional")}
                 rows={2}
                 disabled={isReadOnly}
-                className={`w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 resize-none ${
+                className={`w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none resize-none ${
                   isReadOnly ? "opacity-60 cursor-not-allowed" : ""
                 }`}
               />
@@ -594,10 +595,10 @@ export function SchemaCard({
               <div className="flex items-center justify-between mb-3 flex-shrink-0">
                 <div>
                   <h4 className="text-base font-semibold text-gray-900 dark:text-[#E6EDF3] mb-1">
-                    Schema Fields
+                    {t("schemaCard.schemaFields")}
                     {originalSchemaName && (
                       <span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">
-                        (editing mode)
+                        ({t("schemaCard.editingModeShort")})
                       </span>
                     )}
                   </h4>
@@ -612,7 +613,7 @@ export function SchemaCard({
                       isReadOnly ? "opacity-50 cursor-not-allowed" : ""
                     }`}
                   >
-                    + Add Field
+                    {t("apiCard.addField")}
                   </button>
                   <button
                     onClick={saveSchema}
@@ -626,10 +627,10 @@ export function SchemaCard({
                     }`}
                   >
                     {isLoading
-                      ? "Saving..."
+                      ? t("schemaCard.saving")
                       : originalSchemaName
-                      ? "Save Changes"
-                      : "Create Schema"}
+                      ? t("schemaCard.saveChanges")
+                      : t("schemaCard.createSchema")}
                   </button>
                 </div>
               </div>
@@ -656,7 +657,7 @@ export function SchemaCard({
                 ))}
                 {schemaFields.length === 0 && (
                   <div className="text-center py-12 text-gray-500 dark:text-gray-400 text-sm border-2 border-dashed border-gray-300 dark:border-[#2D333B] rounded-md bg-gray-50 dark:bg-[#0D1117]">
-                    <p>No fields yet. Click "+ Add Field" to add one.</p>
+                    <p>{t("apiCard.noFieldsYet")}</p>
                   </div>
                 )}
               </div>
@@ -679,8 +680,8 @@ export function SchemaCard({
           } else {
             setAlertModal({
               isOpen: true,
-              title: "Type Error",
-              message: "Only object type schemas are supported.",
+              title: t("schemaCard.typeError"),
+              message: t("schemaCard.onlyObjectTypeSupported"),
               variant: "warning",
             });
           }

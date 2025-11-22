@@ -176,11 +176,6 @@
 dependencies {
     implementation 'io.github.whitesnakegang:ouroboros:1.0.4'
     implementation 'org.springframework.boot:spring-boot-starter-web'
-    
-    // 선택사항: WebSocket 코드 스캔 및 명세 비교를 원하는 경우에만 추가
-    // WebSocket API의 자동 코드 스캔이 필요한 경우에만 추가하세요
-    implementation 'io.github.springwolf:springwolf-stomp:1.17.0'
-    runtimeOnly 'io.github.springwolf:springwolf-ui:1.17.0'
 }
 ```
 
@@ -190,20 +185,6 @@ dependencies {
     <groupId>io.github.whitesnakegang</groupId>
     <artifactId>ouroboros</artifactId>
     <version>1.0.4</version>
-</dependency>
-
-<!-- 선택사항: WebSocket 코드 스캔 및 명세 비교를 원하는 경우에만 추가 -->
-<!-- WebSocket API의 자동 코드 스캔이 필요한 경우에만 추가하세요 -->
-<dependency>
-    <groupId>io.github.springwolf</groupId>
-    <artifactId>springwolf-stomp</artifactId>
-    <version>1.17.0</version>
-</dependency>
-<dependency>
-    <groupId>io.github.springwolf</groupId>
-    <artifactId>springwolf-ui</artifactId>
-    <version>1.17.0</version>
-    <scope>runtime</scope>
 </dependency>
 ```
 

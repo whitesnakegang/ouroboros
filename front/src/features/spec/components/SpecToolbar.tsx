@@ -1,7 +1,9 @@
 import { useSpecStore } from "../store/spec.store";
+import { useTranslation } from "react-i18next";
 
 export function SpecToolbar() {
   const { isEditing, setIsEditing } = useSpecStore();
+  const { t } = useTranslation();
 
   return (
     <div className="flex justify-end gap-3 mb-6">
@@ -13,16 +15,16 @@ export function SpecToolbar() {
             : "border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
         }`}
       >
-        {isEditing ? "완료" : "Edit"}
+        {isEditing ? t("editor.done") : t("editor.edit")}
       </button>
       <button className="px-4 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium">
-        Import YAML
+        {t("editor.importYaml")}
       </button>
       <button className="px-4 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium">
-        Export Markdown
+        {t("editor.exportMarkdown")}
       </button>
       <button className="px-4 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium">
-        Generate api.yaml
+        {t("editor.generateApiYaml")}
       </button>
     </div>
   );

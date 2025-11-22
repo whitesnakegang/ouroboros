@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { SchemaModal } from "./SchemaModal";
 import { SchemaFieldEditor } from "./SchemaFieldEditor";
 import { SchemaViewer } from "./SchemaViewer";
@@ -121,6 +122,7 @@ export function ApiRequestCard({
   );
   const [refSchemaFields, setRefSchemaFields] = useState<SchemaField[]>([]);
   const [isExpandedRefSchema, setIsExpandedRefSchema] = useState(false);
+  const { t } = useTranslation();
 
   // 스키마 목록 로드
   const loadSchemas = async () => {
@@ -286,7 +288,7 @@ export function ApiRequestCard({
         {pathParams.length > 0 && (
           <div>
             <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">
-              Path Parameters
+              {t("apiCard.pathParameters")}
             </h3>
             <div className="space-y-2">
               {pathParams.map((param, index) => (
@@ -305,7 +307,7 @@ export function ApiRequestCard({
                   )}
                   {param.required && (
                     <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-xs rounded">
-                      Required
+                      {t("apiCard.required")}
                     </span>
                   )}
                 </div>
@@ -318,7 +320,7 @@ export function ApiRequestCard({
         {queryParams.length > 0 && (
           <div>
             <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">
-              Query Parameters
+              {t("apiCard.queryParameters")}
             </h3>
             <div className="space-y-2">
               {queryParams.map((param, index) => (
@@ -337,7 +339,7 @@ export function ApiRequestCard({
                   )}
                   {param.required && (
                     <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-xs rounded">
-                      Required
+                      {t("apiCard.required")}
                     </span>
                   )}
                 </div>
@@ -350,7 +352,7 @@ export function ApiRequestCard({
         {requestHeaders.length > 0 && (
           <div>
             <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">
-              Headers
+              {t("apiCard.headers")}
             </h3>
             <div className="space-y-2">
               {requestHeaders.map((header, index) => (
@@ -361,12 +363,14 @@ export function ApiRequestCard({
                   <span className="text-gray-600 dark:text-[#8B949E]">:</span>
                   <span className="text-gray-900 dark:text-[#E6EDF3] flex-1">
                     {header.value || (
-                      <span className="text-gray-400 italic">(empty)</span>
+                      <span className="text-gray-400 italic">
+                        ({t("apiCard.empty")})
+                      </span>
                     )}
                   </span>
                   {header.required && (
                     <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-xs rounded">
-                      Required
+                      {t("apiCard.required")}
                     </span>
                   )}
                 </div>
@@ -401,10 +405,11 @@ export function ApiRequestCard({
         {auth.type !== "none" && (
           <div>
             <h3 className="text-sm font-semibold text-gray-700 dark:text-[#C9D1D9] mb-2">
-              Authentication
+              {t("apiCard.authentication")}
             </h3>
             <div className="text-sm text-gray-900 dark:text-[#E6EDF3]">
-              Type: <span className="font-mono">{auth.type}</span>
+              {t("apiCard.type")}:{" "}
+              <span className="font-mono">{auth.type}</span>
             </div>
           </div>
         )}
@@ -415,7 +420,7 @@ export function ApiRequestCard({
           requestBody.type === "none" &&
           auth.type === "none" && (
             <div className="text-sm text-gray-500 dark:text-[#8B949E] italic">
-              No request parameters configured.
+              {t("apiCard.noRequestParameters")}
             </div>
           )}
       </div>
@@ -439,7 +444,7 @@ export function ApiRequestCard({
             d="M12 4v16m8-8H4"
           />
         </svg>
-        <span>Request</span>
+        <span>{t("apiCard.request")}</span>
       </div>
 
       {/* Tabs */}
@@ -448,16 +453,20 @@ export function ApiRequestCard({
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 text-sm font-medium transition-colors capitalize border-b-2 focus:outline-none focus:ring-0 ${
+            className={`px-4 py-2 text-sm font-medium transition-colors capitalize border-b-2 focus:outline-none focus:ring-0 focus-visible:outline-none ${
               activeTab === tab
                 ? "text-gray-900 dark:text-[#E6EDF3] border-gray-900 dark:border-[#E6EDF3]"
                 : "text-gray-500 dark:text-[#8B949E] border-transparent hover:text-gray-900 dark:hover:text-[#E6EDF3]"
             }`}
+            style={{
+              borderBottomWidth: activeTab === tab ? "2px" : "0px",
+              marginBottom: activeTab === tab ? "-2px" : "0px",
+            }}
           >
-            {tab === "params" && "Params"}
-            {tab === "headers" && "Headers"}
-            {tab === "body" && "Body"}
-            {tab === "auth" && "Auth"}
+            {tab === "params" && t("apiCard.params")}
+            {tab === "headers" && t("apiCard.headers")}
+            {tab === "body" && t("apiCard.body")}
+            {tab === "auth" && t("apiCard.auth")}
           </button>
         ))}
       </div>
@@ -476,7 +485,7 @@ export function ApiRequestCard({
                     : "text-[#2563EB] hover:text-[#1E40AF]"
                 }`}
               >
-                + Add Header
+                {t("apiCard.addHeader")}
               </button>
             </div>
             <div className="space-y-2">
@@ -500,7 +509,7 @@ export function ApiRequestCard({
                     onChange={(e) => updateHeader(index, "key", e.target.value)}
                     placeholder="Header Name (e.g., X-API-Key)"
                     disabled={isReadOnly}
-                    className="flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                    className="flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm"
                   />
                   <input
                     type="text"
@@ -510,7 +519,7 @@ export function ApiRequestCard({
                     }
                     placeholder="Header Value (e.g., abc123)"
                     disabled={isReadOnly}
-                    className="flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                    className="flex-1 px-3 py-2 rounded-md bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm"
                   />
                   <button
                     onClick={() => removeHeader(index)}
@@ -561,13 +570,23 @@ export function ApiRequestCard({
                     setRequestBody(newBody);
                   }}
                   disabled={isReadOnly}
-                  className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 focus:outline-none focus:ring-0 ${
+                  className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 focus:outline-none focus:ring-0 focus-visible:outline-none ${
                     requestBody.type === type
                       ? "text-gray-900 dark:text-[#E6EDF3] border-gray-900 dark:border-[#E6EDF3]"
                       : "text-gray-500 dark:text-[#8B949E] border-transparent hover:text-gray-900 dark:hover:text-[#E6EDF3]"
                   } disabled:opacity-50`}
+                  style={{
+                    borderBottomWidth:
+                      requestBody.type === type ? "2px" : "0px",
+                    marginBottom: requestBody.type === type ? "-2px" : "0px",
+                  }}
                 >
-                  {type}
+                  {type === "none" && t("apiCard.bodyTypeNone")}
+                  {type === "form-data" && t("apiCard.bodyTypeFormData")}
+                  {type === "x-www-form-urlencoded" &&
+                    t("apiCard.bodyTypeXWwwFormUrlencoded")}
+                  {type === "json" && t("apiCard.bodyTypeJson")}
+                  {type === "xml" && t("apiCard.bodyTypeXml")}
                 </button>
               ))}
             </div>
@@ -580,7 +599,7 @@ export function ApiRequestCard({
                   requestBody.type === "xml") && (
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Root Type
+                      {t("apiCard.rootType")}
                     </label>
                     <select
                       value={requestBody.rootSchemaType?.kind || "object"}
@@ -628,14 +647,20 @@ export function ApiRequestCard({
                         }
                       }}
                       disabled={isReadOnly}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm"
                     >
-                      <option value="object">Object</option>
-                      <option value="array">Array</option>
-                      <option value="primitive">
-                        Primitive (string, number, etc.)
+                      <option value="object">
+                        {t("apiCard.rootTypeObject")}
                       </option>
-                      <option value="ref">Schema Reference</option>
+                      <option value="array">
+                        {t("apiCard.rootTypeArray")}
+                      </option>
+                      <option value="primitive">
+                        {t("apiCard.rootTypePrimitive")}
+                      </option>
+                      <option value="ref">
+                        {t("apiCard.rootTypeSchemaReference")}
+                      </option>
                     </select>
                   </div>
                 )}
@@ -700,7 +725,7 @@ export function ApiRequestCard({
                               : ""
                           }`}
                         >
-                          + Add Field
+                          {t("apiCard.addField")}
                         </button>
                         <button
                           onClick={() => setIsSchemaModalOpen(true)}
@@ -711,7 +736,7 @@ export function ApiRequestCard({
                         >
                           {requestBody.schemaRef
                             ? "Change Schema"
-                            : "+ Add Schema"}
+                            : t("apiCard.addSchema")}
                         </button>
                       </>
                     )}
@@ -804,7 +829,7 @@ export function ApiRequestCard({
                                       : ""
                                   }`}
                                 >
-                                  + Add Field
+                                  {t("apiCard.addField")}
                                 </button>
                                 <button
                                   onClick={() => setIsSchemaModalOpen(true)}
@@ -817,7 +842,7 @@ export function ApiRequestCard({
                                 >
                                   {hasSchemaRef
                                     ? "Change Schema"
-                                    : "+ Add Schema"}
+                                    : t("apiCard.addSchema")}
                                 </button>
                               </div>
                               <div className="space-y-2">
@@ -855,10 +880,7 @@ export function ApiRequestCard({
                               </div>
                               {properties.length === 0 && !hasSchemaRef && (
                                 <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
-                                  <p>
-                                    No fields yet. Click "+ Add Field" to add
-                                    one.
-                                  </p>
+                                  <p>{t("apiCard.noFieldsYet")}</p>
                                 </div>
                               )}
                             </div>
@@ -964,7 +986,7 @@ export function ApiRequestCard({
                               });
                             }}
                             disabled={isReadOnly}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-sm"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-0 focus-visible:outline-none text-sm"
                           >
                             <option value="string">string</option>
                             <option value="integer">integer</option>
@@ -1197,9 +1219,7 @@ export function ApiRequestCard({
                         requestBody.fields.length === 0) &&
                         !requestBody.schemaRef && (
                           <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
-                            <p>
-                              No fields yet. Click "+ Add Field" to add one.
-                            </p>
+                            <p>{t("apiCard.noFieldsYet")}</p>
                           </div>
                         )}
                     </>
@@ -1228,7 +1248,7 @@ export function ApiRequestCard({
                       : "text-[#2563EB] hover:text-[#1E40AF]"
                   }`}
                 >
-                  + Add Param
+                  {t("apiCard.addParam")}
                 </button>
               </div>
               <div className="space-y-2">
@@ -1257,7 +1277,7 @@ export function ApiRequestCard({
                         }}
                         placeholder="Key"
                         disabled={isReadOnly}
-                        className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500"
+                        className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none"
                       />
                       <select
                         value={param.type || "string"}
@@ -1267,7 +1287,7 @@ export function ApiRequestCard({
                           setQueryParams(updated);
                         }}
                         disabled={isReadOnly}
-                        className="px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500"
+                        className="px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-0 focus-visible:outline-none"
                       >
                         <option value="string">string</option>
                         <option value="number">number</option>
@@ -1284,7 +1304,7 @@ export function ApiRequestCard({
                         }}
                         placeholder="Value"
                         disabled={isReadOnly}
-                        className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500"
+                        className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#2D333B] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none"
                       />
                       <button
                         onClick={() =>
@@ -1320,7 +1340,7 @@ export function ApiRequestCard({
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Authentication Type
+                {t("apiCard.authenticationType")}
               </label>
               <select
                 value={auth.type}
@@ -1344,12 +1364,12 @@ export function ApiRequestCard({
                   }
                 }}
                 disabled={isReadOnly}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-[#30363D] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-[#30363D] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] focus:outline-none focus:ring-0 focus-visible:outline-none"
               >
-                <option value="none">No Auth</option>
-                <option value="bearer">Bearer Token</option>
-                <option value="apiKey">API Key</option>
-                <option value="basicAuth">Basic Auth</option>
+                <option value="none">{t("apiCard.noAuth")}</option>
+                <option value="bearer">{t("apiCard.bearerToken")}</option>
+                <option value="apiKey">{t("apiCard.apiKey")}</option>
+                <option value="basicAuth">{t("apiCard.basicAuth")}</option>
               </select>
             </div>
 
@@ -1370,7 +1390,7 @@ export function ApiRequestCard({
                     }
                     placeholder="Bearer token"
                     disabled={isReadOnly}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-[#30363D] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-[#30363D] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none"
                   />
                 </div>
                 <div className="p-3 bg-gray-50 dark:bg-[#0D1117] border border-gray-200 dark:border-[#2D333B] rounded-md">
@@ -1407,7 +1427,7 @@ export function ApiRequestCard({
                     }
                     placeholder="X-API-Key"
                     disabled={isReadOnly}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-[#30363D] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-[#30363D] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none"
                   />
                 </div>
                 <div>
@@ -1430,7 +1450,7 @@ export function ApiRequestCard({
                     }
                     placeholder="API Key value"
                     disabled={isReadOnly}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-[#30363D] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-[#30363D] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none"
                   />
                 </div>
                 <div className="p-3 bg-gray-50 dark:bg-[#0D1117] border border-gray-200 dark:border-[#2D333B] rounded-md">
@@ -1465,7 +1485,7 @@ export function ApiRequestCard({
                     }
                     placeholder="Username"
                     disabled={isReadOnly}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-[#30363D] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-[#30363D] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none"
                   />
                 </div>
                 <div>
@@ -1486,7 +1506,7 @@ export function ApiRequestCard({
                     }
                     placeholder="Password"
                     disabled={isReadOnly}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-[#30363D] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-[#30363D] rounded-md bg-white dark:bg-[#0D1117] text-gray-900 dark:text-[#E6EDF3] placeholder:text-gray-400 dark:placeholder:text-[#8B949E] focus:outline-none focus:ring-0 focus-visible:outline-none"
                   />
                 </div>
                 <div className="p-3 bg-gray-50 dark:bg-[#0D1117] border border-gray-200 dark:border-[#2D333B] rounded-md">

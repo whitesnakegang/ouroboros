@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { deleteSchema, deleteWebSocketSchema } from "../services/api";
 import type { SchemaResponse } from "../services/api";
 import type { SchemaField } from "../types/schema.types";
@@ -33,6 +34,7 @@ export function SchemaModal({
   setSchemas,
   protocol = "REST",
 }: SchemaModalProps) {
+  const { t } = useTranslation();
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -68,8 +70,8 @@ export function SchemaModal({
   const handleDeleteSchema = (schemaName: string) => {
     setConfirmModal({
       isOpen: true,
-      title: "Delete Schema",
-      message: `Are you sure you want to delete the schema "${schemaName}"?`,
+      title: t("schema.deleteSchema"),
+      message: t("schema.confirmDeleteSchema", { name: schemaName }),
       variant: "danger",
       onConfirm: async () => {
         setConfirmModal((prev) => ({ ...prev, isOpen: false }));
@@ -82,17 +84,19 @@ export function SchemaModal({
           setSchemas(schemas.filter((s) => s.schemaName !== schemaName));
           setAlertModal({
             isOpen: true,
-            title: "Deleted",
-            message: `Schema "${schemaName}" has been deleted successfully.`,
+            title: t("common.delete"),
+            message: t("schema.schemaDeletedSuccessfully", {
+              name: schemaName,
+            }),
             variant: "success",
           });
         } catch (err) {
           console.error("스키마 삭제 실패:", err);
           setAlertModal({
             isOpen: true,
-            title: "Delete Failed",
-            message: `Failed to delete schema: ${
-              err instanceof Error ? err.message : "Unknown error"
+            title: t("modal.saveFailed"),
+            message: `${t("schema.deleteSchema")}: ${
+              err instanceof Error ? err.message : t("common.error")
             }`,
             variant: "error",
           });
@@ -130,7 +134,7 @@ export function SchemaModal({
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-            Schema List
+            {t("apiCard.schemaList")}
           </h2>
           <div className="flex gap-2">
             <button
@@ -160,9 +164,9 @@ export function SchemaModal({
           <div className="p-6">
             {schemas.length === 0 ? (
               <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                <p>저장된 Schema가 없습니다.</p>
+                <p>{t("schema.noSchemasSaved")}</p>
                 <p className="text-sm mt-2">
-                  Response 탭에서 새 Schema를 생성하세요.
+                  {t("schema.createSchemaInResponseTab")}
                 </p>
               </div>
             ) : (
@@ -184,8 +188,8 @@ export function SchemaModal({
                           <p className="text-sm text-gray-500 dark:text-gray-400">
                             {schema.properties
                               ? Object.keys(schema.properties).length
-                              : 0}
-                            fields
+                              : 0}{" "}
+                            {t("apiCard.fields")}
                           </p>
                           {schema.schemaName.includes(".") && (
                             <span
@@ -212,13 +216,13 @@ export function SchemaModal({
                           onClick={() => handleSelectSchema(schema)}
                           className="px-3 py-1 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
                         >
-                          Select
+                          {t("apiCard.select")}
                         </button>
                         <button
                           onClick={() => handleDeleteSchema(schema.schemaName)}
                           className="px-3 py-1 text-sm text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 font-medium"
                         >
-                          Delete
+                          {t("apiCard.delete")}
                         </button>
                       </div>
                     </div>

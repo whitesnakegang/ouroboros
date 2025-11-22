@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 interface ConfirmModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -16,11 +18,12 @@ export function ConfirmModal({
   onConfirm,
   title,
   message,
-  confirmText = "Confirm",
-  cancelText = "Cancel",
+  confirmText,
+  cancelText,
   variant = "info",
   isLoading = false,
 }: ConfirmModalProps) {
+  const { t } = useTranslation();
   if (!isOpen) return null;
 
   const handleConfirm = () => {
@@ -35,19 +38,19 @@ export function ConfirmModal({
         return {
           accentColor: "text-red-600 dark:text-red-400",
           confirmButton:
-            "bg-red-600 hover:bg-red-700 focus:ring-red-500 dark:bg-red-600 dark:hover:bg-red-700",
+            "bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700",
         };
       case "warning":
         return {
           accentColor: "text-amber-600 dark:text-amber-400",
           confirmButton:
-            "bg-amber-600 hover:bg-amber-700 focus:ring-amber-500 dark:bg-amber-600 dark:hover:bg-amber-700",
+            "bg-amber-600 hover:bg-amber-700 dark:bg-amber-600 dark:hover:bg-amber-700",
         };
       default:
         return {
           accentColor: "text-blue-600 dark:text-blue-400",
           confirmButton:
-            "bg-[#2563EB] hover:bg-[#1D4ED8] focus:ring-blue-500 dark:bg-[#2563EB] dark:hover:bg-[#1D4ED8]",
+            "bg-[#2563EB] hover:bg-[#1D4ED8] dark:bg-[#2563EB] dark:hover:bg-[#1D4ED8]",
         };
     }
   };
@@ -77,7 +80,7 @@ export function ConfirmModal({
                 <button
                   onClick={onClose}
                   className="flex-shrink-0 p-1.5 -mt-1 -mr-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#21262D] rounded-md transition-colors"
-                  aria-label="Close"
+                  aria-label={t("common.close")}
                 >
                   <svg
                     className="w-5 h-5"
@@ -109,14 +112,14 @@ export function ConfirmModal({
             <button
               onClick={onClose}
               disabled={isLoading}
-              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-[#C9D1D9] bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#30363D] rounded-lg hover:bg-gray-50 dark:hover:bg-[#161B22] transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600 focus:ring-offset-2 dark:focus:ring-offset-[#0D1117] disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-[#C9D1D9] bg-white dark:bg-[#0D1117] border border-gray-300 dark:border-[#30363D] rounded-lg hover:bg-gray-50 dark:hover:bg-[#161B22] transition-colors focus:outline-none focus:ring-0 focus-visible:outline-none disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
             >
-              {cancelText}
+              {cancelText || t("common.cancel")}
             </button>
             <button
               onClick={handleConfirm}
               disabled={isLoading}
-              className={`px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-[#0D1117] disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] ${variantStyles.confirmButton}`}
+              className={`px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors focus:outline-none focus:ring-0 focus-visible:outline-none disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] ${variantStyles.confirmButton}`}
             >
               {isLoading ? (
                 <span className="flex items-center gap-2">
@@ -140,10 +143,10 @@ export function ConfirmModal({
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     ></path>
                   </svg>
-                  Processing...
+                  {t("common.processing")}
                 </span>
               ) : (
-                confirmText
+                confirmText || t("common.confirm")
               )}
             </button>
           </div>

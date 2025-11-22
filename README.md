@@ -176,11 +176,6 @@
 dependencies {
     implementation 'io.github.whitesnakegang:ouroboros:1.0.4'
     implementation 'org.springframework.boot:spring-boot-starter-web'
-    
-    // Optional: For WebSocket code scanning and spec comparison
-    // Only add if you need automatic code scanning for WebSocket APIs
-    implementation 'io.github.springwolf:springwolf-stomp:1.17.0'
-    runtimeOnly 'io.github.springwolf:springwolf-ui:1.17.0'
 }
 ```
 
@@ -190,20 +185,6 @@ dependencies {
     <groupId>io.github.whitesnakegang</groupId>
     <artifactId>ouroboros</artifactId>
     <version>1.0.4</version>
-</dependency>
-
-<!-- Optional: For WebSocket code scanning and spec comparison -->
-<!-- Only add if you need automatic code scanning for WebSocket APIs -->
-<dependency>
-    <groupId>io.github.springwolf</groupId>
-    <artifactId>springwolf-stomp</artifactId>
-    <version>1.17.0</version>
-</dependency>
-<dependency>
-    <groupId>io.github.springwolf</groupId>
-    <artifactId>springwolf-ui</artifactId>
-    <version>1.17.0</version>
-    <scope>runtime</scope>
 </dependency>
 ```
 

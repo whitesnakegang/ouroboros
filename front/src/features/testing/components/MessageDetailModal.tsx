@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import type { WebSocketMessage } from "../store/testing.store";
 import type { TryMethod, TryTraceData } from "@/features/spec/services/api";
 import { getTryMethodList, getTryTrace } from "@/features/spec/services/api";
@@ -32,7 +33,8 @@ function convertToTryMethodLite(methods: TryMethod[]): Array<{
 }
 
 export function MessageDetailModal({ isOpen, onClose, message }: MessageDetailModalProps) {
-  const [activeTab, setActiveTab] = useState<"message" | "test">("message");
+  const { t } = useTranslation();
+  const [activeTab, setActiveTab] = useState<"message" | "test">(message.tryId ? "test" : "message");
   const [methodList, setMethodList] = useState<TryMethod[] | null>(null);
   const [totalDurationMs, setTotalDurationMs] = useState<number | null>(null);
   const [isLoadingMethods, setIsLoadingMethods] = useState(false);
@@ -41,18 +43,23 @@ export function MessageDetailModal({ isOpen, onClose, message }: MessageDetailMo
   const [isLoadingTrace, setIsLoadingTrace] = useState(false);
   const [initialExpandedSpanId, setInitialExpandedSpanId] = useState<string | null>(null);
 
-  // Test 탭이 활성화되고 tryId가 있을 때 메서드 리스트 로드
+  // tryId가 있을 때 메서드 리스트 로드
   useEffect(() => {
     const loadTryMethods = async () => {
-      if (!message.tryId || activeTab !== "test") return;
+      if (!message.tryId) {
+        return;
+      }
 
       setIsLoadingMethods(true);
       try {
         const response = await getTryMethodList(message.tryId);
-        setMethodList(response.data.methods);
-        setTotalDurationMs(response.data.totalDurationMs);
-            } catch (error) {
-              setMethodList(null);
+        
+        // methods가 빈 배열이어도 정상 응답이므로 null이 아닌 빈 배열로 설정
+        setMethodList(response.data.methods || []);
+        setTotalDurationMs(response.data.totalDurationMs || 0);
+      } catch (error) {
+        console.error("[MessageDetailModal] 메서드 실행 정보 로드 실패:", error);
+        setMethodList(null);
         setTotalDurationMs(null);
       } finally {
         setIsLoadingMethods(false);
@@ -60,12 +67,13 @@ export function MessageDetailModal({ isOpen, onClose, message }: MessageDetailMo
     };
 
     loadTryMethods();
-  }, [activeTab, message.tryId]);
+  }, [message.tryId]);
 
   // 모달이 열릴 때 탭 초기화
   useEffect(() => {
     if (isOpen) {
-      setActiveTab(message.tryId ? "message" : "message");
+      // tryId가 있으면 test 탭으로 시작, 없으면 message 탭으로 시작
+      setActiveTab(message.tryId ? "test" : "message");
     }
   }, [isOpen, message.tryId]);
 
@@ -114,7 +122,7 @@ export function MessageDetailModal({ isOpen, onClose, message }: MessageDetailMo
           <div className="flex items-center gap-3">
             <div className={`w-3 h-3 rounded-full ${isSent ? "bg-blue-500" : "bg-green-500"}`} />
             <h2 className="text-lg font-semibold text-gray-900 dark:text-[#E6EDF3]">
-              메시지 상세
+              {t("messageDetail.messageDetail")}
             </h2>
           </div>
           <button
@@ -127,41 +135,55 @@ export function MessageDetailModal({ isOpen, onClose, message }: MessageDetailMo
           </button>
         </div>
 
-        {/* Tabs */}
-        <div className="flex border-b border-gray-200 dark:border-[#2D333B]">
-          <button
-            onClick={() => setActiveTab("message")}
-            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-              activeTab === "message"
-                ? "text-[#2563EB] border-b-2 border-[#2563EB] bg-blue-50 dark:bg-blue-900/20"
-                : "text-gray-600 dark:text-[#8B949E] hover:text-gray-900 dark:hover:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#0D1117]"
-            }`}
-          >
-            Message
-          </button>
-          {message.tryId && (
+        {/* Tabs - tryId가 있으면 탭 표시 안 함 */}
+        {!message.tryId && (
+          <div className="flex border-b border-gray-200 dark:border-[#2D333B]">
             <button
-              onClick={() => setActiveTab("test")}
+              onClick={() => setActiveTab("message")}
               className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-                activeTab === "test"
+                activeTab === "message"
                   ? "text-[#2563EB] border-b-2 border-[#2563EB] bg-blue-50 dark:bg-blue-900/20"
                   : "text-gray-600 dark:text-[#8B949E] hover:text-gray-900 dark:hover:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#0D1117]"
               }`}
             >
-              Test
+              {t("messageDetail.message")}
             </button>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
-          {activeTab === "message" ? (
+          {message.tryId ? (
+            // tryId가 있으면 Test 콘텐츠만 표시
+            <TestContent
+              methodList={methodList ? convertToTryMethodLite(methodList) : null}
+              totalDurationMs={totalDurationMs}
+              isMockEndpoint={false}
+              isLoading={isLoadingMethods}
+              tryId={message.tryId || null}
+              onShowTrace={async (spanId?: string) => {
+                if (!message.tryId) return;
+                setIsLoadingTrace(true);
+                setIsTraceModalOpen(true);
+                setInitialExpandedSpanId(spanId || null);
+                try {
+                  const response = await getTryTrace(message.tryId);
+                  setTraceData(response.data);
+                } catch (error) {
+                  setTraceData(null);
+                } finally {
+                  setIsLoadingTrace(false);
+                }
+              }}
+              isLoadingTrace={isLoadingTrace}
+            />
+          ) : activeTab === "message" ? (
             <div className="space-y-4">
               {/* Message Info */}
               <div className="space-y-3">
                 <div>
                   <label className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] uppercase tracking-wide">
-                    Direction
+                    {t("messageDetail.direction")}
                   </label>
                   <div className="mt-1">
                     <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
@@ -169,14 +191,14 @@ export function MessageDetailModal({ isOpen, onClose, message }: MessageDetailMo
                         ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400"
                         : "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
                     }`}>
-                      {isSent ? "Sent" : "Received"}
+                      {isSent ? t("messageDetail.sent") : t("messageDetail.received")}
                     </span>
                   </div>
                 </div>
 
                 <div>
                   <label className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] uppercase tracking-wide">
-                    Address
+                    {t("messageDetail.address")}
                   </label>
                   <div className="mt-1 px-3 py-2 bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] rounded-md">
                     <code className="text-sm font-mono text-gray-900 dark:text-[#E6EDF3]">
@@ -187,7 +209,7 @@ export function MessageDetailModal({ isOpen, onClose, message }: MessageDetailMo
 
                 <div>
                   <label className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] uppercase tracking-wide">
-                    Timestamp
+                    {t("messageDetail.timestamp")}
                   </label>
                   <div className="mt-1 px-3 py-2 bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] rounded-md">
                     <span className="text-sm text-gray-900 dark:text-[#E6EDF3]">
@@ -199,7 +221,7 @@ export function MessageDetailModal({ isOpen, onClose, message }: MessageDetailMo
                 {message.tryId && (
                   <div>
                     <label className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] uppercase tracking-wide">
-                      Try ID
+                      {t("messageDetail.tryId")}
                     </label>
                     <div className="mt-1 px-3 py-2 bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] rounded-md">
                       <code className="text-sm font-mono text-gray-900 dark:text-[#E6EDF3]">
@@ -211,7 +233,7 @@ export function MessageDetailModal({ isOpen, onClose, message }: MessageDetailMo
 
                 <div>
                   <label className="text-xs font-semibold text-gray-600 dark:text-[#8B949E] uppercase tracking-wide">
-                    Content
+                    {t("messageDetail.content")}
                   </label>
                   <div className="mt-1">
                     {isJson ? (
@@ -229,30 +251,7 @@ export function MessageDetailModal({ isOpen, onClose, message }: MessageDetailMo
                 </div>
               </div>
             </div>
-          ) : (
-            <TestContent
-              methodList={methodList ? convertToTryMethodLite(methodList) : null}
-              totalDurationMs={totalDurationMs}
-              isMockEndpoint={false}
-              isLoading={isLoadingMethods}
-              tryId={message.tryId || null}
-              onShowTrace={async (spanId?: string) => {
-                if (!message.tryId) return;
-                setIsLoadingTrace(true);
-                setIsTraceModalOpen(true);
-                setInitialExpandedSpanId(spanId || null);
-                try {
-                  const response = await getTryTrace(message.tryId);
-                  setTraceData(response.data);
-                      } catch (error) {
-                        setTraceData(null);
-                } finally {
-                  setIsLoadingTrace(false);
-                }
-              }}
-              isLoadingTrace={isLoadingTrace}
-            />
-          )}
+          ) : null}
         </div>
       </div>
 

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useTestingStore } from "../store/testing.store";
 import { useSidebarStore } from "@/features/sidebar/store/sidebar.store";
 import type {
@@ -11,6 +12,7 @@ import { getTryMethodList, getTryTrace } from "@/features/spec/services/api";
 import { TraceModal } from "./TraceModal";
 
 export function TestResponseTabs() {
+  const { t } = useTranslation();
   const {
     response,
     methodList,
@@ -73,7 +75,7 @@ export function TestResponseTabs() {
               d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
             />
           </svg>
-          <span>Response</span>
+          <span>{t("testing.response")}</span>
         </div>
         <div className="text-center py-12 text-gray-600 dark:text-[#8B949E]">
           <div className="w-16 h-16 mx-auto mb-4 rounded-md bg-gray-50 dark:bg-[#0D1117] border border-gray-300 dark:border-[#2D333B] flex items-center justify-center">
@@ -97,7 +99,7 @@ export function TestResponseTabs() {
               />
             </svg>
           </div>
-          <p className="text-sm">Click the RUN button to execute the test</p>
+          <p className="text-sm">{t("testing.clickRunButton")}</p>
         </div>
       </div>
     );

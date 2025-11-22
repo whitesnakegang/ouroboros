@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { downloadMarkdown } from "../utils/markdownExporter";
 import { AlertModal } from "@/ui/AlertModal";
 import DOMPurify from "dompurify";
@@ -287,6 +288,7 @@ export function MarkdownPreviewModal({
   content,
   filename = "API_DOCUMENTATION.md",
 }: MarkdownPreviewModalProps) {
+  const { t } = useTranslation();
   const [viewMode, setViewMode] = useState<ViewMode>("source");
   const [alertModal, setAlertModal] = useState<{
     isOpen: boolean;
@@ -306,15 +308,15 @@ export function MarkdownPreviewModal({
       await navigator.clipboard.writeText(content);
       setAlertModal({
         isOpen: true,
-        title: "Copy Completed",
-        message: "Markdown has been copied to the clipboard.",
+        title: t("markdownPreview.copyCompleted"),
+        message: t("markdownPreview.markdownCopiedToClipboard"),
         variant: "success",
       });
     } catch {
       setAlertModal({
         isOpen: true,
-        title: "Copy Failed",
-        message: "Failed to copy to clipboard.",
+        title: t("markdownPreview.copyFailed"),
+        message: t("markdownPreview.failedToCopyToClipboard"),
         variant: "error",
       });
     }
@@ -368,7 +370,7 @@ export function MarkdownPreviewModal({
         <div className="bg-white dark:bg-[#161B22] rounded-md shadow-2xl max-w-5xl w-full mx-4 max-h-[85vh] overflow-hidden flex flex-col pointer-events-auto border border-gray-200 dark:border-[#2D333B]">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-[#2D333B] flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-[#E6EDF3]">
-              Markdown Preview
+              {t("markdownPreview.markdownPreview")}
             </h2>
             <div className="flex items-center gap-2">
               {/* View Mode Toggle - 눈 아이콘만 */}
@@ -381,7 +383,7 @@ export function MarkdownPreviewModal({
                     ? "bg-[#2563EB] text-white"
                     : "bg-white dark:bg-[#0D1117] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#161B22] border border-gray-300 dark:border-[#2D333B]"
                 }`}
-                title={viewMode === "preview" ? "Show Source" : "Show Preview"}
+                title={viewMode === "preview" ? t("markdownPreview.showSource") : t("markdownPreview.showPreview")}
               >
                 <EyeIcon className="w-5 h-5" />
               </button>
@@ -389,13 +391,13 @@ export function MarkdownPreviewModal({
                 onClick={handleCopy}
                 className="px-3 py-2 text-sm rounded-md border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#0D1117] transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none"
               >
-                Copy
+                {t("markdownPreview.copy")}
               </button>
               <button
                 onClick={onClose}
                 className="px-3 py-2 text-sm rounded-md border border-gray-300 dark:border-[#2D333B] text-gray-700 dark:text-[#E6EDF3] hover:bg-gray-50 dark:hover:bg-[#0D1117] transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none"
               >
-                Close
+                {t("common.close")}
               </button>
             </div>
           </div>
@@ -416,7 +418,7 @@ export function MarkdownPreviewModal({
               onClick={handleDownload}
               className="px-4 py-2 bg-[#2563EB] hover:bg-[#1E40AF] text-white rounded-md text-sm font-medium transition-all active:translate-y-[1px] focus:outline-none focus-visible:outline-none"
             >
-              Download
+              {t("markdownPreview.download")}
             </button>
           </div>
         </div>
