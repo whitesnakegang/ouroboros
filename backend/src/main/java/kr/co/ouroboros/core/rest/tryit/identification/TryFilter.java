@@ -5,6 +5,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import kr.co.ouroboros.core.global.tryit.TryHeaders;
 import kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.context.TryContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.Ordered;
@@ -43,9 +44,6 @@ import java.util.UUID;
 @Order(Ordered.HIGHEST_PRECEDENCE) // Highest priority to process all requests
 public class TryFilter extends OncePerRequestFilter {
 
-    private static final String HEADER_NAME = "X-Ouroboros-Try";
-    private static final String TRY_VALUE = "on";
-    private static final String RESPONSE_TRY_ID_HEADER = "X-Ouroboros-Try-Id";
     private static final String REQUEST_TRY_ID_ATTR = "kr.co.ouroboros.tryId";
 
     /**
@@ -59,11 +57,11 @@ public class TryFilter extends OncePerRequestFilter {
      * when processing completes.
      */
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, 
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                    FilterChain filterChain) throws ServletException, IOException {
-        
-        String tryHeader = request.getHeader(HEADER_NAME);
-        boolean isTryRequest = TRY_VALUE.equalsIgnoreCase(tryHeader);
+
+        String tryHeader = request.getHeader(TryHeaders.TRY_HEADER);
+        boolean isTryRequest = TryHeaders.TRY_HEADER_ENABLED_VALUE.equalsIgnoreCase(tryHeader);
         Scope tryScope = null;
 
         if (isTryRequest && request.getDispatcherType() == jakarta.servlet.DispatcherType.REQUEST) {
@@ -71,7 +69,7 @@ public class TryFilter extends OncePerRequestFilter {
             log.debug("Try request detected, generating tryId: {}", tryId);
             tryScope = TryContext.setTryId(tryId);
             // Set header early to cover cases where response may be committed within the chain (e.g., 404 basic error)
-            response.setHeader(RESPONSE_TRY_ID_HEADER, tryId.toString());
+            response.setHeader(TryHeaders.TRY_ID_HEADER, tryId.toString());
             request.setAttribute(REQUEST_TRY_ID_ATTR, tryId.toString());
         }
 
@@ -89,7 +87,7 @@ public class TryFilter extends OncePerRequestFilter {
                 if (v != null) tryIdStr = String.valueOf(v);
             }
             if (tryIdStr != null && !tryIdStr.isEmpty() && !response.isCommitted()) {
-                response.setHeader(RESPONSE_TRY_ID_HEADER, tryIdStr);
+                response.setHeader(TryHeaders.TRY_ID_HEADER, tryIdStr);
             }
             if(tryScope != null){
                 tryScope.close();
