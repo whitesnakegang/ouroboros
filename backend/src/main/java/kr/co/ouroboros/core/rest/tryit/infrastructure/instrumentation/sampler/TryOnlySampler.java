@@ -6,6 +6,7 @@ import io.opentelemetry.context.Context;
 import io.opentelemetry.sdk.trace.data.LinkData;
 import io.opentelemetry.sdk.trace.samplers.Sampler;
 import io.opentelemetry.sdk.trace.samplers.SamplingResult;
+import kr.co.ouroboros.core.global.tryit.TryHeaders;
 import kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.context.TryContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -49,9 +50,6 @@ import java.util.List;
 @Slf4j
 public class TryOnlySampler implements Sampler {
 
-    private static final String HEADER_NAME = "X-Ouroboros-Try";
-    private static final String TRY_VALUE = "on";
-
     /**
      * Determines if a span should be sampled by checking the X-Ouroboros-Try HTTP header and, when no HTTP context is available, falling back to TryContext.
      *
@@ -81,9 +79,9 @@ public class TryOnlySampler implements Sampler {
 
             if (attrs != null) {
                 HttpServletRequest request = attrs.getRequest();
-                String tryHeader = request.getHeader(HEADER_NAME);
+                String tryHeader = request.getHeader(TryHeaders.TRY_HEADER);
                 log.debug("X-Ouroboros-Try header value: {}", tryHeader);
-                isTryRequest = TRY_VALUE.equalsIgnoreCase(tryHeader);
+                isTryRequest = TryHeaders.TRY_HEADER_ENABLED_VALUE.equalsIgnoreCase(tryHeader);
 
                 if (isTryRequest) {
                     log.debug("Try request detected via header - sampling span: {}", name);
