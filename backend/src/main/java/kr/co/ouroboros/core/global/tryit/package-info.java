@@ -12,8 +12,8 @@
  * <p>
  * <b>Related Packages:</b>
  * <ul>
- *   <li>{@link kr.co.ouroboros.core.rest.tryit} - REST implementation</li>
- *   <li>{@link kr.co.ouroboros.core.websocket.tryit} - WebSocket implementation</li>
+ *   <li>{@code kr.co.ouroboros.core.rest.tryit} - REST implementation</li>
+ *   <li>{@code kr.co.ouroboros.core.websocket.tryit} - WebSocket implementation</li>
  * </ul>
  *
  * @since 0.0.1
