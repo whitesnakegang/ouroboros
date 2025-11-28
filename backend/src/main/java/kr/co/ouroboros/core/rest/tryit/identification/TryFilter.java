@@ -6,7 +6,8 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import kr.co.ouroboros.core.global.tryit.TryHeaders;
-import kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.context.TryContext;
+import kr.co.ouroboros.core.global.tryit.context.TryContext;
+import kr.co.ouroboros.core.global.tryit.identification.TryIdResolver;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -61,13 +62,13 @@ public class TryFilter extends OncePerRequestFilter {
                                    FilterChain filterChain) throws ServletException, IOException {
 
         String tryHeader = request.getHeader(TryHeaders.TRY_HEADER);
-        boolean isTryRequest = TryHeaders.TRY_HEADER_ENABLED_VALUE.equalsIgnoreCase(tryHeader);
+        boolean isTryRequest = TryIdResolver.isTryRequest(tryHeader);
         Scope tryScope = null;
 
         if (isTryRequest && request.getDispatcherType() == jakarta.servlet.DispatcherType.REQUEST) {
-            UUID tryId = UUID.randomUUID();
+            UUID tryId = TryIdResolver.generateTryId();
             log.debug("Try request detected, generating tryId: {}", tryId);
-            tryScope = TryContext.setTryId(tryId);
+            tryScope = TryIdResolver.activateTryScope(tryId);
             // Set header early to cover cases where response may be committed within the chain (e.g., 404 basic error)
             response.setHeader(TryHeaders.TRY_ID_HEADER, tryId.toString());
             request.setAttribute(REQUEST_TRY_ID_ATTR, tryId.toString());

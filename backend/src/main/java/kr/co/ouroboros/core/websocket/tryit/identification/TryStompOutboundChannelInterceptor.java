@@ -1,6 +1,6 @@
 package kr.co.ouroboros.core.websocket.tryit.identification;
 
-import kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.context.TryContext;
+import kr.co.ouroboros.core.global.tryit.context.TryContext;
 import kr.co.ouroboros.core.websocket.tryit.common.TryStompHeaders;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.Nullable;
