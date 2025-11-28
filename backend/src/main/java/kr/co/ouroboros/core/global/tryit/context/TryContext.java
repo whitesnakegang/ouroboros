@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.context;
+package kr.co.ouroboros.core.global.tryit.context;
 
 import io.opentelemetry.api.baggage.Baggage;
 import io.opentelemetry.api.baggage.BaggageBuilder;
@@ -33,9 +33,9 @@ import java.util.UUID;
  */
 @Slf4j
 public class TryContext {
-    
+
     private static final String BAGGAGE_KEY = "ouro.try_id";
-    
+
     /**
      * Store the given try session UUID in OpenTelemetry Baggage so it is propagated across threads and async boundaries.
      * <p>
@@ -65,7 +65,7 @@ public class TryContext {
             return null;
         }
     }
-    
+
     /**
      * Retrieve the current try session ID from OpenTelemetry Baggage.
      *
@@ -90,7 +90,7 @@ public class TryContext {
         }
         return null;
     }
-    
+
     /**
      * Checks if there is a tryId in the current context.
      * <p>
@@ -101,7 +101,7 @@ public class TryContext {
     public static boolean hasTryId() {
         return getTryId() != null;
     }
-    
+
     /**
      * Remove the current tryId from the OpenTelemetry Baggage context.
      *
