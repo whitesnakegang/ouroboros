@@ -4,7 +4,7 @@ import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.sdk.trace.ReadWriteSpan;
 import io.opentelemetry.sdk.trace.SpanProcessor;
-import kr.co.ouroboros.core.global.tryit.context.TryContext;
+import kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.context.TryContext;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.UUID;

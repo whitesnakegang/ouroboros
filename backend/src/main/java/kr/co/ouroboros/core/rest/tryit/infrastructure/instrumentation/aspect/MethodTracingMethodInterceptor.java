@@ -3,7 +3,7 @@ package kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.aspect;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
 import kr.co.ouroboros.core.rest.tryit.config.properties.MethodTracingProperties;
-import kr.co.ouroboros.core.global.tryit.context.TryContext;
+import kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.context.TryContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aopalliance.intercept.MethodInterceptor;
