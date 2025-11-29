@@ -1,6 +1,7 @@
 package kr.co.ouroboros.core.websocket.tryit.identification;
 
-import kr.co.ouroboros.core.global.tryit.context.TryContext;
+import kr.co.ouroboros.core.global.tryit.common.TryHeaders;
+import kr.co.ouroboros.core.global.tryit.infrastructure.instrumentation.context.TryContext;
 import kr.co.ouroboros.core.websocket.tryit.common.TryStompHeaders;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.Nullable;
@@ -81,8 +82,8 @@ public class TryStompOutboundChannelInterceptor implements ChannelInterceptor {
             });
             
             // Add tryId header
-            newAccessor.setNativeHeader(TryStompHeaders.TRY_ID_HEADER, tryId.toString());
-            newAccessor.setHeader(TryStompHeaders.TRY_ID_HEADER, tryId.toString());
+            newAccessor.setNativeHeader(TryHeaders.TRY_ID_HEADER, tryId.toString());
+            newAccessor.setHeader(TryHeaders.TRY_ID_HEADER, tryId.toString());
             
             log.trace("Set tryId({}) header on outbound STOMP message (no command, new accessor created). subscriptionId={}, destination={}", 
                     tryId, newAccessor.getSubscriptionId(), newAccessor.getDestination());
@@ -93,8 +94,8 @@ public class TryStompOutboundChannelInterceptor implements ChannelInterceptor {
         }
         
         // If command exists, only add tryId header to original accessor
-        accessor.setNativeHeader(TryStompHeaders.TRY_ID_HEADER, tryId.toString());
-        accessor.setHeader(TryStompHeaders.TRY_ID_HEADER, tryId.toString());
+        accessor.setNativeHeader(TryHeaders.TRY_ID_HEADER, tryId.toString());
+        accessor.setHeader(TryHeaders.TRY_ID_HEADER, tryId.toString());
         
         log.trace("Set tryId({}) header on outbound STOMP message. command={}, destination={}, subscriptionId={}", 
                 tryId, accessor.getCommand(), accessor.getDestination(), accessor.getSubscriptionId());

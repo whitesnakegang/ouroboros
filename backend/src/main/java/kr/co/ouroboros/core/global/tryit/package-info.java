@@ -3,17 +3,22 @@
  * <p>
  * This package contains cross-cutting Try functionality that is used
  * by both REST and WebSocket implementations. It provides protocol-agnostic
- * constants and utilities for Try request identification and tracking.
+ * infrastructure, trace processing, configuration, and service components.
  * <p>
- * <b>Components:</b>
+ * <b>Subpackages:</b>
  * <ul>
- *   <li>{@link kr.co.ouroboros.core.global.tryit.TryHeaders} - Protocol-agnostic Try header constants</li>
+ *   <li><b>common</b> - Common constants and utilities (e.g., {@link kr.co.ouroboros.core.global.tryit.common.TryHeaders})</li>
+ *   <li><b>config</b> - Auto-configuration and properties for Try feature</li>
+ *   <li><b>exception</b> - Try-specific exception types</li>
+ *   <li><b>infrastructure</b> - Instrumentation, storage, and client implementations</li>
+ *   <li><b>trace</b> - Trace processing, analysis, conversion, and tree building components</li>
+ *   <li><b>service</b> - Business logic for retrieving and analyzing Try results</li>
  * </ul>
  * <p>
- * <b>Related Packages:</b>
+ * <b>Protocol-Specific Packages:</b>
  * <ul>
- *   <li>{@code kr.co.ouroboros.core.rest.tryit} - REST implementation</li>
- *   <li>{@code kr.co.ouroboros.core.websocket.tryit} - WebSocket implementation</li>
+ *   <li><b>kr.co.ouroboros.core.rest.tryit</b> - REST-specific Try components</li>
+ *   <li><b>kr.co.ouroboros.core.websocket.tryit</b> - WebSocket-specific Try components</li>
  * </ul>
  *
  * @since 0.0.1

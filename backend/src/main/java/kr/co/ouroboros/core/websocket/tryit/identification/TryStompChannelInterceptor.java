@@ -1,9 +1,9 @@
 package kr.co.ouroboros.core.websocket.tryit.identification;
 
 import io.opentelemetry.context.Scope;
-import kr.co.ouroboros.core.global.tryit.context.TryContext;
 import kr.co.ouroboros.core.global.tryit.identification.TryIdResolver;
 import kr.co.ouroboros.core.websocket.tryit.common.TryStompHeaders;
+import kr.co.ouroboros.core.global.tryit.common.TryHeaders;
 import kr.co.ouroboros.core.websocket.tryit.infrastructure.messaging.TryPublisherNotifier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,7 +43,7 @@ public class TryStompChannelInterceptor implements ChannelInterceptor {
         }
 
         // Only inbound channel (client -> server) messages are processed. Additional filtering by command is possible.
-        String tryHeader = getFirstNativeHeader(accessor, TryStompHeaders.TRY_HEADER);
+        String tryHeader = getFirstNativeHeader(accessor, TryHeaders.TRY_HEADER);
         boolean tryRequested = TryIdResolver.isTryRequest(tryHeader);
 
         UUID tryId = resolveTryId(accessor, tryRequested);
@@ -94,7 +94,7 @@ public class TryStompChannelInterceptor implements ChannelInterceptor {
     @Nullable
     private UUID resolveTryId(StompHeaderAccessor accessor, boolean tryRequested) {
         // 1) If tryId is included in frame header, use it as is
-        String headerTryId = getFirstNativeHeader(accessor, TryStompHeaders.TRY_ID_HEADER);
+        String headerTryId = getFirstNativeHeader(accessor, TryHeaders.TRY_ID_HEADER);
         if (headerTryId != null) {
             try {
                 return UUID.fromString(headerTryId);

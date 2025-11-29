@@ -1,8 +1,8 @@
 package kr.co.ouroboros.core.global.tryit.identification;
 
 import io.opentelemetry.context.Scope;
-import kr.co.ouroboros.core.global.tryit.TryHeaders;
-import kr.co.ouroboros.core.global.tryit.context.TryContext;
+import kr.co.ouroboros.core.global.tryit.common.TryHeaders;
+import kr.co.ouroboros.core.global.tryit.infrastructure.instrumentation.context.TryContext;
 
 import java.util.UUID;
 
