@@ -6,8 +6,8 @@
  * <p>
  * <b>Components:</b>
  * <ul>
- *   <li>{@link kr.co.ouroboros.core.rest.tryit.config.TraceStorageConfig} - Auto-configuration for trace storage selection</li>
- *   <li>{@link kr.co.ouroboros.core.rest.tryit.config.MethodTracingConfig} - AOP configuration for method tracing</li>
+ *   <li>{@link kr.co.ouroboros.core.global.tryit.config.TraceStorageConfig} - Auto-configuration for trace storage selection</li>
+ *   <li>{@link kr.co.ouroboros.core.global.tryit.config.MethodTracingConfig} - AOP configuration for method tracing</li>
  * </ul>
  * <p>
  * <b>Subpackages:</b>
@@ -17,5 +17,5 @@
  *
  * @since 0.0.1
  */
-package kr.co.ouroboros.core.rest.tryit.config;
+package kr.co.ouroboros.core.global.tryit.config;
 

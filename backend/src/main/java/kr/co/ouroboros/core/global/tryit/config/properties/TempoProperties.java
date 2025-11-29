@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.tryit.config.properties;
+package kr.co.ouroboros.core.global.tryit.config.properties;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -35,7 +35,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @Data
 @ConfigurationProperties(prefix = "ouroboros.tempo")
 public class TempoProperties {
-    
+
     /**
      * Whether Tempo integration is enabled.
      * <p>
@@ -45,7 +45,7 @@ public class TempoProperties {
      * Default: false (for SDK library - actual usage should override)
      */
     private boolean enabled = false;
-    
+
     /**
      * Tempo base URL.
      * <p>
@@ -56,7 +56,7 @@ public class TempoProperties {
      * Default: http://localhost:3200
      */
     private String baseUrl = "http://localhost:3200";
-    
+
     /**
      * Query timeout in seconds for HTTP requests to Tempo.
      * <p>
@@ -66,19 +66,19 @@ public class TempoProperties {
      * Default: 30 seconds
      */
     private int queryTimeoutSeconds = 30;
-    
+
     /**
      * Poll interval in milliseconds.
      * <p>
      * How long to wait between polling attempts when using
-     * {@link kr.co.ouroboros.core.rest.tryit.infrastructure.storage.tempo.client.TempoClient#pollForTrace(String)}.
+     * {@code TempoClient#pollForTrace(String)}.
      * <p>
      * Total maximum wait time = {@code maxPollAttempts * pollIntervalMillis}
      * <p>
      * Default: 1000ms (1 second)
      */
     private long pollIntervalMillis = 1000;
-    
+
     /**
      * Maximum number of polling attempts.
      * <p>
@@ -92,4 +92,3 @@ public class TempoProperties {
      */
     private int maxPollAttempts = 10;
 }
-

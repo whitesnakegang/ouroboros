@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.rest.tryit.config.properties;
+package kr.co.ouroboros.core.global.tryit.config.properties;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -37,7 +37,7 @@ public class MethodTracingProperties {
      * Default: false
      */
     private boolean enabled = false;
-    
+
     /**
      * List of package prefixes for classes to trace.
      * <p>
@@ -90,4 +90,3 @@ public class MethodTracingProperties {
         this.allowedPackages = (allowedPackages != null) ? allowedPackages : new java.util.ArrayList<>();
     }
 }
-

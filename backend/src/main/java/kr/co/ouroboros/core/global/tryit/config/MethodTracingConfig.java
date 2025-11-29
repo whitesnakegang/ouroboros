@@ -1,7 +1,7 @@
-package kr.co.ouroboros.core.rest.tryit.config;
+package kr.co.ouroboros.core.global.tryit.config;
 
-import kr.co.ouroboros.core.rest.tryit.config.properties.MethodTracingProperties;
-import kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.aspect.MethodTracingMethodInterceptor;
+import kr.co.ouroboros.core.global.tryit.config.properties.MethodTracingProperties;
+import kr.co.ouroboros.core.global.tryit.infrastructure.instrumentation.aspect.MethodTracingMethodInterceptor;
 
 import org.aopalliance.aop.Advice;
 import org.springframework.aop.Advisor;
