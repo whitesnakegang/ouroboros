@@ -1,12 +1,11 @@
 /**
- * Common constants and utilities for Try feature.
+ * Common constants and utilities for WebSocket Try feature.
  * <p>
- * This package contains protocol-agnostic constants and utilities shared
- * across REST and WebSocket Try implementations.
+ * This package contains constants and utilities for WebSocket Try implementations.
  * <p>
  * <b>Components:</b>
  * <ul>
- *   <li>{@link kr.co.ouroboros.core.global.tryit.common.TryHeaders} - Protocol-agnostic Try header constants</li>
+ *   <li>{@link kr.co.ouroboros.core.global.tryit.common.TryHeaders} - WebSocket Try header constants</li>
  * </ul>
  *
  * @since 0.0.1
