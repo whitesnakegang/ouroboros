@@ -9,7 +9,7 @@
  * </ul>
  *
  * @since 0.0.1
- * @see kr.co.ouroboros.core.global.tryit.TryHeaders
- * @see kr.co.ouroboros.core.global.tryit.context.TryContext
+ * @see kr.co.ouroboros.core.global.tryit.common.TryHeaders
+ * @see kr.co.ouroboros.core.global.tryit.infrastructure.instrumentation.context.TryContext
  */
 package kr.co.ouroboros.core.global.tryit.identification;
