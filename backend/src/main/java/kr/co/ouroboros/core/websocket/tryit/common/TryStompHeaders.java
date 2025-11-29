@@ -1,6 +1,6 @@
 package kr.co.ouroboros.core.websocket.tryit.common;
 
-import kr.co.ouroboros.core.global.tryit.TryHeaders;
+import kr.co.ouroboros.core.global.tryit.common.TryHeaders;
 
 /**
  * Defines header and attribute names used in STOMP Try functionality.

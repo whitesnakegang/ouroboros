@@ -5,13 +5,9 @@
  * by both REST and WebSocket implementations. It provides protocol-agnostic
  * infrastructure, trace processing, configuration, and service components.
  * <p>
- * <b>Key Components:</b>
- * <ul>
- *   <li>{@link kr.co.ouroboros.core.global.tryit.TryHeaders} - Protocol-agnostic Try header constants</li>
- * </ul>
- * <p>
  * <b>Subpackages:</b>
  * <ul>
+ *   <li><b>common</b> - Common constants and utilities (e.g., {@link kr.co.ouroboros.core.global.tryit.common.TryHeaders})</li>
  *   <li><b>config</b> - Auto-configuration and properties for Try feature</li>
  *   <li><b>exception</b> - Try-specific exception types</li>
  *   <li><b>infrastructure</b> - Instrumentation, storage, and client implementations</li>

@@ -1,4 +1,4 @@
-package kr.co.ouroboros.core.global.tryit;
+package kr.co.ouroboros.core.global.tryit.common;
 
 /**
  * Defines protocol-agnostic header names used in Try functionality across REST and WebSocket.
