@@ -1,22 +1,20 @@
 /**
- * Core Try functionality for API testing and analysis.
+ * REST-specific Try functionality for API testing and analysis.
  * <p>
- * This package provides the core business logic for the Try feature, which enables
- * developers to test and analyze API endpoints by capturing distributed traces,
- * analyzing performance issues, and providing detailed execution insights.
+ * This package provides REST-specific components for the Try feature,
+ * specifically request identification components.
  * <p>
  * <b>Key Components:</b>
  * <ul>
- *   <li><b>Service Layer</b> - Business logic for retrieving Try results (summary, trace, methods, issues)</li>
- *   <li><b>Trace Processing</b> - Analysis, conversion, and tree building for distributed traces</li>
- *   <li><b>Infrastructure</b> - Instrumentation, storage, and client implementations</li>
- *   <li><b>Exception Handling</b> - Try-specific exception types and handlers</li>
- *   <li><b>Configuration</b> - Auto-configuration and properties</li>
+ *   <li><b>Identification</b> - REST request/response identification components (TryFilter, TryResponseAdvice)</li>
  * </ul>
  * <p>
- * The Try feature integrates with distributed tracing systems (e.g., Tempo) to capture
- * execution traces and provides analysis capabilities including performance bottleneck
- * detection and method-level profiling.
+ * <b>Related Packages:</b>
+ * <ul>
+ *   <li>{@link kr.co.ouroboros.core.global.tryit} - Protocol-agnostic Try components (trace, infrastructure, service, exception, configuration)</li>
+ *   <li>{@link kr.co.ouroboros.core.websocket.tryit} - WebSocket-specific Try components</li>
+ *   <li>{@link kr.co.ouroboros.ui.global.tryit} - Protocol-agnostic UI components (controllers, DTOs)</li>
+ * </ul>
  *
  * @since 0.0.1
  */
