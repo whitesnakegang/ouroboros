@@ -6,7 +6,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import kr.co.ouroboros.core.global.tryit.TryHeaders;
-import kr.co.ouroboros.core.global.tryit.context.TryContext;
+import kr.co.ouroboros.core.global.tryit.infrastructure.instrumentation.context.TryContext;
 import kr.co.ouroboros.core.global.tryit.identification.TryIdResolver;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.Ordered;

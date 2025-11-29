@@ -1,8 +1,8 @@
 package kr.co.ouroboros.core.websocket.tryit.identification;
 
 import io.opentelemetry.context.Scope;
-import kr.co.ouroboros.core.global.tryit.context.TryContext;
 import kr.co.ouroboros.core.global.tryit.identification.TryIdResolver;
+import kr.co.ouroboros.core.global.tryit.infrastructure.instrumentation.context.TryContext;
 import kr.co.ouroboros.core.websocket.tryit.common.TryStompHeaders;
 import kr.co.ouroboros.core.websocket.tryit.infrastructure.messaging.TryPublisherNotifier;
 import lombok.RequiredArgsConstructor;
