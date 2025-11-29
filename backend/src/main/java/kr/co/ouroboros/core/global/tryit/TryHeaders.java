@@ -10,7 +10,7 @@ package kr.co.ouroboros.core.global.tryit;
  * <ul>
  *   <li>REST: {@link kr.co.ouroboros.core.rest.tryit.identification.TryFilter}</li>
  *   <li>REST: {@link kr.co.ouroboros.core.rest.tryit.identification.TryResponseAdvice}</li>
- *   <li>REST: {@link kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.sampler.TryOnlySampler}</li>
+ *   <li>Global: {@link kr.co.ouroboros.core.global.tryit.infrastructure.instrumentation.sampler.TryOnlySampler}</li>
  *   <li>WebSocket: {@link kr.co.ouroboros.core.websocket.tryit.common.TryStompHeaders}</li>
  * </ul>
  *

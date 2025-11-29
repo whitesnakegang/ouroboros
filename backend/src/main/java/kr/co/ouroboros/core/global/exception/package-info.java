@@ -10,7 +10,7 @@
  *   <li><b>Package-specific handlers</b> (higher priority) - Handle domain-specific exceptions
  *       <ul>
  *         <li>{@link kr.co.ouroboros.core.rest.spec.exception.RestSpecExceptionHandler} - REST API spec exceptions</li>
- *         <li>{@link kr.co.ouroboros.core.rest.tryit.exception.TryExceptionHandler} - Try endpoint exceptions</li>
+ *         <li>{@link kr.co.ouroboros.core.global.tryit.exception.TryExceptionHandler} - Try endpoint exceptions</li>
  *       </ul>
  *   </li>
  *   <li><b>Global handler</b> (lower priority) - Handles common exceptions for all SDK endpoints
