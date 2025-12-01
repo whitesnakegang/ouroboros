@@ -7,3 +7,4 @@ kr.co.ouroboros.core.rest.mock.config.RestMockAutoConfiguration
 # Try 구성
 kr.co.ouroboros.core.global.tryit.config.TraceStorageConfig
 kr.co.ouroboros.core.global.tryit.config.MethodTracingConfig
+kr.co.ouroboros.core.global.tryit.config.AspectJMethodTracingConfig
