@@ -202,14 +202,29 @@ client.activate();
 
 > **Note**: Internal method tracing is **disabled by default**. If you need to trace internal method calls in the Try feature, you must enable this configuration.
 
+#### Spring AOP Mode (Default)
+
 ```properties
 # Enable Method Tracing
 ouroboros.method-tracing.enabled=true
 ouroboros.method-tracing.allowed-packages=your.package.name
 ```
 
-> **Note**: 
+> **Note**:
 > - Specify the package paths to apply tracing. Examples: `com.example.yourproject`, `your.package.name`, etc.
+> - **Spring AOP Limitations**: Cannot trace self-invocation, private methods, or static methods. See [Self-Invocation Solution](#self-invocation-solution) in QnA.
+
+#### AspectJ Mode (Advanced)
+
+For comprehensive method tracing including self-invocation, private methods, and static methods, use AspectJ mode:
+
+```properties
+ouroboros.method-tracing.enabled=true
+ouroboros.method-tracing.mode=ASPECTJ
+ouroboros.method-tracing.allowed-packages=your.package.name
+```
+
+📖 **[Complete AspectJ Setup Guide](./ASPECTJ_SETUP.md)** - Includes build configuration, troubleshooting, and examples.
 
 ### 4.2. Tempo Integration (Optional)
 

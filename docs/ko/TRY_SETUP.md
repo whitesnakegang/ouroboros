@@ -202,14 +202,29 @@ client.activate();
 
 > **참고**: 기본적으로 내부 메소드 추적은 **비활성화**되어 있습니다. Try 기능에서 내부 메소드 호출을 추적하려면 반드시 이 설정을 활성화해야 합니다.
 
+#### Spring AOP 모드 (기본값)
+
 ```properties
 # Method Tracing 활성화
 ouroboros.method-tracing.enabled=true
 ouroboros.method-tracing.allowed-packages=your.package.name
 ```
 
-> **참고**: 
+> **참고**:
 > - `allowed-packages`에는 트레이싱을 적용할 패키지 경로를 지정합니다. 예: `com.example.yourproject`, `your.package.name` 등
+> - **Spring AOP 제약사항**: Self-invocation, private 메서드, static 메서드는 트레이싱되지 않습니다. QnA의 [Self-Invocation 해결 방법](#self-invocation-해결-방법) 참고.
+
+#### AspectJ 모드 (고급)
+
+Self-invocation, private 메서드, static 메서드를 포함한 포괄적인 메서드 트레이싱이 필요하면 AspectJ 모드를 사용하세요:
+
+```properties
+ouroboros.method-tracing.enabled=true
+ouroboros.method-tracing.mode=ASPECTJ
+ouroboros.method-tracing.allowed-packages=your.package.name
+```
+
+📖 **[AspectJ 설정 가이드](./ASPECTJ_SETUP.md)** - 빌드 설정, 문제 해결, 예제 포함.
 
 ### 4.2. Tempo 연동 (선택 사항)
 
