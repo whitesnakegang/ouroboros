@@ -196,7 +196,7 @@ public class MethodTracingAspect {
         }
 
         for (String allowedPkg : properties.getAllowedPackages()) {
-            if (className.startsWith(allowedPkg)) {
+            if (className.equals(allowedPkg) || className.startsWith(allowedPkg + ".")) {
                 return true;
             }
         }
