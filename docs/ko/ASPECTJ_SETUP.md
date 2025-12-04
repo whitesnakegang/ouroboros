@@ -317,7 +317,7 @@ Spring AOP 모드에서는 Final class, Static 메서드를 트레이싱할 수 
 - ✅ `FinalClassService.finalClassMethod` (Final 메서드)
 - ✅ `StaticMethodService.staticMethod` (Static 메서드)
 
-**AspectJ 모드를 사용하면** Self-invocation, Privatem Final class, Static 메서드를 모두 트레이싱할 수 있습니다!
+**AspectJ 모드를 사용하면** Self-invocation, Private, Final class, Static 메서드를 모두 트레이싱할 수 있습니다!
 
 ## 더 알아보기
 

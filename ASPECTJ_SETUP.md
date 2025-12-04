@@ -211,7 +211,7 @@ public class AopTestService {
 }
 ```
 
-![Spring AOP CGLIB Limitations](../images/scrennshots/proxy-self-invocation.png)
+![Spring AOP CGLIB Limitations](./docs/images/scrennshots/proxy-self-invocation.png)
 *Self-invocation and private methods are missing from the trace in Spring AOP mode*
 
 As shown in the image above:
@@ -224,7 +224,7 @@ As shown in the image above:
 
 Spring AOP mode cannot trace Self-invocation and private methods.
 
-![AspectJ Self-Invocation Tracing](../images/scrennshots/aspectj-self-invocation.png)
+![AspectJ Self-Invocation Tracing](./docs/images/scrennshots/aspectj-self-invocation.png)
 *Example showing Self-invocation and Private methods being traced in AspectJ mode*
 
 As shown in the image above:
@@ -297,7 +297,7 @@ public class StaticMethodService {
 }
 ```
 
-![Spring AOP CGLIB Limitations](../images/scrennshots/proxy-cglib-limitations.png)
+![Spring AOP CGLIB Limitations](./docs/images/scrennshots/proxy-cglib-limitations.png)
 *Final class and Static methods are missing from the trace in Spring AOP mode*
 
 As shown in the image above:
@@ -308,7 +308,7 @@ As shown in the image above:
 
 Spring AOP mode cannot trace Final class and Static methods.
 
-![AspectJ CGLIB Limitations Tracing](../images/scrennshots/aspectj-cglib-limitations.png)
+![AspectJ CGLIB Limitations Tracing](./docs/images/scrennshots/aspectj-cglib-limitations.png)
 *Example showing Final and Static methods being traced in AspectJ mode*
 
 As shown in the image above:

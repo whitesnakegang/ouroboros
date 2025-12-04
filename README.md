@@ -214,7 +214,7 @@ Ouroboros supports two method tracing modes:
    - ✅ Traces final methods
    - ✅ Traces static methods
    - ✅ No proxy overhead
-   - ⚠️ Requires AspectJ build configuration ([Setup Guide](./docs/ASPECTJ_SETUP.md))
+   - ⚠️ Requires AspectJ build configuration ([Setup Guide](./ASPECTJ_SETUP.md))
 
 `application.yml`:
 ```yaml
