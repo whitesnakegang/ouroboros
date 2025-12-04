@@ -23,10 +23,11 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Auto-configuration for method-level tracing using AOP.
+ * Auto-configuration for method-level tracing using Spring AOP.
  * <p>
  * This configuration sets up AOP-based method tracing for classes in allowed packages,
- * creating OpenTelemetry spans for method invocations automatically.
+ * creating OpenTelemetry spans for method invocations automatically using Spring's
+ * CGLIB/JDK dynamic proxy mechanism.
  * <p>
  * <b>Configuration:</b>
  * <ul>
@@ -45,15 +46,26 @@ import java.util.Set;
  * </ul>
  * <p>
  * <b>Activation:</b>
- * This configuration is enabled by default. To disable, set {@code ouroboros.enabled=false}.
- * Method tracing is disabled by default within this configuration. To enable it, set {@code ouroboros.method-tracing.enabled=true}
- * and configure at least one allowed package. If no allowed packages are configured, method tracing is disabled.
+ * This configuration is enabled when {@code ouroboros.method-tracing.mode=SPRING_AOP} (default).
+ * For AspectJ compile-time weaving mode, set {@code ouroboros.method-tracing.mode=ASPECTJ}.
+ * Method tracing is disabled by default. To enable it, set {@code ouroboros.method-tracing.enabled=true}
+ * and configure at least one allowed package.
+ * <p>
+ * <b>Limitations of Spring AOP Mode:</b>
+ * <ul>
+ *   <li>Cannot trace self-invocation (same class method calls)</li>
+ *   <li>Cannot trace private methods</li>
+ *   <li>Cannot trace static methods</li>
+ *   <li>Proxy creation overhead at runtime</li>
+ * </ul>
  *
  * @author Ouroboros Team
  * @since 0.0.1
+ * @see kr.co.ouroboros.core.global.tryit.config.AspectJMethodTracingConfig
  */
 @AutoConfiguration
 @ConditionalOnProperty(prefix = "ouroboros", name = "enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(prefix = "ouroboros.method-tracing", name = "mode", havingValue = "SPRING_AOP", matchIfMissing = true)
 @EnableConfigurationProperties(MethodTracingProperties.class)
 @ConditionalOnClass(Advisor.class)
 public class MethodTracingConfig {

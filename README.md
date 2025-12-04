@@ -77,7 +77,7 @@
   - ⚠️ **Only methods with `@ApiState` are scanned and validated** - methods without this annotation are excluded from validation
 - ✅ **Automatic Enrichment**: Automatically add missing Ouroboros extension fields
 - ✅ **Error Reporting**: Detailed validation error messages
-- ✅ **Try Feature**: API execution tracking and analysis with **in-memory storage by default** (📖 [Setup Guide](./OUROBOROS_TRY_SETUP.md))
+- ✅ **Try Feature**: API execution tracking and analysis with **in-memory storage by default** (📖 [Setup Guide](./TRY_SETUP.md))
   - **Default**: In-memory trace storage (no setup required)
 
 ### 🌐 WebSocket/STOMP API Management
@@ -196,6 +196,26 @@ dependencies {
 
 > **Method Tracing**: Internal method tracing is **disabled by default**. If you need internal method tracing in the Try feature, you must add the `method-tracing` configuration.
 
+#### Method Tracing Modes
+
+Ouroboros supports two method tracing modes:
+
+1. **Spring AOP Mode** (Default)
+   - ✅ No additional build configuration required
+   - ✅ Works immediately out of the box
+   - ⚠️ Cannot trace self-invocation (method calls within the same class)
+   - ⚠️ Cannot trace private methods
+   - ⚠️ Cannot trace final methods
+   - ⚠️ Cannot trace static methods
+
+2. **AspectJ Compile-Time Weaving Mode** (v1.1.0+)
+   - ✅ Traces self-invocation
+   - ✅ Traces private methods
+   - ✅ Traces final methods
+   - ✅ Traces static methods
+   - ✅ No proxy overhead
+   - ⚠️ Requires AspectJ build configuration ([Setup Guide](./ASPECTJ_SETUP.md))
+
 `application.yml`:
 ```yaml
 ouroboros:
@@ -207,6 +227,7 @@ ouroboros:
   # Internal method tracing is disabled by default
   method-tracing:
     enabled: true
+    mode: SPRING_AOP  # default: SPRING_AOP, options: ASPECTJ
     allowed-packages: your.package.name  # Specify package paths to trace
 
 # WebSocket Configuration (Optional)
@@ -542,7 +563,8 @@ Ouroboros will automatically:
 - [Project Documentation](./backend/PROJECT_DOCUMENTATION.md)
 - [GraphQL Design](./backend/docs/graphql/DESIGN.md)
 - [Troubleshooting](./backend/docs/troubleshooting/README.md)
-- [Try Feature Setup Guide](./OUROBOROS_TRY_SETUP.md)
+- [Try Feature Setup Guide](./TRY_SETUP.md)
+- [AspectJ Method Tracing Setup](./ASPECTJ_SETUP.md) - Advanced tracing for self-invocation, private, and static methods
 
 ### OpenAPI Extension Fields
 
