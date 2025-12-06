@@ -105,8 +105,8 @@ public class InMemoryTraceStorage implements TraceStorage {
             return null;
         }
 
-        // Check expiration (lazy deletion)
-        if (cachedData.isExpired()) {
+        // Check expiration (lazy deletion) - only in Tempo mode
+        if (tempoProperties.isEnabled() && cachedData.isExpired()) {
             log.debug("Trace expired in cache: tryId={}", tryId);
             deleteTraceByTryId(tryId); // Clean up expired entry
             return null;
@@ -143,8 +143,8 @@ public class InMemoryTraceStorage implements TraceStorage {
             return false;
         }
 
-        // Check expiration
-        if (cachedData.isExpired()) {
+        // Check expiration - only in Tempo mode
+        if (tempoProperties.isEnabled() && cachedData.isExpired()) {
             deleteTraceByTryId(tryId);
             return false;
         }
@@ -162,12 +162,16 @@ public class InMemoryTraceStorage implements TraceStorage {
      */
     public String getTraceId(String tryId) {
         CachedTraceData cachedData = traces.get(tryId);
-        if (cachedData == null || cachedData.isExpired()) {
-            if (cachedData != null) {
-                deleteTraceByTryId(tryId);
-            }
+        if (cachedData == null) {
             return null;
         }
+
+        // Check expiration - only in Tempo mode
+        if (tempoProperties.isEnabled() && cachedData.isExpired()) {
+            deleteTraceByTryId(tryId);
+            return null;
+        }
+
         return cachedData.getTraceData().getTraceId();
     }
     
