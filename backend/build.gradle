@@ -6,10 +6,13 @@ plugins {
 	// (선택) 사용자 프로젝트에 Boot를 쓰더라도, 여긴 라이브러리 모듈로만 빌드됨
 	id 'org.springframework.boot' version '3.5.7' apply false
 	id 'io.spring.dependency-management' version '1.1.7'
+
+	// AspectJ weaving for MethodTracingAspect
+	id 'io.freefair.aspectj.post-compile-weaving' version '8.11'
 }
 
 group = 'io.github.whitesnakegang'   // ← 실제 groupId 반영
-version = '1.0.5'                    // ← 스냅샷이면 0.1.1-SNAPSHOT 등으로
+version = '1.0.6'                    // ← 스냅샷이면 0.1.1-SNAPSHOT 등으로
 
 description = 'Open Source Project'
 
@@ -74,6 +77,11 @@ dependencies {
     // Spring AOP (메서드 추적용)
     api 'org.springframework.boot:spring-boot-starter-aop'
 
+    // AspectJ dependencies (Ouroboros 라이브러리 자체를 weaving하기 위해 필요)
+    // MethodTracingAspect에 aspectOf() 메서드를 생성하기 위함
+    api 'org.aspectj:aspectjrt:1.9.22'
+    aspect 'org.aspectj:aspectjweaver:1.9.22'
+
     // OpenTelemetry OTLP Exporter (Tempo로 trace 전송)
     api 'io.opentelemetry:opentelemetry-exporter-otlp'
 
@@ -84,6 +92,7 @@ dependencies {
 	testImplementation "org.springframework.boot:spring-boot-starter-test"
 	testRuntimeOnly "org.junit.platform:junit-platform-launcher"
     testImplementation 'org.springframework.boot:spring-boot-starter-web'
+	testImplementation 'org.springframework.boot:spring-boot-starter-websocket'
 }
 
 tasks.named('test') {

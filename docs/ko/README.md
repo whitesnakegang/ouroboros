@@ -77,7 +77,7 @@
   - ⚠️ **`@ApiState`가 있는 메서드만 스캔되고 검증됩니다** - 이 어노테이션이 없는 메서드는 검증에서 제외됩니다
 - ✅ **자동 Enrichment**: 누락된 Ouroboros 확장 필드 자동 추가
 - ✅ **에러 리포팅**: 상세한 검증 에러 메시지
-- ✅ **Try 기능**: API 실행 추적 및 분석 (📖 [설정 가이드](./OUROBOROS_TRY_SETUP.md))
+- ✅ **Try 기능**: API 실행 추적 및 분석 (📖 [설정 가이드](./TRY_SETUP.md))
   - **기본값**: In-memory trace 저장소 (설정 불필요)
 
 ### 🌐 WebSocket/STOMP API 관리
@@ -169,12 +169,12 @@
 
 ### 설치
 
-> **⚠️ 버전 경고**: 1.0.2 버전은 에러가 발생하므로 사용하지 마세요. 반드시 1.0.4 버전을 사용해주세요.
+> **⚠️ 버전 경고**: 1.0.2 버전은 에러가 발생하므로 사용하지 마세요. 반드시 1.0.5 버전을 사용해주세요.
 
 #### Gradle
 ```gradle
 dependencies {
-    implementation 'io.github.whitesnakegang:ouroboros:1.0.4'
+    implementation 'io.github.whitesnakegang:ouroboros:1.0.5'
     implementation 'org.springframework.boot:spring-boot-starter-web'
 }
 ```
@@ -184,7 +184,7 @@ dependencies {
 <dependency>
     <groupId>io.github.whitesnakegang</groupId>
     <artifactId>ouroboros</artifactId>
-    <version>1.0.4</version>
+    <version>1.0.5</version>
 </dependency>
 ```
 
@@ -195,6 +195,26 @@ dependencies {
 ### 설정 (선택 사항)
 
 > **Method Tracing**: 내부 메서드 추적은 기본적으로 비활성화되어 있습니다. Try 기능에서 내부 메서드를 추적하려면 `method-tracing` 설정을 추가해야 합니다.
+
+#### Method Tracing 모드
+
+Ouroboros는 두 가지 메서드 트레이싱 모드를 지원합니다:
+
+1. **Spring AOP 모드** (기본값)
+   - ✅ 별도 빌드 설정 불필요
+   - ✅ 즉시 사용 가능
+   - ⚠️ Self-invocation (같은 클래스 내 메서드 호출) 트레이싱 불가
+   - ⚠️ Private 메서드 트레이싱 불가
+   - ⚠️ Final 메서드 트레이싱 불가
+   - ⚠️ Static 메서드 트레이싱 불가
+
+2. **AspectJ Compile-Time Weaving 모드** (v1.1.0+)
+   - ✅ Self-invocation 트레이싱 가능
+   - ✅ Private 메서드 트레이싱 가능
+   - ✅ Final 메서드 트레이싱 가능
+   - ✅ Static 메서드 트레이싱 가능
+   - ✅ Proxy 오버헤드 없음
+   - ⚠️ AspectJ 빌드 설정 필요 ([상세 가이드](./ASPECTJ_SETUP.md) 참조)
 
 `application.yml`:
 ```yaml
@@ -207,6 +227,7 @@ ouroboros:
   # 기본적으로 내부 메서드 추적은 비활성화되어 있습니다
   method-tracing:
     enabled: true
+    mode: SPRING_AOP  # 기본값: SPRING_AOP, 옵션: ASPECTJ
     allowed-packages: your.package.name  # 추적할 패키지 경로 지정
 
 # WebSocket 설정 (선택사항)
@@ -544,7 +565,8 @@ Ouroboros가 자동으로:
 - [프로젝트 문서](../../backend/PROJECT_DOCUMENTATION.md)
 - [GraphQL 설계](../../backend/docs/graphql/DESIGN.md)
 - [트러블슈팅](../../backend/docs/troubleshooting/README.md)
-- [Try 기능 설정 가이드](./OUROBOROS_TRY_SETUP.md)
+- [Try 기능 설정 가이드](./TRY_SETUP.md)
+- [AspectJ 메서드 트레이싱 설정](./ASPECTJ_SETUP.md) - Self-invocation, private, static 메서드를 포함한 고급 트레이싱
 
 ### OpenAPI 확장 필드
 

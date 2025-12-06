@@ -1,8 +1,9 @@
 package kr.co.ouroboros.core.websocket.tryit.identification;
 
 import io.opentelemetry.context.Scope;
-import kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.context.TryContext;
+import kr.co.ouroboros.core.global.tryit.identification.TryIdResolver;
 import kr.co.ouroboros.core.websocket.tryit.common.TryStompHeaders;
+import kr.co.ouroboros.core.global.tryit.common.TryHeaders;
 import kr.co.ouroboros.core.websocket.tryit.infrastructure.messaging.TryPublisherNotifier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,8 +43,8 @@ public class TryStompChannelInterceptor implements ChannelInterceptor {
         }
 
         // Only inbound channel (client -> server) messages are processed. Additional filtering by command is possible.
-        String tryHeader = getFirstNativeHeader(accessor, TryStompHeaders.TRY_HEADER);
-        boolean tryRequested = TryStompHeaders.TRY_HEADER_ENABLED_VALUE.equalsIgnoreCase(tryHeader);
+        String tryHeader = getFirstNativeHeader(accessor, TryHeaders.TRY_HEADER);
+        boolean tryRequested = TryIdResolver.isTryRequest(tryHeader);
 
         UUID tryId = resolveTryId(accessor, tryRequested);
         if (tryId == null) {
@@ -51,7 +52,7 @@ public class TryStompChannelInterceptor implements ChannelInterceptor {
             return message;
         }
 
-        Scope scope = TryContext.setTryId(tryId);
+        Scope scope = TryIdResolver.activateTryScope(tryId);
         if (scope != null) {
             accessor.setHeader(TryStompHeaders.INTERNAL_SCOPE_HEADER, scope);
         }
@@ -93,7 +94,7 @@ public class TryStompChannelInterceptor implements ChannelInterceptor {
     @Nullable
     private UUID resolveTryId(StompHeaderAccessor accessor, boolean tryRequested) {
         // 1) If tryId is included in frame header, use it as is
-        String headerTryId = getFirstNativeHeader(accessor, TryStompHeaders.TRY_ID_HEADER);
+        String headerTryId = getFirstNativeHeader(accessor, TryHeaders.TRY_ID_HEADER);
         if (headerTryId != null) {
             try {
                 return UUID.fromString(headerTryId);
@@ -104,7 +105,7 @@ public class TryStompChannelInterceptor implements ChannelInterceptor {
 
         // 2) If Try request header is enabled, generate a new one
         if (tryRequested) {
-            UUID newTryId = UUID.randomUUID();
+            UUID newTryId = TryIdResolver.generateTryId();
             log.debug("Detected STOMP Try request and generated new tryId: {}", newTryId);
             return newTryId;
         }

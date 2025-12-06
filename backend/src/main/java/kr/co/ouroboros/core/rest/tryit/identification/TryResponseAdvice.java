@@ -1,6 +1,7 @@
 package kr.co.ouroboros.core.rest.tryit.identification;
 
-import kr.co.ouroboros.core.rest.tryit.infrastructure.instrumentation.context.TryContext;
+import kr.co.ouroboros.core.global.tryit.common.TryHeaders;
+import kr.co.ouroboros.core.global.tryit.infrastructure.instrumentation.context.TryContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.Ordered;
@@ -78,9 +79,9 @@ public class TryResponseAdvice implements ResponseBodyAdvice<Object> {
         // Filter에서 이미 헤더를 설정했는지 확인하고, 없을 때만 설정합니다.
         try {
             var headers = response.getHeaders();
-            if (!headers.containsKey("X-Ouroboros-Try-Id")) {
+            if (!headers.containsKey(TryHeaders.TRY_ID_HEADER)) {
                 // 헤더가 없으면 설정 (Filter에서 누락된 경우 대비)
-                headers.set("X-Ouroboros-Try-Id", tryId.toString());
+                headers.set(TryHeaders.TRY_ID_HEADER, tryId.toString());
                 log.debug("Set tryId in response header (Filter missed): {}", tryId);
             } else {
                 // 헤더가 이미 있으면 Filter에서 설정한 것이므로 건너뜀
