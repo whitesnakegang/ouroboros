@@ -29,10 +29,10 @@ plugins {
 }
 
 dependencies {
-    implementation 'io.github.whitesnakegang:ouroboros:1.1.0'
+    implementation 'io.github.whitesnakegang:ouroboros:1.0.6'
 
     // AspectJ 설정 (2줄만 추가하면 됩니다!)
-    aspect 'io.github.whitesnakegang:ouroboros:1.1.0'
+    aspect 'io.github.whitesnakegang:ouroboros:1.0.6'
     aspect 'org.aspectj:aspectjweaver:1.9.22'
 
     // ... 나머지 dependencies
@@ -74,7 +74,7 @@ Successfully retrieved AspectJ singleton instance via aspectOf()
     <dependency>
         <groupId>io.github.whitesnakegang</groupId>
         <artifactId>ouroboros</artifactId>
-        <version>1.1.0</version>
+        <version>1.0.6</version>
     </dependency>
 </dependencies>
 
@@ -119,7 +119,7 @@ Successfully retrieved AspectJ singleton instance via aspectOf()
 
 2. `aspect` 설정 확인:
    ```gradle
-   aspect 'io.github.whitesnakegang:ouroboros:1.1.0'
+   aspect 'io.github.whitesnakegang:ouroboros:1.0.6'
    aspect 'org.aspectj:aspectjweaver:1.9.22'
    ```
 

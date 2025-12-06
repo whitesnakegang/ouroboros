@@ -174,7 +174,7 @@
 #### Gradle
 ```gradle
 dependencies {
-    implementation 'io.github.whitesnakegang:ouroboros:1.0.5'
+    implementation 'io.github.whitesnakegang:ouroboros:1.0.6'
     implementation 'org.springframework.boot:spring-boot-starter-web'
 }
 ```

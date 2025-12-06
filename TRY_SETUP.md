@@ -42,7 +42,7 @@ Add the Ouroboros SDK dependency to your project's `build.gradle` file.
 
 ```gradle
 dependencies {
-    implementation 'io.github.whitesnakegang:ouroboros:1.0.4'
+    implementation 'io.github.whitesnakegang:ouroboros:1.0.6'
 }
 ```
 
