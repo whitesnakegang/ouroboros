@@ -3,9 +3,11 @@ package kr.co.ouroboros.core.global.tryit.infrastructure.storage.memory;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.sdk.trace.ReadableSpan;
+import kr.co.ouroboros.core.global.tryit.config.properties.TempoProperties;
 import kr.co.ouroboros.core.global.tryit.infrastructure.storage.TraceStorage;
 import kr.co.ouroboros.core.global.tryit.infrastructure.storage.model.TraceDTO;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -18,14 +20,20 @@ import java.util.stream.Collectors;
  * In-memory implementation of TraceStorage interface.
  * <p>
  * This component stores OpenTelemetry spans in memory, organized by tryId.
- * When Tempo is disabled, this storage is used as a fallback.
+ * <p>
+ * <b>Modes:</b>
+ * <ul>
+ *   <li>InMemory mode (Tempo disabled): Permanent storage for all traces</li>
+ *   <li>Tempo mode (Tempo enabled): Cache layer with 3-minute TTL for fast retrieval</li>
+ * </ul>
  * <p>
  * <b>Features:</b>
  * <ul>
  *   <li>Thread-safe span storage using ConcurrentHashMap</li>
  *   <li>Automatic trace grouping by tryId</li>
+ *   <li>TTL-based expiration (Tempo mode only)</li>
+ *   <li>Scheduled cleanup (Tempo mode only)</li>
  *   <li>TraceDTO conversion for compatibility with existing code</li>
- *   <li>Memory-efficient span storage</li>
  * </ul>
  *
  * @author Ouroboros Team
@@ -34,18 +42,28 @@ import java.util.stream.Collectors;
 @Slf4j
 @Component
 public class InMemoryTraceStorage implements TraceStorage {
-    
+
     private static final AttributeKey<String> TRY_ID_ATTRIBUTE = AttributeKey.stringKey("ouro.try_id");
-    
+    private static final long TTL_MILLIS = 3 * 60 * 1000; // 3 minutes
+
     /**
-     * Storage: tryId -> TraceData
+     * Storage: tryId -> CachedTraceData (with timestamp)
      */
-    private final ConcurrentHashMap<String, TraceData> traces = new ConcurrentHashMap<>();
-    
+    private final ConcurrentHashMap<String, CachedTraceData> traces = new ConcurrentHashMap<>();
+
     /**
      * Mapping: traceId -> tryId (for reverse lookup)
      */
     private final ConcurrentHashMap<String, String> traceIdToTryId = new ConcurrentHashMap<>();
+
+    /**
+     * Tempo configuration to check if TTL cleanup should be enabled
+     */
+    private final TempoProperties tempoProperties;
+
+    public InMemoryTraceStorage(TempoProperties tempoProperties) {
+        this.tempoProperties = tempoProperties;
+    }
     
     /**
      * Adds a span to the storage for the given tryId.
@@ -61,30 +79,40 @@ public class InMemoryTraceStorage implements TraceStorage {
             log.debug("Span does not have tryId attribute, skipping");
             return;
         }
-        
+
         String traceId = span.getSpanContext().getTraceId();
-        
-        traces.computeIfAbsent(tryId, k -> new TraceData(traceId))
+
+        traces.computeIfAbsent(tryId, k -> new CachedTraceData(traceId))
               .addSpan(span);
-        
+
         traceIdToTryId.put(traceId, tryId);
-        
-        log.debug("Added span to in-memory storage: tryId={}, traceId={}, spanId={}", 
+
+        log.debug("Added span to in-memory storage: tryId={}, traceId={}, spanId={}",
                   tryId, traceId, span.getSpanContext().getSpanId());
     }
     
     /**
      * Retrieves trace data by tryId.
+     * <p>
+     * Checks expiration in Tempo mode and performs lazy deletion if expired.
      *
      * @param tryId The try ID to look up
-     * @return TraceDTO if found, null otherwise
+     * @return TraceDTO if found and not expired, null otherwise
      */
     public TraceDTO getTraceByTryId(String tryId) {
-        TraceData traceData = traces.get(tryId);
-        if (traceData == null) {
+        CachedTraceData cachedData = traces.get(tryId);
+        if (cachedData == null) {
             return null;
         }
-        return traceData.toTraceDTO();
+
+        // Check expiration (lazy deletion) - only in Tempo mode
+        if (tempoProperties.isEnabled() && cachedData.isExpired()) {
+            log.debug("Trace expired in cache: tryId={}", tryId);
+            deleteTraceByTryId(tryId); // Clean up expired entry
+            return null;
+        }
+
+        return cachedData.getTraceData().toTraceDTO();
     }
     
     /**
@@ -103,23 +131,48 @@ public class InMemoryTraceStorage implements TraceStorage {
     
     /**
      * Checks if a trace exists for the given tryId.
+     * <p>
+     * Checks expiration and performs lazy deletion if expired.
      *
      * @param tryId The try ID to check
-     * @return true if trace exists, false otherwise
+     * @return true if trace exists and not expired, false otherwise
      */
     public boolean hasTrace(String tryId) {
-        return traces.containsKey(tryId);
+        CachedTraceData cachedData = traces.get(tryId);
+        if (cachedData == null) {
+            return false;
+        }
+
+        // Check expiration - only in Tempo mode
+        if (tempoProperties.isEnabled() && cachedData.isExpired()) {
+            deleteTraceByTryId(tryId);
+            return false;
+        }
+
+        return true;
     }
     
     /**
      * Gets the trace ID for a given tryId.
+     * <p>
+     * Checks expiration before returning.
      *
      * @param tryId The try ID to look up
-     * @return Trace ID if found, null otherwise
+     * @return Trace ID if found and not expired, null otherwise
      */
     public String getTraceId(String tryId) {
-        TraceData traceData = traces.get(tryId);
-        return traceData != null ? traceData.getTraceId() : null;
+        CachedTraceData cachedData = traces.get(tryId);
+        if (cachedData == null) {
+            return null;
+        }
+
+        // Check expiration - only in Tempo mode
+        if (tempoProperties.isEnabled() && cachedData.isExpired()) {
+            deleteTraceByTryId(tryId);
+            return null;
+        }
+
+        return cachedData.getTraceData().getTraceId();
     }
     
     /**
@@ -131,9 +184,9 @@ public class InMemoryTraceStorage implements TraceStorage {
      * @return true if trace was found and deleted, false otherwise
      */
     public boolean deleteTraceByTryId(String tryId) {
-        TraceData traceData = traces.remove(tryId);
-        if (traceData != null) {
-            String traceId = traceData.getTraceId();
+        CachedTraceData cachedData = traces.remove(tryId);
+        if (cachedData != null) {
+            String traceId = cachedData.getTraceData().getTraceId();
             traceIdToTryId.remove(traceId);
             log.info("Deleted trace from in-memory storage: tryId={}, traceId={}", tryId, traceId);
             return true;
@@ -150,7 +203,64 @@ public class InMemoryTraceStorage implements TraceStorage {
         traceIdToTryId.clear();
         log.debug("Cleared all in-memory traces");
     }
+
+    /**
+     * Scheduled cleanup task for expired traces (Tempo mode only).
+     * <p>
+     * Runs every 1 minute to remove expired traces from cache.
+     * Only operates when Tempo is enabled (InMemory mode keeps traces permanently).
+     */
+    @Scheduled(fixedRate = 60_000) // 1 minute
+    public void cleanupExpiredTraces() {
+        // Only run cleanup in Tempo mode (InMemory mode keeps traces forever)
+        if (!tempoProperties.isEnabled()) {
+            return;
+        }
+
+        long now = System.currentTimeMillis();
+        List<String> expiredTryIds = traces.entrySet().stream()
+                .filter(entry -> entry.getValue().isExpired(now))
+                .map(java.util.Map.Entry::getKey)
+                .collect(Collectors.toList());
+
+        if (!expiredTryIds.isEmpty()) {
+            log.info("Cleaning up {} expired traces from cache (TTL: 3 minutes)", expiredTryIds.size());
+            expiredTryIds.forEach(this::deleteTraceByTryId);
+        }
+    }
     
+    /**
+     * Wrapper class that adds TTL functionality to TraceData.
+     * <p>
+     * In Tempo mode, traces expire after TTL_MILLIS (3 minutes).
+     * In InMemory mode, traces are kept permanently (TTL not enforced).
+     */
+    private static class CachedTraceData {
+        private final TraceData traceData;
+        private final long createdAt;
+
+        public CachedTraceData(String traceId) {
+            this.traceData = new TraceData(traceId);
+            this.createdAt = System.currentTimeMillis();
+        }
+
+        public void addSpan(ReadableSpan span) {
+            traceData.addSpan(span);
+        }
+
+        public TraceData getTraceData() {
+            return traceData;
+        }
+
+        public boolean isExpired() {
+            return isExpired(System.currentTimeMillis());
+        }
+
+        public boolean isExpired(long now) {
+            return now - createdAt > TTL_MILLIS;
+        }
+    }
+
     /**
      * Internal class to hold trace data for a tryId.
      */

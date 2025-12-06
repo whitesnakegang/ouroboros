@@ -1,6 +1,8 @@
 package kr.co.ouroboros.core.global.tryit.infrastructure.storage;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import kr.co.ouroboros.core.global.tryit.config.properties.TempoProperties;
+import kr.co.ouroboros.core.global.tryit.infrastructure.storage.memory.InMemoryTraceStorage;
 import kr.co.ouroboros.core.global.tryit.infrastructure.storage.model.TraceDTO;
 import kr.co.ouroboros.core.global.tryit.trace.converter.TraceSpanConverter;
 import kr.co.ouroboros.core.global.tryit.trace.dto.TraceSpanInfo;
@@ -20,6 +22,7 @@ import java.util.Optional;
  * <p>
  * <b>Features:</b>
  * <ul>
+ *   <li>Cache-first retrieval (Tempo mode only)</li>
  *   <li>Trace querying by tryId</li>
  *   <li>Trace data parsing from JSON</li>
  *   <li>TraceDTO to TraceSpanInfo conversion</li>
@@ -33,10 +36,12 @@ import java.util.Optional;
 @Component
 @RequiredArgsConstructor
 public class TraceDataRetriever {
-    
+
     private final TraceClient traceClient;
     private final ObjectMapper objectMapper;
     private final TraceSpanConverter traceSpanConverter;
+    private final InMemoryTraceStorage inMemoryTraceStorage;
+    private final TempoProperties tempoProperties;
     
     /**
      * Checks if the trace client is enabled.
@@ -52,7 +57,8 @@ public class TraceDataRetriever {
      * <p>
      * This method performs the following steps:
      * <ol>
-     *   <li>Queries for trace with the given tryId</li>
+     *   <li>In Tempo mode: Check in-memory cache first (fast path)</li>
+     *   <li>Queries for trace with the given tryId (slow path)</li>
      *   <li>Fetches trace data from storage</li>
      *   <li>Parses trace data from JSON</li>
      *   <li>Converts TraceDTO to TraceSpanInfo list</li>
@@ -63,38 +69,63 @@ public class TraceDataRetriever {
      */
     public Optional<TraceDataResult> getTraceData(String tryIdStr) {
         log.debug("Retrieving trace data for tryId: {}", tryIdStr);
-        
+
         if (!traceClient.isEnabled()) {
             log.debug("Trace client is not enabled");
             return Optional.empty();
         }
-        
+
+        // In Tempo mode, check in-memory cache first (fast path)
+        if (tempoProperties.isEnabled()) {
+            TraceDTO cachedTrace = inMemoryTraceStorage.getTraceByTryId(tryIdStr);
+            if (cachedTrace != null) {
+                log.info("Trace found in memory cache (fast path): tryId={}", tryIdStr);
+                try {
+                    String traceId = inMemoryTraceStorage.getTraceId(tryIdStr);
+                    if (traceId == null) {
+                        log.debug("Trace expired between cache lookups, falling back to Tempo");
+                        // Fall through to Tempo polling
+                    } else {
+                        List<TraceSpanInfo> spans = traceSpanConverter.convert(cachedTrace);
+                        return Optional.of(new TraceDataResult(traceId, spans));
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to convert cached trace, falling back to Tempo: tryId={}", tryIdStr, e);
+                    // Fall through to Tempo polling
+                }
+            }
+            log.debug("Trace not in cache, querying Tempo (slow path): tryId={}", tryIdStr);
+        }
+
         try {
-            // Query for trace with this tryId
+            // Query for trace with this tryId (slow path)
             String query = String.format("{ span.ouro.try_id = \"%s\" }", tryIdStr);
             String traceId = traceClient.pollForTrace(query);
-            
+
             if (traceId == null) {
                 log.debug("Trace not found for tryId: {}", tryIdStr);
                 return Optional.empty();
             }
-            
+
             // Fetch trace data
             String traceDataJson = traceClient.getTrace(traceId);
-            
+
             if (traceDataJson == null) {
                 log.warn("Trace data is null for traceId: {}", traceId);
                 return Optional.empty();
             }
-            
+
             // Parse trace data
             TraceDTO traceData = objectMapper.readValue(traceDataJson, TraceDTO.class);
-            
+
             // Convert to TraceSpanInfo
             List<TraceSpanInfo> spans = traceSpanConverter.convert(traceData);
-            
+
+            // Note: Do NOT cache Tempo results back to memory
+            // Tempo is already the permanent storage, no need to duplicate
+
             return Optional.of(new TraceDataResult(traceId, spans));
-            
+
         } catch (Exception e) {
             log.error("Error retrieving trace data for tryId: {}", tryIdStr, e);
             return Optional.empty();

@@ -11,11 +11,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.actuate.autoconfigure.tracing.OpenTelemetryTracingAutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureBefore;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * Trace storage configuration.
@@ -45,6 +45,7 @@ import org.springframework.context.annotation.Primary;
 @AutoConfigureBefore(OpenTelemetryTracingAutoConfiguration.class)
 @ConditionalOnProperty(prefix = "ouroboros", name = "enabled", havingValue = "true", matchIfMissing = true)
 @EnableConfigurationProperties(TempoProperties.class)
+@EnableScheduling
 public class TraceStorageConfig {
     
     /**
@@ -52,11 +53,13 @@ public class TraceStorageConfig {
      * <p>
      * This bean is used when Tempo is enabled. It only adds tryId attributes to spans
      * but does not collect them in memory. Spans are automatically exported to Tempo.
+     * <p>
+     * Note: In Tempo mode, both TempoTrySpanProcessor and InMemoryTrySpanProcessor are active
+     * to enable hybrid caching (Tempo for permanent storage, in-memory for fast retrieval).
      *
      * @return the created TempoTrySpanProcessor instance as a `SpanProcessor`
      */
-    @Bean(name = "trySpanProcessor")
-    @ConditionalOnMissingBean(name = "trySpanProcessor")
+    @Bean(name = "tempoTrySpanProcessor")
     @ConditionalOnProperty(name = "ouroboros.tempo.enabled", havingValue = "true", matchIfMissing = false)
     public SpanProcessor tempoTrySpanProcessor() {
         log.info("Creating TempoTrySpanProcessor bean (Tempo enabled)");
@@ -66,19 +69,23 @@ public class TraceStorageConfig {
     }
     
     /**
-     * Provides an in-memory SpanProcessor used when Tempo is disabled.
-     *
+     * Provides an in-memory SpanProcessor for trace caching.
+     * <p>
+     * This processor is always created to enable in-memory caching in both modes:
+     * <ul>
+     *   <li>InMemory mode (Tempo disabled): Primary storage for traces (permanent)</li>
+     *   <li>Tempo mode (Tempo enabled): Cache layer for fast retrieval (3-minute TTL)</li>
+     * </ul>
+     * <p>
      * The processor attaches try identifiers to spans and stores them in the provided
      * TraceStorage for later retrieval.
      *
      * @param traceStorage the TraceStorage used to persist spans in memory
      * @return the created InMemoryTrySpanProcessor as a `SpanProcessor`
      */
-    @Bean(name = "trySpanProcessor")
-    @ConditionalOnMissingBean(name = "trySpanProcessor")
-    @ConditionalOnProperty(name = "ouroboros.tempo.enabled", havingValue = "false", matchIfMissing = true)
+    @Bean(name = "inMemoryTrySpanProcessor")
     public SpanProcessor inMemoryTrySpanProcessor(TraceStorage traceStorage) {
-        log.info("Creating InMemoryTrySpanProcessor bean (Tempo disabled)");
+        log.info("Creating InMemoryTrySpanProcessor bean");
         InMemoryTrySpanProcessor processor = new InMemoryTrySpanProcessor(traceStorage);
         log.info("InMemoryTrySpanProcessor bean created successfully");
         return processor;
