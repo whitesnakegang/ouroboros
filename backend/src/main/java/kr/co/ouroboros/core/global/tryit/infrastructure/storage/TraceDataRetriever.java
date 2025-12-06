@@ -81,9 +81,14 @@ public class TraceDataRetriever {
             if (cachedTrace != null) {
                 log.info("Trace found in memory cache (fast path): tryId={}", tryIdStr);
                 try {
-                    List<TraceSpanInfo> spans = traceSpanConverter.convert(cachedTrace);
                     String traceId = inMemoryTraceStorage.getTraceId(tryIdStr);
-                    return Optional.of(new TraceDataResult(traceId, spans));
+                    if (traceId == null) {
+                        log.debug("Trace expired between cache lookups, falling back to Tempo");
+                        // Fall through to Tempo polling
+                    } else {
+                        List<TraceSpanInfo> spans = traceSpanConverter.convert(cachedTrace);
+                        return Optional.of(new TraceDataResult(traceId, spans));
+                    }
                 } catch (Exception e) {
                     log.warn("Failed to convert cached trace, falling back to Tempo: tryId={}", tryIdStr, e);
                     // Fall through to Tempo polling
